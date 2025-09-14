@@ -4,19 +4,34 @@ import { useState, useTransition } from "react";
 import { actualizarCliente, eliminarCliente } from "./_actions";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
+import { getErrorMessage } from "@/lib/errors";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
-type Cliente = { id: string; nombre: string; email: string | null; telefono: string | null; };
+type Cliente = { id: string; nombre: string; email: string | null; telefono: string | null };
 
 export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [confirm, setConfirm] = useState<{ open: boolean; id: string | null; nombre?: string }>({
+    open: false,
+    id: null,
+  });
   const router = useRouter();
   const params = useSearchParams();
 
-  const onDelete = (id: string) => {
+  const askDelete = (c: Cliente) => setConfirm({ open: true, id: c.id, nombre: c.nombre });
+
+  const doDelete = () => {
+    if (!confirm.id) return;
     startTransition(async () => {
-      await eliminarCliente(id);
-      router.refresh();
+      try {
+        await eliminarCliente(confirm.id!);
+        toast.success("Cliente eliminado");
+        setConfirm({ open: false, id: null });
+        router.refresh();
+      } catch (err: unknown) {
+        toast.error(getErrorMessage(err) || "No se pudo eliminar");
+      }
     });
   };
 
@@ -39,11 +54,15 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
                   <div className="font-medium">{c.nombre}</div>
                   <div className="text-sm opacity-75">{c.email ?? "—"} · {c.telefono ?? "—"}</div>
                 </div>
-                <button className="text-sm border px-2 py-1 rounded" onClick={() => setEditing(c.id)}>Editar</button>
-                <button className="text-sm border px-2 py-1 rounded"
-                        onClick={() => onDelete(c.id)}
-                        disabled={isPending}>
-                  {isPending ? "Borrando..." : "Eliminar"}
+                <button className="text-sm border px-2 py-1 rounded" onClick={() => setEditing(c.id)}>
+                  Editar
+                </button>
+                <button
+                  className="text-sm border px-2 py-1 rounded"
+                  onClick={() => askDelete(c)}
+                  disabled={isPending}
+                >
+                  Eliminar
                 </button>
               </div>
             )}
@@ -51,6 +70,16 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
         ))}
         {clientes.length === 0 && <li className="p-3 text-sm opacity-60">Sin clientes.</li>}
       </ul>
+
+      <ConfirmDialog
+        open={confirm.open}
+        title="Eliminar cliente"
+        description={`Vas a eliminar a “${confirm.nombre ?? ""}”. Esta acción no se puede deshacer.`}
+        confirmText={isPending ? "Eliminando…" : "Eliminar"}
+        onConfirm={doDelete}
+        onClose={() => setConfirm({ open: false, id: null })}
+        disabled={isPending}
+      />
     </div>
   );
 }
@@ -67,18 +96,21 @@ function EditRow({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <form action={(fd) => {
-      startTransition(async () => {
-        try {
-          fd.set("id", initial.id);
-          await actualizarCliente(fd);
-          toast.success("Cliente actualizado");
-          afterSave();
-        } catch (err: any) {
-          toast.error(err?.message || "No se pudo actualizar");
-        }
-      });
-    }} className="flex flex-wrap items-end gap-2">
+    <form
+      action={(fd) => {
+        startTransition(async () => {
+          try {
+            fd.set("id", initial.id);
+            await actualizarCliente(fd);
+            toast.success("Cliente actualizado");
+            afterSave();
+          } catch (err: unknown) {
+            toast.error(getErrorMessage(err) || "No se pudo actualizar");
+          }
+        });
+      }}
+      className="flex flex-wrap items-end gap-2"
+    >
       <div>
         <label className="block text-sm">Nombre</label>
         <input name="nombre" defaultValue={initial.nombre} required className="border px-2 py-1 rounded" />
@@ -94,7 +126,9 @@ function EditRow({
       <button className="border px-3 py-1 rounded" disabled={isPending}>
         {isPending ? "Guardando..." : "Guardar"}
       </button>
-      <button type="button" className="border px-3 py-1 rounded" onClick={onCancel}>Cancelar</button>
+      <button type="button" className="border px-3 py-1 rounded" onClick={onCancel}>
+        Cancelar
+      </button>
     </form>
   );
 }
@@ -112,7 +146,12 @@ function SearchBox({ defaultValue }: { defaultValue: string }) {
       }}
       className="flex gap-2 items-center"
     >
-      <input name="q" defaultValue={defaultValue} placeholder="Buscar por nombre o email..." className="border px-2 py-1 rounded" />
+      <input
+        name="q"
+        defaultValue={defaultValue}
+        placeholder="Buscar por nombre o email..."
+        className="border px-2 py-1 rounded"
+      />
       <button className="border px-3 py-1 rounded">Buscar</button>
     </form>
   );

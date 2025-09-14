@@ -1,7 +1,9 @@
 "use client";
+
 import { useState, FormEvent } from "react";
 import { crearCliente } from "./_actions";
 import toast from "react-hot-toast";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function NewClienteForm() {
   const [pending, setPending] = useState(false);
@@ -15,8 +17,8 @@ export default function NewClienteForm() {
       await crearCliente(fd);
       form.reset();
       toast.success("Cliente creado");
-    } catch (err: any) {
-      toast.error(err?.message || "No se pudo crear el cliente");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "No se pudo crear el cliente");
     } finally {
       setPending(false);
     }
@@ -26,15 +28,15 @@ export default function NewClienteForm() {
     <form onSubmit={onSubmit} className="flex gap-2 flex-wrap items-end">
       <div>
         <label className="block text-sm">Nombre</label>
-        <input name="nombre" required className="border px-2 py-1 rounded" />
+        <input name="nombre" required className="border px-2 py-1 rounded" disabled={pending} />
       </div>
       <div>
         <label className="block text-sm">Email</label>
-        <input name="email" type="email" className="border px-2 py-1 rounded" />
+        <input name="email" type="email" className="border px-2 py-1 rounded" disabled={pending} />
       </div>
       <div>
         <label className="block text-sm">Teléfono</label>
-        <input name="telefono" className="border px-2 py-1 rounded" />
+        <input name="telefono" className="border px-2 py-1 rounded" disabled={pending} />
       </div>
       <button disabled={pending} className="border px-3 py-2 rounded">
         {pending ? "Creando..." : "Agregar"}

@@ -1,4 +1,4 @@
-"use client";
+/* "use client";
 import { useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
@@ -37,4 +37,17 @@ export default function LoginPage() {
       </form>
     </main>
   );
+}
+ */
+
+
+import { redirect } from "next/navigation";
+import { supabaseServer } from "@/lib/supabaseServer";
+import LoginForm from "./_LoginForm";
+
+export default async function LoginPage() {
+  const s = await supabaseServer();
+  const { data: { user } } = await s.auth.getUser();
+  if (user) redirect("/dashboard"); // ya logueado → al dashboard
+  return <LoginForm />;             // si no, mostramos el form
 }

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import ThemeToggle from "./ThemeToggle";
+import { signOut } from "@/app/_actionsAuth";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -22,7 +23,7 @@ export default function Header() {
         <div className="ml-auto flex items-center gap-3">
           <input placeholder="Buscar..." className="hidden md:block border rounded-xl px-3 py-1.5 w-72 bg-bg-muted" />
           <ThemeToggle/>
-          <form method="post" action="/logout">
+          <form action={signOut}>
             <button className="border rounded-xl px-3 py-1.5">Salir</button>
           </form>
         </div>

@@ -1,13 +1,14 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
+import Header from "@/components/Header"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/auth/login");
 
-  return (
+  /*return (
     <div className="min-h-dvh">
       <header className="border-b p-4 flex items-center gap-3">
         <div className="font-semibold">AMERSUR CRM</div>
@@ -22,5 +23,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       </header>
       <main className="p-6">{children}</main>
     </div>
+  );*/
+
+  return (
+    <>
+      <Header />
+      <main className="mx-auto max-w-6xl p-6">{children}</main>
+    </>
   );
 }

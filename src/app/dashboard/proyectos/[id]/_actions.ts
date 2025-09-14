@@ -78,3 +78,27 @@ export async function eliminarLote(proyectoId: string, id: string) {
 
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
 }
+
+export async function reservarLote(proyectoId: string, loteId: string) {
+  const s = await supabaseServer();
+  const { data, error } = await s.rpc("reservar_lote", { p_lote: loteId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("El lote no está disponible.");
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+}
+
+export async function venderLote(proyectoId: string, loteId: string) {
+  const s = await supabaseServer();
+  const { data, error } = await s.rpc("vender_lote", { p_lote: loteId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("El lote debe estar reservado para venderse.");
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+}
+
+export async function liberarLote(proyectoId: string, loteId: string) {
+  const s = await supabaseServer();
+  const { data, error } = await s.rpc("liberar_lote", { p_lote: loteId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sólo lotes reservados pueden liberarse.");
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+}
