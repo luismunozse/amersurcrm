@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter, Montserrat } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AppToaster from "@/components/Toaster";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const inter = Inter({
   subsets: ["latin"],
@@ -31,9 +32,11 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${mont.variable} font-sans bg-bg text-text`}>
         <ThemeProvider>
-          {children}
-          <AppToaster />
-          </ThemeProvider>
+          <ErrorBoundary>
+            {children}
+            <AppToaster />
+          </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -64,7 +64,7 @@ export async function actualizarCliente(formData: FormData) {
 }
 
 export async function eliminarCliente(id: string) {
-  const supabase = await supabaseServer();
+  const supabase = await createOptimizedServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 

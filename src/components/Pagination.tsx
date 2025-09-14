@@ -1,24 +1,90 @@
 "use client";
-import { useSearchParams, useRouter } from "next/navigation";
 
-export default function Pagination({ total, page, perPage }: { total: number; page: number; perPage: number; }) {
-  const router = useRouter();
-  const params = useSearchParams();
-  const lastPage = Math.max(1, Math.ceil(total / perPage));
-  const q = params.get("q") || "";
+import React, { memo } from 'react';
 
-  const go = (p: number) => {
-    const sp = new URLSearchParams(params.toString());
-    if (q) sp.set("q", q); else sp.delete("q");
-    sp.set("page", String(p));
-    router.push(`/dashboard/clientes?${sp.toString()}`);
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  className?: string;
+}
+
+export const Pagination = memo(function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+  className = "",
+}: PaginationProps) {
+  if (totalPages <= 1) return null;
+
+  const getVisiblePages = () => {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
+      range.push(i);
+    }
+
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, '...');
+    } else {
+      rangeWithDots.push(1);
+    }
+
+    rangeWithDots.push(...range);
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push('...', totalPages);
+    } else {
+      rangeWithDots.push(totalPages);
+    }
+
+    return rangeWithDots;
   };
 
+  const visiblePages = getVisiblePages();
+
   return (
-    <div className="flex items-center justify-between mt-4">
-      <button className="btn" disabled={page <= 1} onClick={() => go(page - 1)}>← Anterior</button>
-      <div className="text-sm text-text-muted">Página {page} de {lastPage}</div>
-      <button className="btn" disabled={page >= lastPage} onClick={() => go(page + 1)}>Siguiente →</button>
-    </div>
+    <nav className={`flex items-center justify-center space-x-1 ${className}`}>
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+      >
+        Anterior
+      </button>
+
+      {visiblePages.map((page, index) => (
+        <React.Fragment key={index}>
+          {page === '...' ? (
+            <span className="px-3 py-2 text-sm">...</span>
+          ) : (
+            <button
+              onClick={() => onPageChange(page as number)}
+              className={`px-3 py-2 text-sm border rounded ${
+                currentPage === page
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          )}
+        </React.Fragment>
+      ))}
+
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="px-3 py-2 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+      >
+        Siguiente
+      </button>
+    </nav>
   );
-}
+});
