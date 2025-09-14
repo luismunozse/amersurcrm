@@ -1,15 +1,25 @@
 "use client";
 import { useState, FormEvent } from "react";
 import { crearCliente } from "./_actions";
+import toast from "react-hot-toast";
 
 export default function NewClienteForm() {
   const [pending, setPending] = useState(false);
+
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setPending(true);
-    const fd = new FormData(e.currentTarget);
-    try { await crearCliente(fd); e.currentTarget.reset(); }
-    finally { setPending(false); }
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await crearCliente(fd);
+      form.reset();
+      toast.success("Cliente creado");
+    } catch (err: any) {
+      toast.error(err?.message || "No se pudo crear el cliente");
+    } finally {
+      setPending(false);
+    }
   };
 
   return (

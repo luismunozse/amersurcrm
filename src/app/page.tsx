@@ -1,8 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { redirect } from "next/navigation"
+import next from "next";
 
 export default function Home() {
+  redirect("/dashboard");
   const [clientes, setClientes] = useState<any[]>([]);
 
   useEffect(() => {

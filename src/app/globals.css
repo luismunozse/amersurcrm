@@ -1,26 +1,30 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@layer components{
+  .input{@apply w-full border rounded-xl px-3 py-2 bg-bg focus:outline-none focus:ring-2 focus:ring-brand-400;}
+  .btn{@apply inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-medium border hover:bg-neutral-50;}
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Light */
+:root{
+  --brand-50:#EDEEDD; --brand-300:#B0B76D; --brand-400:#9EA64C; --brand-500:#86901F; --brand-600:#6B7319; --brand-700:#575E14;
+
+  --slate-50:#F0F0F3; --slate-400:#9C9EB1; --slate-500:#83869E; --slate-600:#6B6E82;
+
+  --neutral-50:#F2F7FA; --neutral-100:#ECECEC; --neutral-300:#898B8B; --neutral-500:#3B3D3D; --neutral-600:#2F3131; --neutral-700:#262828; --neutral-900:#1E1E1E;
+
+  --success:#22C55E; --warning:#F59E0B; --danger:#DC2626; --info:#3B82F6;
+
+  --bg:#FFFFFF; --bg-muted:#F8FAFB; --bg-card:#FFFFFF;
+  --text:#1A1A1A; --text-muted:#5A5A5A;
+  --border:#E5E7EB;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Dark */
+.dark{
+  --bg:#0F1111; --bg-muted:#141717; --bg-card:#121414;
+  --text:#F5F6F7; --text-muted:#C7C9CC;
+  --border:#232525;
 }
