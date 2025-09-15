@@ -13,11 +13,39 @@ export default function LoginForm() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPending(true);
-    const s = supabaseBrowser();
-    const { error } = await s.auth.signInWithPassword({ email, password: pass });
-    setPending(false);
-    if (error) return toast.error(error.message);
-    router.replace("/dashboard");
+    
+    try {
+      const s = supabaseBrowser();
+      console.log("Intentando login con:", email);
+      
+      const { data, error } = await s.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password: pass 
+      });
+      
+      console.log("Respuesta de Supabase:", { data, error });
+      
+      if (error) {
+        console.error("Error de autenticación:", error);
+        toast.error(`Error: ${error.message}`);
+        setPending(false);
+        return;
+      }
+      
+      if (data.user) {
+        console.log("Login exitoso, redirigiendo...");
+        toast.success("¡Login exitoso!");
+        router.replace("/dashboard");
+      } else {
+        console.error("No se recibió usuario");
+        toast.error("Error: No se pudo autenticar");
+        setPending(false);
+      }
+    } catch (err) {
+      console.error("Error inesperado:", err);
+      toast.error("Error inesperado durante el login");
+      setPending(false);
+    }
   };
 
   return (

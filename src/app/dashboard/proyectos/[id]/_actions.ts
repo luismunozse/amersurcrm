@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createServerActionClient } from "@/lib/supabase.server-actions";
 import {z} from "zod";
 
 const LoteSchema = z.object({
@@ -17,16 +17,31 @@ export async function crearLote(proyectoId: string, fd: FormData) {
   const codigo  = String(fd.get("codigo") || "");
   const sup_m2  = fd.get("sup_m2") ? Number(fd.get("sup_m2")) : null;
   const precio  = fd.get("precio") ? Number(fd.get("precio")) : null;
-  const moneda  = String(fd.get("moneda") || "ARS");
+  const moneda  = String(fd.get("moneda") || "PEN");
   const estado  = String(fd.get("estado") || "disponible");
+  const dataJson = String(fd.get("data") || "{}");
 
-  const supabase = await supabaseServer();
+  const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // Parsear datos adicionales (ya incluye URLs de Storage)
+  let additionalData = {};
+  try {
+    additionalData = JSON.parse(dataJson);
+  } catch (e) {
+    console.warn("Error parsing additional data:", e);
+  }
+
   const { error } = await supabase.from("lote").insert({
     proyecto_id: proyectoId,
-    codigo, sup_m2, precio, moneda, estado, created_by: user.id
+    codigo, 
+    sup_m2, 
+    precio, 
+    moneda, 
+    estado, 
+    data: additionalData, // Ya incluye URLs de Storage
+    created_by: user.id
   });
   if (error) throw new Error(error.message);
 
@@ -52,7 +67,7 @@ export async function actualizarLote(proyectoId: string, fd: FormData) {
     }
 
 
-  const supabase = await supabaseServer();
+  const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
@@ -69,7 +84,7 @@ export async function actualizarLote(proyectoId: string, fd: FormData) {
 }
 
 export async function eliminarLote(proyectoId: string, id: string) {
-  const supabase = await supabaseServer();
+  const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
@@ -80,24 +95,33 @@ export async function eliminarLote(proyectoId: string, id: string) {
 }
 
 export async function reservarLote(proyectoId: string, loteId: string) {
-  const s = await supabaseServer();
-  const { data, error } = await s.rpc("reservar_lote", { p_lote: loteId });
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data, error } = await supabase.rpc("reservar_lote", { p_lote: loteId });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("El lote no está disponible.");
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
 }
 
 export async function venderLote(proyectoId: string, loteId: string) {
-  const s = await supabaseServer();
-  const { data, error } = await s.rpc("vender_lote", { p_lote: loteId });
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data, error } = await supabase.rpc("vender_lote", { p_lote: loteId });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("El lote debe estar reservado para venderse.");
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
 }
 
 export async function liberarLote(proyectoId: string, loteId: string) {
-  const s = await supabaseServer();
-  const { data, error } = await s.rpc("liberar_lote", { p_lote: loteId });
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data, error } = await supabase.rpc("liberar_lote", { p_lote: loteId });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sólo lotes reservados pueden liberarse.");
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);

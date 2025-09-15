@@ -1,34 +1,38 @@
-import { ReactNode } from "react";
+/* import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabaseServer";
-import Header from "@/components/Header"
+import { createServerOnlyClient } from "@/lib/supabase.server";
+import DashboardClient from "./DashboardClient";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const supabase = await supabaseServer();
+  const supabase = await createServerOnlyClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  /*return (
-    <div className="min-h-dvh">
-      <header className="border-b p-4 flex items-center gap-3">
-        <div className="font-semibold">AMERSUR CRM</div>
-        <nav className="text-sm">
-          <a className="mr-4" href="/dashboard">Dashboard</a>
-          <a className="mr-4" href="/dashboard/proyectos">Proyectos</a>
-          <a className="mr-4" href="/dashboard/clientes">Clientes</a>
-        </nav>
-        <form action="/logout" className="ml-auto">
-          <button className="text-sm border px-3 py-1 rounded" formAction="/logout">Salir</button>
-        </form>
-      </header>
-      <main className="p-6">{children}</main>
-    </div>
-  );*/
+  return <DashboardClient>{children}</DashboardClient>;
+}
+ */
+
+// Evita SSG/ISR en el dashboard: siempre SSR con cookies de usuario
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
+import { ReactNode } from "react";
+import { redirect } from "next/navigation";
+import { createServerOnlyClient } from "@/lib/supabase.server";
+import DashboardClient from "./DashboardClient";
+import FloatingNotifications from "@/components/FloatingNotifications";
+
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const s = await createServerOnlyClient();
+  const { data: { user } } = await s.auth.getUser();
+  if (!user) redirect("/auth/login");
 
   return (
     <>
-      <Header />
-      <main className="mx-auto max-w-6xl p-6">{children}</main>
+      <DashboardClient userEmail={user.email}>{children}</DashboardClient>
+      {/* Botón flotante de notificaciones */}
+      <FloatingNotifications />
     </>
   );
 }

@@ -32,4 +32,10 @@ begin
     (gen_random_uuid(), 'Ana Gómez',  'ana@example.com',   '351-555-0002', v_user),
     (gen_random_uuid(), 'Carlos Ruiz',null,                null,           v_user)
   on conflict do nothing;
+
+  -- Completar descripción del proyecto demo si existe
+  update crm.proyecto
+  set descripcion = coalesce(descripcion, 'Desarrollo residencial con lotes de 250–300 m²')
+  where nombre = 'Parque Norte';
+
 end $$;

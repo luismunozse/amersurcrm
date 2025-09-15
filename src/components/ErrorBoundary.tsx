@@ -83,7 +83,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
 // Hook para usar en componentes funcionales
 export function useErrorHandler() {
-  const handleError = (error: Error, context?: Record<string, any>) => {
+  const handleError = (error: Error, context?: Record<string, unknown>) => {
     errorLogger.error('Unhandled error in component', error, context);
   };
 

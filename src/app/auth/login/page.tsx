@@ -40,13 +40,16 @@ export default function LoginPage() {
 }
  */
 
+// src/app/auth/login/page.tsx
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createServerOnlyClient } from "@/lib/supabase.server";
 import LoginForm from "./_LoginForm";
 
 export default async function LoginPage() {
-  const s = await supabaseServer();
+  const s = await createServerOnlyClient();
   const { data: { user } } = await s.auth.getUser();
   if (user) redirect("/dashboard"); // ya logueado → al dashboard
   return <LoginForm />;             // si no, mostramos el form

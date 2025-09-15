@@ -29,9 +29,10 @@ npm run build:webpack
 
 ### 1. Configuración de Next.js
 - **`optimizePackageImports`**: Optimiza imports de Supabase y react-hot-toast
-- **`turbo.rules`**: Configuración específica para SVG y otros assets
-- **`turbo.resolveAlias`**: Alias optimizado para `@/` paths
+- **`turbopack.rules`**: Configuración específica para SVG y otros assets (nueva sintaxis)
+- **`turbopack.resolveAlias`**: Alias optimizado para `@/` paths (nueva sintaxis)
 - **Webpack condicional**: Solo se carga si no estás usando Turbopack
+- **Migración automática**: Usando `@next/codemod` para la nueva sintaxis
 
 ### 2. Archivo turbo.json
 - **Pipeline optimizado**: Define dependencias entre tareas

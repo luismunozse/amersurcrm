@@ -19,7 +19,7 @@ export const mont = Montserrat({
 
 export const metadata: Metadata = {
   title: "AMERSUR CRM",
-  description: "",
+  description: "Tu Propiedad, sin fronteras",
 };
 
 export default function RootLayout({

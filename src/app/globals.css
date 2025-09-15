@@ -5,6 +5,35 @@
 @layer components{
   .input{@apply w-full border rounded-xl px-3 py-2 bg-bg focus:outline-none focus:ring-2 focus:ring-brand-400;}
   .btn{@apply inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-medium border hover:bg-neutral-50;}
+  
+  /* Estilos específicos para CRM */
+  .crm-card {
+    @apply bg-crm-card border border-crm-border rounded-xl shadow-sm;
+  }
+  
+  .crm-card-hover {
+    @apply hover:bg-crm-card-hover hover:shadow-md transition-all duration-200;
+  }
+  
+  .crm-button-primary {
+    @apply bg-crm-primary text-white hover:bg-crm-primary-hover focus:ring-crm-primary;
+  }
+  
+  .crm-button-secondary {
+    @apply bg-crm-secondary text-white hover:bg-neutral-600 focus:ring-crm-secondary;
+  }
+  
+  .crm-text-primary {
+    @apply text-crm-text-primary;
+  }
+  
+  .crm-text-secondary {
+    @apply text-crm-text-secondary;
+  }
+  
+  .crm-text-muted {
+    @apply text-crm-text-muted;
+  }
 }
 
 /* Light */
@@ -20,6 +49,26 @@
   --bg:#FFFFFF; --bg-muted:#F8FAFB; --bg-card:#FFFFFF;
   --text:#1A1A1A; --text-muted:#5A5A5A;
   --border:#E5E7EB;
+
+  /* Colores específicos para CRM - Paleta verde del cliente */
+  --crm-primary: #86901F;
+  --crm-primary-hover: #6B7319;
+  --crm-secondary: #9EA64C;
+  --crm-accent: #B0B76D;
+  --crm-success: #22C55E;
+  --crm-warning: #F59E0B;
+  --crm-danger: #DC2626;
+  --crm-info: #3B82F6;
+  --crm-sidebar: #1e293b;
+  --crm-sidebar-hover: #334155;
+  --crm-card: #ffffff;
+  --crm-card-hover: #f8fafc;
+  --crm-border: #e2e8f0;
+  --crm-border-hover: #cbd5e1;
+  --crm-text-primary: #0f172a;
+  --crm-text-secondary: #64748b;
+  --crm-text-muted: #94a3b8;
+  --crm-bg-primary: #f8fafc;
 }
 
 /* Dark */
@@ -27,4 +76,24 @@
   --bg:#0F1111; --bg-muted:#141717; --bg-card:#121414;
   --text:#F5F6F7; --text-muted:#C7C9CC;
   --border:#232525;
+
+  /* Colores CRM en modo oscuro - Paleta verde del cliente */
+  --crm-primary: #9EA64C;
+  --crm-primary-hover: #B0B76D;
+  --crm-secondary: #86901F;
+  --crm-accent: #6B7319;
+  --crm-success: #34d399;
+  --crm-warning: #fbbf24;
+  --crm-danger: #f87171;
+  --crm-info: #22d3ee;
+  --crm-sidebar: #0f172a;
+  --crm-sidebar-hover: #1e293b;
+  --crm-card: #1e293b;
+  --crm-card-hover: #334155;
+  --crm-border: #334155;
+  --crm-border-hover: #475569;
+  --crm-text-primary: #f1f5f9;
+  --crm-text-secondary: #cbd5e1;
+  --crm-text-muted: #94a3b8;
+  --crm-bg-primary: #0f172a;
 }

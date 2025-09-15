@@ -1,6 +1,9 @@
 # AMERSUR CRM
 
-Sistema de gestión de clientes y proyectos inmobiliarios construido con Next.js 15, TypeScript y Supabase.
+Sistema de gestión de clientes y proyectos inmobiliarios para el mercado peruano, construido con Next.js 15, TypeScript y Supabase.
+
+**Ubicación**: Huaral,Lima, Perú  
+**Moneda**: Soles Peruanos (PEN)
 
 ## 🚀 Características
 

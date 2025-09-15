@@ -5,7 +5,7 @@ export class AppError extends Error {
     message: string,
     public code?: string,
     public statusCode?: number,
-    public context?: Record<string, any>
+    public context?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'AppError';
@@ -73,7 +73,7 @@ export function getErrorMessage(err: unknown): string {
   }
 }
 
-export function handleError(error: unknown, context?: Record<string, any>): never {
+export function handleError(error: unknown, context?: Record<string, unknown>): never {
   const message = getErrorMessage(error);
   errorLogger.error('Handled error', error instanceof Error ? error : new Error(message), context);
   throw new AppError(message, 'HANDLED_ERROR', 500, context);

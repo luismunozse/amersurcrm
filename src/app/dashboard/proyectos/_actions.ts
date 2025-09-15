@@ -1,14 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createServerActionClient } from "@/lib/supabase.server-actions";
 
 export async function crearProyecto(fd: FormData) {
   const nombre = String(fd.get("nombre") || "");
   const estado = String(fd.get("estado") || "activo");
   const ubicacion = String(fd.get("ubicacion") || "");
 
-  const supabase = await supabaseServer();
+  const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 

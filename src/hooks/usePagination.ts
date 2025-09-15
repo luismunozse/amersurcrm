@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
 
-interface UsePaginationProps {
-  items: any[];
+interface UsePaginationProps<T> {
+  items: T[];
   itemsPerPage?: number;
   initialPage?: number;
 }
 
-interface UsePaginationReturn {
+interface UsePaginationReturn<T> {
   currentPage: number;
   totalPages: number;
-  paginatedItems: any[];
+  paginatedItems: T[];
   goToPage: (page: number) => void;
   nextPage: () => void;
   prevPage: () => void;
@@ -17,11 +17,11 @@ interface UsePaginationReturn {
   hasPrevPage: boolean;
 }
 
-export function usePagination({
+export function usePagination<T>({
   items,
   itemsPerPage = 10,
   initialPage = 1,
-}: UsePaginationProps): UsePaginationReturn {
+}: UsePaginationProps<T>): UsePaginationReturn<T> {
   const [currentPage, setCurrentPage] = useState(initialPage);
 
   const totalPages = Math.ceil(items.length / itemsPerPage);

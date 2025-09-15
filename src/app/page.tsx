@@ -1,29 +1,20 @@
 "use client";
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { redirect } from "next/navigation"
-import next from "next";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  redirect("/dashboard");
-  const [clientes, setClientes] = useState<any[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data } = await supabase.from("crm.cliente").select("*").limit(10);
-      setClientes(data || []);
-    };
-    fetchData();
-  }, []);
+    router.replace("/dashboard");
+  }, [router]);
 
   return (
-    <main className="p-6">
-      <h1 className="text-xl font-bold">Clientes</h1>
-      <ul>
-        {clientes.map((c) => (
-          <li key={c.id}>{c.nombre} — {c.email}</li>
-        ))}
-      </ul>
+    <main className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crm-primary mx-auto mb-4"></div>
+        <p className="text-crm-text-muted">Redirigiendo al dashboard...</p>
+      </div>
     </main>
   );
 }

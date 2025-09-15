@@ -8,8 +8,33 @@ import { getErrorMessage } from "@/lib/errors";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Pagination } from "@/components/Pagination";
 import { usePagination } from "@/hooks/usePagination";
+import ClienteForm from "@/components/ClienteForm";
 
-type Cliente = { id: string; nombre: string; email: string | null; telefono: string | null };
+type Cliente = { 
+  id: string; 
+  codigo_cliente: string;
+  nombre: string; 
+  tipo_cliente: string;
+  email: string | null; 
+  telefono: string | null;
+  telefono_whatsapp: string | null;
+  documento_identidad: string | null;
+  estado_cliente: string;
+  origen_lead: string | null;
+  vendedor_asignado: string | null;
+  fecha_alta: string;
+  ultimo_contacto: string | null;
+  proxima_accion: string | null;
+  interes_principal: string | null;
+  capacidad_compra_estimada: number | null;
+  forma_pago_preferida: string | null;
+  propiedades_reservadas: number;
+  propiedades_compradas: number;
+  propiedades_alquiladas: number;
+  saldo_pendiente: number;
+  notas: string | null;
+  direccion: any;
+};
 
 export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -57,33 +82,51 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   };
 
   return (
-    <div className="space-y-4">
-      <SearchBox defaultValue={params.get("q") ?? ""} />
+    <div className="space-y-6">
+      <div className="crm-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-crm-text-primary">Lista de Clientes</h3>
+          <div className="text-sm text-crm-text-muted">
+            {clientes.length} {clientes.length === 1 ? 'cliente' : 'clientes'}
+          </div>
+        </div>
 
-      <div className="space-y-2">
-        <ul className="divide-y border rounded">
-          {paginatedItems.map((c) => (
-            <ClienteItem
-              key={c.id}
-              cliente={c}
-              isEditing={editing === c.id}
-              isPending={isPending}
-              onEdit={handleEdit}
-              onCancelEdit={handleCancelEdit}
-              onAfterSave={handleAfterSave}
-              onDelete={askDelete}
-            />
-          ))}
-          {clientes.length === 0 && <li className="p-3 text-sm opacity-60">Sin clientes.</li>}
-        </ul>
+        {clientes.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+            </div>
+            <h4 className="text-lg font-medium text-crm-text-primary mb-2">No hay clientes registrados</h4>
+            <p className="text-crm-text-muted">Comienza agregando tu primer cliente usando el formulario de arriba.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {paginatedItems.map((c) => (
+              <ClienteItem
+                key={c.id}
+                cliente={c}
+                isEditing={editing === c.id}
+                isPending={isPending}
+                onEdit={handleEdit}
+                onCancelEdit={handleCancelEdit}
+                onAfterSave={handleAfterSave}
+                onDelete={askDelete}
+              />
+            ))}
+          </div>
+        )}
 
         {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={goToPage}
-            className="mt-4"
-          />
+          <div className="mt-6 pt-4 border-t border-crm-border">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={goToPage}
+              className="justify-center"
+            />
+          </div>
         )}
       </div>
 
@@ -130,28 +173,162 @@ const ClienteItem = memo(function ClienteItem({
     );
   }
 
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case 'activo': return 'bg-green-100 text-green-800';
+      case 'lead': return 'bg-yellow-100 text-yellow-800';
+      case 'prospecto': return 'bg-blue-100 text-blue-800';
+      case 'inactivo': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatCapacidad = (capacidad: number | null) => {
+    if (!capacidad) return 'No especificada';
+    if (capacidad >= 1000000) return `S/ ${(capacidad / 1000000).toFixed(1)}M`;
+    if (capacidad >= 1000) return `S/ ${(capacidad / 1000).toFixed(0)}K`;
+    return `S/ ${capacidad.toLocaleString()}`;
+  };
+
   return (
-    <li className="p-3">
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
-          <div className="font-medium">{cliente.nombre}</div>
-          <div className="text-sm opacity-75">{cliente.email ?? "—"} · {cliente.telefono ?? "—"}</div>
+    <div className="crm-card-hover p-6 rounded-lg border border-crm-border transition-all duration-200">
+      <div className="space-y-4">
+        {/* Header con código y estado */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-crm-primary/10 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+            </div>
+            <div>
+              <div className="font-semibold text-crm-text-primary text-lg">{cliente.nombre}</div>
+              <div className="text-sm text-crm-text-muted">Código: {cliente.codigo_cliente || 'N/A'}</div>
+              <div className="text-xs text-crm-text-muted capitalize">
+                {cliente.tipo_cliente === 'persona' ? 'Persona Natural' : 
+                 cliente.tipo_cliente === 'empresa' ? 'Empresa' : 'No especificado'}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(cliente.estado_cliente || 'prospecto')}`}>
+              {cliente.estado_cliente ? 
+                cliente.estado_cliente.charAt(0).toUpperCase() + cliente.estado_cliente.slice(1) : 
+                'Prospecto'
+              }
+            </span>
+            <button 
+              className="px-3 py-1.5 text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors" 
+              onClick={() => onEdit(cliente.id)}
+            >
+              Editar
+            </button>
+            <button
+              className="px-3 py-1.5 text-sm font-medium text-crm-danger bg-crm-danger/10 hover:bg-crm-danger/20 rounded-lg transition-colors"
+              onClick={() => onDelete(cliente)}
+              disabled={isPending}
+            >
+              Eliminar
+            </button>
+          </div>
         </div>
-        <button 
-          className="text-sm border px-2 py-1 rounded" 
-          onClick={() => onEdit(cliente.id)}
-        >
-          Editar
-        </button>
-        <button
-          className="text-sm border px-2 py-1 rounded"
-          onClick={() => onDelete(cliente)}
-          disabled={isPending}
-        >
-          Eliminar
-        </button>
+
+        {/* Información de contacto */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-crm-text-primary">Contacto</h4>
+            <div className="space-y-1">
+              {cliente.email && (
+                <div className="flex items-center gap-2 text-sm text-crm-text-muted">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  {cliente.email}
+                </div>
+              )}
+              {cliente.telefono && (
+                <div className="flex items-center gap-2 text-sm text-crm-text-muted">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                  </svg>
+                  {cliente.telefono}
+                </div>
+              )}
+              {cliente.telefono_whatsapp && (
+                <div className="flex items-center gap-2 text-sm text-crm-text-muted">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                  </svg>
+                  WhatsApp: {cliente.telefono_whatsapp}
+                </div>
+              )}
+              {cliente.documento_identidad && (
+                <div className="flex items-center gap-2 text-sm text-crm-text-muted">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
+                  </svg>
+                  DNI: {cliente.documento_identidad}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-crm-text-primary">Información Comercial</h4>
+            <div className="space-y-1">
+              {cliente.interes_principal && (
+                <div className="text-sm text-crm-text-muted">
+                  <span className="font-medium">Interés:</span> {cliente.interes_principal}
+                </div>
+              )}
+              {cliente.capacidad_compra_estimada && (
+                <div className="text-sm text-crm-text-muted">
+                  <span className="font-medium">Capacidad:</span> {formatCapacidad(cliente.capacidad_compra_estimada)}
+                </div>
+              )}
+              {cliente.forma_pago_preferida && (
+                <div className="text-sm text-crm-text-muted">
+                  <span className="font-medium">Pago:</span> {cliente.forma_pago_preferida}
+                </div>
+              )}
+              {cliente.origen_lead && (
+                <div className="text-sm text-crm-text-muted">
+                  <span className="font-medium">Origen:</span> {cliente.origen_lead}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Estadísticas de propiedades */}
+        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-crm-border">
+          <div className="text-center">
+            <div className="text-lg font-semibold text-crm-text-primary">{cliente.propiedades_reservadas}</div>
+            <div className="text-xs text-crm-text-muted">Reservadas</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-crm-text-primary">{cliente.propiedades_compradas}</div>
+            <div className="text-xs text-crm-text-muted">Compradas</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-crm-text-primary">{cliente.propiedades_alquiladas}</div>
+            <div className="text-xs text-crm-text-muted">Alquiladas</div>
+          </div>
+        </div>
+
+        {/* Próxima acción */}
+        {cliente.proxima_accion && (
+          <div className="flex items-center gap-2 p-3 bg-crm-primary/5 rounded-lg">
+            <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span className="text-sm text-crm-text-primary">
+              <span className="font-medium">Próxima acción:</span> {cliente.proxima_accion}
+            </span>
+          </div>
+        )}
       </div>
-    </li>
+    </div>
   );
 });
 
@@ -160,47 +337,17 @@ function EditRow({
   onCancel,
   afterSave,
 }: {
-  initial: { id: string; nombre: string; email: string | null; telefono: string | null };
+  initial: Cliente;
   onCancel: () => void;
   afterSave: () => void;
 }) {
-  const [isPending, startTransition] = useTransition();
-
   return (
-    <form
-      action={(fd) => {
-        startTransition(async () => {
-          try {
-            fd.set("id", initial.id);
-            await actualizarCliente(fd);
-            toast.success("Cliente actualizado");
-            afterSave();
-          } catch (err: unknown) {
-            toast.error(getErrorMessage(err) || "No se pudo actualizar");
-          }
-        });
-      }}
-      className="flex flex-wrap items-end gap-2"
-    >
-      <div>
-        <label className="block text-sm">Nombre</label>
-        <input name="nombre" defaultValue={initial.nombre} required className="border px-2 py-1 rounded" />
-      </div>
-      <div>
-        <label className="block text-sm">Email</label>
-        <input name="email" defaultValue={initial.email ?? ""} className="border px-2 py-1 rounded" />
-      </div>
-      <div>
-        <label className="block text-sm">Teléfono</label>
-        <input name="telefono" defaultValue={initial.telefono ?? ""} className="border px-2 py-1 rounded" />
-      </div>
-      <button className="border px-3 py-1 rounded" disabled={isPending}>
-        {isPending ? "Guardando..." : "Guardar"}
-      </button>
-      <button type="button" className="border px-3 py-1 rounded" onClick={onCancel}>
-        Cancelar
-      </button>
-    </form>
+    <ClienteForm
+      cliente={initial}
+      isEditing={true}
+      onSuccess={afterSave}
+      onCancel={onCancel}
+    />
   );
 }
 
