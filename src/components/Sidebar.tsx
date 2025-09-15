@@ -142,9 +142,9 @@ function NavLink({
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+        "flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200",
         active
-          ? "bg-crm-primary text-white shadow-md"
+          ? "bg-crm-primary text-white shadow-lg"
           : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
       )}
     >
@@ -189,7 +189,7 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-crm-sidebar transform transition-transform duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 w-80 sm:w-72 bg-crm-sidebar transform transition-transform duration-300 ease-in-out",
           "lg:translate-x-0 lg:static lg:inset-0 lg:z-auto",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
@@ -197,30 +197,33 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-crm-sidebar-hover">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
+          <div className="flex items-center justify-between h-16 sm:h-20 px-4 sm:px-6 border-b border-crm-sidebar-hover">
+            <div className="flex items-center space-x-3 sm:space-x-4 w-full">
+              <div className="relative flex-shrink-0">
                 <Image
                   src="/logo-amersur.png"
                   alt="AMERSUR"
-                  width={56}
-                  height={56}
-                  className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 object-contain"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 sm:h-16 sm:w-16 object-contain"
                   priority
                 />
                 {/* Efecto de resplandor sutil */}
                 <div className="absolute inset-0 bg-white/15 rounded-full blur-md -z-10"></div>
               </div>
-              <div className="hidden sm:block">
-                <span className="text-white font-semibold text-xl">
-                  AMERSUR CRM
+              <div className="flex-1 min-w-0">
+                <span className="text-white font-bold text-lg sm:text-2xl block">
+                  AMERSUR
                 </span>
-                <p className="text-sm text-crm-text-muted">Tu Propiedad, sin fronteras</p>
+                <span className="text-crm-primary font-semibold text-sm sm:text-lg block">
+                  CRM
+                </span>
+                <p className="text-xs text-crm-text-muted mt-1 hidden sm:block">Tu Propiedad, sin fronteras</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="lg:hidden text-crm-text-muted hover:text-white"
+              className="lg:hidden text-crm-text-muted hover:text-white flex-shrink-0"
               aria-label="Cerrar menú"
             >
               <svg
@@ -236,7 +239,7 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
+          <nav className="flex-1 px-4 sm:px-6 py-4 sm:py-6 space-y-2 sm:space-y-3">
             {navigation.map((item) => {
               const isActive =
                 item.href === "/dashboard"
@@ -259,8 +262,8 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
             {/* Sección de Administración - Solo para admins */}
             {!loading && isAdmin && (
               <>
-                <div className="border-t border-crm-sidebar-hover my-4"></div>
-                <div className="px-2 py-1">
+                <div className="border-t border-crm-sidebar-hover my-4 sm:my-6"></div>
+                <div className="px-3 sm:px-4 py-2">
                   <h3 className="text-xs font-semibold text-crm-text-muted uppercase tracking-wider">
                     Administración
                   </h3>
@@ -285,18 +288,18 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
           </nav>
 
           {/* Footer - Responsive */}
-          <div className="p-3 sm:p-4 border-t border-crm-sidebar-hover">
+          <div className="p-4 sm:p-6 border-t border-crm-sidebar-hover">
             <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-8 h-8 bg-crm-accent rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-medium">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-crm-accent rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-xs sm:text-sm font-medium">
                   {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
                 </span>
               </div>
-              <div className="flex-1 min-w-0 hidden sm:block">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">
                   {userEmail ? userEmail.split('@')[0] : 'Usuario'}
                 </p>
-                <p className="text-xs text-crm-text-muted truncate">
+                <p className="text-xs text-crm-text-muted truncate hidden sm:block">
                   {userEmail || 'usuario@amersur.com'}
                 </p>
               </div>

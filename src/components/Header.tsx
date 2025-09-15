@@ -11,9 +11,9 @@ type HeaderProps = {
 
 export default function Header({ onSidebarToggle = () => {}, userEmail }: HeaderProps) {
   return (
-    <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-crm-border sticky top-0 z-30">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <header className="bg-crm-card shadow-crm-lg border-b border-crm-border sticky top-0 z-30">
+      <div className="w-full px-6">
+        <div className="flex justify-between items-center h-20">
           {/* Left: menú + logo */}
           <div className="flex items-center space-x-4">
             <button
@@ -27,23 +27,22 @@ export default function Header({ onSidebarToggle = () => {}, userEmail }: Header
               </svg>
             </button>
 
-            {/* Logo - Tamaño aumentado para mejor visibilidad */}
-            <div className="flex items-center space-x-3">
+            {/* Logo - Solo visible en mobile ya que el sidebar tiene el logo principal */}
+            <div className="lg:hidden flex items-center space-x-3">
               <div className="relative">
                 <Image 
                   src="/logo-amersur.png" 
                   alt="AMERSUR" 
-                  width={64} 
-                  height={64} 
-                  className="h-14 w-14 sm:h-16 sm:w-16 object-contain" 
+                  width={48} 
+                  height={48} 
+                  className="h-12 w-12 object-contain" 
                   priority
                 />
                 {/* Efecto de resplandor sutil */}
                 <div className="absolute inset-0 bg-crm-primary/15 rounded-full blur-md -z-10"></div>
               </div>
-              <div className="hidden sm:block">
-                <span className="text-2xl font-bold text-crm-text-primary font-display">AMERSUR CRM</span>
-                <p className="text-sm text-crm-text-muted">Tu Propiedad, sin fronteras</p>
+              <div>
+                <span className="text-xl font-bold text-crm-text-primary">AMERSUR CRM</span>
               </div>
             </div>
           </div>
