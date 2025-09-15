@@ -6,11 +6,16 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="border rounded-xl px-3 py-1.5 text-sm hover:bg-neutral-50"
+      className="border border-crm-border rounded-xl px-2 sm:px-3 py-1.5 text-sm hover:bg-crm-card-hover transition-colors"
       aria-label="Cambiar tema"
-      title="Cambiar tema"
+      title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
-      {theme === "dark" ? "☀️ Claro" : "🌙 Oscuro"}
+      <span className="hidden sm:inline">
+        {theme === "dark" ? "☀️ Claro" : "🌙 Oscuro"}
+      </span>
+      <span className="sm:hidden text-lg">
+        {theme === "dark" ? "☀️" : "🌙"}
+      </span>
     </button>
   );
 }
