@@ -2,127 +2,225 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import {z} from "zod";
+import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 
-const LoteSchema = z.object({
-  id: z.string().uuid(),
-  codigo: z.string().min(1),
-  sup_m2: z.preprocess((v) => (v === "" ? undefined : v), z.number().optional()),
-  precio: z.preprocess((v) => (v === "" ? undefined : v), z.number().optional()),
-  moneda: z.string().min(1).default("ARS"),
-  estado: z.enum(["disponible", "reservado", "vendido"]).default("disponible"),
-});
-
-export async function crearLote(proyectoId: string, fd: FormData) {
-  const codigo  = String(fd.get("codigo") || "");
-  const sup_m2  = fd.get("sup_m2") ? Number(fd.get("sup_m2")) : null;
-  const precio  = fd.get("precio") ? Number(fd.get("precio")) : null;
-  const moneda  = String(fd.get("moneda") || "PEN");
-  const estado  = String(fd.get("estado") || "disponible");
-  const dataJson = String(fd.get("data") || "{}");
+export async function subirPlanos(proyectoId: string, fd: FormData) {
+  const planosFile = fd.get("planos") as File | null;
 
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Parsear datos adicionales (ya incluye URLs de Storage)
-  let additionalData = {};
+  // Verificar permisos de administrador
   try {
-    additionalData = JSON.parse(dataJson);
-  } catch (e) {
-    console.warn("Error parsing additional data:", e);
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para subir planos. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
   }
 
-  const { error } = await supabase.from("lote").insert({
-    proyecto_id: proyectoId,
-    codigo, 
-    sup_m2, 
-    precio, 
-    moneda, 
-    estado, 
-    data: additionalData, // Ya incluye URLs de Storage
-    created_by: user.id
-  });
-  if (error) throw new Error(error.message);
+  if (!planosFile || planosFile.size === 0) {
+    throw new Error("Debe seleccionar un archivo de planos");
+  }
 
-  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
-}
+  try {
+    const fileExt = planosFile.name.split('.').pop();
+    const fileName = `planos-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `proyectos/${proyectoId}/${fileName}`;
 
-export async function actualizarLote(proyectoId: string, fd: FormData) {
-  const parsed = LoteSchema.safeParse({
-    id: String(fd.get("id") || ""),
-    codigo: String(fd.get("codigo") || ""),
-    sup_m2: fd.get("sup_m2") ? Number(fd.get("sup_m2")) : undefined,
-    precio: fd.get("precio") ? Number(fd.get("precio")) : undefined,
-    moneda: String(fd.get("moneda") || "ARS"),
-    estado: String(fd.get("estado") || "disponible"),
-  });
-  //if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Datos inválidos");
+    const { error: uploadError } = await supabase.storage
+      .from('imagenes')
+      .upload(filePath, planosFile);
 
-  if (!parsed.success) {
-    const { fieldErrors, formErrors } = parsed.error.flatten();
-    const firstFieldMsg = Object.values(fieldErrors).flat()[0];
-    const msg = firstFieldMsg ?? formErrors[0] ?? "Datos inválidos";
-    throw new Error(msg);
+    if (uploadError) {
+      throw new Error(`Error subiendo planos: ${uploadError.message}`);
     }
 
+    const { data: { publicUrl } } = supabase.storage
+      .from('imagenes')
+      .getPublicUrl(filePath);
+
+    // Actualizar el proyecto con la URL de los planos
+    const { error: updateError } = await supabase
+      .from("proyecto")
+      .update({ planos_url: publicUrl })
+      .eq("id", proyectoId);
+
+    if (updateError) {
+      throw new Error(`Error actualizando proyecto: ${updateError.message}`);
+    }
+
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    return { success: true, url: publicUrl };
+  } catch (error) {
+    throw new Error(`Error procesando planos: ${(error as Error).message}`);
+  }
+}
+
+export async function eliminarPlanos(proyectoId: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para eliminar planos. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  try {
+    // Obtener la URL actual de los planos
+    const { data: proyecto, error: fetchError } = await supabase
+      .from("proyecto")
+      .select("planos_url")
+      .eq("id", proyectoId)
+      .single();
+
+    if (fetchError) {
+      throw new Error(`Error obteniendo proyecto: ${fetchError.message}`);
+    }
+
+    if (proyecto.planos_url) {
+      // Extraer el path del archivo de la URL
+      const url = new URL(proyecto.planos_url);
+      const filePath = url.pathname.split('/storage/v1/object/public/imagenes/')[1];
+      
+      if (filePath) {
+        // Eliminar el archivo del storage
+        const { error: deleteError } = await supabase.storage
+          .from('imagenes')
+          .remove([filePath]);
+
+        if (deleteError) {
+          console.warn(`Error eliminando archivo del storage: ${deleteError.message}`);
+        }
+      }
+    }
+
+    // Actualizar el proyecto para eliminar la URL de los planos
+    const { error: updateError } = await supabase
+      .from("proyecto")
+      .update({ planos_url: null })
+      .eq("id", proyectoId);
+
+    if (updateError) {
+      throw new Error(`Error actualizando proyecto: ${updateError.message}`);
+    }
+
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    return { success: true };
+  } catch (error) {
+    throw new Error(`Error eliminando planos: ${(error as Error).message}`);
+  }
+}
+
+// =========================================
+// Funciones para manejo de lotes
+// =========================================
+
+export async function crearLote(fd: FormData) {
+  const proyectoId = String(fd.get("proyecto_id") || "");
+  const codigo = String(fd.get("codigo") || "");
+  const sup_m2 = fd.get("sup_m2") ? Number(fd.get("sup_m2")) : null;
+  const precio = fd.get("precio") ? Number(fd.get("precio")) : null;
+  const moneda = String(fd.get("moneda") || "ARS");
+  const estado = String(fd.get("estado") || "disponible");
 
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { id, codigo, sup_m2, precio, moneda, estado } = parsed.data;
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para crear lotes. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
 
-  // RLS garantiza que solo puedas actualizar lotes de proyectos tuyos
   const { error } = await supabase
     .from("lote")
-    .update({ codigo, sup_m2, precio, moneda, estado })
-    .eq("id", id);
+    .insert({
+      proyecto_id: proyectoId,
+      codigo,
+      sup_m2,
+      precio,
+      moneda,
+      estado: estado as "disponible" | "reservado" | "vendido",
+      created_by: user.id,
+    });
 
   if (error) throw new Error(error.message);
+
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
 }
 
-export async function eliminarLote(proyectoId: string, id: string) {
+export async function actualizarLote(loteId: string, fd: FormData) {
+  const codigo = String(fd.get("codigo") || "");
+  const sup_m2 = fd.get("sup_m2") ? Number(fd.get("sup_m2")) : null;
+  const precio = fd.get("precio") ? Number(fd.get("precio")) : null;
+  const moneda = String(fd.get("moneda") || "ARS");
+  const estado = String(fd.get("estado") || "disponible");
+
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { error } = await supabase.from("lote").delete().eq("id", id);
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para actualizar lotes. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const { error } = await supabase
+    .from("lote")
+    .update({
+      codigo,
+      sup_m2,
+      precio,
+      moneda,
+      estado: estado as "disponible" | "reservado" | "vendido",
+    })
+    .eq("id", loteId);
+
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  revalidatePath(`/dashboard/proyectos/${fd.get("proyecto_id")}`);
 }
 
-export async function reservarLote(proyectoId: string, loteId: string) {
+export async function eliminarLote(loteId: string, proyectoId: string) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { data, error } = await supabase.rpc("reservar_lote", { p_lote: loteId });
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para eliminar lotes. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const { error } = await supabase
+    .from("lote")
+    .delete()
+    .eq("id", loteId);
+
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("El lote no está disponible.");
-  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
-}
 
-export async function venderLote(proyectoId: string, loteId: string) {
-  const supabase = await createServerActionClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-
-  const { data, error } = await supabase.rpc("vender_lote", { p_lote: loteId });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("El lote debe estar reservado para venderse.");
-  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
-}
-
-export async function liberarLote(proyectoId: string, loteId: string) {
-  const supabase = await createServerActionClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-
-  const { data, error } = await supabase.rpc("liberar_lote", { p_lote: loteId });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Sólo lotes reservados pueden liberarse.");
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
 }

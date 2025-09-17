@@ -66,10 +66,10 @@ export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return [];
 
+  // Todos los usuarios pueden ver todos los proyectos (vendedores y admins)
   const { data, error } = await supabase
     .from("proyecto")
-    .select("id,nombre,estado,ubicacion,descripcion,created_at")
-    .eq("created_by", userId)
+    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -82,11 +82,11 @@ export const getCachedLotes = cache(async (proyectoId: string): Promise<LoteCach
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return [];
 
+  // Todos los usuarios pueden ver todos los lotes de un proyecto
   const { data, error } = await supabase
     .from("lote")
     .select("id,codigo,sup_m2,precio,moneda,estado")
     .eq("proyecto_id", proyectoId)
-    .eq("created_by", userId)
     .order("codigo");
 
   if (error) throw error;
@@ -100,9 +100,12 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
   if (!userId) return { totalClientes: 0, totalProyectos: 0, totalLotes: 0 };
 
   const [cRes, pRes, lRes] = await Promise.all([
+    // Clientes: solo los del usuario actual (vendedor gestiona sus propios clientes)
     supabase.from("cliente").select("*", { count: "exact", head: true }).eq("created_by", userId),
-    supabase.from("proyecto").select("*", { count: "exact", head: true }).eq("created_by", userId),
-    supabase.from("lote").select("*", { count: "exact", head: true }).eq("created_by", userId),
+    // Proyectos: todos los proyectos (vendedores pueden ver todos)
+    supabase.from("proyecto").select("*", { count: "exact", head: true }),
+    // Lotes: todos los lotes (vendedores pueden ver todos)
+    supabase.from("lote").select("*", { count: "exact", head: true }),
   ]);
 
   return {
@@ -118,11 +121,11 @@ export const getCachedProyecto = cache(async (proyectoId: string): Promise<Proye
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return null;
 
+  // Todos los usuarios pueden ver cualquier proyecto
   const { data, error } = await supabase
     .from("proyecto")
-    .select("id,nombre,estado,ubicacion,descripcion,created_at")
+    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
     .eq("id", proyectoId)
-    .eq("created_by", userId)
     .single();
 
   if (error) throw error;

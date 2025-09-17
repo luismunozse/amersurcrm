@@ -2,7 +2,7 @@
 
 export type TipoCliente = 'persona' | 'empresa';
 
-export type EstadoCliente = 'activo' | 'prospecto' | 'lead' | 'inactivo';
+export type EstadoCliente = 'por_contactar' | 'contactado' | 'transferido';
 
 export type OrigenLead = 
   | 'web' 
@@ -115,15 +115,14 @@ export interface ClienteFormData {
 
 // Opciones para formularios
 export const TIPOS_CLIENTE_OPTIONS = [
-  { value: 'persona', label: 'Persona Natural' },
+  { value: 'persona', label: 'Persona' },
   { value: 'empresa', label: 'Empresa' }
 ] as const;
 
 export const ESTADOS_CLIENTE_OPTIONS = [
-  { value: 'prospecto', label: 'Prospecto', color: 'blue' },
-  { value: 'lead', label: 'Lead Calificado', color: 'yellow' },
-  { value: 'activo', label: 'Cliente Activo', color: 'green' },
-  { value: 'inactivo', label: 'Inactivo', color: 'gray' }
+  { value: 'por_contactar', label: 'Por Contactar', color: 'blue' },
+  { value: 'contactado', label: 'Contactado', color: 'yellow' },
+  { value: 'transferido', label: 'Transferido', color: 'green' }
 ] as const;
 
 export const ORIGENES_LEAD_OPTIONS = [
@@ -166,13 +165,21 @@ export const PROXIMAS_ACCIONES_OPTIONS = [
 
 // Utilidades
 export function getEstadoClienteColor(estado: EstadoCliente): string {
-  const estadoInfo = ESTADOS_CLIENTE_OPTIONS.find(e => e.value === estado);
-  return estadoInfo?.color || 'gray';
+  switch (estado) {
+    case 'por_contactar': return 'blue';
+    case 'contactado': return 'yellow';
+    case 'transferido': return 'green';
+    default: return 'gray';
+  }
 }
 
 export function getEstadoClienteLabel(estado: EstadoCliente): string {
-  const estadoInfo = ESTADOS_CLIENTE_OPTIONS.find(e => e.value === estado);
-  return estadoInfo?.label || estado;
+  switch (estado) {
+    case 'por_contactar': return 'Por Contactar';
+    case 'contactado': return 'Contactado';
+    case 'transferido': return 'Transferido';
+    default: return estado;
+  }
 }
 
 export function formatCapacidadCompra(capacidad?: number): string {

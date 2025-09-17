@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { z } from "zod";
+import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 
 const PropiedadSchema = z.object({
   id: z.string().uuid(),
@@ -62,6 +63,16 @@ export async function crearPropiedad(fd: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para crear propiedades. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
   // Parsear datos adicionales
   let additionalData = {};
   try {
@@ -115,6 +126,16 @@ export async function actualizarPropiedad(propiedadId: string, fd: FormData) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
+
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para actualizar propiedades. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
 
   const dataJson = String(fd.get("data") || "{}");
   let additionalData = {};

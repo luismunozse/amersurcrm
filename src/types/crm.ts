@@ -32,6 +32,8 @@ export type ClienteCached = {
     estado: "activo" | "pausado" | "cerrado";
     ubicacion: string | null;
     descripcion: string | null;
+    imagen_url: string | null;
+    planos_url: string | null;
     created_at: string;
   };
   

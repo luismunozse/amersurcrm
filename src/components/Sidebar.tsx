@@ -123,6 +123,37 @@ const adminNavigation = [
       </svg>
     ),
   },
+  {
+    name: "Usuarios",
+    href: "/dashboard/admin/usuarios",
+    icon: (
+      <svg
+        className="w-5 h-5"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+      </svg>
+    ),
+  },
+  {
+    name: "Configuración",
+    href: "/dashboard/admin/configuracion",
+    icon: (
+      <svg
+        className="w-5 h-5"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
 ];
 
 function NavLink({
@@ -142,13 +173,25 @@ function NavLink({
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200",
+        "group flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
         active
-          ? "bg-crm-primary text-white shadow-lg"
-          : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
+          ? "bg-gradient-to-r from-crm-primary to-crm-primary-hover text-white shadow-lg shadow-crm-primary/25"
+          : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white hover:shadow-md hover:scale-[1.02]"
       )}
     >
-      {children}
+      {/* Efecto de brillo en hover */}
+      {!active && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+      )}
+      
+      {/* Indicador activo */}
+      {active && (
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full"></div>
+      )}
+      
+      <div className="relative z-10 flex items-center space-x-3 w-full">
+        {children}
+      </div>
     </Link>
   );
 }
@@ -197,28 +240,32 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between h-16 sm:h-20 px-4 sm:px-6 border-b border-crm-sidebar-hover">
-            <div className="flex items-center space-x-3 sm:space-x-4 w-full">
+          <div className="flex items-center justify-between h-20 px-6 border-b border-crm-sidebar-hover bg-gradient-to-r from-crm-sidebar to-crm-sidebar-hover/50">
+            <div className="flex items-center space-x-4 w-full">
               <div className="relative flex-shrink-0">
-                <Image
-                  src="/logo-amersur.png"
-                  alt="AMERSUR"
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 sm:h-16 sm:w-16 object-contain"
-                  priority
-                />
-                {/* Efecto de resplandor sutil */}
-                <div className="absolute inset-0 bg-white/15 rounded-full blur-md -z-10"></div>
+                {/* Fondo del logo con gradiente */}
+                <div className="absolute inset-0 bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 rounded-2xl blur-sm"></div>
+                <div className="relative bg-white/10 backdrop-blur-sm rounded-2xl p-2 border border-white/20">
+                  <Image
+                    src="/amersur-logo-b.png"
+                    alt="AMERSUR"
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 object-contain"
+                    priority
+                  />
+                </div>
+                {/* Efecto de resplandor mejorado */}
+                <div className="absolute inset-0 bg-crm-primary/30 rounded-2xl blur-lg -z-10"></div>
               </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-white font-bold text-lg sm:text-2xl block">
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <span className="text-white font-bold text-xl block tracking-wide leading-tight">
                   AMERSUR
                 </span>
-                <span className="text-crm-primary font-semibold text-sm sm:text-lg block">
+                <span className="text-crm-primary font-semibold text-base block tracking-wider leading-tight">
                   CRM
                 </span>
-                <p className="text-xs text-crm-text-muted mt-1 hidden sm:block">Tu Propiedad, sin fronteras</p>
+                <p className="text-xs text-crm-text-muted mt-0.5 hidden sm:block font-medium leading-tight">Tu Propiedad, sin fronteras</p>
               </div>
             </div>
             <button
@@ -239,7 +286,7 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 sm:px-6 py-4 sm:py-6 space-y-2 sm:space-y-3">
+          <nav className="flex-1 px-4 sm:px-6 py-6 space-y-1">
             {navigation.map((item) => {
               const isActive =
                 item.href === "/dashboard"
@@ -262,9 +309,10 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
             {/* Sección de Administración - Solo para admins */}
             {!loading && isAdmin && (
               <>
-                <div className="border-t border-crm-sidebar-hover my-4 sm:my-6"></div>
-                <div className="px-3 sm:px-4 py-2">
-                  <h3 className="text-xs font-semibold text-crm-text-muted uppercase tracking-wider">
+                <div className="border-t border-crm-sidebar-hover/50 my-6"></div>
+                <div className="px-4 py-3">
+                  <h3 className="text-xs font-bold text-crm-primary uppercase tracking-widest flex items-center">
+                    <div className="w-2 h-2 bg-crm-primary rounded-full mr-2"></div>
                     Administración
                   </h3>
                 </div>
@@ -288,15 +336,19 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
           </nav>
 
           {/* Footer - Responsive */}
-          <div className="p-4 sm:p-6 border-t border-crm-sidebar-hover">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-crm-accent rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-xs sm:text-sm font-medium">
-                  {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
-                </span>
+          <div className="p-4 sm:p-6 border-t border-crm-sidebar-hover/50 bg-gradient-to-r from-crm-sidebar-hover/30 to-transparent">
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-crm-primary to-crm-accent rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                  <span className="text-white text-sm sm:text-base font-bold">
+                    {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
+                  </span>
+                </div>
+                {/* Indicador de estado online */}
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 border-2 border-crm-sidebar rounded-full"></div>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-semibold text-white truncate">
                   {userEmail ? userEmail.split('@')[0] : 'Usuario'}
                 </p>
                 <p className="text-xs text-crm-text-muted truncate hidden sm:block">

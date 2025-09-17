@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
+import PlanosUploader from "./_PlanosUploader";
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -39,7 +40,7 @@ export default async function ProyLotesPage({
   // Proyecto (para título/404)
   const { data: proyecto, error: eProyecto } = await supabase
     .from("proyecto")
-    .select("id,nombre,estado,ubicacion,descripcion,created_at")
+    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -158,6 +159,13 @@ export default async function ProyLotesPage({
           </button>
         </form>
       </div>
+
+      {/* Planos del Proyecto */}
+      <PlanosUploader 
+        proyectoId={proyecto.id}
+        planosUrl={proyecto.planos_url}
+        proyectoNombre={proyecto.nombre}
+      />
 
       <NewLoteForm 
         proyectoId={proyecto.id} 

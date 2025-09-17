@@ -46,9 +46,9 @@ const ClienteCompletoSchema = z.object({
   direccion: DireccionSchema.optional().default({}),
   
   // Estado comercial
-  estado_cliente: z.enum(['activo', 'prospecto', 'lead', 'inactivo']),
+  estado_cliente: z.enum(['por_contactar', 'contactado', 'transferido']),
   origen_lead: z.enum(['web', 'recomendacion', 'feria', 'campaña', 'redes_sociales', 'publicidad', 'referido', 'otro']).optional(),
-  vendedor_asignado: z.string().uuid().optional().or(z.literal("")),
+  vendedor_asignado: z.string().optional().or(z.literal("")),
   proxima_accion: z.enum(['llamar', 'enviar_propuesta', 'reunion', 'seguimiento', 'cierre', 'nada']).optional(),
   
   // Información financiera/comercial
@@ -77,14 +77,14 @@ export async function crearCliente(formData: FormData) {
       provincia: String(formData.get("direccion_provincia") || ""),
       pais: String(formData.get("direccion_pais") || "Perú"),
     },
-    estado_cliente: String(formData.get("estado_cliente") || "prospecto") as EstadoCliente,
-    origen_lead: String(formData.get("origen_lead") || ""),
-    vendedor_asignado: String(formData.get("vendedor_asignado") || ""),
-    proxima_accion: String(formData.get("proxima_accion") || ""),
-    interes_principal: String(formData.get("interes_principal") || ""),
+    estado_cliente: String(formData.get("estado_cliente") || "por_contactar") as EstadoCliente,
+    origen_lead: formData.get("origen_lead") ? String(formData.get("origen_lead")) : undefined,
+    vendedor_asignado: formData.get("vendedor_asignado") ? String(formData.get("vendedor_asignado")) : undefined,
+    proxima_accion: formData.get("proxima_accion") ? String(formData.get("proxima_accion")) : undefined,
+    interes_principal: formData.get("interes_principal") ? String(formData.get("interes_principal")) : undefined,
     capacidad_compra_estimada: formData.get("capacidad_compra_estimada") ? 
       Number(formData.get("capacidad_compra_estimada")) : undefined,
-    forma_pago_preferida: String(formData.get("forma_pago_preferida") || ""),
+    forma_pago_preferida: formData.get("forma_pago_preferida") ? String(formData.get("forma_pago_preferida")) : undefined,
     notas: String(formData.get("notas") || ""),
   };
 
@@ -109,7 +109,7 @@ export async function crearCliente(formData: FormData) {
     telefono_whatsapp: parsed.data.telefono_whatsapp || null,
     documento_identidad: parsed.data.documento_identidad || null,
     origen_lead: parsed.data.origen_lead || null,
-    vendedor_asignado: parsed.data.vendedor_asignado || null,
+    vendedor_asignado: parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== "" ? parsed.data.vendedor_asignado : null,
     proxima_accion: parsed.data.proxima_accion || null,
     interes_principal: parsed.data.interes_principal || null,
     capacidad_compra_estimada: parsed.data.capacidad_compra_estimada || null,

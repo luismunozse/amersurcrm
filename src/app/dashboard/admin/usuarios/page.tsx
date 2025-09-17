@@ -1,53 +1,8 @@
-import { Suspense } from "react";
-import { createServerOnlyClient } from "@/lib/supabase.server";
-import { redirect } from "next/navigation";
-import { esAdmin } from "@/lib/auth/roles";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export default async function AdminUsuariosPage() {
-  const supabase = await createServerOnlyClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/auth/login");
-  }
-
-  const isAdminUser = await esAdmin();
-  if (!isAdminUser) {
-    redirect("/dashboard");
-  }
-
-  return (
-    <div className="min-h-screen bg-crm-bg-primary">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-crm-text-primary">Gestión de Usuarios</h1>
-          <p className="text-crm-text-secondary mt-2">
-            Administra usuarios, roles y permisos del sistema
-          </p>
-        </div>
-
-        <Suspense fallback={
-          <div className="crm-card p-6">
-            <div className="animate-pulse">
-              <div className="h-8 bg-crm-border rounded mb-4"></div>
-              <div className="h-64 bg-crm-border rounded"></div>
-            </div>
-          </div>
-        }>
-          <GestionUsuarios />
-        </Suspense>
-      </div>
-    </div>
-  );
-}
-
 "use client";
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 
 interface Usuario {
   id: string;
@@ -308,6 +263,54 @@ function GestionUsuarios() {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminUsuariosPage() {
+  const { isAdmin, loading } = useAdminPermissions();
+
+  if (loading) {
+    return (
+      <div className="crm-card p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-crm-border rounded w-1/4 mb-4"></div>
+          <div className="h-10 bg-crm-border rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="crm-card p-6 border-l-4 border-crm-warning">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-crm-warning/20 rounded-lg flex items-center justify-center">
+            <svg className="w-4 h-4 text-crm-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-crm-text-primary">Acceso Restringido</h3>
+            <p className="text-xs text-crm-text-muted">Solo los administradores pueden gestionar usuarios.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-crm-bg-primary">
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-crm-text-primary">Gestión de Usuarios</h1>
+          <p className="text-crm-text-secondary mt-2">
+            Administra usuarios, roles y permisos del sistema
+          </p>
+        </div>
+
+        <GestionUsuarios />
       </div>
     </div>
   );

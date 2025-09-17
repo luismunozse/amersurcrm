@@ -124,11 +124,19 @@ export default async function ProyectosPage() {
                 </div>
 
                 <div className="p-6 space-y-6">
-                  {/* Avatar/ícono mejorado */}
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden mx-auto ring-4 ring-crm-primary/20 bg-gradient-to-br from-crm-primary/10 to-crm-primary/5">
-                    <div className="h-full w-full grid place-items-center">
-                      <BuildingOffice2Icon className="h-10 w-10 text-crm-primary" />
-                    </div>
+                  {/* Imagen del proyecto o ícono por defecto */}
+                  <div className="w-full h-48 rounded-2xl overflow-hidden ring-4 ring-[#86901F]/30 bg-gradient-to-br from-[#86901F]/15 to-[#86901F]/8">
+                    {p.imagen_url ? (
+                      <img 
+                        src={p.imagen_url} 
+                        alt={p.nombre}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-full w-full grid place-items-center">
+                        <BuildingOffice2Icon className="h-16 w-16 text-[#86901F]" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Información del proyecto */}
@@ -150,7 +158,7 @@ export default async function ProyectosPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-crm-text-primary">
-                          <ChartBarIcon className="h-4 w-4 text-crm-success" />
+                          <ChartBarIcon className="h-4 w-4 text-crm-primary" />
                           <span className="font-medium">Vendidas</span>
                         </div>
                         <div className="text-sm text-crm-text-primary font-bold">
@@ -159,7 +167,7 @@ export default async function ProyectosPage() {
                       </div>
                       <div className="h-3 rounded-full bg-crm-border/30 overflow-hidden">
                         <div
-                          className="h-3 rounded-full bg-gradient-to-r from-crm-success to-green-500 transition-all duration-500"
+                          className="h-3 rounded-full bg-gradient-to-r from-crm-primary to-crm-primary/80 transition-all duration-500"
                           style={{ width: `${vendidoPct}%` }}
                         />
                       </div>
@@ -169,7 +177,7 @@ export default async function ProyectosPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-crm-text-primary">
-                          <PresentationChartLineIcon className="h-4 w-4 text-crm-info" />
+                          <PresentationChartLineIcon className="h-4 w-4 text-crm-accent" />
                           <span className="font-medium">Disponibles</span>
                         </div>
                         <div className="text-sm text-crm-text-primary font-bold">
@@ -178,7 +186,7 @@ export default async function ProyectosPage() {
                       </div>
                       <div className="h-3 rounded-full bg-crm-border/30 overflow-hidden">
                         <div
-                          className="h-3 rounded-full bg-gradient-to-r from-crm-info to-blue-500 transition-all duration-500"
+                          className="h-3 rounded-full bg-gradient-to-r from-crm-accent to-crm-accent/80 transition-all duration-500"
                           style={{ width: `${dispPct}%` }}
                         />
                       </div>
@@ -197,7 +205,7 @@ export default async function ProyectosPage() {
                       <p className="text-xs text-crm-text-muted font-medium uppercase tracking-wide mb-1">
                         Disponibles
                       </p>
-                      <p className="text-2xl font-bold text-crm-info">{stats.disponibles}</p>
+                      <p className="text-2xl font-bold text-crm-accent">{stats.disponibles}</p>
                     </div>
                   </div>
 
@@ -217,10 +225,33 @@ export default async function ProyectosPage() {
       </div>
     );
   } catch (error) {
+    console.error('Error cargando proyectos:', error);
     return (
-      <pre className="text-red-600 whitespace-pre-wrap p-4">
-        Error cargando proyectos: {String(error)}
-      </pre>
+      <div className="w-full p-6">
+        <div className="crm-card p-6 border-l-4 border-crm-danger">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-crm-danger/20 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-crm-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-crm-text-primary">Error cargando proyectos</h3>
+              <p className="text-xs text-crm-text-muted mt-1">
+                {error instanceof Error ? error.message : 'Error desconocido al cargar los proyectos'}
+              </p>
+              <details className="mt-2">
+                <summary className="text-xs text-crm-text-muted cursor-pointer hover:text-crm-text-primary">
+                  Ver detalles técnicos
+                </summary>
+                <pre className="text-xs text-crm-text-muted mt-2 whitespace-pre-wrap bg-crm-card p-2 rounded border">
+                  {JSON.stringify(error, null, 2)}
+                </pre>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 }
