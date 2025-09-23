@@ -7,21 +7,35 @@ import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 interface Usuario {
   id: string;
   email: string;
-  nombre?: string;
-  rol: string;
-  estado: string;
-  ultimo_acceso?: string;
+  nombre_completo?: string;
+  dni?: string;
+  telefono?: string;
+  rol: {
+    id: string;
+    nombre: string;
+    descripcion: string;
+  };
+  activo: boolean;
+  created_at: string;
   meta_mensual?: number;
   comision_porcentaje?: number;
 }
 
+interface Rol {
+  id: string;
+  nombre: string;
+  descripcion: string;
+}
+
 function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [roles, setRoles] = useState<Rol[]>([]);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     cargarUsuarios();
+    cargarRoles();
   }, []);
 
   const cargarUsuarios = async () => {
@@ -35,6 +49,17 @@ function GestionUsuarios() {
       toast.error('Error cargando usuarios');
     } finally {
       setCargando(false);
+    }
+  };
+
+  const cargarRoles = async () => {
+    try {
+      const response = await fetch('/api/admin/roles');
+      const data = await response.json();
+      setRoles(data.roles || []);
+    } catch (error) {
+      console.error('Error cargando roles:', error);
+      toast.error('Error cargando roles');
     }
   };
 
@@ -68,7 +93,7 @@ function GestionUsuarios() {
           <div>
             <h2 className="text-xl font-semibold text-crm-text-primary">Gestión de Usuarios</h2>
             <p className="text-crm-text-secondary text-sm mt-1">
-              Crea y administra vendedores del sistema
+              Crea y administra usuarios del sistema (Vendedores, Coordinadores, etc.)
             </p>
           </div>
           <button 
@@ -78,7 +103,7 @@ function GestionUsuarios() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            <span>Crear Vendedor</span>
+            <span>Crear Usuario</span>
           </button>
         </div>
       </div>
@@ -87,7 +112,7 @@ function GestionUsuarios() {
       {mostrarFormulario && (
         <div className="crm-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-crm-text-primary">Crear Nuevo Vendedor</h3>
+            <h3 className="text-lg font-semibold text-crm-text-primary">Crear Nuevo Usuario</h3>
             <button 
               onClick={() => setMostrarFormulario(false)}
               className="text-crm-text-muted hover:text-crm-text-primary"
@@ -102,36 +127,79 @@ function GestionUsuarios() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Nombre Completo
+                  Nombre Completo *
                 </label>
                 <input
                   type="text"
-                  name="nombre"
+                  name="nombre_completo"
                   required
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="Nombre del vendedor"
+                  placeholder="Juan Pérez García"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Email
+                  DNI *
+                </label>
+                <input
+                  type="text"
+                  name="dni"
+                  required
+                  pattern="[0-9]{8}"
+                  maxLength="8"
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                  placeholder="12345678"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  name="telefono"
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                  placeholder="987654321"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                  Email *
                 </label>
                 <input
                   type="email"
                   name="email"
                   required
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="vendedor@amersur.com"
+                  placeholder="usuario@amersur.com"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Contraseña Temporal
+                  Rol *
+                </label>
+                <select
+                  name="rol_id"
+                  required
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                >
+                  <option value="">Seleccionar rol</option>
+                  {roles.map((rol) => (
+                    <option key={rol.id} value={rol.id}>
+                      {rol.nombre.replace('ROL_', '').replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                  Contraseña Temporal *
                 </label>
                 <input
                   type="password"
                   name="password"
                   required
+                  minLength="6"
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
                   placeholder="Contraseña temporal"
                 />
@@ -177,7 +245,7 @@ function GestionUsuarios() {
                 type="submit"
                 className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
               >
-                Crear Vendedor
+                Crear Usuario
               </button>
             </div>
           </form>
@@ -191,9 +259,10 @@ function GestionUsuarios() {
             <thead>
               <tr className="border-b border-crm-border">
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Usuario</th>
+                <th className="text-left py-3 px-4 font-medium text-crm-text-primary">DNI</th>
+                <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Teléfono</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Rol</th>
-                <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Meta Mensual</th>
-                <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Comisión</th>
+                <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Meta/Comisión</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Estado</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Acciones</th>
               </tr>
@@ -201,13 +270,13 @@ function GestionUsuarios() {
             <tbody>
               {cargando ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-crm-text-muted">
+                  <td colSpan={7} className="py-8 text-center text-crm-text-muted">
                     <div className="animate-pulse">Cargando usuarios...</div>
                   </td>
                 </tr>
               ) : usuarios.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-crm-text-muted">
+                  <td colSpan={7} className="py-8 text-center text-crm-text-muted">
                     No hay usuarios registrados
                   </td>
                 </tr>
@@ -218,33 +287,51 @@ function GestionUsuarios() {
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-crm-accent rounded-full flex items-center justify-center">
                           <span className="text-white text-sm font-medium">
-                            {usuario.nombre?.charAt(0) || usuario.email.charAt(0).toUpperCase()}
+                            {usuario.nombre_completo?.charAt(0) || usuario.email.charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-crm-text-primary">{usuario.nombre || 'Sin nombre'}</p>
+                          <p className="font-medium text-crm-text-primary">{usuario.nombre_completo || 'Sin nombre'}</p>
                           <p className="text-sm text-crm-text-muted">{usuario.email}</p>
                         </div>
                       </div>
                     </td>
+                    <td className="py-3 px-4 text-sm text-crm-text-primary">
+                      {usuario.dni || '-'}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-crm-text-primary">
+                      {usuario.telefono || '-'}
+                    </td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        usuario.rol === 'ROL_ADMIN' 
+                        usuario.rol?.nombre === 'ROL_ADMIN' 
                           ? 'bg-red-100 text-red-800' 
+                          : usuario.rol?.nombre === 'ROL_COORDINADOR_VENTAS'
+                          ? 'bg-purple-100 text-purple-800'
                           : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {usuario.rol === 'ROL_ADMIN' ? 'Administrador' : 'Vendedor'}
+                        {usuario.rol?.nombre === 'ROL_ADMIN' 
+                          ? 'Administrador' 
+                          : usuario.rol?.nombre === 'ROL_COORDINADOR_VENTAS'
+                          ? 'Coordinador'
+                          : 'Vendedor'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-sm text-crm-text-primary">
-                      {usuario.meta_mensual ? `S/ ${usuario.meta_mensual.toLocaleString()}` : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-crm-text-primary">
-                      {usuario.comision_porcentaje ? `${usuario.comision_porcentaje}%` : '-'}
+                    <td className="py-3 px-4">
+                      <div className="space-y-1">
+                        <p className="text-xs text-crm-text-primary">
+                          {usuario.meta_mensual ? `S/ ${usuario.meta_mensual.toLocaleString()}` : 'Sin meta'}
+                        </p>
+                        <p className="text-xs text-crm-text-muted">
+                          {usuario.comision_porcentaje ? `${usuario.comision_porcentaje}%` : 'Sin comisión'}
+                        </p>
+                      </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                        Activo
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        usuario.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {usuario.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -253,7 +340,7 @@ function GestionUsuarios() {
                           Editar
                         </button>
                         <button className="text-red-600 hover:text-red-800 text-sm">
-                          Desactivar
+                          {usuario.activo ? 'Desactivar' : 'Activar'}
                         </button>
                       </div>
                     </td>
@@ -306,7 +393,7 @@ export default function AdminUsuariosPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-crm-text-primary">Gestión de Usuarios</h1>
           <p className="text-crm-text-secondary mt-2">
-            Administra usuarios, roles y permisos del sistema
+            Administra usuarios, roles y permisos del sistema. Crea vendedores y coordinadores con información completa.
           </p>
         </div>
 
@@ -315,3 +402,4 @@ export default function AdminUsuariosPage() {
     </div>
   );
 }
+

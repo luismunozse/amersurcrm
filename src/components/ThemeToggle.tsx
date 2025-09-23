@@ -1,21 +1,21 @@
 "use client";
 import { useTheme } from "./ThemeProvider";
+import { Sun, Moon } from "lucide-react";
 
 export default function ThemeToggle() {
   const { theme, toggle } = useTheme();
   return (
     <button
       onClick={toggle}
-      className="border border-crm-border rounded-xl px-2 sm:px-3 py-1.5 text-sm hover:bg-crm-card-hover transition-colors"
+      className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
       aria-label="Cambiar tema"
       title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
-      <span className="hidden sm:inline">
-        {theme === "dark" ? "☀️ Claro" : "🌙 Oscuro"}
-      </span>
-      <span className="sm:hidden text-lg">
-        {theme === "dark" ? "☀️" : "🌙"}
-      </span>
+      {theme === "dark" ? (
+        <Sun className="w-5 h-5" />
+      ) : (
+        <Moon className="w-5 h-5" />
+      )}
     </button>
   );
 }
