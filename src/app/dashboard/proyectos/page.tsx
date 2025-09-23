@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCachedProyectos } from "@/lib/cache.server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewProyectoForm from "./_NewProyectoForm";
+import QuickActions from "./QuickActions";
 
 import {
   BuildingOffice2Icon,
@@ -209,14 +210,17 @@ export default async function ProyectosPage() {
                     </div>
                   </div>
 
-                  {/* Botón de acción */}
-                  <Link
-                    className="w-full crm-button-primary inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold group-hover:shadow-crm-xl transition-all duration-300"
-                    href={`/dashboard/proyectos/${p.id}`}
-                  >
-                    Ver Proyecto
-                    <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
+                  {/* Acciones rápidas + CTA */}
+                  <div className="space-y-3">
+                    <QuickActions id={p.id} nombre={p.nombre} ubicacion={p.ubicacion || undefined} />
+                    <Link
+                      className="w-full crm-button-primary inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold group-hover:shadow-crm-xl transition-all duration-300"
+                      href={`/dashboard/proyectos/${p.id}`}
+                    >
+                      Ver Proyecto
+                      <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             );

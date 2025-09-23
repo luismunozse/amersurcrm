@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Edit, Trash2, Eye, MapPin, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { actualizarLote, eliminarLote } from "./_actions";
+import LoteEditModal from "./LoteEditModal";
 
 type Lote = {
   id: string;
@@ -175,7 +176,6 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
 
   const handleEdit = (loteId: string) => {
     setEditingLote(loteId);
-    toast.info('Funcionalidad de edición en desarrollo');
   };
 
   const handleDelete = async (loteId: string, codigo: string) => {
@@ -197,7 +197,18 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
   };
 
   const handleView = (loteId: string) => {
-    toast.info('Funcionalidad de visualización en desarrollo');
+    const l = lotesAMostrar.find(l => l.id === loteId);
+    if (!l) return;
+    const d = parseData(l.data);
+    const detalles = [
+      `Código: ${l.codigo}`,
+      `Superficie: ${l.sup_m2 ?? 'No especificado'} m²`,
+      `Precio: ${l.precio ?? 'No especificado'}`,
+      d?.manzana ? `Manzana: ${d.manzana}` : null,
+      d?.numero ? `Número: ${d.numero}` : null,
+      d?.etapa ? `Etapa: ${d.etapa}` : null,
+    ].filter(Boolean).join('\n');
+    alert(detalles);
   };
 
   const toggleMenu = (loteId: string) => {
@@ -310,6 +321,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
   };
 
   return (
+    <>
     <div className="space-y-6">
       <Card>
         <CardHeader>
@@ -657,6 +669,40 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
         </CardContent>
       </Card>
     </div>
+    {/* Modal de edición de lote */}
+    <LoteEditModal
+      open={!!editingLote}
+      onClose={() => setEditingLote(null)}
+      lote={lotesAMostrar.find(l => l.id === editingLote) || null}
+      onSave={async (payload) => {
+        try {
+          const fd = new FormData();
+          if (typeof payload.codigo !== 'undefined') fd.append('codigo', payload.codigo);
+          if (typeof payload.sup_m2 !== 'undefined') fd.append('sup_m2', String(payload.sup_m2 ?? ''));
+          if (typeof payload.precio !== 'undefined') fd.append('precio', String(payload.precio ?? ''));
+          if (typeof payload.moneda !== 'undefined') fd.append('moneda', String(payload.moneda ?? ''));
+          if (typeof payload.estado !== 'undefined') fd.append('estado', String(payload.estado));
+          fd.append('proyecto_id', proyectoId);
+
+          await actualizarLote(payload.id, fd);
+          toast.success('Lote actualizado');
+          // Optimista: refrescar lista
+          setLotesState(prev => prev.map(it => it.id === payload.id ? {
+            ...it,
+            codigo: payload.codigo ?? it.codigo,
+            sup_m2: typeof payload.sup_m2 === 'undefined' ? it.sup_m2 : (payload.sup_m2 as any),
+            precio: typeof payload.precio === 'undefined' ? it.precio : (payload.precio as any),
+            moneda: typeof payload.moneda === 'undefined' ? it.moneda : (payload.moneda as any),
+            estado: (payload.estado as any) ?? it.estado,
+          } : it));
+          return true;
+        } catch (e) {
+          toast.error('No se pudo actualizar');
+          return false;
+        }
+      }}
+    />
+    </>
   );
 }
 

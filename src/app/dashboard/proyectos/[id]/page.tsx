@@ -40,7 +40,7 @@ export default async function ProyLotesPage({
   // Proyecto (para título/404)
   const { data: proyecto, error: eProyecto } = await supabase
     .from("proyecto")
-    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
+    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,created_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -174,6 +174,8 @@ export default async function ProyLotesPage({
         proyectoId={proyecto.id}
         planosUrl={proyecto.planos_url}
         proyectoNombre={proyecto.nombre}
+        initialBounds={proyecto.overlay_bounds as any}
+        initialRotation={proyecto.overlay_rotation as any}
       />
 
       <NewLoteForm 

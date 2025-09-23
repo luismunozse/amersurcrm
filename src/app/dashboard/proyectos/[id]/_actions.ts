@@ -302,6 +302,34 @@ export async function guardarCoordenadasMultiples(proyectoId: string, coordenada
   return { success: true, count: coordenadas.length };
 }
 
+// Guardar bounds de overlay del plano
+export async function guardarOverlayBounds(proyectoId: string, bounds: [[number, number], [number, number]], rotationDeg?: number) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Solo admin
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para calibrar el plano");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const payload: any = { overlay_bounds: bounds as any };
+  if (typeof rotationDeg === 'number') payload.overlay_rotation = rotationDeg;
+  const { error } = await supabase
+    .from('proyecto')
+    .update(payload)
+    .eq('id', proyectoId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { success: true };
+}
+
 export async function obtenerCoordenadasProyecto(proyectoId: string) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();

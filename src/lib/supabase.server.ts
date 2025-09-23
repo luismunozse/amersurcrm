@@ -1,5 +1,6 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 // ⚠️ SOLO servidor (RSC/Server Actions/Route Handlers). No lo importes en "use client".
@@ -29,3 +30,19 @@ export async function createOptimizedServerClient() {
 
 // Alias para compatibilidad
 export const createServerOnlyClient = createOptimizedServerClient;
+
+// Cliente de servicio (service role) - USO EXCLUSIVO EN SERVIDOR
+// Permite usar métodos admin como auth.admin.createUser
+export function createServiceRoleClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      db: { schema: "crm" },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}

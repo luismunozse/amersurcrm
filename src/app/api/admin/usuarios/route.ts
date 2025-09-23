@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 
 // GET - Obtener lista de usuarios
@@ -87,9 +87,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Retornar perfiles directamente sin combinar con auth.users
+    // Mapear para compatibilidad con el frontend: meta_mensual = meta_mensual_ventas
+    const usuariosCompat = (usuarios || []).map((u: any) => ({
+      ...u,
+      meta_mensual: typeof u.meta_mensual_ventas === 'number' ? u.meta_mensual_ventas : (u.meta_mensual_ventas ? Number(u.meta_mensual_ventas) : undefined),
+    }));
+
     return NextResponse.json({ 
       success: true, 
-      usuarios 
+      usuarios: usuariosCompat 
     });
 
   } catch (error) {
@@ -127,8 +133,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
     }
 
-    // Crear usuario en auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Crear usuario en auth con client de service role (requiere key SRV)
+    const srv = createServiceRoleClient();
+    const { data: authData, error: authError } = await srv.auth.admin.createUser({
       email,
       password,
       email_confirm: true
@@ -165,7 +172,7 @@ export async function POST(request: NextRequest) {
         dni: dni,
         telefono: telefono || null,
         rol_id: rol.id,
-        meta_mensual_ventas: meta_mensual ? parseFloat(meta_mensual) : null,
+        meta_mensual_ventas: meta_mensual ? parseInt(meta_mensual, 10) : null,
         comision_porcentaje: comision_porcentaje ? parseFloat(comision_porcentaje) : null,
         activo: true
       });
@@ -173,7 +180,7 @@ export async function POST(request: NextRequest) {
     if (perfilError) {
       console.error('Error creando perfil:', perfilError);
       // Intentar eliminar el usuario de auth si falla la creación del perfil
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      await srv.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ error: "Error creando perfil de usuario" }, { status: 500 });
     }
 
@@ -191,6 +198,68 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error en POST /api/admin/usuarios:', error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+  }
+}
+
+// PATCH - Editar/activar/desactivar usuario
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const {
+      id, // requerido
+      nombre_completo,
+      dni,
+      telefono,
+      rol_id,
+      meta_mensual,
+      comision_porcentaje,
+      activo,
+    } = body || {};
+
+    if (!id) {
+      return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
+    }
+
+    // Construir payload de update solo con campos presentes
+    const updatePayload: Record<string, any> = {};
+    if (typeof nombre_completo === 'string') updatePayload.nombre_completo = nombre_completo;
+    if (typeof dni === 'string') updatePayload.dni = dni;
+    if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;
+    if (typeof rol_id === 'string') updatePayload.rol_id = rol_id;
+    if (typeof meta_mensual !== 'undefined') updatePayload.meta_mensual_ventas = meta_mensual === null ? null : parseInt(String(meta_mensual), 10);
+    if (typeof comision_porcentaje !== 'undefined') updatePayload.comision_porcentaje = comision_porcentaje === null ? null : Number(comision_porcentaje);
+    if (typeof activo === 'boolean') updatePayload.activo = activo;
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
+    }
+
+    const { error: updError } = await supabase
+      .from('usuario_perfil')
+      .update(updatePayload)
+      .eq('id', id);
+
+    if (updError) {
+      console.error('Error actualizando usuario:', updError);
+      return NextResponse.json({ error: "Error actualizando usuario" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error en PATCH /api/admin/usuarios:', error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import UserEditModal from "@/components/UserEditModal";
 
 interface Usuario {
   id: string;
@@ -32,6 +33,8 @@ function GestionUsuarios() {
   const [roles, setRoles] = useState<Rol[]>([]);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [userEditing, setUserEditing] = useState<Usuario | null>(null);
 
   useEffect(() => {
     cargarUsuarios();
@@ -83,6 +86,39 @@ function GestionUsuarios() {
       console.error('Error creando usuario:', error);
       toast.error('Error creando usuario');
     }
+  };
+
+  // PATCH helper
+  const patchUsuario = async (payload: { id: string; nombre_completo?: string; dni?: string; telefono?: string | null; rol_id?: string; meta_mensual?: number | null; comision_porcentaje?: number | null; activo?: boolean; }) => {
+    try {
+      const response = await fetch('/api/admin/usuarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Error actualizando usuario');
+      }
+      return true;
+    } catch (error) {
+      console.error('Error patch usuario:', error);
+      toast.error('Error actualizando usuario');
+      return false;
+    }
+  };
+
+  const toggleActivo = async (u: Usuario) => {
+    const ok = await patchUsuario({ id: u.id, activo: !u.activo });
+    if (ok) {
+      toast.success(u.activo ? 'Usuario desactivado' : 'Usuario activado');
+      cargarUsuarios();
+    }
+  };
+
+  const editarUsuarioPrompt = async (u: Usuario) => {
+    setUserEditing(u);
+    setModalOpen(true);
   };
 
   return (
@@ -336,10 +372,10 @@ function GestionUsuarios() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-800 text-sm">
+                        <button className="text-blue-600 hover:text-blue-800 text-sm" onClick={() => editarUsuarioPrompt(usuario)}>
                           Editar
                         </button>
-                        <button className="text-red-600 hover:text-red-800 text-sm">
+                        <button className="text-red-600 hover:text-red-800 text-sm" onClick={() => toggleActivo(usuario)}>
                           {usuario.activo ? 'Desactivar' : 'Activar'}
                         </button>
                       </div>
@@ -351,6 +387,22 @@ function GestionUsuarios() {
           </table>
         </div>
       </div>
+      {/* Modal de edición */}
+      <UserEditModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setUserEditing(null); }}
+        user={userEditing}
+        roles={roles}
+        onSave={async (payload) => {
+          const ok = await patchUsuario(payload);
+          if (ok) {
+            toast.success('Usuario actualizado');
+            cargarUsuarios();
+            return true;
+          }
+          return false;
+        }}
+      />
     </div>
   );
 }

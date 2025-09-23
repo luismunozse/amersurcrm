@@ -1,27 +1,21 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, ImageOverlay, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Upload, MapPin, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { subirPlanos, eliminarPlanos, guardarCoordenadasMultiples, obtenerCoordenadasProyecto } from './_actions';
+import { subirPlanos, eliminarPlanos, guardarCoordenadasMultiples, obtenerCoordenadasProyecto, guardarOverlayBounds } from './_actions';
 
-// Fix para iconos de Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+// (Leaflet se carga sólo en cliente dentro de LeafletMap)
 
 interface MapeoLotesProps {
   proyectoId: string;
   planosUrl: string | null;
   proyectoNombre: string;
+  initialBounds?: [[number, number],[number, number]] | null;
+  initialRotation?: number | null;
 }
 
 interface Coordenada {
@@ -31,12 +25,18 @@ interface Coordenada {
   nombre: string;
 }
 
-export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: MapeoLotesProps) {
+const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
+
+export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation }: MapeoLotesProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [mapBounds, setMapBounds] = useState<L.LatLngBounds | null>(null);
-  const [imageBounds, setImageBounds] = useState<L.LatLngBounds | null>(null);
-  const mapRef = useRef<L.Map>(null);
+  const [calibrating, setCalibrating] = useState(false);
+  const [overlayBounds, setOverlayBounds] = useState<[[number, number],[number, number]] | undefined>(initialBounds || undefined);
+  const [placing, setPlacing] = useState(false);
+  const [firstCorner, setFirstCorner] = useState<[number, number] | null>(null);
+  const [rotation, setRotation] = useState(initialRotation ?? 0);
+  // Permite seguir el flujo seleccionar zona -> subir plano sin recargar
+  const [planUrl, setPlanUrl] = useState<string | null>(planosUrl);
 
   // Coordenadas de Lima, Perú como centro por defecto
   const defaultCenter: [number, number] = [-12.0464, -77.0428];
@@ -64,10 +64,12 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: Ma
     formData.append('planos', file);
 
     try {
-      await subirPlanos(proyectoId, formData);
+      const res = await subirPlanos(proyectoId, formData) as unknown as { success: boolean; url?: string };
+      if (res && (res as any).url) {
+        setPlanUrl((res as any).url);
+      }
       toast.success('Plano subido correctamente');
-      // Recargar la página para mostrar el nuevo plano
-      window.location.reload();
+      // Si ya hay bounds marcados, se mostrará sobre esa zona automáticamente
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error subiendo plano');
     } finally {
@@ -87,8 +89,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: Ma
     }
   };
 
-  const handleMapClick = (e: L.LeafletMouseEvent) => {
-    const { lat, lng } = e.latlng;
+  const handleMapClick = (lat: number, lng: number) => {
     const nuevaCoordenada: Coordenada = {
       id: Date.now().toString(),
       lat,
@@ -126,58 +127,41 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: Ma
     }
   };
 
-  // Componente interno para manejar clics en el mapa
-  const MapClickHandler = () => {
-    const map = useMap();
-    
-    useEffect(() => {
-      const handleClick = (e: L.LeafletMouseEvent) => {
-        handleMapClick(e);
-      };
-
-      map.on('click', handleClick);
-      return () => {
-        map.off('click', handleClick);
-      };
-    }, [map]);
-
-    return null;
+  const guardarBounds = async () => {
+    if (!overlayBounds) {
+      toast.error('Ajusta las esquinas del plano antes de guardar');
+      return;
+    }
+    try {
+      await guardarOverlayBounds(proyectoId, overlayBounds, rotation);
+      toast.success('Calibración del plano guardada');
+      setCalibrating(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error guardando calibración');
+    }
   };
 
-  // Componente para mostrar marcadores de coordenadas
-  const CoordenadasMarkers = () => {
-    const map = useMap();
-    
-    useEffect(() => {
-      const markers: L.Marker[] = [];
-      
-      coordenadas.forEach(coord => {
-        const marker = L.marker([coord.lat, coord.lng])
-          .bindPopup(`
-            <div class="p-2">
-              <h3 class="font-semibold">${coord.nombre}</h3>
-              <p class="text-sm text-gray-600">
-                Lat: ${coord.lat.toFixed(6)}<br>
-                Lng: ${coord.lng.toFixed(6)}
-              </p>
-              <button 
-                onclick="eliminarCoordenada('${coord.id}')"
-                class="mt-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-              >
-                Eliminar
-              </button>
-            </div>
-          `)
-          .addTo(map);
-        markers.push(marker);
-      });
-
-      return () => {
-        markers.forEach(marker => marker.remove());
-      };
-    }, [coordenadas, map]);
-
-    return null;
+  const onMapClickCoord = (lat: number, lng: number) => {
+    // Si estamos marcando zona para el plano, usar los dos clics para fijar bounds
+    if (calibrating && placing) {
+      if (!firstCorner) {
+        setFirstCorner([lat, lng]);
+        toast.success('Esquina 1 fijada. Haz clic para fijar esquina 2');
+      } else {
+        const swLat = Math.min(firstCorner[0], lat);
+        const swLng = Math.min(firstCorner[1], lng);
+        const neLat = Math.max(firstCorner[0], lat);
+        const neLng = Math.max(firstCorner[1], lng);
+        const bounds: [[number, number], [number, number]] = [[swLat, swLng], [neLat, neLng]];
+        setOverlayBounds(bounds);
+        setFirstCorner(null);
+        setPlacing(false);
+        toast.success('Zona del plano establecida. Puedes guardar la calibración');
+      }
+      return;
+    }
+    // Comportamiento normal: agregar coordenadas de lotes
+    handleMapClick(lat, lng);
   };
 
   return (
@@ -190,13 +174,52 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: Ma
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Controles de subida de plano */}
+          {/* Controles de subida/calibración de plano */}
           <div className="flex items-center gap-4 p-4 border rounded-lg">
             <div className="flex-1">
               <h3 className="font-medium mb-2">Plano del Proyecto</h3>
-              {planosUrl ? (
+              {planUrl ? (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-green-600">✓ Plano cargado</span>
+                  <button
+                    type="button"
+                    onClick={() => setCalibrating((v) => !v)}
+                    className={`px-3 py-2 rounded-lg border ${calibrating ? 'bg-crm-primary text-white border-crm-primary' : 'text-crm-text-primary bg-crm-card hover:bg-crm-card-hover border-crm-border'}`}
+                  >
+                    {calibrating ? 'Calibrando…' : 'Calibrar plano'}
+                  </button>
+                  {calibrating && (
+                    <button
+                      type="button"
+                      onClick={() => { setPlacing(true); setFirstCorner(null); toast('Haz dos clics en el mapa para ubicar el plano (esquina 1 y 2)'); }}
+                      className="px-3 py-2 rounded-lg border text-crm-text-primary bg-crm-card hover:bg-crm-card-hover border-crm-border"
+                    >
+                      Marcar zona en mapa
+                    </button>
+                  )}
+                  {calibrating && (
+                    <button
+                      type="button"
+                      onClick={guardarBounds}
+                      className="px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                    >
+                      Guardar calibración
+                    </button>
+                  )}
+                  {calibrating && (
+                    <div className="flex items-center gap-2 ml-2">
+                      <label className="text-sm text-crm-text-muted">Rotación</label>
+                      <input
+                        type="range"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={rotation}
+                        onChange={(e)=>setRotation(parseInt(e.target.value))}
+                      />
+                      <span className="text-sm text-crm-text-primary w-10 text-right">{rotation}°</span>
+                    </div>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -230,6 +253,14 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: Ma
                   <span className="text-sm text-gray-500">
                     JPG, PNG, WEBP • Máx: 5MB
                   </span>
+                  {/* Permitir marcar zona aun sin plano para seguir el flujo */}
+                  <button
+                    type="button"
+                    onClick={() => { setCalibrating(true); setPlacing(true); setFirstCorner(null); toast('Haz dos clics en el mapa para ubicar el plano (esquina 1 y 2)'); }}
+                    className="ml-2 px-3 py-2 rounded-lg border text-crm-text-primary bg-crm-card hover:bg-crm-card-hover border-crm-border"
+                  >
+                    Marcar zona primero
+                  </button>
                 </div>
               )}
             </div>
@@ -237,29 +268,17 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre }: Ma
 
           {/* Mapa */}
           <div className="h-96 border rounded-lg overflow-hidden">
-            <MapContainer
-              center={defaultCenter}
-              zoom={defaultZoom}
-              style={{ height: '100%', width: '100%' }}
-              ref={mapRef}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              
-              {/* Imagen del plano si existe */}
-              {planosUrl && imageBounds && (
-                <ImageOverlay
-                  url={planosUrl}
-                  bounds={imageBounds}
-                  opacity={0.8}
-                />
-              )}
-              
-              <MapClickHandler />
-              <CoordenadasMarkers />
-            </MapContainer>
+            <LeafletMap
+              defaultCenter={defaultCenter}
+              defaultZoom={defaultZoom}
+              coordenadas={coordenadas}
+              onMapClick={onMapClickCoord}
+              planosUrl={planUrl}
+              overlayBounds={overlayBounds}
+              calibrating={calibrating}
+              onBoundsChange={(b) => setOverlayBounds(b)}
+              rotationDeg={rotation}
+            />
           </div>
 
           {/* Instrucciones */}

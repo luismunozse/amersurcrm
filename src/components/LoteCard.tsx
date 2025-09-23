@@ -80,7 +80,7 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
   const handleDelete = () => {
     start(async () => {
       try {
-        await eliminarLote(proyectoId, lote.id);
+        await eliminarLote(lote.id, proyectoId);
         toast.success("Lote eliminado");
         setConfirm((c) => ({ ...c, open: false }));
         router.refresh();
@@ -93,8 +93,9 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
   const handleUpdate = (formData: FormData) => {
     start(async () => {
       try {
-        formData.set("id", lote.id);
-        await actualizarLote(proyectoId, formData);
+        // asegurar que el servidor pueda revalidar la ruta del proyecto
+        formData.set("proyecto_id", proyectoId);
+        await actualizarLote(lote.id, formData);
         toast.success("Lote actualizado");
         setIsEditing(false);
         router.refresh();
