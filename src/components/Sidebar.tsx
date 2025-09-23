@@ -10,6 +10,8 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   userEmail?: string;
+  collapsed?: boolean;
+  onCollapseChange?: (collapsed: boolean) => void;
 }
 
 const navigation = [
@@ -21,7 +23,7 @@ const navigation = [
   )},
   { name: "Clientes", href: "/dashboard/clientes", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
   )},
   { name: "Proyectos", href: "/dashboard/proyectos", icon: (
@@ -39,11 +41,6 @@ const navigation = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
   )},
-  { name: "Reportes", href: "/dashboard/reportes", icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-  )},
 ];
 
 const adminNavigation = [
@@ -55,13 +52,19 @@ const adminNavigation = [
   )},
   { name: "Usuarios", href: "/dashboard/admin/usuarios", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
       </svg>
   )},
   { name: "Configuración", href: "/dashboard/admin/configuracion", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+  )},
+  { name: "Reportes", href: "/dashboard/admin/reportes", icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
   )},
 ];
@@ -88,7 +91,12 @@ function NavLink({
       {!active && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
       )}
-      {active && <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full" />}
+      {active && (
+        <div className={cn(
+          "absolute top-2 bottom-2 w-1 bg-crm-primary rounded-r-full",
+          collapsed ? "left-1" : "left-0"
+        )} />
+      )}
       <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0" : "lg:gap-3")}>
         {children}
       </div>
@@ -96,11 +104,21 @@ function NavLink({
   );
 }
 
-export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollapsed = false, onCollapseChange }: SidebarProps) {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  
+  const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
+  
+  const handleCollapseChange = (newCollapsed: boolean) => {
+    if (onCollapseChange) {
+      onCollapseChange(newCollapsed);
+    } else {
+      setInternalCollapsed(newCollapsed);
+    }
+  };
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -118,7 +136,7 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
   // Persistencia + variable global para margin del contenido
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("sidebarCollapsed") : null;
-    if (saved === "1") setCollapsed(true);
+    if (saved === "1") handleCollapseChange(true);
   }, []);
   useEffect(() => {
     try { localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "0"); } catch {}
@@ -157,15 +175,33 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between h-20 px-6 border-b border-crm-sidebar-hover bg-gradient-to-r from-crm-sidebar to-crm-sidebar-hover/50">
-            <div className={cn("flex items-center space-x-4 w-full", collapsed && "lg:justify-center lg:space-x-0")}>
-              <div className="relative flex-shrink-0">
-                <div className="absolute inset-0 bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 rounded-2xl blur-sm" />
-                <div className="relative bg-white/10 backdrop-blur-sm rounded-2xl p-2 border border-white/20">
-                  <Image src="/amersur-logo-b.png" alt="AMERSUR" width={48} height={48} className="h-12 w-12 object-contain" priority />
+          <div className={cn(
+            "flex items-center h-20 px-6 border-b border-crm-sidebar-hover bg-gradient-to-r from-crm-sidebar to-crm-sidebar-hover/50",
+            collapsed ? "lg:justify-center lg:px-3" : "justify-between"
+          )}>
+            <div className={cn("flex items-center", collapsed ? "lg:space-x-0" : "space-x-4 w-full")}>
+              {/* Logo o botón de expandir */}
+              {collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => handleCollapseChange(false)}
+                  className="hidden lg:flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                  aria-label="Expandir sidebar"
+                  title="Expandir"
+                >
+                  <svg className="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              ) : (
+                <div className="relative flex-shrink-0">
+                  <div className="absolute inset-0 bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 rounded-2xl blur-sm" />
+                  <div className="relative bg-white/10 backdrop-blur-sm rounded-2xl p-2 border border-white/20">
+                    <Image src="/amersur-logo-b.png" alt="AMERSUR" width={48} height={48} className="h-12 w-12 object-contain" priority />
+                  </div>
+                  <div className="absolute inset-0 bg-crm-primary/30 rounded-2xl blur-lg -z-10" />
                 </div>
-                <div className="absolute inset-0 bg-crm-primary/30 rounded-2xl blur-lg -z-10" />
-              </div>
+              )}
 
               {/* Títulos (ocultos al colapsar) */}
               <div className={cn("flex-1 min-w-0 flex flex-col justify-center", collapsed && "hidden lg:hidden")}>
@@ -175,18 +211,20 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
               </div>
             </div>
 
-            {/* Toggle collapse (desktop) */}
-            <button
-              type="button"
-              onClick={() => setCollapsed(v => !v)}
-              className="hidden lg:flex items-center justify-center ml-3 w-9 h-9 rounded-lg border border-white/20 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
-              title={collapsed ? "Expandir" : "Colapsar"}
-            >
-              <svg className={cn("w-5 h-5 transition-transform", collapsed && "rotate-180")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+            {/* Toggle collapse (desktop) - Solo visible cuando no está colapsado */}
+            {!collapsed && (
+              <button
+                type="button"
+                onClick={() => handleCollapseChange(true)}
+                className="hidden lg:flex items-center justify-center ml-3 w-9 h-9 rounded-lg border border-white/20 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Colapsar sidebar"
+                title="Colapsar"
+              >
+                <svg className="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
 
             {/* Close (mobile) */}
             <button onClick={onClose} className="lg:hidden text-crm-text-muted hover:text-white flex-shrink-0" aria-label="Cerrar menú">
@@ -194,6 +232,7 @@ export function Sidebar({ isOpen, onClose, userEmail }: SidebarProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+
           </div>
 
           {/* Navigation */}

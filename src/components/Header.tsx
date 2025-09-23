@@ -7,9 +7,11 @@ import LogoutButton from "./LogoutButton";
 type HeaderProps = {
   onSidebarToggle?: () => void;
   userEmail?: string;
+  sidebarCollapsed?: boolean;
+  onSidebarExpand?: () => void;
 };
 
-export default function Header({ onSidebarToggle = () => {}, userEmail }: HeaderProps) {
+export default function Header({ onSidebarToggle = () => {}, userEmail, sidebarCollapsed = false, onSidebarExpand }: HeaderProps) {
   return (
     <header className="bg-crm-card shadow-crm-lg border-b border-crm-border sticky top-0 z-30">
       <div className="w-full px-6">
@@ -27,8 +29,8 @@ export default function Header({ onSidebarToggle = () => {}, userEmail }: Header
               </svg>
             </button>
 
-            {/* Logo - Solo visible en mobile ya que el sidebar tiene el logo principal */}
-            <div className="lg:hidden flex items-center space-x-3">
+            {/* Logo - Visible en mobile o cuando sidebar está colapsado */}
+            <div className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} flex items-center space-x-3`}>
               <div className="relative">
                 <Image 
                   src="/logo-amersur.png" 
