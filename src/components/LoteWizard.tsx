@@ -68,7 +68,7 @@ export default function LoteWizard({ proyectoId, proyectos, onClose }: LoteWizar
   const [data, setData] = useState<LoteData>(initialData);
   const [isPending, startTransition] = useTransition();
 
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   const updateData = (updates: Partial<LoteData>) => {
     setData(prev => ({ ...prev, ...updates }));
@@ -188,8 +188,6 @@ export default function LoteWizard({ proyectoId, proyectos, onClose }: LoteWizar
       case 3:
         return <Step3 data={data} updateData={updateData} />;
       case 4:
-        return <Step4 data={data} updateData={updateData} />;
-      case 5:
         return <Step5 data={data} onConfirm={handleSubmit} isPending={isPending} />;
       default:
         return null;

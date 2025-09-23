@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
-import PlanosUploader from "./_PlanosUploader";
+import MapeoLotes from "./_MapeoLotes";
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -58,7 +58,7 @@ export default async function ProyLotesPage({
   // Lotes: lista (con filtros) + paginación
   let listQuery = supabase
     .from("lote")
-    .select("id,codigo,sup_m2,precio,moneda,estado,data,created_at")
+    .select("*")
     .eq("proyecto_id", id)
     .order("codigo", { ascending: true })
     .range(from, to);
@@ -68,6 +68,15 @@ export default async function ProyLotesPage({
 
   const { data: lotes, error: eLotes } = await listQuery;
   if (eLotes) throw eLotes;
+
+  // Agregar información del proyecto a cada lote
+  const lotesConProyecto = lotes?.map(lote => ({
+    ...lote,
+    proyecto: {
+      id: proyecto.id,
+      nombre: proyecto.nombre
+    }
+  })) || [];
 
   // Conteo total (mismos filtros)
   let countQuery = supabase
@@ -160,8 +169,8 @@ export default async function ProyLotesPage({
         </form>
       </div>
 
-      {/* Planos del Proyecto */}
-      <PlanosUploader 
+      {/* Mapeo de Lotes */}
+      <MapeoLotes 
         proyectoId={proyecto.id}
         planosUrl={proyecto.planos_url}
         proyectoNombre={proyecto.nombre}
@@ -172,7 +181,7 @@ export default async function ProyLotesPage({
         proyectos={todosLosProyectos || []} 
       />
 
-      <LotesList proyectoId={proyecto.id} lotes={lotes ?? []} />
+      <LotesList proyectoId={proyecto.id} lotes={lotesConProyecto} />
 
       {/* Paginación */}
       <div className="crm-card p-4">

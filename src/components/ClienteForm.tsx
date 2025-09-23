@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import { 
   TIPOS_CLIENTE_OPTIONS, 
+  TIPOS_DOCUMENTO_OPTIONS,
   ESTADOS_CLIENTE_OPTIONS, 
   ORIGENES_LEAD_OPTIONS, 
   INTERESES_PRINCIPALES_OPTIONS 
@@ -19,6 +20,7 @@ interface ClienteFormProps {
     email?: string;
     telefono?: string;
     tipo_cliente?: string;
+    tipo_documento?: string;
     documento_identidad?: string;
     telefono_whatsapp?: string;
     direccion?: any;
@@ -41,6 +43,7 @@ export default function ClienteForm({
 }: ClienteFormProps) {
   const [pending, setPending] = useState(false);
   const [tipoCliente, setTipoCliente] = useState(cliente?.tipo_cliente || "persona");
+  const [tipoDocumento, setTipoDocumento] = useState(cliente?.tipo_documento || "DNI");
   const [ubicacion, setUbicacion] = useState({
     departamento: '',
     provincia: '',
@@ -106,7 +109,7 @@ export default function ClienteForm({
             <h3 className="text-lg font-semibold text-crm-text-primary">Información Básica</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Tipo de Cliente */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-crm-text-primary">
@@ -141,22 +144,51 @@ export default function ClienteForm({
               />
             </div>
 
-            {/* DNI/RUC */}
+            {/* Tipo de Documento */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-crm-text-primary">
-                {tipoCliente === 'persona' ? 'DNI' : 'RUC'} <span className="text-red-500">*</span>
+                Tipo de Documento <span className="text-red-500">*</span>
               </label>
-              <input 
-                name="documento_identidad" 
-                required
-                defaultValue={cliente?.documento_identidad || ""}
-                className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
+              <select 
+                name="tipo_documento" 
+                required 
+                value={tipoDocumento}
+                onChange={(e) => setTipoDocumento(e.target.value)}
+                className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                 disabled={pending}
-                placeholder={tipoCliente === 'persona' ? '12345678' : '20123456789'}
-                pattern={tipoCliente === 'persona' ? '[0-9]{8}' : '[0-9]{11}'}
-                title={tipoCliente === 'persona' ? 'Ingrese 8 dígitos' : 'Ingrese 11 dígitos'}
-              />
+              >
+                {TIPOS_DOCUMENTO_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </div>
+
+          {/* Número de Documento */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-crm-text-primary">
+              Número de Documento <span className="text-red-500">*</span>
+            </label>
+            <input 
+              name="documento_identidad" 
+              required
+              defaultValue={cliente?.documento_identidad || ""}
+              className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
+              disabled={pending}
+              placeholder={tipoDocumento === 'DNI' ? '12345678' : 
+                         tipoDocumento === 'RUC' ? '20123456789' : 
+                         tipoDocumento === 'PAS' ? 'AB123456' : 
+                         '12345678'}
+              pattern={tipoDocumento === 'DNI' ? '[0-9]{8}' : 
+                      tipoDocumento === 'RUC' ? '[0-9]{11}' : 
+                      tipoDocumento === 'PAS' ? '[A-Z]{2}[0-9]{6}' : 
+                      '[0-9]{8}'}
+              title={tipoDocumento === 'DNI' ? 'Ingrese 8 dígitos' : 
+                     tipoDocumento === 'RUC' ? 'Ingrese 11 dígitos' : 
+                     tipoDocumento === 'PAS' ? 'Formato: AB123456' : 
+                     'Ingrese el número de documento'}
+            />
+          </div>
+
 
             {/* Email */}
             <div className="space-y-2">
@@ -254,9 +286,9 @@ export default function ClienteForm({
           </div>
 
           {/* Campos ocultos para enviar datos de ubicación */}
-          <input type="hidden" name="direccion_departamento" value={ubicacion.departamento} />
-          <input type="hidden" name="direccion_provincia" value={ubicacion.provincia} />
-          <input type="hidden" name="direccion_distrito" value={ubicacion.distrito} />
+          <input type="hidden" name="direccion_departamento" value={ubicacion.departamento || ""} />
+          <input type="hidden" name="direccion_provincia" value={ubicacion.provincia || ""} />
+          <input type="hidden" name="direccion_distrito" value={ubicacion.distrito || ""} />
           <input type="hidden" name="direccion_pais" value="Perú" />
         </div>
 

@@ -1,15 +1,35 @@
-import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
+import csv from 'csv-parser';
 
-function pad2(v: string) { return v.padStart(2, "0").slice(0,2); }
+export async function GET() {
+  try {
+    const csvPath = path.join(process.cwd(), 'data/inei-csvs/provincias.csv');
+    
+    if (!fs.existsSync(csvPath)) {
+      return NextResponse.json({ error: 'Archivo de provincias no encontrado' }, { status: 404 });
+    }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const dep = pad2(searchParams.get("dep") || "");
-  if (!/^\d{2}$/.test(dep)) return NextResponse.json({ error: "dep (2 dígitos) requerido" }, { status: 400 });
+    const provincias: any[] = [];
+    
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(csvPath)
+        .pipe(csv())
+        .on('data', (row) => {
+          provincias.push({
+            code: row.code,
+            name: row.name,
+            departamento_code: row.departamento_code
+          });
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
 
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase.rpc("api_get_provincias", { dep });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400" } });
+    return NextResponse.json(provincias);
+  } catch (error) {
+    console.error('Error leyendo provincias:', error);
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
 }

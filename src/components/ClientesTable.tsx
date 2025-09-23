@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, memo, useMemo } from "react";
-import { actualizarCliente, eliminarCliente } from "@/app/dashboard/clientes/_actions";
+import { actualizarCliente, eliminarCliente, actualizarEstadoCliente } from "@/app/dashboard/clientes/_actions";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -738,6 +738,86 @@ const ClienteRow = memo(function ClienteRow({
     }
   };
 
+  const getEstadoButtons = (cliente: Cliente) => {
+    let currentEstado = cliente.estado_cliente || 'prospecto';
+    
+    // Normalizar el estado (convertir a minúsculas y manejar variaciones)
+    if (typeof currentEstado === 'string') {
+      currentEstado = currentEstado.toLowerCase().trim();
+      // Mapear variaciones comunes
+      if (currentEstado === 'transferido') currentEstado = 'transferido';
+      if (currentEstado === 'contactado') currentEstado = 'contactado';
+      if (currentEstado === 'por contactar' || currentEstado === 'por_contactar') currentEstado = 'por_contactar';
+    }
+
+    // Mostrar solo un botón que avance al siguiente estado
+    if (currentEstado === 'prospecto' || currentEstado === '') {
+      return (
+        <button
+          onClick={() => handleEstadoChange(cliente.id, 'por_contactar')}
+          className="px-3 py-1 text-xs font-medium text-blue-800 bg-blue-100 border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-all duration-200 rounded-full flex items-center gap-1 group"
+        >
+          <span>Por Contactar</span>
+          <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+      );
+    }
+
+    if (currentEstado === 'por_contactar') {
+      return (
+        <button
+          onClick={() => handleEstadoChange(cliente.id, 'contactado')}
+          className="px-3 py-1 text-xs font-medium text-blue-800 bg-blue-100 border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-all duration-200 rounded-full flex items-center gap-1 group"
+        >
+          <span>Por Contactar</span>
+          <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+      );
+    }
+
+    if (currentEstado === 'contactado') {
+      return (
+        <button
+          onClick={() => handleEstadoChange(cliente.id, 'transferido')}
+          className="px-3 py-1 text-xs font-medium text-yellow-800 bg-yellow-100 border border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-all duration-200 rounded-full flex items-center gap-1 group"
+        >
+          <span>Contactado</span>
+          <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+      );
+    }
+
+    // Los clientes transferidos no tienen más acciones
+    if (currentEstado === 'transferido') {
+      return (
+        <span className="px-3 py-1 text-xs font-medium text-green-800 bg-green-100 border border-green-200 rounded-full flex items-center gap-1">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>Transferido</span>
+        </span>
+      );
+    }
+
+    return null;
+  };
+
+  const handleEstadoChange = async (clienteId: string, nuevoEstado: string) => {
+    console.log('Cambiando estado del cliente:', clienteId, 'a:', nuevoEstado);
+    try {
+      await actualizarEstadoCliente(clienteId, nuevoEstado);
+      toast.success(`Estado cambiado a ${getEstadoClienteLabel(nuevoEstado as any)}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error) || 'Error cambiando estado');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-PE', {
       day: '2-digit',
@@ -768,9 +848,9 @@ const ClienteRow = memo(function ClienteRow({
 
       {/* Estado */}
       <td className="px-4 py-4 whitespace-nowrap">
-        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getEstadoColor(cliente.estado_cliente || 'prospecto')}`}>
-          {getEstadoClienteLabel(cliente.estado_cliente as any)}
-        </span>
+        <div className="flex items-center gap-2">
+          {getEstadoButtons(cliente)}
+        </div>
       </td>
 
       {/* Contacto */}

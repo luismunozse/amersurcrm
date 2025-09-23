@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useTransition, memo, useMemo } from "react";
-import { actualizarCliente, eliminarCliente } from "./_actions";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useTransition, memo, useMemo, useEffect } from "react";
+import { eliminarCliente, actualizarEstadoCliente } from "./_actions";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Pagination } from "@/components/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import ClienteForm from "@/components/ClienteForm";
-import ClienteDetailModal from "@/components/ClienteDetailModal";
 import SimpleModal from "@/components/SimpleModal";
 
 type Cliente = { 
@@ -35,7 +34,7 @@ type Cliente = {
   propiedades_alquiladas: number;
   saldo_pendiente: number;
   notas: string | null;
-  direccion: any;
+  direccion: Record<string, unknown>;
 };
 
 export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
@@ -47,8 +46,13 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   });
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [clientesState, setClientesState] = useState<Cliente[]>(clientes);
   const router = useRouter();
-  const params = useSearchParams();
+
+  // Sincronizar estado cuando cambien los props
+  useEffect(() => {
+    setClientesState(clientes);
+  }, [clientes]);
 
   // Paginación
   const {
@@ -57,7 +61,7 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
     paginatedItems,
     goToPage,
   } = usePagination({
-    items: clientes,
+    items: clientesState,
     itemsPerPage: 10,
   });
 
@@ -97,6 +101,37 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
     setSelectedCliente(null);
   };
 
+  const getEstadoText = (estado: string) => {
+    switch (estado) {
+      case 'por_contactar': return 'Por Contactar';
+      case 'contactado': return 'Contactado';
+      case 'transferido': return 'Transferido';
+      default: return 'Prospecto';
+    }
+  };
+
+  const handleEstadoChange = async (clienteId: string, nuevoEstado: string) => {
+    console.log('Cambiando estado del cliente:', clienteId, 'a:', nuevoEstado);
+    try {
+      // Actualización optimista
+      setClientesState(prevClientes =>
+        prevClientes.map(cliente =>
+          cliente.id === clienteId
+            ? { ...cliente, estado_cliente: nuevoEstado }
+            : cliente
+        )
+      );
+
+      await actualizarEstadoCliente(clienteId, nuevoEstado);
+      toast.success(`Estado cambiado a ${getEstadoText(nuevoEstado)}`);
+    } catch (error) {
+      // Revertir cambios en caso de error
+      setClientesState(clientes);
+      toast.error(getErrorMessage(error) || 'Error cambiando estado');
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <div className="crm-card p-6">
@@ -130,6 +165,7 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
                 onAfterSave={handleAfterSave}
                 onDelete={askDelete}
                 onShowDetail={handleShowDetail}
+                onEstadoChange={handleEstadoChange}
               />
             ))}
           </div>
@@ -184,6 +220,7 @@ const ClienteItem = memo(function ClienteItem({
   onAfterSave,
   onDelete,
   onShowDetail,
+  onEstadoChange,
 }: {
   cliente: Cliente;
   isEditing: boolean;
@@ -193,6 +230,7 @@ const ClienteItem = memo(function ClienteItem({
   onAfterSave: () => void;
   onDelete: (c: Cliente) => void;
   onShowDetail: (c: Cliente) => void;
+  onEstadoChange: (clienteId: string, nuevoEstado: string) => void;
 }) {
   if (isEditing) {
     return (
@@ -208,11 +246,97 @@ const ClienteItem = memo(function ClienteItem({
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
-      case 'por_contactar': return 'bg-blue-100 text-blue-800';
-      case 'contactado': return 'bg-yellow-100 text-yellow-800';
-      case 'transferido': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'por_contactar': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'contactado': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'transferido': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
+  };
+
+  const getEstadoText = (estado: string) => {
+    switch (estado) {
+      case 'por_contactar': return 'Por Contactar';
+      case 'contactado': return 'Contactado';
+      case 'transferido': return 'Transferido';
+      default: return 'Prospecto';
+    }
+  };
+
+  const getEstadoButtons = (cliente: Cliente) => {
+    const buttons = [];
+    let currentEstado = cliente.estado_cliente || 'prospecto';
+    
+    // Normalizar el estado (convertir a minúsculas y manejar variaciones)
+    if (typeof currentEstado === 'string') {
+      currentEstado = currentEstado.toLowerCase().trim();
+      // Mapear variaciones comunes
+      if (currentEstado === 'transferido') currentEstado = 'transferido';
+      if (currentEstado === 'contactado') currentEstado = 'contactado';
+      if (currentEstado === 'por contactar' || currentEstado === 'por_contactar') currentEstado = 'por_contactar';
+    }
+    
+    console.log('Cliente:', cliente.nombre, 'Estado original:', cliente.estado_cliente, 'Estado normalizado:', currentEstado);
+
+    // Botón de prueba que siempre aparece
+    buttons.push(
+      <button
+        key="test"
+        onClick={() => console.log('Botón de prueba clickeado para:', cliente.nombre)}
+        className="px-2 py-1 text-xs font-medium text-red-600 bg-red-100 border border-red-200 hover:bg-red-200 hover:border-red-300 transition-colors rounded-full"
+      >
+        TEST
+      </button>
+    );
+
+    if (currentEstado === 'prospecto' || currentEstado === '') {
+      buttons.push(
+        <button
+          key="contactar"
+          onClick={() => onEstadoChange(cliente.id, 'por_contactar')}
+          className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-colors rounded-full"
+        >
+          Por Contactar
+        </button>
+      );
+    }
+
+    if (currentEstado === 'por_contactar') {
+      buttons.push(
+        <button
+          key="contactado"
+          onClick={() => onEstadoChange(cliente.id, 'contactado')}
+          className="px-2 py-1 text-xs font-medium text-yellow-600 bg-yellow-100 border border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-colors rounded-full"
+        >
+          Contactado
+        </button>
+      );
+    }
+
+    if (currentEstado === 'contactado') {
+      buttons.push(
+        <button
+          key="transferir"
+          onClick={() => onEstadoChange(cliente.id, 'transferido')}
+          className="px-2 py-1 text-xs font-medium text-green-600 bg-green-100 border border-green-200 hover:bg-green-200 hover:border-green-300 transition-colors rounded-full"
+        >
+          Transferir
+        </button>
+      );
+    }
+
+    if (currentEstado === 'transferido') {
+      buttons.push(
+        <button
+          key="revertir"
+          onClick={() => onEstadoChange(cliente.id, 'contactado')}
+          className="px-2 py-1 text-xs font-medium text-orange-600 bg-orange-100 border border-orange-200 hover:bg-orange-200 hover:border-orange-300 transition-colors rounded-full"
+        >
+          Revertir
+        </button>
+      );
+    }
+
+    return buttons;
   };
 
   const formatCapacidad = (capacidad: number | null) => {
@@ -252,12 +376,12 @@ const ClienteItem = memo(function ClienteItem({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(cliente.estado_cliente || 'prospecto')}`}>
-              {cliente.estado_cliente ? 
-                cliente.estado_cliente.charAt(0).toUpperCase() + cliente.estado_cliente.slice(1) : 
-                'Prospecto'
-              }
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getEstadoColor(cliente.estado_cliente || 'prospecto')}`}>
+              {getEstadoText(cliente.estado_cliente || 'prospecto')}
             </span>
+            <div className="flex items-center gap-1">
+              {getEstadoButtons(cliente)}
+            </div>
             <button 
               className="px-3 py-1.5 text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors" 
               onClick={() => onEdit(cliente.id)}
@@ -397,9 +521,26 @@ function EditRow({
   onCancel: () => void;
   afterSave: () => void;
 }) {
+  // Convert Cliente type to match ClienteForm expectations
+  const clienteForForm = {
+    id: initial.id,
+    nombre: initial.nombre,
+    email: initial.email || undefined,
+    telefono: initial.telefono || undefined,
+    tipo_cliente: initial.tipo_cliente,
+    documento_identidad: initial.documento_identidad || undefined,
+    telefono_whatsapp: initial.telefono_whatsapp || undefined,
+    direccion: initial.direccion,
+    estado_cliente: initial.estado_cliente,
+    origen_lead: initial.origen_lead || undefined,
+    vendedor_asignado: initial.vendedor_asignado || undefined,
+    interes_principal: initial.interes_principal || undefined,
+    notas: initial.notas || undefined,
+  };
+
   return (
     <ClienteForm
-      cliente={initial}
+      cliente={clienteForForm}
       isEditing={true}
       onSuccess={afterSave}
       onCancel={onCancel}
@@ -407,25 +548,3 @@ function EditRow({
   );
 }
 
-const SearchBox = memo(function SearchBox({ defaultValue }: { defaultValue: string }) {
-  const router = useRouter();
-
-  const handleSubmit = useMemo(() => (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const q = new FormData(e.currentTarget).get("q") as string;
-    const url = q ? `/dashboard/clientes?q=${encodeURIComponent(q)}` : `/dashboard/clientes`;
-    router.push(url);
-  }, [router]);
-
-  return (
-    <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-      <input
-        name="q"
-        defaultValue={defaultValue}
-        placeholder="Buscar por nombre o email..."
-        className="border px-2 py-1 rounded"
-      />
-      <button className="border px-3 py-1 rounded">Buscar</button>
-    </form>
-  );
-});

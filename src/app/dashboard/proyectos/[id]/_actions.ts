@@ -184,15 +184,20 @@ export async function actualizarLote(loteId: string, fd: FormData) {
     throw new Error("Error verificando permisos: " + (error as Error).message);
   }
 
+  // Construir objeto de actualización dinámicamente
+  const updateData: any = {
+    estado: estado as "disponible" | "reservado" | "vendido",
+  };
+
+  // Solo actualizar otros campos si tienen valores válidos
+  if (codigo) updateData.codigo = codigo;
+  if (sup_m2 !== null) updateData.sup_m2 = sup_m2;
+  if (precio !== null) updateData.precio = precio;
+  if (moneda && moneda !== "ARS") updateData.moneda = moneda;
+
   const { error } = await supabase
     .from("lote")
-    .update({
-      codigo,
-      sup_m2,
-      precio,
-      moneda,
-      estado: estado as "disponible" | "reservado" | "vendido",
-    })
+    .update(updateData)
     .eq("id", loteId);
 
   if (error) throw new Error(error.message);
@@ -223,4 +228,100 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+}
+
+// =========================================
+// Funciones para manejo de coordenadas de lotes
+// =========================================
+
+export async function guardarCoordenadasLote(loteId: string, lat: number, lng: number) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const { error } = await supabase
+    .from("lote")
+    .update({
+      coordenada_lat: lat,
+      coordenada_lng: lng,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", loteId);
+
+  if (error) throw new Error(`Error guardando coordenadas: ${error.message}`);
+
+  revalidatePath(`/dashboard/proyectos/${loteId}`);
+  return { success: true };
+}
+
+export async function guardarCoordenadasMultiples(proyectoId: string, coordenadas: Array<{loteId: string, lat: number, lng: number, nombre: string}>) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  // Crear lotes si no existen, o actualizar si existen
+  const updates = coordenadas.map(coord => ({
+    id: coord.loteId,
+    proyecto_id: proyectoId,
+    nombre: coord.nombre,
+    coordenada_lat: coord.lat,
+    coordenada_lng: coord.lng,
+    updated_at: new Date().toISOString()
+  }));
+
+  const { error } = await supabase
+    .from("lote")
+    .upsert(updates, { 
+      onConflict: 'id',
+      ignoreDuplicates: false 
+    });
+
+  if (error) throw new Error(`Error guardando coordenadas: ${error.message}`);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { success: true, count: coordenadas.length };
+}
+
+export async function obtenerCoordenadasProyecto(proyectoId: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data: lotes, error } = await supabase
+    .from('lote')
+    .select(`
+      id,
+      nombre,
+      coordenada_lat,
+      coordenada_lng,
+      created_at,
+      updated_at
+    `)
+    .eq('proyecto_id', proyectoId)
+    .not('coordenada_lat', 'is', null)
+    .not('coordenada_lng', 'is', null);
+
+  if (error) throw new Error(`Error obteniendo coordenadas: ${error.message}`);
+
+  return lotes || [];
 }

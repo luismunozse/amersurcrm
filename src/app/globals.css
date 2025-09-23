@@ -23,16 +23,64 @@
     @apply bg-crm-secondary text-white hover:bg-neutral-600 focus:ring-crm-secondary;
   }
   
-  .crm-text-primary {
-    @apply text-crm-text-primary;
+  .crm-text-primary { @apply text-crm-text-primary; }
+  .crm-text-secondary { @apply text-crm-text-secondary; }
+  .crm-text-muted { @apply text-crm-text-muted; }
+
+  /* === FIX: Menú de Ubigeo (dropdown custom) ============================= */
+  /* Fuerza color/altura dentro del popup sin afectar el resto del sitio.   */
+  .ubigeo-menu,
+  .ubigeo-menu * {
+    color: #0f172a !important;              /* texto visible */
+    -webkit-text-fill-color: #0f172a !important; /* fuerza en webkit */
+    background-color: #ffffff;              /* fondo blanco */
+    line-height: 1.25rem !important;        /* 20px */
+    font-size: 14px !important;
+    opacity: 1 !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    -webkit-background-clip: initial !important;
+    text-shadow: 0 0 0 #0f172a; /* truco para forzar pintado del texto */
   }
-  
-  .crm-text-secondary {
-    @apply text-crm-text-secondary;
+  .ubigeo-menu {
+    @apply rounded-xl border-2 border-[var(--crm-border)] shadow-xl;
+    isolation: isolate;
   }
-  
-  .crm-text-muted {
-    @apply text-crm-text-muted;
+  .ubigeo-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--crm-border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .ubigeo-item-text {
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+    display: block;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 0 0 #0f172a;
+  }
+  .ubigeo-item:last-child { border-bottom: 0; }
+  .ubigeo-item:hover { background: #f8fafc; }
+
+  /* Variante dark del popup */
+  .dark .ubigeo-menu,
+  .dark .ubigeo-menu * {
+    color: var(--crm-text-primary) !important;
+    -webkit-text-fill-color: var(--crm-text-primary) !important;
+    background-color: var(--crm-card);
+  }
+  .dark .ubigeo-item { border-bottom: 1px solid var(--crm-border); }
+  .dark .ubigeo-item:hover { background: var(--crm-card-hover); }
+
+  /* Safety net para selects nativos (Safari, Firefox) */
+  select option {
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+  }
+  .dark select option {
+    color: var(--crm-text-primary) !important;
+    background-color: var(--crm-card) !important;
   }
 }
 
@@ -97,3 +145,7 @@
   --crm-text-muted: #94a3b8;
   --crm-bg-primary: #0f172a;
 }
+
+/* === Sidebar responsive width === */
+:root { --sidebar-w: 18rem; }        /* w-72 por defecto */
+.sidebar-collapsed { --sidebar-w: 5rem; } /* w-20 al colapsar */

@@ -49,8 +49,7 @@ export default function NewProyectoForm() {
       </div>
       
       <form action={(fd) => start(async () => { await crearProyecto(fd); })}
-            className="space-y-6"
-            encType="multipart/form-data">
+            className="space-y-6">
         
         {/* Primera fila: Nombre y Estado */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

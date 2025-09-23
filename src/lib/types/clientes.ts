@@ -2,6 +2,8 @@
 
 export type TipoCliente = 'persona' | 'empresa';
 
+export type TipoDocumento = 'DNI' | 'PAS' | 'EXT' | 'RUC';
+
 export type EstadoCliente = 'por_contactar' | 'contactado' | 'transferido';
 
 export type OrigenLead = 
@@ -58,6 +60,7 @@ export interface ClienteCompleto {
   codigo_cliente: string;
   tipo_cliente: TipoCliente;
   nombre: string;
+  tipo_documento?: TipoDocumento;
   documento_identidad?: string;
   email?: string;
   telefono?: string;
@@ -92,6 +95,7 @@ export interface ClienteFormData {
   // Identificación básica
   tipo_cliente: TipoCliente;
   nombre: string;
+  tipo_documento?: TipoDocumento;
   documento_identidad?: string;
   email?: string;
   telefono?: string;
@@ -117,6 +121,13 @@ export interface ClienteFormData {
 export const TIPOS_CLIENTE_OPTIONS = [
   { value: 'persona', label: 'Persona' },
   { value: 'empresa', label: 'Empresa' }
+] as const;
+
+export const TIPOS_DOCUMENTO_OPTIONS = [
+  { value: 'DNI', label: 'DNI' },
+  { value: 'PAS', label: 'PAS (Pasaporte)' },
+  { value: 'EXT', label: 'EXT (Libreta de Extranjería)' },
+  { value: 'RUC', label: 'RUC' }
 ] as const;
 
 export const ESTADOS_CLIENTE_OPTIONS = [

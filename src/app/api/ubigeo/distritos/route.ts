@@ -1,15 +1,36 @@
-import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
+import csv from 'csv-parser';
 
-function pad4(v: string) { return v.padStart(4, "0").slice(0,4); }
+export async function GET() {
+  try {
+    const csvPath = path.join(process.cwd(), 'data/inei-csvs/distritos.csv');
+    
+    if (!fs.existsSync(csvPath)) {
+      return NextResponse.json({ error: 'Archivo de distritos no encontrado' }, { status: 404 });
+    }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const prov = pad4(searchParams.get("prov") || "");
-  if (!/^\d{4}$/.test(prov)) return NextResponse.json({ error: "prov (4 dígitos) requerido" }, { status: 400 });
+    const distritos: any[] = [];
+    
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(csvPath)
+        .pipe(csv())
+        .on('data', (row) => {
+          distritos.push({
+            code: row.code,
+            name: row.name,
+            provincia_code: row.provincia_code,
+            departamento_code: row.departamento_code
+          });
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
 
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase.rpc("api_get_distritos", { prov });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400" } });
+    return NextResponse.json(distritos);
+  } catch (error) {
+    console.error('Error leyendo distritos:', error);
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
 }

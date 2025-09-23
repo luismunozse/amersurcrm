@@ -6,6 +6,7 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { 
   TipoCliente, 
+  TipoDocumento,
   EstadoCliente, 
   OrigenLead, 
   FormaPago, 
@@ -39,6 +40,7 @@ const ClienteCompletoSchema = z.object({
   // Identificación básica
   tipo_cliente: z.enum(['persona', 'empresa']),
   nombre: z.string().min(1, "Nombre requerido"),
+  tipo_documento: z.enum(['DNI', 'PAS', 'EXT', 'RUC']).optional(),
   documento_identidad: z.string().optional().or(z.literal("")),
   email: z.string().email().optional().or(z.literal("")),
   telefono: z.string().optional().or(z.literal("")),
@@ -60,11 +62,26 @@ const ClienteCompletoSchema = z.object({
   notas: z.string().optional().or(z.literal("")),
 });
 
+// Mapea el tipo de documento de la UI a los valores permitidos por la BD
+// UI: 'DNI' | 'RUC' | 'PAS' | 'EXT'
+// DB: 'dni' | 'ruc' | 'pasaporte' | 'carnet_extranjeria' | 'cuit' | 'otro'
+function mapTipoDocumentoToDb(tipo?: TipoDocumento | null): string | null {
+  if (!tipo) return null;
+  const map: Record<string, string> = {
+    DNI: 'dni',
+    RUC: 'ruc',
+    PAS: 'pasaporte',
+    EXT: 'carnet_extranjeria',
+  };
+  return map[tipo] ?? 'otro';
+}
+
 export async function crearCliente(formData: FormData) {
   // Extraer datos del formulario
   const clienteData = {
     tipo_cliente: String(formData.get("tipo_cliente") || "persona") as TipoCliente,
     nombre: String(formData.get("nombre") || ""),
+    tipo_documento: String(formData.get("tipo_documento") || "DNI") as TipoDocumento,
     documento_identidad: String(formData.get("documento_identidad") || ""),
     email: String(formData.get("email") || ""),
     telefono: String(formData.get("telefono") || ""),
@@ -107,6 +124,8 @@ export async function crearCliente(formData: FormData) {
     email: parsed.data.email || null,
     telefono: parsed.data.telefono || null,
     telefono_whatsapp: parsed.data.telefono_whatsapp || null,
+    // Alinear con constraint cliente_tipo_documento_check
+    tipo_documento: mapTipoDocumentoToDb(parsed.data.tipo_documento),
     documento_identidad: parsed.data.documento_identidad || null,
     origen_lead: parsed.data.origen_lead || null,
     vendedor_asignado: parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== "" ? parsed.data.vendedor_asignado : null,
@@ -164,6 +183,20 @@ export async function actualizarCliente(formData: FormData) {
     .from("cliente")
     .update({ nombre, email: email || null, telefono: telefono || null })
     .eq("id", id); // RLS garantiza que solo se actualicen los propios
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/clientes");
+}
+
+export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { error } = await supabase
+    .from("cliente")
+    .update({ estado_cliente: nuevoEstado })
+    .eq("id", clienteId);
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/clientes");
