@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Edit, Trash2, Eye, MapPin, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
-import { actualizarLote, eliminarLote } from "./_actions";
+import { actualizarLote, eliminarLote, duplicarLote } from "./_actions";
 import LoteEditModal from "./LoteEditModal";
+import LoteDetailModal from "./LoteDetailModal";
 
 type Lote = {
   id: string;
@@ -41,6 +42,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // Helper para parsear data
   const parseData = (data: any) => {
@@ -197,18 +199,17 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
   };
 
   const handleView = (loteId: string) => {
-    const l = lotesAMostrar.find(l => l.id === loteId);
-    if (!l) return;
-    const d = parseData(l.data);
-    const detalles = [
-      `Código: ${l.codigo}`,
-      `Superficie: ${l.sup_m2 ?? 'No especificado'} m²`,
-      `Precio: ${l.precio ?? 'No especificado'}`,
-      d?.manzana ? `Manzana: ${d.manzana}` : null,
-      d?.numero ? `Número: ${d.numero}` : null,
-      d?.etapa ? `Etapa: ${d.etapa}` : null,
-    ].filter(Boolean).join('\n');
-    alert(detalles);
+    setDetailId(loteId);
+  };
+
+  const handleDuplicate = async (loteId: string, codigo: string) => {
+    try {
+      const dup = await duplicarLote(loteId, proyectoId);
+      toast.success(`Lote ${codigo} duplicado como ${dup.codigo}`);
+      setLotesState(prev => [dup as any, ...prev]);
+    } catch (e) {
+      toast.error((e as Error).message || 'Error duplicando lote');
+    }
   };
 
   const toggleMenu = (loteId: string) => {
@@ -490,6 +491,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
                                 )}
                                 
                                 {/* Acciones adicionales */}
+                                
                                 <button
                                   onClick={() => {
                                     handleView(lote.id);
@@ -509,6 +511,17 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
                                 >
                                   <Edit className="w-4 h-4" />
                                   Editar lote
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleDuplicate(lote.id, lote.codigo);
+                                    closeMenu();
+                                  }}
+                                  title="Duplicar lote"
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
+                                  Duplicar lote
                                 </button>
                                 <button
                                   onClick={() => {
@@ -636,6 +649,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
                               )}
                               
                               {/* Acciones adicionales */}
+                              
                               <button
                                 onClick={() => {
                                   handleEdit(lote.id);
@@ -701,6 +715,11 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
           return false;
         }
       }}
+    />
+    <LoteDetailModal
+      open={!!detailId}
+      onClose={() => setDetailId(null)}
+      lote={lotesAMostrar.find(l => l.id === detailId) || null}
     />
     </>
   );

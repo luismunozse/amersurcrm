@@ -230,6 +230,75 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
 }
 
+// Duplicar un lote manteniendo sus datos. Genera un código único con sufijo -copy, -copy-2, ...
+export async function duplicarLote(loteId: string, proyectoId: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Solo admin
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para duplicar lotes");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  // Traer lote original
+  const { data: original, error: errGet } = await supabase
+    .from('lote')
+    .select('proyecto_id,codigo,sup_m2,precio,moneda,estado,data')
+    .eq('id', loteId)
+    .single();
+  if (errGet) throw new Error(errGet.message);
+  if (!original) throw new Error('Lote no encontrado');
+
+  // Generar código único
+  const base = `${original.codigo}-copy`;
+  let candidate = base;
+  let idx = 2;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data: exists, error: errExists } = await supabase
+      .from('lote')
+      .select('id', { count: 'exact', head: true })
+      .eq('proyecto_id', proyectoId)
+      .eq('codigo', candidate);
+    if (errExists) throw new Error(errExists.message);
+    if (!exists) break; // head:true -> exists es null; count viene en headers, pero si no hay error podemos intentar otra estrategia
+    // fallback: intentar otra consulta para determinar existencia de manera confiable
+    const { count } = await supabase
+      .from('lote')
+      .select('*', { count: 'exact', head: true })
+      .eq('proyecto_id', proyectoId)
+      .eq('codigo', candidate);
+    if ((count ?? 0) === 0) break;
+    candidate = `${base}-${idx++}`;
+  }
+
+  // Insertar duplicado
+  const { data: inserted, error: errIns } = await supabase
+    .from('lote')
+    .insert({
+      proyecto_id: proyectoId,
+      codigo: candidate,
+      sup_m2: original.sup_m2,
+      precio: original.precio,
+      moneda: original.moneda,
+      estado: original.estado,
+      data: original.data,
+      created_by: user.id,
+    })
+    .select('*')
+    .single();
+  if (errIns) throw new Error(errIns.message);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return inserted;
+}
+
 // =========================================
 // Funciones para manejo de coordenadas de lotes
 // =========================================

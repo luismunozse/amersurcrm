@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, TileLayer, useMap, Marker, Popup, ImageOverlay, Rectangle, SVGOverlay } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, Marker, Popup, ImageOverlay, Rectangle, SVGOverlay, Polygon } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -33,6 +33,7 @@ interface LeafletMapProps {
   calibrating?: boolean;
   onBoundsChange?: (bounds: [[number, number], [number, number]]) => void;
   rotationDeg?: number; // ángulo en grados
+  lotePolygons?: Record<string, [number, number][]>; // id -> array de [lat,lng]
 }
 
 function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
@@ -70,6 +71,7 @@ export default function LeafletMap({
   calibrating = false,
   onBoundsChange,
   rotationDeg = 0,
+  lotePolygons,
 }: LeafletMapProps) {
   // Bounds por defecto (caja de ~1-2km alrededor del centro)
   const defaultBounds: [[number, number], [number, number]] = [
@@ -148,6 +150,13 @@ export default function LeafletMap({
 
       <MapClickHandler onMapClick={onMapClick} />
       <FitOnUpdate bounds={overlayBounds} markers={coordenadas} />
+
+      {/* Polígonos de lotes vinculados al plano */}
+      {lotePolygons && Object.entries(lotePolygons).map(([id, pts]) => (
+        pts.length >= 3 ? (
+          <Polygon key={id} positions={pts as any} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
+        ) : null
+      ))}
     </MapContainer>
   );
 }

@@ -16,6 +16,7 @@ interface MapeoLotesProps {
   proyectoNombre: string;
   initialBounds?: [[number, number],[number, number]] | null;
   initialRotation?: number | null;
+  lotes?: Array<{ id: string; codigo: string; data?: any }>;
 }
 
 interface Coordenada {
@@ -27,7 +28,7 @@ interface Coordenada {
 
 const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
 
-export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation }: MapeoLotesProps) {
+export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation, lotes = [] }: MapeoLotesProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
@@ -37,6 +38,19 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
   const [rotation, setRotation] = useState(initialRotation ?? 0);
   // Permite seguir el flujo seleccionar zona -> subir plano sin recargar
   const [planUrl, setPlanUrl] = useState<string | null>(planosUrl);
+  const [keepAspect, setKeepAspect] = useState(true);
+  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
+  const [lotePoints, setLotePoints] = useState<Record<string, [number, number][]>>({});
+
+  // Snap de rotación a ángulos cardinales si está cerca del umbral
+  const snapAngle = (deg: number) => {
+    const targets = [ -180, -90, 0, 90, 180 ];
+    const threshold = 5; // grados
+    for (const t of targets) {
+      if (Math.abs(deg - t) <= threshold) return t;
+    }
+    return deg;
+  };
 
   // Coordenadas de Lima, Perú como centro por defecto
   const defaultCenter: [number, number] = [-12.0464, -77.0428];
@@ -160,8 +174,53 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
       }
       return;
     }
+    // Si estamos vinculando un lote, añadimos un punto al polígono de ese lote
+    if (selectedLoteId) {
+      setLotePoints(prev => {
+        const arr = prev[selectedLoteId] ? [...prev[selectedLoteId]] : [];
+        arr.push([lat, lng]);
+        return { ...prev, [selectedLoteId]: arr };
+      });
+      toast.success(`Punto agregado al lote ${selectedLoteId}`);
+      return;
+    }
     // Comportamiento normal: agregar coordenadas de lotes
     handleMapClick(lat, lng);
+  };
+
+  // Helpers de bounds
+  const getCenterFromBounds = (b: [[number, number],[number, number]]) => {
+    const lat = (b[0][0] + b[1][0]) / 2;
+    const lng = (b[0][1] + b[1][1]) / 2;
+    return [lat, lng] as [number, number];
+  };
+  const scaleBounds = (b: [[number, number],[number, number]], factor: number) => {
+    const [clat, clng] = getCenterFromBounds(b);
+    const halfLat = (b[1][0] - b[0][0]) / 2 * factor;
+    const halfLng = (b[1][1] - b[0][1]) / 2 * factor;
+    const sw: [number, number] = [clat - halfLat, clng - halfLng];
+    const ne: [number, number] = [clat + halfLat, clng + halfLng];
+    return [sw, ne] as [[number, number],[number, number]];
+  };
+  const onBoundsChangeWithAspect = (b: [[number, number],[number, number]]) => {
+    if (!keepAspect || !overlayBounds) { setOverlayBounds(b); return; }
+    const prev = overlayBounds;
+    const swPrev = prev[0];
+    const nePrev = prev[1];
+    const sw = [...b[0]] as [number, number];
+    const ne = [...b[1]] as [number, number];
+    const prevLatSpan = Math.max(1e-9, nePrev[0] - swPrev[0]);
+    const prevLngSpan = Math.max(1e-9, nePrev[1] - swPrev[1]);
+    const ratio = prevLatSpan / prevLngSpan;
+    const movedNE = Math.abs(ne[0]-nePrev[0]) + Math.abs(ne[1]-nePrev[1]) > Math.abs(sw[0]-swPrev[0]) + Math.abs(sw[1]-swPrev[1]);
+    const lngSpan = Math.max(1e-9, ne[1] - sw[1]);
+    const latSpan = ratio * lngSpan;
+    if (movedNE) {
+      ne[0] = sw[0] + latSpan;
+    } else {
+      sw[0] = ne[0] - latSpan;
+    }
+    setOverlayBounds([sw, ne]);
   };
 
   return (
@@ -215,9 +274,27 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
                         max={180}
                         step={1}
                         value={rotation}
-                        onChange={(e)=>setRotation(parseInt(e.target.value))}
+                        onChange={(e)=>setRotation(snapAngle(parseInt(e.target.value)))}
+                        onMouseUp={(e)=>setRotation(snapAngle(parseInt((e.target as HTMLInputElement).value)))}
+                        onTouchEnd={(e)=>setRotation(snapAngle(rotation))}
                       />
-                      <span className="text-sm text-crm-text-primary w-10 text-right">{rotation}°</span>
+                      <span className="text-sm text-crm-text-primary w-12 text-right">{rotation}°</span>
+                      <div className="flex items-center gap-1">
+                        <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setRotation(0)}>0°</button>
+                        <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setRotation(90)}>90°</button>
+                        <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setRotation(-90)}>-90°</button>
+                      </div>
+                    </div>
+                  )}
+                  {calibrating && overlayBounds && (
+                    <div className="flex items-center gap-2 ml-2">
+                      <label className="text-sm text-crm-text-muted">Escala</label>
+                      <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setOverlayBounds(scaleBounds(overlayBounds!, 0.95))}>–</button>
+                      <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setOverlayBounds(scaleBounds(overlayBounds!, 1.05))}>+</button>
+                      <label className="inline-flex items-center gap-1 text-sm ml-2">
+                        <input type="checkbox" checked={keepAspect} onChange={(e)=>setKeepAspect(e.target.checked)} />
+                        Mantener proporción
+                      </label>
                     </div>
                   )}
                   <Button
@@ -266,6 +343,61 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
             </div>
           </div>
 
+          {/* Vinculación de lotes a zonas (polígonos aproximados) */}
+          <div className="p-4 border rounded-lg">
+            <h4 className="font-medium mb-2">Vincular lote a zona del plano</h4>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedLoteId || ''}
+                onChange={(e)=>setSelectedLoteId(e.target.value || null)}
+                className="px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary"
+              >
+                <option value="">Seleccionar lote</option>
+                {lotes.map(l => (
+                  <option key={l.id} value={l.id}>{l.codigo}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="px-3 py-2 border border-crm-border rounded-lg hover:bg-crm-card-hover"
+                onClick={()=>{
+                  if (!selectedLoteId) { toast('Selecciona un lote'); return; }
+                  setLotePoints(prev => ({ ...prev, [selectedLoteId!]: [] }));
+                  toast('Ahora haz clics en el mapa para marcar el perímetro (mín. 3 puntos).');
+                }}
+              >
+                Iniciar demarcación
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 border border-crm-danger text-crm-danger rounded-lg hover:bg-crm-danger/10"
+                onClick={()=>{
+                  if (!selectedLoteId) return;
+                  setLotePoints(prev => ({ ...prev, [selectedLoteId!]: [] }));
+                }}
+              >
+                Limpiar
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary/90"
+                onClick={async ()=>{
+                  if (!selectedLoteId || !(lotePoints[selectedLoteId] && lotePoints[selectedLoteId].length >= 3)) { toast.error('Marca al menos 3 puntos'); return; }
+                  try {
+                    const fd = new FormData();
+                    fd.append('data', JSON.stringify({ plano_polygon: lotePoints[selectedLoteId] }));
+                    await actualizarLote(selectedLoteId, fd as any);
+                    toast.success('Zona vinculada al lote');
+                  } catch (e) {
+                    toast.error('No se pudo guardar la zona');
+                  }
+                }}
+              >
+                Guardar zona
+              </button>
+            </div>
+          </div>
+
           {/* Mapa */}
           <div className="h-96 border rounded-lg overflow-hidden">
             <LeafletMap
@@ -276,8 +408,9 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
               planosUrl={planUrl}
               overlayBounds={overlayBounds}
               calibrating={calibrating}
-              onBoundsChange={(b) => setOverlayBounds(b)}
+              onBoundsChange={onBoundsChangeWithAspect}
               rotationDeg={rotation}
+              lotePolygons={lotePoints}
             />
           </div>
 
