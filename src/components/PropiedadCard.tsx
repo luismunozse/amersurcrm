@@ -21,6 +21,7 @@ type Propiedad = {
   marketing: any;
   data: any;
   created_at: string;
+  proyecto_id: string | null;
   proyecto: {
     id: string;
     nombre: string;
@@ -131,45 +132,37 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
           </div>
         </div>
 
-        {/* Imagen principal */}
-        <div className="mb-4">
-          <div className="w-full h-48 bg-crm-card-hover rounded-lg overflow-hidden">
-            {propiedad.marketing?.fotos && propiedad.marketing.fotos.length > 0 ? (
-              <StorageImagePreview
-                src={propiedad.marketing.fotos[0]}
-                alt={`${getTipoLabel(propiedad.tipo)} ${propiedad.identificacion_interna}`}
-                className="w-full h-full"
-                fallbackIcon={
-                  <svg className="w-16 h-16 text-crm-text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                }
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center">
-                  <svg className="w-16 h-16 text-crm-text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                  <p className="text-sm text-crm-text-muted">Sin imagen</p>
-                </div>
+        {/* Información comercial compacta */}
+        <div className="mb-4 p-3 bg-crm-card-hover rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+                </svg>
               </div>
-            )}
+              <div>
+                <p className="text-sm font-medium text-crm-text-primary">
+                  {formatPrecio(propiedad.precio, propiedad.moneda)}
+                </p>
+                <p className="text-xs text-crm-text-muted">Precio de venta</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-crm-text-primary">
+                {propiedad.superficie?.total ? `${propiedad.superficie.total} m²` : 'N/A'}
+              </p>
+              <p className="text-xs text-crm-text-muted">Superficie</p>
+            </div>
           </div>
         </div>
 
-        {/* Información de la propiedad */}
+        {/* Información de gestión */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="space-y-1">
             <p className="text-xs text-crm-text-muted">Proyecto</p>
             <p className="text-sm font-medium text-crm-text-primary">
-              {propiedad.proyecto ? propiedad.proyecto.nombre : 'Sin proyecto'}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-crm-text-muted">Superficie</p>
-            <p className="text-sm font-medium text-crm-text-primary">
-              {propiedad.superficie?.total ? `${propiedad.superficie.total} m²` : 'No especificada'}
+              {propiedad.proyecto ? propiedad.proyecto.nombre : 'Independiente'}
             </p>
           </div>
           <div className="space-y-1">
@@ -179,68 +172,62 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-crm-text-muted">Precio</p>
+            <p className="text-xs text-crm-text-muted">Código</p>
+            <p className="text-sm font-medium text-crm-text-primary font-mono">
+              {propiedad.codigo}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-crm-text-muted">Creado</p>
             <p className="text-sm font-medium text-crm-text-primary">
-              {formatPrecio(propiedad.precio, propiedad.moneda)}
+              {new Date(propiedad.created_at).toLocaleDateString('es-PE')}
             </p>
           </div>
         </div>
 
-        {/* Multimedia info */}
+        {/* Recursos disponibles */}
         <div className="flex items-center justify-between text-xs text-crm-text-muted mb-4">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {propiedad.marketing?.fotos && propiedad.marketing.fotos.length > 0 && (
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <span>{propiedad.marketing.fotos.length} foto(s)</span>
-              </div>
+              <span className="px-2 py-1 bg-crm-primary/10 text-crm-primary rounded">
+                {propiedad.marketing.fotos.length} fotos
+              </span>
             )}
             {propiedad.marketing?.renders && propiedad.marketing.renders.length > 0 && (
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                </svg>
-                <span>{propiedad.marketing.renders.length} render(s)</span>
-              </div>
+              <span className="px-2 py-1 bg-crm-primary/10 text-crm-primary rounded">
+                {propiedad.marketing.renders.length} renders
+              </span>
             )}
             {propiedad.marketing?.links3D && propiedad.marketing.links3D.length > 0 && (
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                </svg>
-                <span>{propiedad.marketing.links3D.length} enlace(s) 3D</span>
-              </div>
+              <span className="px-2 py-1 bg-crm-primary/10 text-crm-primary rounded">
+                {propiedad.marketing.links3D.length} 3D
+              </span>
             )}
             {(!propiedad.marketing?.fotos || propiedad.marketing.fotos.length === 0) && 
              (!propiedad.marketing?.renders || propiedad.marketing.renders.length === 0) && 
              (!propiedad.marketing?.links3D || propiedad.marketing.links3D.length === 0) && (
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <span>Sin multimedia</span>
-              </div>
+              <span className="px-2 py-1 bg-crm-border text-crm-text-muted rounded">
+                Sin recursos
+              </span>
             )}
           </div>
         </div>
 
-        {/* Etiquetas */}
+        {/* Etiquetas (solo si hay muchas) */}
         {propiedad.marketing?.etiquetas && propiedad.marketing.etiquetas.length > 0 && (
           <div className="mb-4">
             <div className="flex flex-wrap gap-1">
-              {propiedad.marketing.etiquetas.slice(0, 3).map((etiqueta: string) => (
+              {propiedad.marketing.etiquetas.slice(0, 2).map((etiqueta: string) => (
                 <span
                   key={etiqueta}
-                  className="px-2 py-1 bg-crm-primary/10 text-crm-primary text-xs rounded"
+                  className="px-2 py-1 bg-crm-border text-crm-text-muted text-xs rounded"
                 >
                   {etiqueta}
                 </span>
               ))}
-              {propiedad.marketing.etiquetas.length > 3 && (
+              {propiedad.marketing.etiquetas.length > 2 && (
                 <span className="px-2 py-1 bg-crm-card-hover text-crm-text-muted text-xs rounded">
-                  +{propiedad.marketing.etiquetas.length - 3} más
+                  +{propiedad.marketing.etiquetas.length - 2}
                 </span>
               )}
             </div>

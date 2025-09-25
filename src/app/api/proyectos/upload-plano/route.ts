@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { createServerActionClient } from '@/lib/supabase.server-actions';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const supabase = createServerActionClient({ cookies });
     
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await (await supabase).auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const filePath = `proyectos/${proyectoId}/${fileName}`;
 
     // Subir archivo a Supabase Storage
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await (await supabase).storage
       .from('imagenes')
       .upload(filePath, planosFile);
 
@@ -48,12 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener URL pública del archivo
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = (await supabase).storage
       .from('imagenes')
       .getPublicUrl(filePath);
 
     // Actualizar el proyecto con la URL de los planos
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (await supabase)
       .from('proyecto')
       .update({ planos_url: publicUrl })
       .eq('id', proyectoId);
@@ -82,7 +82,7 @@ export async function DELETE(request: NextRequest) {
     const supabase = createServerActionClient({ cookies });
     
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await (await supabase).auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -95,7 +95,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Obtener la URL actual del plano
-    const { data: proyecto, error: fetchError } = await supabase
+    const { data: proyecto, error: fetchError } = await (await supabase)
       .from('proyecto')
       .select('planos_url')
       .eq('id', proyectoId)
@@ -111,7 +111,7 @@ export async function DELETE(request: NextRequest) {
       const filePath = urlParts.slice(-2).join('/'); // proyectos/{proyectoId}/{fileName}
 
       // Eliminar archivo del storage
-      const { error: deleteError } = await supabase.storage
+      const { error: deleteError } = await (await supabase).storage
         .from('imagenes')
         .remove([filePath]);
 
@@ -122,7 +122,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Actualizar el proyecto para remover la URL del plano
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (await supabase)
       .from('proyecto')
       .update({ planos_url: null })
       .eq('id', proyectoId);

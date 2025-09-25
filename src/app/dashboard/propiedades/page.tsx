@@ -5,7 +5,7 @@ import NewPropiedadForm from "./_NewPropiedadForm";
 export default async function PropiedadesPage() {
   const supabase = await createServerOnlyClient();
   
-  // Obtener todas las propiedades
+  // Obtener todas las propiedades (incluyendo las independientes)
   const { data: propiedades, error: ePropiedades } = await supabase
     .from("propiedad")
     .select(`
@@ -21,6 +21,7 @@ export default async function PropiedadesPage() {
       marketing,
       data,
       created_at,
+      proyecto_id,
       proyecto:proyecto_id (
         id,
         nombre,
@@ -29,6 +30,30 @@ export default async function PropiedadesPage() {
       )
     `)
     .order("created_at", { ascending: false });
+
+  // Obtener todos los lotes de proyectos
+  const { data: lotes, error: eLotes } = await supabase
+    .from("lote")
+    .select(`
+      id,
+      codigo,
+      sup_m2,
+      precio,
+      moneda,
+      estado,
+      data,
+      created_at,
+      proyecto_id,
+      proyecto:proyecto_id (
+        id,
+        nombre,
+        ubicacion,
+        estado
+      )
+    `)
+    .order("created_at", { ascending: false });
+
+  if (eLotes) throw eLotes;
 
   if (ePropiedades) throw ePropiedades;
 
@@ -40,6 +65,39 @@ export default async function PropiedadesPage() {
 
   if (eProyectos) throw eProyectos;
 
+  // Combinar propiedades y lotes en un solo array
+  const todasLasPropiedades = [
+    // Propiedades de la tabla propiedad
+    ...(propiedades || []).map(prop => ({
+      ...prop,
+      tipo: prop.tipo,
+      identificacion_interna: prop.identificacion_interna,
+      ubicacion: prop.ubicacion,
+      superficie: prop.superficie,
+      estado_comercial: prop.estado_comercial,
+      marketing: prop.marketing,
+      es_lote: false
+    })),
+    // Lotes de la tabla lote
+    ...(lotes || []).map(lote => ({
+      id: lote.id,
+      codigo: lote.codigo,
+      tipo: "lote",
+      identificacion_interna: lote.codigo,
+      ubicacion: lote.proyecto?.ubicacion ? { ciudad: lote.proyecto.ubicacion } : null,
+      superficie: { total: lote.sup_m2, construida: null },
+      estado_comercial: lote.estado,
+      precio: lote.precio,
+      moneda: lote.moneda,
+      marketing: { etiquetas: [] },
+      data: lote.data,
+      created_at: lote.created_at,
+      proyecto_id: lote.proyecto_id,
+      proyecto: lote.proyecto,
+      es_lote: true
+    }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
   return (
     <div className="w-full p-6 space-y-6">
       {/* Header */}
@@ -47,12 +105,12 @@ export default async function PropiedadesPage() {
         <div>
           <h1 className="text-2xl font-bold text-crm-text-primary">Propiedades</h1>
           <p className="text-crm-text-muted mt-1">
-            Gestiona todas las propiedades inmobiliarias
+            Gestiona propiedades de proyectos y propiedades independientes
           </p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-sm text-crm-text-muted">
-            {propiedades?.length || 0} propiedades
+            {todasLasPropiedades?.length || 0} propiedades
           </div>
         </div>
       </div>
@@ -104,6 +162,7 @@ export default async function PropiedadesPage() {
             </label>
             <select className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary">
               <option value="">Todos los proyectos</option>
+              <option value="independientes">Propiedades Independientes</option>
               {proyectos?.map((proyecto) => (
                 <option key={proyecto.id} value={proyecto.id}>
                   {proyecto.nombre}
@@ -118,7 +177,7 @@ export default async function PropiedadesPage() {
       <NewPropiedadForm proyectos={proyectos || []} />
 
       {/* Lista de propiedades */}
-      <PropiedadesList propiedades={propiedades || []} />
+      <PropiedadesList propiedades={todasLasPropiedades || []} />
     </div>
   );
 }

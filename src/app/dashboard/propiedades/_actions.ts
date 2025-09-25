@@ -2,63 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import { z } from "zod";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { redirect } from "next/navigation";
 
-const PropiedadSchema = z.object({
-  id: z.string().uuid(),
-  codigo: z.string().min(1),
-  tipo: z.enum(['lote', 'casa', 'departamento', 'oficina', 'otro']),
-  proyecto_id: z.string().uuid(),
-  identificacion_interna: z.string().min(1),
-  ubicacion: z.object({
-    direccion_completa: z.string(),
-    pais: z.string(),
-    provincia: z.string(),
-    ciudad: z.string(),
-    barrio: z.string(),
-    codigo_postal: z.string().optional(),
-    geolocalizacion: z.object({
-      lat: z.number(),
-      lng: z.number()
-    }).optional()
-  }),
-  superficie: z.object({
-    total: z.number(),
-    cubierta: z.number().optional(),
-    semicubierta: z.number().optional(),
-    descubierta: z.number().optional(),
-    terreno: z.number().optional()
-  }),
-  estado_comercial: z.enum(['disponible', 'reservado', 'vendido', 'bloqueado']),
-  precio: z.number().optional(),
-  moneda: z.string().default('PEN'),
-  opciones_financiacion: z.object({
-    anticipo_porcentaje: z.number().optional(),
-    cuotas: z.number().optional(),
-    interes_anual: z.number().optional(),
-    moneda_financiacion: z.string().optional(),
-    observaciones: z.string().optional()
-  }).optional(),
-  marketing: z.object({
-    fotos: z.array(z.string()),
-    plano: z.string().optional(),
-    video: z.string().optional(),
-    links3D: z.array(z.string()),
-    etiquetas: z.array(z.string()),
-    descripcion: z.string().optional(),
-    fecha_publicacion: z.string().optional()
-  }).optional(),
-  data: z.record(z.any())
-});
-
-export async function crearPropiedad(fd: FormData) {
-  const tipo = String(fd.get("tipo") || "");
-  const codigo = String(fd.get("codigo") || "");
-  const proyecto_id = String(fd.get("proyecto_id") || "");
-  const proyectoId = proyecto_id === "" ? null : proyecto_id;
-  const dataJson = String(fd.get("data") || "{}");
-
+export async function crearPropiedad(formData: FormData) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -73,56 +20,89 @@ export async function crearPropiedad(fd: FormData) {
     throw new Error("Error verificando permisos: " + (error as Error).message);
   }
 
-  // Parsear datos adicionales
-  let additionalData = {};
   try {
-    additionalData = JSON.parse(dataJson);
-  } catch (e) {
-    console.warn("Error parsing additional data:", e);
+    const codigo = String(formData.get("codigo") || "").trim();
+    const tipo = String(formData.get("tipo") || "lote");
+    const identificacion_interna = String(formData.get("identificacion_interna") || "").trim();
+    const proyecto_id = formData.get("proyecto_id") ? String(formData.get("proyecto_id")) : null;
+    const ubicacion_ciudad = String(formData.get("ubicacion_ciudad") || "").trim();
+    const ubicacion_direccion = String(formData.get("ubicacion_direccion") || "").trim();
+    const superficie_total = formData.get("superficie_total") ? Number(formData.get("superficie_total")) : null;
+    const superficie_construida = formData.get("superficie_construida") ? Number(formData.get("superficie_construida")) : null;
+    const precio = formData.get("precio") ? Number(formData.get("precio")) : null;
+    const moneda = String(formData.get("moneda") || "USD");
+    const estado_comercial = String(formData.get("estado_comercial") || "disponible");
+    const descripcion = String(formData.get("descripcion") || "").trim();
+    const caracteristicas = String(formData.get("caracteristicas") || "").trim();
+    const condiciones_venta = String(formData.get("condiciones_venta") || "").trim();
+        const etiquetas = formData.getAll("etiquetas") as string[];
+
+        // Validaciones
+        if (!codigo) {
+          throw new Error("El código de la propiedad es requerido");
+        }
+        if (!identificacion_interna) {
+          throw new Error("La identificación interna es requerida");
+        }
+
+        // Generar código único si no se proporciona
+        let codigoFinal = codigo;
+        if (!codigoFinal) {
+          codigoFinal = `${tipo.toUpperCase()}-${Date.now()}`;
+        }
+
+    // Crear la propiedad
+    const { data: propiedad, error: insertError } = await supabase
+      .from("propiedad")
+      .insert({
+        codigo: codigoFinal,
+        tipo: tipo as "lote" | "casa" | "departamento" | "oficina" | "local" | "terreno" | "otro",
+        identificacion_interna,
+        proyecto_id: proyecto_id || null,
+        ubicacion: {
+          ciudad: ubicacion_ciudad || null,
+          direccion: ubicacion_direccion || null,
+        },
+        superficie: {
+          total: superficie_total,
+          construida: superficie_construida,
+        },
+        precio,
+        moneda,
+        estado_comercial: estado_comercial as "disponible" | "reservado" | "vendido" | "bloqueado",
+        descripcion: descripcion || null,
+        caracteristicas: caracteristicas || null,
+        condiciones_venta: condiciones_venta || null,
+            marketing: {
+              etiquetas: etiquetas.filter(etiqueta => etiqueta.trim() !== ''),
+            },
+        created_by: user.id
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      throw new Error(`Error creando propiedad: ${insertError.message}`);
+    }
+
+    // Revalidar las páginas relacionadas
+    revalidatePath("/dashboard/propiedades");
+    revalidatePath("/dashboard");
+
+    // Redirigir al nuevo proyecto si pertenece a uno
+    if (proyecto_id) {
+      redirect(`/dashboard/proyectos/${proyecto_id}`);
+    } else {
+      redirect(`/dashboard/propiedades/${propiedad.id}`);
+    }
+
+  } catch (error) {
+    console.error("Error creando propiedad:", error);
+    throw new Error(error instanceof Error ? error.message : "Error creando propiedad");
   }
-
-  // Crear datos básicos de la propiedad
-  const propiedadData = {
-    codigo,
-    tipo,
-    proyecto_id: proyectoId, // Permitir null para propiedades independientes
-    identificacion_interna: additionalData.identificador || codigo,
-    ubicacion: {
-      direccion_completa: additionalData.ubicacion || "",
-      pais: "Perú",
-      provincia: "Lima",
-      ciudad: "Huaral",
-      barrio: additionalData.ubicacion || "",
-      geolocalizacion: null
-    },
-    superficie: {
-      total: 0, // Se calculará según el tipo
-      terreno: 0
-    },
-    estado_comercial: additionalData.condiciones || "disponible",
-    precio: null,
-    moneda: "PEN",
-    opciones_financiacion: {},
-    marketing: {
-      fotos: additionalData.fotos || [],
-      renders: additionalData.renders || [],
-      plano: additionalData.plano || null,
-      links3D: additionalData.links3D || [],
-      etiquetas: additionalData.etiquetas || [],
-      descripcion: additionalData.descripcion || "",
-      fecha_publicacion: additionalData.fecha_publicacion || new Date().toISOString()
-    },
-    data: additionalData,
-    created_by: user.id
-  };
-
-  const { error } = await supabase.from("propiedad").insert(propiedadData);
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/dashboard/propiedades");
 }
 
-export async function actualizarPropiedad(propiedadId: string, fd: FormData) {
+export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: 'disponible' | 'reservado' | 'vendido' | 'bloqueado') {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -131,30 +111,32 @@ export async function actualizarPropiedad(propiedadId: string, fd: FormData) {
   try {
     const perfil = await obtenerPerfilUsuario(user.id);
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para actualizar propiedades. Solo los administradores pueden realizar esta acción.");
+      throw new Error("No tienes permisos para cambiar el estado de propiedades. Solo los administradores pueden realizar esta acción.");
     }
   } catch (error) {
     throw new Error("Error verificando permisos: " + (error as Error).message);
   }
 
-  const dataJson = String(fd.get("data") || "{}");
-  let additionalData = {};
   try {
-    additionalData = JSON.parse(dataJson);
-  } catch (e) {
-    console.warn("Error parsing additional data:", e);
+    const { error } = await supabase
+      .from("propiedad")
+      .update({ 
+        estado_comercial: nuevoEstado,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", propiedadId);
+
+    if (error) {
+      throw new Error(`Error actualizando estado: ${error.message}`);
+    }
+
+    revalidatePath("/dashboard/propiedades");
+    return { success: true, message: "Estado actualizado correctamente" };
+
+  } catch (error) {
+    console.error("Error cambiando estado de propiedad:", error);
+    throw new Error(error instanceof Error ? error.message : "Error cambiando estado de propiedad");
   }
-
-  const { error } = await supabase
-    .from("propiedad")
-    .update({ 
-      data: additionalData,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", propiedadId);
-
-  if (error) throw new Error(error.message);
-  revalidatePath("/dashboard/propiedades");
 }
 
 export async function eliminarPropiedad(propiedadId: string) {
@@ -162,31 +144,107 @@ export async function eliminarPropiedad(propiedadId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { error } = await supabase
-    .from("propiedad")
-    .delete()
-    .eq("id", propiedadId);
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para eliminar propiedades. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
 
-  if (error) throw new Error(error.message);
-  revalidatePath("/dashboard/propiedades");
-}
+  try {
+    // 1. Obtener información de la propiedad para eliminar archivos relacionados
+    const { data: propiedad, error: propiedadError } = await supabase
+      .from("propiedad")
+      .select("id, codigo, marketing")
+      .eq("id", propiedadId)
+      .single();
 
-export async function cambiarEstadoPropiedad(
-  propiedadId: string, 
-  nuevoEstado: 'disponible' | 'reservado' | 'vendido' | 'bloqueado'
-) {
-  const supabase = await createServerActionClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+    if (propiedadError) {
+      throw new Error(`Error obteniendo propiedad: ${propiedadError.message}`);
+    }
 
-  const { error } = await supabase
-    .from("propiedad")
-    .update({ 
-      estado_comercial: nuevoEstado,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", propiedadId);
+    if (!propiedad) {
+      throw new Error("Propiedad no encontrada");
+    }
 
-  if (error) throw new Error(error.message);
-  revalidatePath("/dashboard/propiedades");
+    // 2. Eliminar registros relacionados primero (si existen)
+    // Esto evita problemas de dependencias que puedan causar ambigüedades
+    try {
+      // Eliminar recordatorios relacionados (si existen)
+      const { error: recordatoriosError } = await supabase
+        .from("recordatorio")
+        .delete()
+        .eq("propiedad_id", propiedadId);
+      
+      if (recordatoriosError) {
+        console.warn("Error eliminando recordatorios:", recordatoriosError);
+      } else {
+        console.log("Recordatorios eliminados correctamente");
+      }
+    } catch (error) {
+      console.warn("No se pudieron eliminar recordatorios:", error);
+    }
+
+    // 3. Eliminar archivos del storage si existen
+    if (propiedad.marketing?.fotos) {
+      try {
+        const fotos = Array.isArray(propiedad.marketing.fotos) ? propiedad.marketing.fotos : [];
+        const filePaths = fotos.map(foto => `propiedades/${propiedadId}/${foto.split('/').pop()}`);
+        
+        if (filePaths.length > 0) {
+          const { error: deleteError } = await supabase.storage
+            .from('imagenes')
+            .remove(filePaths);
+
+          if (deleteError) {
+            console.warn(`Error eliminando fotos del storage: ${deleteError.message}`);
+          }
+        }
+      } catch (storageError) {
+        console.warn(`Error procesando fotos del storage: ${storageError}`);
+      }
+    }
+
+    if (propiedad.marketing?.renders) {
+      try {
+        const renders = Array.isArray(propiedad.marketing.renders) ? propiedad.marketing.renders : [];
+        const filePaths = renders.map(render => `propiedades/${propiedadId}/${render.split('/').pop()}`);
+        
+        if (filePaths.length > 0) {
+          const { error: deleteError } = await supabase.storage
+            .from('imagenes')
+            .remove(filePaths);
+
+          if (deleteError) {
+            console.warn(`Error eliminando renders del storage: ${deleteError.message}`);
+          }
+        }
+      } catch (storageError) {
+        console.warn(`Error procesando renders del storage: ${storageError}`);
+      }
+    }
+
+    // 4. Eliminar la propiedad
+    const { error: deleteError } = await supabase
+      .from("propiedad")
+      .delete()
+      .eq("id", propiedadId);
+
+    if (deleteError) {
+      throw new Error(`Error eliminando propiedad: ${deleteError.message}`);
+    }
+
+    // 5. Revalidar las páginas relacionadas
+    revalidatePath("/dashboard/propiedades");
+    revalidatePath("/dashboard");
+
+    return { success: true, message: `Propiedad "${propiedad.codigo}" eliminada correctamente` };
+
+  } catch (error) {
+    console.error("Error eliminando propiedad:", error);
+    throw new Error(error instanceof Error ? error.message : "Error eliminando propiedad");
+  }
 }

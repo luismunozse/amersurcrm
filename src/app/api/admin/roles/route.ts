@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 
 // GET - Obtener lista de roles
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();

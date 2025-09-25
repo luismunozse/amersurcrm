@@ -3,7 +3,7 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 import { esAdmin } from "@/lib/auth/roles";
 
 // GET - Obtener lista de usuarios
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -88,9 +88,16 @@ export async function GET(request: NextRequest) {
 
     // Retornar perfiles directamente sin combinar con auth.users
     // Mapear para compatibilidad con el frontend: meta_mensual = meta_mensual_ventas
-    const usuariosCompat = (usuarios || []).map((u: any) => ({
+    type Usuario = {
+      [key: string]: unknown;
+      meta_mensual_ventas?: number | string;
+    };
+
+    const usuariosCompat = (usuarios || []).map((u: Usuario) => ({
       ...u,
-      meta_mensual: typeof u.meta_mensual_ventas === 'number' ? u.meta_mensual_ventas : (u.meta_mensual_ventas ? Number(u.meta_mensual_ventas) : undefined),
+      meta_mensual: typeof u.meta_mensual_ventas === 'number'
+        ? u.meta_mensual_ventas
+        : (u.meta_mensual_ventas ? Number(u.meta_mensual_ventas) : undefined),
     }));
 
     return NextResponse.json({ 
@@ -234,7 +241,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Construir payload de update solo con campos presentes
-    const updatePayload: Record<string, any> = {};
+    const updatePayload: Record<string, unknown> = {};
     if (typeof nombre_completo === 'string') updatePayload.nombre_completo = nombre_completo;
     if (typeof dni === 'string') updatePayload.dni = dni;
     if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;

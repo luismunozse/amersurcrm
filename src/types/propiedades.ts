@@ -63,13 +63,8 @@ export interface OpcionesFinanciacionAlquiler {
   observaciones?: string;
 }
 
-// Estructura de marketing mejorada
+// Estructura de marketing simplificada (sin multimedia)
 export interface Marketing {
-  fotos: string[];
-  renders: string[];
-  plano: string | null;
-  videos: string[];
-  links3D: string[];
   etiquetas: string[];
   descripcion: string;
   fecha_publicacion: string;
@@ -189,12 +184,7 @@ export interface PropiedadWizardData {
   condiciones_venta: OpcionesFinanciacionVenta;
   condiciones_alquiler: OpcionesFinanciacionAlquiler;
   
-  // Paso 5: Marketing y multimedia
-  fotos: File[];
-  renders: File[];
-  plano: File | null;
-  videos: File[];
-  links3D: string[];
+  // Paso 5: Marketing (sin multimedia)
   etiquetas: string[];
   descripcion: string;
   destacado: boolean;

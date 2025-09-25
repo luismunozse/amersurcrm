@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { createServerActionClient } from '@/lib/supabase.server-actions';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const supabase = createServerActionClient({ cookies });
     
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await (await supabase).auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Actualizar el lote con las coordenadas
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (await supabase)
       .from('lote')
       .update({ 
         coordenada_lat: lat,
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     const supabase = createServerActionClient({ cookies });
     
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await (await supabase).auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener todos los lotes del proyecto con coordenadas
-    const { data: lotes, error: fetchError } = await supabase
+    const { data: lotes, error: fetchError } = await (await supabase)
       .from('lote')
       .select(`
         id,
@@ -107,7 +107,7 @@ export async function PUT(request: NextRequest) {
     const supabase = createServerActionClient({ cookies });
     
     // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await (await supabase).auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -127,7 +127,7 @@ export async function PUT(request: NextRequest) {
       updated_at: new Date().toISOString()
     }));
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (await supabase)
       .from('lote')
       .upsert(updates, { 
         onConflict: 'id',
