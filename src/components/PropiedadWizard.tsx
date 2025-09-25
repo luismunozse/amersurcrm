@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { crearPropiedad } from "@/app/dashboard/propiedades/_actions";
+import { crearLote } from "@/app/dashboard/proyectos/[id]/_actions";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
+import UbicacionSelector from "./UbicacionSelector";
 import { 
   TipoPropiedad, 
   TipoOperacion,
@@ -43,10 +45,12 @@ const initialData: PropiedadWizardData = {
   disponibilidad_inmediata: true,
   disponibilidad_desde: "",
   
-  // Paso 3: Características específicas
-  caracteristicas: {},
+  // Datos de ubigeo
+  departamento: "",
+  provincia: "",
+  distrito: "",
   
-  // Paso 4: Precios y condiciones comerciales
+  // Paso 3: Precios y condiciones comerciales
   precio_venta: 0,
   precio_alquiler: 0,
   condiciones_venta: {},
@@ -54,7 +58,6 @@ const initialData: PropiedadWizardData = {
   
   // Paso 5: Marketing (sin multimedia)
   etiquetas: [],
-  descripcion: "",
   destacado: false,
   premium: false,
   
@@ -72,7 +75,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
   };
 
   const getTotalSteps = () => {
-    return data.tipo === 'lote' ? 2 : 4;
+    return data.tipo === 'lote' ? 2 : 3;
   };
 
   const nextStep = () => {
@@ -99,8 +102,12 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
           formData.append("ubicacion_ciudad", data.proyecto ? "" : data.ubicacion); // Solo si es independiente
           formData.append("ubicacion_direccion", ""); // Los lotes no tienen dirección específica
         } else {
-          formData.append("ubicacion_ciudad", data.ubicacion);
-          formData.append("ubicacion_direccion", `${data.calle} ${data.numero}, ${data.barrio}`);
+          // Para propiedades, usar ubigeo si está disponible, sino usar ubicación manual
+          const ubicacionCompleta = [data.distrito, data.provincia, data.departamento]
+            .filter(Boolean)
+            .join(', ');
+          formData.append("ubicacion_ciudad", ubicacionCompleta || data.ubicacion);
+          formData.append("ubicacion_direccion", `${data.calle} ${data.numero}`);
         }
         
         formData.append("superficie_total", data.superficie_total.toString());
@@ -108,16 +115,37 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
         formData.append("precio", data.precio_venta.toString());
         formData.append("moneda", "PEN");
         formData.append("estado_comercial", "disponible");
-        formData.append("descripcion", data.descripcion || "");
-        formData.append("caracteristicas", JSON.stringify(data.caracteristicas || {}));
-        formData.append("condiciones_venta", JSON.stringify(data.condiciones_venta || {}));
         
         // Agregar solo etiquetas básicas (sin archivos multimedia)
         data.etiquetas.forEach(etiqueta => formData.append("etiquetas", etiqueta));
 
-        await crearPropiedad(formData);
-        toast.success("Propiedad creada correctamente");
-        onClose();
+        if (data.tipo === 'lote') {
+          // Para lotes, usar crearLote
+          const result = await crearLote(formData);
+          if (result.success) {
+            toast.success("Lote creado correctamente");
+            onClose();
+            // Redirigir al proyecto si pertenece a uno
+            if (data.proyecto) {
+              window.location.href = `/dashboard/proyectos/${data.proyecto}`;
+            } else {
+              window.location.href = '/dashboard/propiedades';
+            }
+          }
+        } else {
+          // Para propiedades, usar crearPropiedad
+          const result = await crearPropiedad(formData);
+          if (result.success) {
+            toast.success("Propiedad creada correctamente");
+            onClose();
+            // Redirigir después de cerrar el modal
+            if (data.proyecto) {
+              window.location.href = `/dashboard/proyectos/${data.proyecto}`;
+            } else {
+              window.location.href = '/dashboard/propiedades';
+            }
+          }
+        }
       } catch (error) {
         console.error("Error creando propiedad:", error);
         toast.error(getErrorMessage(error) || "Error creando propiedad");
@@ -133,7 +161,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
           return <Paso1Tipo data={data} updateData={updateData} />;
         case 2:
           return <Paso2DatosGenerales data={data} updateData={updateData} proyectos={proyectos} />;
-        default:
+      default:
           return null;
       }
     }
@@ -145,8 +173,6 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
       case 2:
         return <Paso2DatosGenerales data={data} updateData={updateData} proyectos={proyectos} />;
       case 3:
-        return <Paso3Caracteristicas data={data} updateData={updateData} />;
-      case 4:
         return <Paso4Precios data={data} updateData={updateData} proyectos={proyectos} />;
       default:
         return null;
@@ -270,7 +296,7 @@ function Paso1Tipo({ data, updateData }: { data: PropiedadWizardData; updateData
         <p className="text-crm-text-muted">Selecciona el tipo de propiedad que deseas crear</p>
       </div>
 
-      {/* Tipo de Propiedad */}
+        {/* Tipo de Propiedad */}
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center">
           <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,7 +322,7 @@ function Paso1Tipo({ data, updateData }: { data: PropiedadWizardData; updateData
                   {tipo === 'departamento' && '🏢'}
                   {tipo === 'oficina' && '🏢'}
                   {tipo === 'otro' && '🏗️'}
-                </div>
+        </div>
                 <div className="font-semibold capitalize text-sm">{tipo}</div>
               </div>
             </button>
@@ -347,9 +373,9 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
 }) {
   // Si es lote, usar el formulario simplificado como en LoteWizard
   if (data.tipo === 'lote') {
-    return (
+  return (
       <div className="space-y-8">
-        <div className="text-center">
+      <div className="text-center">
           <div className="w-16 h-16 bg-crm-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
@@ -357,7 +383,7 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
           </div>
           <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Datos del Lote</h3>
           <p className="text-crm-text-muted">Información básica del lote</p>
-        </div>
+      </div>
 
         <div className="crm-card p-6">
           <h4 className="text-lg font-semibold text-crm-text-primary mb-6 flex items-center">
@@ -366,67 +392,67 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
             </svg>
             Información del Lote
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Proyecto */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
                 Proyecto
               </label>
-              <select
-                value={data.proyecto}
-                onChange={(e) => updateData({ proyecto: e.target.value })}
+          <select
+            value={data.proyecto}
+            onChange={(e) => updateData({ proyecto: e.target.value })}
                 className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-              >
+          >
                 <option value="">Lote Independiente</option>
-                {proyectos.map((proyecto) => (
-                  <option key={proyecto.id} value={proyecto.id}>
+            {proyectos.map((proyecto) => (
+              <option key={proyecto.id} value={proyecto.id}>
                     {proyecto.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
+              </option>
+            ))}
+          </select>
+        </div>
 
             {/* Nombre del Lote */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
                 Nombre del Lote
               </label>
-              <input
-                type="text"
-                value={data.identificador}
-                onChange={(e) => updateData({ identificador: e.target.value })}
+          <input
+            type="text"
+            value={data.identificador}
+            onChange={(e) => updateData({ identificador: e.target.value })}
                 className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
                 placeholder="Ej: LOTE-001, MZ5-LT10"
-              />
-            </div>
+          />
+        </div>
 
             {/* Superficie */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
                 Superficie (m²)
               </label>
-              <input
-                type="number"
+          <input
+            type="number"
                 value={data.superficie_total || ''}
                 onChange={(e) => updateData({ superficie_total: Number(e.target.value) || 0 })}
                 className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
                 placeholder="150"
-              />
-            </div>
+          />
+        </div>
 
             {/* Precio */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
                 Precio (S/.)
               </label>
-              <input
-                type="number"
+          <input
+            type="number"
                 value={data.precio_venta || ''}
                 onChange={(e) => updateData({ precio_venta: Number(e.target.value) || 0 })}
                 className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
                 placeholder="150000"
-              />
-            </div>
+          />
+        </div>
           </div>
         </div>
       </div>
@@ -436,15 +462,15 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
   // Para otros tipos de propiedad, usar el formulario completo
   return (
     <div className="space-y-8">
-      <div className="text-center">
+          <div className="text-center">
         <div className="w-16 h-16 bg-crm-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
+              </svg>
+            </div>
         <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Datos Generales</h3>
         <p className="text-crm-text-muted">Información básica de la propiedad</p>
-      </div>
+          </div>
 
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-6 flex items-center">
@@ -453,73 +479,101 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
           </svg>
           Información de la Propiedad
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Proyecto */}
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">
-              Proyecto
-            </label>
-            <select
-              value={data.proyecto}
-              onChange={(e) => updateData({ proyecto: e.target.value })}
-              className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-            >
-              <option value="">Propiedad Independiente</option>
-              {proyectos.map((proyecto) => (
-                <option key={proyecto.id} value={proyecto.id}>
-                  {proyecto.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+    <div className="space-y-6">
+          {/* Ubicación - Solo para propiedades que no sean lotes - Ocupa todo el ancho */}
+          {data.tipo !== 'lote' && (
+            <div className="w-full">
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Ubicación (Ubigeo)
+              </label>
+              <UbicacionSelector
+                key={`ubigeo-${data.tipo}`}
+                departamento={data.departamento}
+                provincia={data.provincia}
+                distrito={data.distrito}
+                onUbigeoChange={(departamento, provincia, distrito) => {
+                  updateData({ 
+                    departamento, 
+                    provincia, 
+                    distrito,
+                    ubicacion: [distrito, provincia, departamento].filter(Boolean).join(', ')
+                  });
+                }}
+                className="w-full"
+              />
+            </div>
+          )}
 
-          {/* Identificador */}
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">
-              Código/Identificador
-            </label>
-            <input
-              type="text"
-              value={data.identificador}
-              onChange={(e) => updateData({ identificador: e.target.value })}
-              className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-              placeholder="Ej: CASA-A1, DEP-102"
-            />
-          </div>
+          {/* Grid de 2 columnas para el resto de campos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Proyecto */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Proyecto
+              </label>
+          <select
+                value={data.proyecto}
+                onChange={(e) => updateData({ proyecto: e.target.value })}
+                className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
+              >
+                <option value="">Propiedad Independiente</option>
+                {proyectos.map((proyecto) => (
+                  <option key={proyecto.id} value={proyecto.id}>
+                    {proyecto.nombre}
+                  </option>
+                ))}
+          </select>
+        </div>
 
-          {/* Ubicación */}
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">
-              Ciudad/Ubicación
-            </label>
-            <input
-              type="text"
-              value={data.ubicacion}
-              onChange={(e) => updateData({ ubicacion: e.target.value })}
-              className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-              placeholder="Ej: Lima, Arequipa"
-            />
-          </div>
+            {/* Identificador */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Código/Identificador
+              </label>
+          <input
+                type="text"
+                value={data.identificador}
+                onChange={(e) => updateData({ identificador: e.target.value })}
+                className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
+                placeholder="Ej: CASA-A1, DEP-102"
+          />
+        </div>
+
+          {/* Para lotes, mantener el campo simple */}
+          {data.tipo === 'lote' && (
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Ciudad/Ubicación
+              </label>
+              <input
+                type="text"
+                value={data.ubicacion}
+                onChange={(e) => updateData({ ubicacion: e.target.value })}
+                className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
+                placeholder="Ej: Lima, Arequipa"
+              />
+            </div>
+          )}
 
           {/* Calle */}
           <div>
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Calle
             </label>
-            <input
-              type="text"
+        <input
+          type="text"
               value={data.calle}
               onChange={(e) => updateData({ calle: e.target.value })}
               className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
               placeholder="Nombre de la calle"
-            />
-          </div>
+        />
+      </div>
 
           {/* Número */}
           <div>
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Número
-            </label>
+          </label>
             <input
               type="text"
               value={data.numero}
@@ -527,48 +581,36 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
               className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
               placeholder="123"
             />
-          </div>
+      </div>
 
-          {/* Barrio */}
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">
-              Barrio/Distrito
-            </label>
-            <input
-              type="text"
-              value={data.barrio}
-              onChange={(e) => updateData({ barrio: e.target.value })}
-              className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-              placeholder="Ej: Miraflores, San Isidro"
-            />
-          </div>
 
           {/* Superficie Total */}
           <div>
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Superficie Total (m²)
             </label>
-            <input
-              type="number"
+        <input
+          type="number"
               value={data.superficie_total || ''}
               onChange={(e) => updateData({ superficie_total: Number(e.target.value) || 0 })}
               className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
               placeholder="150"
-            />
-          </div>
+        />
+      </div>
 
           {/* Superficie Construida */}
           <div>
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Superficie Construida (m²)
             </label>
-            <input
-              type="number"
+        <input
+          type="number"
               value={data.superficie_construida || ''}
               onChange={(e) => updateData({ superficie_construida: Number(e.target.value) || 0 })}
               className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
               placeholder="120"
-            />
+        />
+      </div>
           </div>
         </div>
       </div>
@@ -576,47 +618,15 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
   );
 }
 
-// Paso 3: Características específicas
-function Paso3Caracteristicas({ data, updateData }: { data: PropiedadWizardData; updateData: (updates: Partial<PropiedadWizardData>) => void }) {
-  const esquema = ESQUEMAS_CARACTERISTICAS[data.tipo] || [];
 
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold text-crm-text-primary">Características Específicas</h3>
-        <p className="text-crm-text-muted">Detalles específicos para {data.tipo}</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {esquema.map((campo) => (
-          <div key={campo}>
-            <label className="block text-sm font-medium text-crm-text-primary mb-1">
-              {campo.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </label>
-            <input
-              type="text"
-              value={data.caracteristicas[campo] || ''}
-              onChange={(e) => updateData({ 
-                caracteristicas: { ...data.caracteristicas, [campo]: e.target.value }
-              })}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-              placeholder={`Ingrese ${campo.replace(/_/g, ' ')}`}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Paso 4: Precios y confirmación final
+// Paso 3: Precios y confirmación final
 function Paso4Precios({ data, updateData, proyectos }: { 
   data: PropiedadWizardData; 
   updateData: (updates: Partial<PropiedadWizardData>) => void;
   proyectos: Array<{ id: string; nombre: string; ubicacion: string | null; estado: string; }>;
 }) {
   const proyectoSeleccionado = proyectos.find(p => p.id === data.proyecto);
-  
+
   return (
     <div className="space-y-8">
       <div className="text-center">
@@ -624,7 +634,7 @@ function Paso4Precios({ data, updateData, proyectos }: {
           <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-        </div>
+                </div>
         <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Precios y Confirmación</h3>
         <p className="text-crm-text-muted">Información comercial y confirmación final</p>
       </div>
@@ -639,7 +649,7 @@ function Paso4Precios({ data, updateData, proyectos }: {
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Precio de Venta */}
-          <div>
+                <div>
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Precio de Venta (S/.)
             </label>
@@ -657,16 +667,16 @@ function Paso4Precios({ data, updateData, proyectos }: {
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Precio de Alquiler (S/./mes)
             </label>
-            <input
+                <input
               type="number"
               value={data.precio_alquiler || ''}
               onChange={(e) => updateData({ precio_alquiler: Number(e.target.value) || 0 })}
               className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
               placeholder="2500"
             />
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Resumen de la Propiedad */}
       <div className="crm-card p-6">
@@ -701,22 +711,22 @@ function Paso4Precios({ data, updateData, proyectos }: {
               <p className="text-crm-text-primary">{data.superficie_total} m²</p>
             </div>
             {data.superficie_construida && (
-              <div>
+            <div>
                 <span className="text-sm font-medium text-crm-text-muted">Superficie Construida:</span>
                 <p className="text-crm-text-primary">{data.superficie_construida} m²</p>
-              </div>
+            </div>
             )}
             <div>
               <span className="text-sm font-medium text-crm-text-muted">Precio Venta:</span>
               <p className="text-crm-text-primary font-semibold">S/. {data.precio_venta?.toLocaleString()}</p>
             </div>
             {data.precio_alquiler && (
-              <div>
+            <div>
                 <span className="text-sm font-medium text-crm-text-muted">Precio Alquiler:</span>
                 <p className="text-crm-text-primary font-semibold">S/. {data.precio_alquiler}/mes</p>
-              </div>
-            )}
-          </div>
+                  </div>
+                )}
+                  </div>
         </div>
       </div>
     </div>

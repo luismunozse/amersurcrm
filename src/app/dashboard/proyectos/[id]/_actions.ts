@@ -132,6 +132,7 @@ export async function crearLote(fd: FormData) {
   const moneda = String(fd.get("moneda") || "ARS");
   const estado = String(fd.get("estado") || "disponible");
 
+
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -146,7 +147,7 @@ export async function crearLote(fd: FormData) {
     throw new Error("Error verificando permisos: " + (error as Error).message);
   }
 
-  const { error } = await supabase
+  const { data: lote, error } = await supabase
     .from("lote")
     .insert({
       proyecto_id: proyectoId,
@@ -156,11 +157,17 @@ export async function crearLote(fd: FormData) {
       moneda,
       estado: estado as "disponible" | "reservado" | "vendido",
       created_by: user.id,
-    });
+    })
+    .select()
+    .single();
 
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  revalidatePath("/dashboard/propiedades");
+  revalidatePath("/dashboard");
+
+  return { success: true, lote };
 }
 
 export async function actualizarLote(loteId: string, fd: FormData) {

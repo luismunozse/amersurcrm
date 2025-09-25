@@ -44,6 +44,11 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  // Sincronizar el estado cuando cambien los lotes
+  useEffect(() => {
+    setLotesState(lotes);
+  }, [lotes]);
+
   // Helper para parsear data
   const parseData = (data: any) => {
     if (!data) return null;
@@ -57,57 +62,6 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
     return data;
   };
 
-  // Datos de prueba para verificar la interfaz
-  const lotesPrueba: Lote[] = [
-    {
-      id: '1',
-      codigo: 'L001',
-      sup_m2: 100,
-      precio: 12000,
-      moneda: 'PEN',
-      estado: 'disponible',
-      created_at: '2025-01-18T10:00:00Z',
-      proyecto: {
-        id: proyectoId,
-        nombre: 'Urbanización La Docta'
-      },
-      data: {
-        manzana: 'A'
-      }
-    },
-    {
-      id: '2',
-      codigo: 'L002',
-      sup_m2: 150,
-      precio: 16500,
-      moneda: 'PEN',
-      estado: 'reservado',
-      created_at: '2025-01-18T10:00:00Z',
-      proyecto: {
-        id: proyectoId,
-        nombre: 'Urbanización La Docta'
-      },
-      data: {
-        manzana: 'B'
-      }
-    },
-    {
-      id: '3',
-      codigo: 'L003',
-      sup_m2: 200,
-      precio: 20000,
-      moneda: 'PEN',
-      estado: 'vendido',
-      created_at: '2025-01-18T10:00:00Z',
-      proyecto: {
-        id: proyectoId,
-        nombre: 'Urbanización La Docta'
-      },
-      data: {
-        manzana: 'C'
-      }
-    }
-  ];
 
   // Sincronizar estado cuando cambien los props
   useEffect(() => {
@@ -128,8 +82,8 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
     };
   }, [openMenuId]);
 
-  // Usar datos de prueba si no hay lotes reales
-  const lotesAMostrar = lotesState.length > 0 ? lotesState : lotesPrueba;
+  // Usar solo los lotes reales
+  const lotesAMostrar = lotesState;
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {

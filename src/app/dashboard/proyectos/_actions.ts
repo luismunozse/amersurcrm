@@ -23,13 +23,22 @@ export async function crearProyecto(formData: FormData) {
   try {
     const nombre = String(formData.get("nombre") || "").trim();
     const estado = String(formData.get("estado") || "activo");
-    const ubicacion = String(formData.get("ubicacion") || "").trim();
     const descripcion = String(formData.get("descripcion") || "").trim();
     const imagenFile = formData.get("imagen") as File | null;
+    
+    // Datos de ubigeo
+    const departamento = String(formData.get("departamento") || "").trim();
+    const provincia = String(formData.get("provincia") || "").trim();
+    const distrito = String(formData.get("distrito") || "").trim();
 
     // Validaciones
     if (!nombre) {
       throw new Error("El nombre del proyecto es requerido");
+    }
+    
+    // Validar que se haya seleccionado al menos el distrito
+    if (!distrito) {
+      throw new Error("Debe seleccionar al menos el distrito para la ubicación del proyecto");
     }
 
     // Subir imagen si existe
@@ -71,13 +80,18 @@ export async function crearProyecto(formData: FormData) {
       }
     }
 
+    // Construir ubicación completa con ubigeo
+    const ubicacionFinal = [distrito, provincia, departamento]
+      .filter(Boolean)
+      .join(', ');
+
     // Crear el proyecto
     const { data: proyecto, error: insertError } = await supabase
       .from("proyecto")
       .insert({
         nombre,
         estado: estado as "activo" | "pausado" | "cerrado",
-        ubicacion: ubicacion || null,
+        ubicacion: ubicacionFinal,
         descripcion: descripcion || null,
         imagen_url: imagenUrl,
         created_by: user.id
@@ -93,10 +107,14 @@ export async function crearProyecto(formData: FormData) {
     revalidatePath("/dashboard/proyectos");
     revalidatePath("/dashboard");
 
-    // Redirigir al nuevo proyecto
-    redirect(`/dashboard/proyectos/${proyecto.id}`);
+    // Retornar éxito sin redirigir (la redirección se maneja en el cliente)
+    return { success: true, proyecto };
 
   } catch (error) {
+    // No capturar NEXT_REDIRECT como error
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+      throw error;
+    }
     console.error("Error creando proyecto:", error);
     throw new Error(error instanceof Error ? error.message : "Error creando proyecto");
   }

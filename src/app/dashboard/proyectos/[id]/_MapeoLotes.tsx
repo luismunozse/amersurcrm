@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Upload, MapPin, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { subirPlanos, eliminarPlanos, guardarCoordenadasMultiples, obtenerCoordenadasProyecto, guardarOverlayBounds, actualizarLote } from './_actions';
+import { obtenerCoordenadasUbicacion } from '@/lib/geocoding';
 
 // (Leaflet se carga sólo en cliente dentro de LeafletMap)
 
@@ -17,6 +18,11 @@ interface MapeoLotesProps {
   initialBounds?: [[number, number],[number, number]] | null;
   initialRotation?: number | null;
   lotes?: Array<{ id: string; codigo: string; estado?: string; data?: any }>;
+  ubigeo?: {
+    departamento: string;
+    provincia: string;
+    distrito: string;
+  };
 }
 
 interface Coordenada {
@@ -28,7 +34,7 @@ interface Coordenada {
 
 const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
 
-export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation, lotes = [] }: MapeoLotesProps) {
+export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation, lotes = [], ubigeo }: MapeoLotesProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
@@ -42,11 +48,30 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.7);
   const [lotesState, setLotesState] = useState(lotes);
+  const [coordenadasUbigeo, setCoordenadasUbigeo] = useState<{ lat: number; lng: number } | null>(null);
 
   // Sincronizar lotes cuando cambien los props
   useEffect(() => {
     setLotesState(lotes);
   }, [lotes]);
+
+  // Obtener coordenadas del ubigeo del proyecto
+  useEffect(() => {
+    if (ubigeo && ubigeo.distrito) {
+      obtenerCoordenadasUbicacion(
+        ubigeo.departamento,
+        ubigeo.provincia,
+        ubigeo.distrito
+      ).then(coords => {
+        if (coords) {
+          setCoordenadasUbigeo(coords);
+          console.log(`📍 Coordenadas del distrito ${ubigeo.distrito}:`, coords);
+        }
+      }).catch(error => {
+        console.error('Error obteniendo coordenadas del ubigeo:', error);
+      });
+    }
+  }, [ubigeo]);
 
   // Función para actualizar el estado de un lote específico
   const updateLoteState = (loteId: string, newEstado: string) => {
@@ -495,7 +520,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
           {/* Mapa */}
           <div id="mapeo-lotes-container" className="h-96 border rounded-lg overflow-hidden">
             <LeafletMap
-              defaultCenter={defaultCenter}
+              defaultCenter={coordenadasUbigeo || defaultCenter}
               defaultZoom={defaultZoom}
               coordenadas={coordenadas}
               onMapClick={onMapClickCoord}

@@ -1,11 +1,27 @@
 "use client";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { crearProyecto } from "./_actions";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import UbicacionSelector from "@/components/UbicacionSelector";
 
 export default function NewProyectoForm() {
   const [pending, start] = useTransition();
   const { isAdmin, loading } = useAdminPermissions();
+  const router = useRouter();
+  
+  // Estado para ubigeo
+  const [ubigeoData, setUbigeoData] = useState({
+    departamento: "",
+    provincia: "",
+    distrito: ""
+  });
+
+  // Manejar cambios de ubigeo
+  const handleUbigeoChange = (departamento: string, provincia: string, distrito: string) => {
+    setUbigeoData({ departamento, provincia, distrito });
+  };
 
   // No mostrar el formulario si no es admin
   if (loading) {
@@ -48,7 +64,18 @@ export default function NewProyectoForm() {
         <h2 className="text-lg font-semibold text-crm-text-primary">Agregar Nuevo Proyecto</h2>
       </div>
       
-      <form action={(fd) => start(async () => { await crearProyecto(fd); })}
+      <form action={(fd) => start(async () => { 
+        try {
+          const result = await crearProyecto(fd);
+          if (result.success) {
+            toast.success("Proyecto creado correctamente");
+            router.push(`/dashboard/proyectos/${result.proyecto.id}`);
+          }
+        } catch (error) {
+          console.error("Error creando proyecto:", error);
+          toast.error("Error al crear el proyecto");
+        }
+      })}
             className="space-y-6">
         
         {/* Primera fila: Nombre y Estado */}
@@ -78,29 +105,39 @@ export default function NewProyectoForm() {
           </div>
         </div>
 
-        {/* Segunda fila: Ubicación e Imagen */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-crm-text-primary">Ubicación</label>
-            <input 
-              name="ubicacion" 
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50" 
-              disabled={pending}
-              placeholder="Ciudad, País"
+        {/* Ubicación con Ubigeo */}
+        <div className="space-y-4">
+          <div className="w-full">
+            <label className="block text-sm font-medium text-crm-text-primary mb-2">
+              Ubicación (Ubigeo) *
+            </label>
+            <UbicacionSelector
+              departamento={ubigeoData.departamento}
+              provincia={ubigeoData.provincia}
+              distrito={ubigeoData.distrito}
+              onUbigeoChange={handleUbigeoChange}
+              className="w-full"
             />
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-crm-text-primary">Imagen del Proyecto</label>
-            <div className="relative">
-              <input 
-                type="file"
-                name="imagen"
-                accept="image/*"
-                className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20" 
-                disabled={pending}
-              />
-              <p className="text-xs text-crm-text-muted mt-1">Formatos: JPG, PNG, WEBP. Máx: 5MB</p>
-            </div>
+          
+          {/* Campos ocultos para enviar datos de ubigeo */}
+          <input type="hidden" name="departamento" value={ubigeoData.departamento} />
+          <input type="hidden" name="provincia" value={ubigeoData.provincia} />
+          <input type="hidden" name="distrito" value={ubigeoData.distrito} />
+        </div>
+
+        {/* Imagen del Proyecto */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-crm-text-primary">Imagen del Proyecto</label>
+          <div className="relative">
+            <input 
+              type="file"
+              name="imagen"
+              accept="image/*"
+              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20" 
+              disabled={pending}
+            />
+            <p className="text-xs text-crm-text-muted mt-1">Formatos: JPG, PNG, WEBP. Máx: 5MB</p>
           </div>
         </div>
 

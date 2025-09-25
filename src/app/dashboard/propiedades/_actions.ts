@@ -32,10 +32,7 @@ export async function crearPropiedad(formData: FormData) {
     const precio = formData.get("precio") ? Number(formData.get("precio")) : null;
     const moneda = String(formData.get("moneda") || "USD");
     const estado_comercial = String(formData.get("estado_comercial") || "disponible");
-    const descripcion = String(formData.get("descripcion") || "").trim();
-    const caracteristicas = String(formData.get("caracteristicas") || "").trim();
-    const condiciones_venta = String(formData.get("condiciones_venta") || "").trim();
-        const etiquetas = formData.getAll("etiquetas") as string[];
+    const etiquetas = formData.getAll("etiquetas") as string[];
 
         // Validaciones
         if (!codigo) {
@@ -70,12 +67,9 @@ export async function crearPropiedad(formData: FormData) {
         precio,
         moneda,
         estado_comercial: estado_comercial as "disponible" | "reservado" | "vendido" | "bloqueado",
-        descripcion: descripcion || null,
-        caracteristicas: caracteristicas || null,
-        condiciones_venta: condiciones_venta || null,
-            marketing: {
-              etiquetas: etiquetas.filter(etiqueta => etiqueta.trim() !== ''),
-            },
+        marketing: {
+          etiquetas: etiquetas.filter(etiqueta => etiqueta.trim() !== ''),
+        },
         created_by: user.id
       })
       .select()
@@ -89,14 +83,14 @@ export async function crearPropiedad(formData: FormData) {
     revalidatePath("/dashboard/propiedades");
     revalidatePath("/dashboard");
 
-    // Redirigir al nuevo proyecto si pertenece a uno
-    if (proyecto_id) {
-      redirect(`/dashboard/proyectos/${proyecto_id}`);
-    } else {
-      redirect(`/dashboard/propiedades/${propiedad.id}`);
-    }
+    // Retornar éxito sin redirigir (la redirección se maneja en el cliente)
+    return { success: true, propiedad };
 
   } catch (error) {
+    // No capturar NEXT_REDIRECT como error
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+      throw error;
+    }
     console.error("Error creando propiedad:", error);
     throw new Error(error instanceof Error ? error.message : "Error creando propiedad");
   }

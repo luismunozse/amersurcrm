@@ -70,6 +70,9 @@ export default async function ProyLotesPage({
   const { data: lotes, error: eLotes } = await listQuery;
   if (eLotes) throw eLotes;
 
+
+
+
   // Agregar información del proyecto a cada lote
   const lotesConProyecto = lotes?.map(lote => {
     // Buscar el proyecto real al que pertenece el lote
@@ -78,10 +81,11 @@ export default async function ProyLotesPage({
       ...lote,
       proyecto: {
         id: lote.proyecto_id,
-        nombre: proyectoReal?.nombre || proyecto.nombre
+        nombre: proyectoReal?.nombre || "Proyecto no encontrado"
       }
     };
   }) || [];
+
 
   // Conteo total (mismos filtros)
   let countQuery = supabase
@@ -191,6 +195,7 @@ export default async function ProyLotesPage({
         initialBounds={proyecto.overlay_bounds as any}
         initialRotation={proyecto.overlay_rotation as any}
         lotes={(lotesConProyecto || []).map(l => ({ id: l.id, codigo: l.codigo, estado: l.estado, data: l.data }))}
+        ubigeo={undefined}
       />
 
       <NewLoteForm 

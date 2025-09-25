@@ -66,7 +66,6 @@ export interface OpcionesFinanciacionAlquiler {
 // Estructura de marketing simplificada (sin multimedia)
 export interface Marketing {
   etiquetas: string[];
-  descripcion: string;
   fecha_publicacion: string;
   destacado: boolean;
   premium: boolean;
@@ -175,6 +174,11 @@ export interface PropiedadWizardData {
   disponibilidad_inmediata: boolean;
   disponibilidad_desde: string;
   
+  // Datos de ubigeo
+  departamento: string;
+  provincia: string;
+  distrito: string;
+  
   // Paso 3: Características específicas (dinámicas según tipo)
   caracteristicas: Record<string, any>;
   
@@ -186,7 +190,6 @@ export interface PropiedadWizardData {
   
   // Paso 5: Marketing (sin multimedia)
   etiquetas: string[];
-  descripcion: string;
   destacado: boolean;
   premium: boolean;
   

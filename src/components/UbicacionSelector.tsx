@@ -7,6 +7,10 @@ interface Provincia { code: string; name: string; departamento_code: string }
 interface Distrito { code: string; name: string; provincia_code: string }
 
 interface UbicacionSelectorProps {
+  departamento?: string;
+  provincia?: string;
+  distrito?: string;
+  onUbigeoChange?: (departamento: string, provincia: string, distrito: string) => void;
   onUbicacionChange?: (ubicacion: {
     departamento: string;
     provincia: string;
@@ -20,6 +24,10 @@ interface UbicacionSelectorProps {
 }
 
 export default function UbicacionSelector({
+  departamento: propDepartamento = "",
+  provincia: propProvincia = "",
+  distrito: propDistrito = "",
+  onUbigeoChange,
   onUbicacionChange,
   disabled = false,
   className = "",
@@ -31,9 +39,16 @@ export default function UbicacionSelector({
   const [provincias, setProvincias] = useState<Provincia[]>([]);
   const [distritos, setDistritos] = useState<Distrito[]>([]);
 
-  const [departamentoSeleccionado, setDepartamentoSeleccionado] = useState("");
-  const [provinciaSeleccionada, setProvinciaSeleccionada] = useState("");
-  const [distritoSeleccionado, setDistritoSeleccionado] = useState("");
+  const [departamentoSeleccionado, setDepartamentoSeleccionado] = useState(propDepartamento);
+  const [provinciaSeleccionada, setProvinciaSeleccionada] = useState(propProvincia);
+  const [distritoSeleccionado, setDistritoSeleccionado] = useState(propDistrito);
+
+  // Solo sincronizar en la inicialización, no en cada cambio
+  useEffect(() => {
+    setDepartamentoSeleccionado(propDepartamento);
+    setProvinciaSeleccionada(propProvincia);
+    setDistritoSeleccionado(propDistrito);
+  }, []); // Solo ejecutar una vez al montar
 
   const [departamentoAbierto, setDepartamentoAbierto] = useState(false);
   const [provinciaAbierta, setProvinciaAbierta] = useState(false);
@@ -112,15 +127,36 @@ export default function UbicacionSelector({
     setProvinciaSeleccionada("");
     setDistritoSeleccionado("");
     setDepartamentoAbierto(false);
+    
+    // Llamar a onUbigeoChange si está disponible
+    if (onUbigeoChange) {
+      const depNombre = departamentos.find(d => d.code === code)?.name || "";
+      onUbigeoChange(depNombre, "", "");
+    }
   };
   const handleProvinciaChange = (code: string) => {
     setProvinciaSeleccionada(code);
     setDistritoSeleccionado("");
     setProvinciaAbierta(false);
+    
+    // Llamar a onUbigeoChange si está disponible
+    if (onUbigeoChange) {
+      const depNombre = departamentos.find(d => d.code === departamentoSeleccionado)?.name || "";
+      const provNombre = provincias.find(p => p.code === code)?.name || "";
+      onUbigeoChange(depNombre, provNombre, "");
+    }
   };
   const handleDistritoChange = (code: string) => {
     setDistritoSeleccionado(code);
     setDistritoAbierto(false);
+    
+    // Llamar a onUbigeoChange si está disponible
+    if (onUbigeoChange) {
+      const depNombre = departamentos.find(d => d.code === departamentoSeleccionado)?.name || "";
+      const provNombre = provincias.find(p => p.code === provinciaSeleccionada)?.name || "";
+      const distNombre = distritos.find(d => d.code === code)?.name || "";
+      onUbigeoChange(depNombre, provNombre, distNombre);
+    }
   };
 
   useEffect(() => {
@@ -155,9 +191,27 @@ export default function UbicacionSelector({
   if (loading) {
     return (
       <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${className}`}>
-        <div className="animate-pulse bg-neutral-100 h-12 rounded-xl" />
-        <div className="animate-pulse bg-neutral-100 h-12 rounded-xl" />
-        <div className="animate-pulse bg-neutral-100 h-12 rounded-xl" />
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-crm-primary/20 rounded animate-pulse"></div>
+            <div className="h-4 bg-crm-primary/20 rounded w-24 animate-pulse"></div>
+          </div>
+          <div className="animate-pulse bg-crm-card-hover h-12 rounded-lg" />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-crm-primary/20 rounded animate-pulse"></div>
+            <div className="h-4 bg-crm-primary/20 rounded w-20 animate-pulse"></div>
+          </div>
+          <div className="animate-pulse bg-crm-card-hover h-12 rounded-lg" />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-crm-primary/20 rounded animate-pulse"></div>
+            <div className="h-4 bg-crm-primary/20 rounded w-16 animate-pulse"></div>
+          </div>
+          <div className="animate-pulse bg-crm-card-hover h-12 rounded-lg" />
+        </div>
       </div>
     );
   }
@@ -167,18 +221,62 @@ export default function UbicacionSelector({
   }
 
   const triggerClass =
-    "w-full px-4 py-3 border-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent bg-white dark:bg-[var(--crm-card)] border-[var(--crm-border)] text-[var(--crm-text-primary)] disabled:opacity-50 transition-all text-left flex justify-between items-center";
+    "w-full px-4 py-3 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-white text-crm-text-primary disabled:opacity-50 disabled:bg-crm-card-hover transition-all text-left flex justify-between items-center hover:border-crm-primary/50 min-h-[48px]";
   const listClass =
-    "absolute z-50 w-full mt-1 max-h-60 overflow-y-auto rounded-xl border-2 border-[var(--crm-border)] shadow-xl ubigeo-menu";
+    "absolute z-50 w-full mt-2 max-h-60 overflow-y-auto rounded-lg border border-crm-border shadow-xl bg-white ubigeo-menu backdrop-blur-sm";
   const itemClass =
-    "w-full px-4 py-3 text-left cursor-pointer transition-colors border-b border-[var(--crm-border)] last:border-b-0 ubigeo-item";
+    "w-full px-4 py-3 text-left cursor-pointer transition-all duration-200 border-b border-crm-border last:border-b-0 hover:bg-crm-primary/5 hover:text-crm-primary text-sm ubigeo-item flex items-center justify-between group";
+
+  // Calcular progreso de selección
+  const progreso = [departamentoSeleccionado, provinciaSeleccionada, distritoSeleccionado].filter(Boolean).length;
+  const totalPasos = 3;
 
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${className}`}>
+    <div className={`space-y-4 w-full ${className}`}>
+      {/* Indicador de progreso */}
+      <div className="flex items-center justify-between text-xs text-crm-text-muted">
+        <span>Progreso de ubicación</span>
+        <span>{progreso}/{totalPasos}</span>
+      </div>
+      <div className="w-full bg-crm-card-hover rounded-full h-2">
+        <div 
+          className="bg-crm-primary h-2 rounded-full transition-all duration-300 ease-out"
+          style={{ width: `${(progreso / totalPasos) * 100}%` }}
+        ></div>
+      </div>
+      
+      {/* Mensaje de ayuda contextual */}
+      
+      {progreso > 0 && progreso < totalPasos && (
+        <div className="bg-crm-success/5 border border-crm-success/20 rounded-lg p-3 text-sm text-crm-text-primary">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-crm-success" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-crm-success font-medium">¡Bien! Continúa con el siguiente paso.</span>
+          </div>
+        </div>
+      )}
+      
+      {progreso === totalPasos && (
+        <div className="bg-crm-success/5 border border-crm-success/20 rounded-lg p-3 text-sm text-crm-text-primary">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-crm-success" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-crm-success font-medium">¡Perfecto! Ubicación completa.</span>
+          </div>
+        </div>
+      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
       {/* Departamento */}
       <div className="space-y-2" ref={depRef}>
-        <label className="block text-sm font-medium text-[var(--crm-text-secondary)]">
-          Departamento <span className="text-red-500">*</span>
+        <label className="flex items-center gap-2 text-sm font-medium text-crm-text-primary">
+          <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          Departamento <span className="text-crm-danger">*</span>
         </label>
         <div className="relative" role="combobox" aria-expanded={departamentoAbierto}>
           <button
@@ -187,8 +285,8 @@ export default function UbicacionSelector({
             disabled={disabled}
             className={triggerClass}
           >
-            <span className={depNombre ? "text-[var(--crm-text-primary)]" : "text-[var(--crm-text-muted)]"} style={{ color: depNombre ? '#0f172a' : '#64748b' }}>
-              {depNombre || "Seleccionar departamento"}
+            <span className={depNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
+              {depNombre || "Selecciona un departamento"}
             </span>
             <svg className={`w-4 h-4 transition-transform ${departamentoAbierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -203,9 +301,17 @@ export default function UbicacionSelector({
                   aria-selected={d.code === departamentoSeleccionado}
                   key={d.code}
                   onClick={() => handleDepartamentoChange(d.code)}
-                  className={itemClass}
+                  className={`${itemClass} ${d.code === departamentoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
                 >
-                  <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
+                    <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+                  </div>
+                  {d.code === departamentoSeleccionado && (
+                    <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </div>
               ))}
             </div>
@@ -215,8 +321,12 @@ export default function UbicacionSelector({
 
       {/* Provincia */}
       <div className="space-y-2" ref={provRef}>
-        <label className="block text-sm font-medium text-[var(--crm-text-secondary)]">
-          Provincia <span className="text-red-500">*</span>
+        <label className="flex items-center gap-2 text-sm font-medium text-crm-text-primary">
+          <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Provincia <span className="text-crm-danger">*</span>
         </label>
         <div className="relative" role="combobox" aria-expanded={provinciaAbierta}>
           <button
@@ -225,8 +335,8 @@ export default function UbicacionSelector({
             disabled={disabled || !departamentoSeleccionado || provinciasFiltradas.length === 0}
             className={triggerClass}
           >
-            <span className={provNombre ? "text-[var(--crm-text-primary)]" : "text-[var(--crm-text-muted)]"} style={{ color: provNombre ? '#0f172a' : '#64748b' }}>
-              {provNombre || "Seleccionar provincia"}
+            <span className={provNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
+              {provNombre || (departamentoSeleccionado ? "Selecciona una provincia" : "Primero selecciona un departamento")}
             </span>
             <svg className={`w-4 h-4 transition-transform ${provinciaAbierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -241,9 +351,17 @@ export default function UbicacionSelector({
                   aria-selected={p.code === provinciaSeleccionada}
                   key={p.code}
                   onClick={() => handleProvinciaChange(p.code)}
-                  className={itemClass}
+                  className={`${itemClass} ${p.code === provinciaSeleccionada ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
                 >
-                  <span className="ubigeo-item-text">{p.name || '(sin nombre)'}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
+                    <span className="ubigeo-item-text">{p.name || '(sin nombre)'}</span>
+                  </div>
+                  {p.code === provinciaSeleccionada && (
+                    <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </div>
               ))}
             </div>
@@ -253,8 +371,12 @@ export default function UbicacionSelector({
 
       {/* Distrito */}
       <div className="space-y-2" ref={distRef}>
-        <label className="block text-sm font-medium text-[var(--crm-text-secondary)]">
-          Distrito <span className="text-red-500">*</span>
+        <label className="flex items-center gap-2 text-sm font-medium text-crm-text-primary">
+          <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+          </svg>
+          Distrito <span className="text-crm-danger">*</span>
         </label>
         <div className="relative" role="combobox" aria-expanded={distritoAbierto}>
           <button
@@ -263,8 +385,8 @@ export default function UbicacionSelector({
             disabled={disabled || !provinciaSeleccionada || distritosFiltrados.length === 0}
             className={triggerClass}
           >
-            <span className={distNombre ? "text-[var(--crm-text-primary)]" : "text-[var(--crm-text-muted)]"} style={{ color: distNombre ? '#0f172a' : '#64748b' }}>
-              {distNombre || "Seleccionar distrito"}
+            <span className={distNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
+              {distNombre || (provinciaSeleccionada ? "Selecciona un distrito" : "Primero selecciona una provincia")}
             </span>
             <svg className={`w-4 h-4 transition-transform ${distritoAbierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -279,14 +401,23 @@ export default function UbicacionSelector({
                   aria-selected={d.code === distritoSeleccionado}
                   key={d.code}
                   onClick={() => handleDistritoChange(d.code)}
-                  className={itemClass}
+                  className={`${itemClass} ${d.code === distritoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
                 >
-                  <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
+                    <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+                  </div>
+                  {d.code === distritoSeleccionado && (
+                    <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
