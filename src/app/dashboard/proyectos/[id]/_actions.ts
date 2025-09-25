@@ -169,6 +169,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   const precio = fd.get("precio") ? Number(fd.get("precio")) : null;
   const moneda = String(fd.get("moneda") || "ARS");
   const estado = String(fd.get("estado") || "disponible");
+  const data = fd.get("data") ? String(fd.get("data")) : null;
 
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -194,6 +195,13 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   if (sup_m2 !== null) updateData.sup_m2 = sup_m2;
   if (precio !== null) updateData.precio = precio;
   if (moneda && moneda !== "ARS") updateData.moneda = moneda;
+  if (data) {
+    try {
+      updateData.data = JSON.parse(data);
+    } catch (e) {
+      console.warn("Error parsing data JSON:", e);
+    }
+  }
 
   const { error } = await supabase
     .from("lote")

@@ -12,7 +12,8 @@ import {
   FormaPago, 
   InteresPrincipal, 
   ProximaAccion,
-  DireccionCliente 
+  DireccionCliente,
+  EstadoCivil 
 } from "@/lib/types/clientes";
 
 const DireccionSchema = z.object({
@@ -46,6 +47,7 @@ const ClienteCompletoSchema = z.object({
   telefono: z.string().optional().or(z.literal("")),
   telefono_whatsapp: z.string().optional().or(z.literal("")),
   direccion: DireccionSchema.optional().default({}),
+  estado_civil: z.enum(['soltero','casado','viudo','divorciado']).optional(),
   
   // Estado comercial
   estado_cliente: z.enum(['por_contactar', 'contactado', 'transferido']),
@@ -94,6 +96,7 @@ export async function crearCliente(formData: FormData) {
       provincia: String(formData.get("direccion_provincia") || ""),
       pais: String(formData.get("direccion_pais") || "Perú"),
     },
+    estado_civil: formData.get("estado_civil") ? String(formData.get("estado_civil")) as EstadoCivil : undefined,
     estado_cliente: String(formData.get("estado_cliente") || "por_contactar") as EstadoCliente,
     origen_lead: formData.get("origen_lead") ? String(formData.get("origen_lead")) : undefined,
     vendedor_asignado: formData.get("vendedor_asignado") ? String(formData.get("vendedor_asignado")) : undefined,
@@ -127,6 +130,7 @@ export async function crearCliente(formData: FormData) {
     // Alinear con constraint cliente_tipo_documento_check
     tipo_documento: mapTipoDocumentoToDb(parsed.data.tipo_documento),
     documento_identidad: parsed.data.documento_identidad || null,
+    estado_civil: parsed.data.estado_civil || null,
     origen_lead: parsed.data.origen_lead || null,
     vendedor_asignado: parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== "" ? parsed.data.vendedor_asignado : null,
     proxima_accion: parsed.data.proxima_accion || null,

@@ -40,6 +40,8 @@ export type ProximaAccion =
   | 'cierre' 
   | 'nada';
 
+export type EstadoCivil = 'soltero' | 'casado' | 'viudo' | 'divorciado';
+
 export interface DireccionCliente {
   calle?: string;
   numero?: string;
@@ -66,6 +68,7 @@ export interface ClienteCompleto {
   telefono?: string;
   telefono_whatsapp?: string;
   direccion: DireccionCliente;
+  estado_civil?: EstadoCivil;
   
   // Estado comercial
   estado_cliente: EstadoCliente;
@@ -101,6 +104,7 @@ export interface ClienteFormData {
   telefono?: string;
   telefono_whatsapp?: string;
   direccion: DireccionCliente;
+  estado_civil?: EstadoCivil;
   
   // Estado comercial
   estado_cliente: EstadoCliente;
@@ -134,6 +138,13 @@ export const ESTADOS_CLIENTE_OPTIONS = [
   { value: 'por_contactar', label: 'Por Contactar', color: 'blue' },
   { value: 'contactado', label: 'Contactado', color: 'yellow' },
   { value: 'transferido', label: 'Transferido', color: 'green' }
+] as const;
+
+export const ESTADO_CIVIL_OPTIONS = [
+  { value: 'soltero', label: 'Soltero(a)' },
+  { value: 'casado', label: 'Casado(a)' },
+  { value: 'viudo', label: 'Viudo(a)' },
+  { value: 'divorciado', label: 'Divorciado(a)' },
 ] as const;
 
 export const ORIGENES_LEAD_OPTIONS = [

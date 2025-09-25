@@ -563,59 +563,7 @@ export default function ClientesTable({ clientes }: ClientesTableProps) {
 
   return (
     <div className="space-y-6">
-      {/* Filtros */}
-      <div className="crm-card p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">Buscar</label>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              placeholder="Nombre, email o código..."
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">Estado</label>
-            <select
-              value={filters.estado}
-              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            >
-              <option value="">Todos los estados</option>
-              <option value="por_contactar">Por Contactar</option>
-              <option value="contactado">En Contacto</option>
-              <option value="transferido">Transferido</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">Tipo</label>
-            <select
-              value={filters.tipo}
-              onChange={(e) => setFilters(prev => ({ ...prev, tipo: e.target.value }))}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            >
-              <option value="">Todos los tipos</option>
-              <option value="persona">Persona</option>
-              <option value="empresa">Empresa</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-crm-text-primary mb-2">Vendedor</label>
-            <select
-              value={filters.vendedor}
-              onChange={(e) => setFilters(prev => ({ ...prev, vendedor: e.target.value }))}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            >
-              <option value="">Todos los vendedores</option>
-              {getVendedores().map(vendedor => (
-                <option key={vendedor} value={vendedor}>{vendedor}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      {/* Los filtros ahora están en el componente AdvancedClientSearch */}
 
       {/* Tabla */}
       <div className="crm-card overflow-hidden">

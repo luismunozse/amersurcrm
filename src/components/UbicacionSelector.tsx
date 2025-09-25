@@ -54,11 +54,12 @@ export default function UbicacionSelector({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  useEffect(() => {
-    if (!disabled && departamentos.length > 0 && !departamentoSeleccionado) {
-      setDepartamentoAbierto(true);
-    }
-  }, [disabled, departamentos.length, departamentoSeleccionado]);
+  // Removed automatic opening of department dropdown
+  // useEffect(() => {
+  //   if (!disabled && departamentos.length > 0 && !departamentoSeleccionado) {
+  //     setDepartamentoAbierto(true);
+  //   }
+  // }, [disabled, departamentos.length, departamentoSeleccionado]);
 
   useEffect(() => {
     const loadAllData = async () => {

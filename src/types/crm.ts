@@ -8,6 +8,7 @@ export type ClienteCached = {
     telefono: string | null;
     telefono_whatsapp: string | null;
     documento_identidad: string | null;
+  estado_civil: string | null;
     estado_cliente: string;
     origen_lead: string | null;
     vendedor_asignado: string | null;

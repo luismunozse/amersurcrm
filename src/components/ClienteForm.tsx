@@ -9,7 +9,8 @@ import {
   TIPOS_DOCUMENTO_OPTIONS,
   ESTADOS_CLIENTE_OPTIONS, 
   ORIGENES_LEAD_OPTIONS, 
-  INTERESES_PRINCIPALES_OPTIONS 
+  INTERESES_PRINCIPALES_OPTIONS,
+  ESTADO_CIVIL_OPTIONS
 } from "@/lib/types/clientes";
 import UbicacionSelector from "./UbicacionSelector";
 
@@ -29,6 +30,7 @@ interface ClienteFormProps {
     vendedor_asignado?: string;
     interes_principal?: string;
     notas?: string;
+    estado_civil?: string;
   };
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -144,6 +146,22 @@ export default function ClienteForm({
               />
             </div>
 
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-crm-text-primary">Email</label>
+              <input 
+                name="email" 
+                type="email"
+                defaultValue={cliente?.email || ""}
+                className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
+                disabled={pending}
+                placeholder="cliente@ejemplo.com"
+              />
+            </div>
+          </div>
+
+          {/* Documento - Fila separada con dos campos juntos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Tipo de Documento */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-crm-text-primary">
@@ -163,46 +181,35 @@ export default function ClienteForm({
               </select>
             </div>
 
-          {/* Número de Documento */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-crm-text-primary">
-              Número de Documento <span className="text-red-500">*</span>
-            </label>
-            <input 
-              name="documento_identidad" 
-              required
-              defaultValue={cliente?.documento_identidad || ""}
-              className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
-              disabled={pending}
-              placeholder={tipoDocumento === 'DNI' ? '12345678' : 
-                         tipoDocumento === 'RUC' ? '20123456789' : 
-                         tipoDocumento === 'PAS' ? 'AB123456' : 
-                         '12345678'}
-              pattern={tipoDocumento === 'DNI' ? '[0-9]{8}' : 
-                      tipoDocumento === 'RUC' ? '[0-9]{11}' : 
-                      tipoDocumento === 'PAS' ? '[A-Z]{2}[0-9]{6}' : 
-                      '[0-9]{8}'}
-              title={tipoDocumento === 'DNI' ? 'Ingrese 8 dígitos' : 
-                     tipoDocumento === 'RUC' ? 'Ingrese 11 dígitos' : 
-                     tipoDocumento === 'PAS' ? 'Formato: AB123456' : 
-                     'Ingrese el número de documento'}
-            />
-          </div>
-
-
-            {/* Email */}
+            {/* Número de Documento */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-crm-text-primary">Email</label>
+              <label className="block text-sm font-medium text-crm-text-primary">
+                Número de Documento <span className="text-red-500">*</span>
+              </label>
               <input 
-                name="email" 
-                type="email"
-                defaultValue={cliente?.email || ""}
+                name="documento_identidad" 
+                required
+                defaultValue={cliente?.documento_identidad || ""}
                 className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
                 disabled={pending}
-                placeholder="cliente@ejemplo.com"
+                placeholder={tipoDocumento === 'DNI' ? '12345678' : 
+                           tipoDocumento === 'RUC' ? '20123456789' : 
+                           tipoDocumento === 'PAS' ? 'AB123456' : 
+                           '12345678'}
+                pattern={tipoDocumento === 'DNI' ? '[0-9]{8}' : 
+                        tipoDocumento === 'RUC' ? '[0-9]{11}' : 
+                        tipoDocumento === 'PAS' ? '[A-Z]{2}[0-9]{6}' : 
+                        '[0-9]{8}'}
+                title={tipoDocumento === 'DNI' ? 'Ingrese 8 dígitos' : 
+                       tipoDocumento === 'RUC' ? 'Ingrese 11 dígitos' : 
+                       tipoDocumento === 'PAS' ? 'Formato: AB123456' : 
+                       'Ingrese el número de documento'}
               />
             </div>
+          </div>
 
+          {/* Contacto y Estado Civil */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Teléfono */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-crm-text-primary">Teléfono</label>
@@ -225,6 +232,22 @@ export default function ClienteForm({
                 disabled={pending}
                 placeholder="+51 987 654 321"
               />
+            </div>
+
+            {/* Estado Civil */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-crm-text-primary">Estado Civil</label>
+              <select 
+                name="estado_civil" 
+                defaultValue={cliente?.estado_civil || ""}
+                className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
+                disabled={pending}
+              >
+                <option value="">Sin especificar</option>
+                {ESTADO_CIVIL_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
