@@ -231,6 +231,11 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
         )
       );
 
+      // Actualizar también el estado en el mapa si existe la función
+      if (typeof (window as any).updateLoteState === 'function') {
+        (window as any).updateLoteState(loteId, nuevoEstado);
+      }
+
       const formData = new FormData();
       formData.append('estado', nuevoEstado);
       formData.append('proyecto_id', proyectoId);

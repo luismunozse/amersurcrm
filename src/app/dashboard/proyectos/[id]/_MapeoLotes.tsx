@@ -16,7 +16,7 @@ interface MapeoLotesProps {
   proyectoNombre: string;
   initialBounds?: [[number, number],[number, number]] | null;
   initialRotation?: number | null;
-  lotes?: Array<{ id: string; codigo: string; data?: any }>;
+  lotes?: Array<{ id: string; codigo: string; estado?: string; data?: any }>;
 }
 
 interface Coordenada {
@@ -41,6 +41,31 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
   const [keepAspect, setKeepAspect] = useState(true);
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.7);
+  const [lotesState, setLotesState] = useState(lotes);
+
+  // Sincronizar lotes cuando cambien los props
+  useEffect(() => {
+    setLotesState(lotes);
+  }, [lotes]);
+
+  // Función para actualizar el estado de un lote específico
+  const updateLoteState = (loteId: string, newEstado: string) => {
+    setLotesState(prevLotes => 
+      prevLotes.map(lote => 
+        lote.id === loteId 
+          ? { ...lote, estado: newEstado }
+          : lote
+      )
+    );
+  };
+
+  // Exponer la función para que pueda ser llamada desde otros componentes
+  useEffect(() => {
+    (window as any).updateLoteState = updateLoteState;
+    return () => {
+      delete (window as any).updateLoteState;
+    };
+  }, []);
 
   // Snap de rotación a ángulos cardinales si está cerca del umbral
   const snapAngle = (deg: number) => {
@@ -54,7 +79,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
 
   // Coordenadas de Lima, Perú como centro por defecto
   const defaultCenter: [number, number] = [-12.0464, -77.0428];
-  const defaultZoom = 13;
+  const defaultZoom = 15; // Aumentado de 13 a 15 para más zoom
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -177,7 +202,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
     
     // Si estamos asignando un pin a un lote seleccionado
     if (selectedLoteId) {
-      const loteSeleccionado = lotes.find(l => l.id === selectedLoteId);
+      const loteSeleccionado = lotesState.find(l => l.id === selectedLoteId);
       if (!loteSeleccionado) {
         toast.error('Lote no encontrado');
         return;
@@ -411,7 +436,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
                   className="px-3 py-2 border border-blue-300 rounded-lg bg-white text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Seleccionar lote para ubicar</option>
-                  {lotes.map(l => (
+                  {lotesState.map(l => (
                     <option key={l.id} value={l.id}>{l.codigo}</option>
                   ))}
                 </select>
@@ -429,7 +454,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
               {selectedLoteId && (
                 <div className="p-3 bg-blue-100 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>Instrucciones:</strong> Haz clic en el plano donde quieres ubicar el lote <strong>{lotes.find(l => l.id === selectedLoteId)?.codigo}</strong>. 
+                    <strong>Instrucciones:</strong> Haz clic en el plano donde quieres ubicar el lote <strong>{lotesState.find(l => l.id === selectedLoteId)?.codigo}</strong>. 
                     Se colocará un pin en esa ubicación y se guardará automáticamente.
                   </p>
                 </div>
@@ -474,7 +499,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
               onBoundsChange={onBoundsChangeWithAspect}
               rotationDeg={rotation}
               overlayOpacity={overlayOpacity}
-              lotesConUbicacion={lotes}
+              lotesConUbicacion={lotesState}
               onToggleFull={() => {
                 const el = document.fullscreenElement;
                 const container = document.querySelector('#mapeo-lotes-container') as HTMLElement | null;
@@ -532,7 +557,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
           </div>
 
           {/* Lotes ubicados en el plano */}
-          {lotes.filter(lote => {
+          {lotesState.filter(lote => {
             const data = lote.data ? 
               (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
             return data.plano_point && Array.isArray(data.plano_point) && data.plano_point.length === 2;
@@ -545,7 +570,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
                   </svg>
                 </div>
                 <h4 className="font-medium text-blue-900">
-                  Lotes ubicados en el plano ({lotes.filter(lote => {
+                  Lotes ubicados en el plano ({lotesState.filter(lote => {
                     const data = lote.data ? 
                       (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
                     return data.plano_point && Array.isArray(data.plano_point) && data.plano_point.length === 2;
@@ -553,7 +578,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
                 </h4>
               </div>
               <div className="max-h-32 overflow-y-auto space-y-1">
-                {lotes.filter(lote => {
+                {lotesState.filter(lote => {
                   const data = lote.data ? 
                     (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
                   return data.plano_point && Array.isArray(data.plano_point) && data.plano_point.length === 2;

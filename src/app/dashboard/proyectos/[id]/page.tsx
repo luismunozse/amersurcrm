@@ -176,7 +176,7 @@ export default async function ProyLotesPage({
         proyectoNombre={proyecto.nombre}
         initialBounds={proyecto.overlay_bounds as any}
         initialRotation={proyecto.overlay_rotation as any}
-        lotes={(lotesConProyecto || []).map(l => ({ id: l.id, codigo: l.codigo, data: l.data }))}
+        lotes={(lotesConProyecto || []).map(l => ({ id: l.id, codigo: l.codigo, estado: l.estado, data: l.data }))}
       />
 
       <NewLoteForm 

@@ -22,7 +22,6 @@ interface LoteData {
   // Paso 1: Datos generales del proyecto
   proyecto: string;
   ubicacion: string;
-  etapa: string;
   
   // Paso 2: Datos del lote/propiedad
   identificador: string;
@@ -47,7 +46,6 @@ interface LoteData {
 const initialData: LoteData = {
   proyecto: "",
   ubicacion: "",
-  etapa: "",
   identificador: "",
   manzana: "",
   numero: "",
@@ -145,9 +143,29 @@ export default function LoteWizard({ proyectoId, proyectos, onClose }: LoteWizar
           }
         }
         
+        // Generar código del lote de forma más robusta
+        let codigoLote = '';
+        if (data.identificador && data.identificador.trim()) {
+          // Usar identificador único si está disponible
+          codigoLote = data.identificador.trim();
+        } else if (data.manzana && data.numero) {
+          // Usar manzana-número si ambos están disponibles
+          codigoLote = `${data.manzana.trim()}-${data.numero.trim()}`;
+        } else if (data.manzana) {
+          // Solo manzana si número está vacío
+          codigoLote = `${data.manzana.trim()}-01`;
+        } else if (data.numero) {
+          // Solo número si manzana está vacía
+          codigoLote = `MzA-${data.numero.trim()}`;
+        } else {
+          // Fallback: usar timestamp
+          codigoLote = `LOTE-${Date.now()}`;
+        }
+
         // Crear FormData con los datos del lote
         const formData = new FormData();
-        formData.append("codigo", `${data.manzana}-${data.numero}`);
+        formData.append("proyecto_id", proyectoSeleccionado);
+        formData.append("codigo", codigoLote);
         formData.append("sup_m2", data.superficie?.toString() || "");
         formData.append("precio", data.precio?.toString() || "");
         formData.append("moneda", data.moneda);
@@ -157,7 +175,6 @@ export default function LoteWizard({ proyectoId, proyectos, onClose }: LoteWizar
         const additionalData = {
           proyecto: data.proyecto,
           ubicacion: data.ubicacion,
-          etapa: data.etapa,
           identificador: data.identificador,
           manzana: data.manzana,
           numero: data.numero,
@@ -170,7 +187,7 @@ export default function LoteWizard({ proyectoId, proyectos, onClose }: LoteWizar
         };
         formData.append("data", JSON.stringify(additionalData));
 
-        await crearLote(proyectoSeleccionado, formData);
+        await crearLote(formData);
         toast.success("Lote creado exitosamente con multimedia");
         onClose();
       } catch (err: unknown) {
@@ -309,8 +326,7 @@ function Step1({ data, updateData, proyectos }: {
               const proyectoSeleccionado = proyectos.find(p => p.id === e.target.value);
               updateData({ 
                 proyecto: e.target.value,
-                ubicacion: proyectoSeleccionado?.ubicacion || "",
-                etapa: proyectoSeleccionado?.estado || ""
+                ubicacion: proyectoSeleccionado?.ubicacion || ""
               });
             }}
             className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
@@ -355,21 +371,6 @@ function Step1({ data, updateData, proyectos }: {
           </div>
         )}
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-crm-text-primary">Etapa del Proyecto *</label>
-          <select
-            value={data.etapa}
-            onChange={(e) => updateData({ etapa: e.target.value })}
-            className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            required
-          >
-            <option value="">Seleccionar etapa</option>
-            <option value="preventa">Preventa</option>
-            <option value="en_construccion">En Construcción</option>
-            <option value="terminado">Terminado</option>
-            <option value="entregado">Entregado</option>
-          </select>
-        </div>
       </div>
     </div>
   );
@@ -398,9 +399,12 @@ function Step2({ data, updateData }: { data: LoteData; updateData: (updates: Par
             value={data.identificador}
             onChange={(e) => updateData({ identificador: e.target.value })}
             className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            placeholder="Ej: LOTE-001"
+            placeholder="Ej: LOTE-001, A-15, MzB-23"
             required
           />
+          <p className="text-xs text-crm-text-muted">
+            Este será el código único del lote. Si no se completa, se generará automáticamente.
+          </p>
         </div>
 
         <div className="space-y-2">

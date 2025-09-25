@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, useMap, Marker, Popup, ImageOverlay, Rectangle, SVGOverlay } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -38,6 +38,7 @@ interface LeafletMapProps {
   lotesConUbicacion?: Array<{
     id: string;
     codigo: string;
+    estado?: string;
     data?: any;
   }>;
 }
@@ -87,10 +88,25 @@ export default function LeafletMap({
     [defaultCenter[0] + 0.01, defaultCenter[1] + 0.01],
   ];
   return (
-    <MapContainer center={defaultCenter} zoom={defaultZoom} style={{ height: "100%", width: "100%" }}>
+    <MapContainer 
+      center={defaultCenter} 
+      zoom={defaultZoom} 
+      style={{ height: "100%", width: "100%" }}
+      minZoom={3}
+      maxZoom={20}
+      zoomControl={true}
+      scrollWheelZoom={true}
+      doubleClickZoom={true}
+      touchZoom={true}
+      boxZoom={true}
+      keyboard={true}
+      dragging={true}
+    >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        maxZoom={20}
+        minZoom={3}
       />
 
       {/* Overlay de imagen si existe plano */}
@@ -294,6 +310,7 @@ export default function LeafletMap({
       <MapClickHandler onMapClick={onMapClick} />
       <FitOnUpdate bounds={overlayBounds} markers={coordenadas} />
       <ZoomFullControl onToggleFull={onToggleFull} />
+      <ZoomLevelIndicator />
     </MapContainer>
   );
 }
@@ -347,6 +364,15 @@ function ZoomFullControl({ onToggleFull }: { onToggleFull?: () => void }) {
         };
         mkBtn('+', 'Acercar', () => map.zoomIn());
         mkBtn('–', 'Alejar', () => map.zoomOut());
+        mkBtn('⌂', 'Centrar', () => {
+          if (overlayBounds) {
+            const sw = L.latLng(overlayBounds[0][0], overlayBounds[0][1]);
+            const ne = L.latLng(overlayBounds[1][0], overlayBounds[1][1]);
+            map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
+          } else {
+            map.setView(defaultCenter, defaultZoom);
+          }
+        });
         mkBtn('⤢', 'Pantalla completa', () => { onToggleFull && onToggleFull(); });
         return div;
       },
@@ -356,6 +382,43 @@ function ZoomFullControl({ onToggleFull }: { onToggleFull?: () => void }) {
     map.addControl(ctl as any);
     return () => { map.removeControl(ctl as any); };
   }, [map, onToggleFull]);
+  return null;
+}
+
+// Indicador de nivel de zoom
+function ZoomLevelIndicator() {
+  const map = useMap();
+  const [zoomLevel, setZoomLevel] = useState(map.getZoom());
+
+  useEffect(() => {
+    const updateZoom = () => setZoomLevel(map.getZoom());
+    
+    map.on('zoomend', updateZoom);
+    return () => map.off('zoomend', updateZoom);
+  }, [map]);
+
+  useEffect(() => {
+    const Control = L.Control.extend({
+      onAdd: function () {
+        const div = L.DomUtil.create('div', 'leaflet-bar');
+        div.style.background = 'var(--crm-card)';
+        div.style.border = `1px solid var(--crm-border)`;
+        div.style.borderRadius = '8px';
+        div.style.padding = '8px 12px';
+        div.style.fontSize = '12px';
+        div.style.fontWeight = 'bold';
+        div.style.color = 'var(--crm-text-primary)';
+        div.innerHTML = `Zoom: ${zoomLevel.toFixed(1)}`;
+        return div;
+      },
+      onRemove: function () {}
+    });
+    
+    const ctl = new Control({ position: 'bottomright' });
+    map.addControl(ctl as any);
+    return () => { map.removeControl(ctl as any); };
+  }, [map, zoomLevel]);
+
   return null;
 }
 
