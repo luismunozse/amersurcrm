@@ -260,7 +260,13 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
       return;
     }
     
-    // Comportamiento normal: agregar coordenadas de lotes (solo si no hay lote seleccionado)
+    // Si hay un plano activo, no permitir agregar coordenadas generales
+    if (planUrl) {
+      toast.info('Para ubicar lotes en el plano, selecciona un lote específico primero');
+      return;
+    }
+    
+    // Comportamiento normal: agregar coordenadas de lotes (solo si no hay plano)
     handleMapClick(lat, lng);
   };
 
@@ -500,6 +506,16 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
               rotationDeg={rotation}
               overlayOpacity={overlayOpacity}
               lotesConUbicacion={lotesState}
+              onRotationChange={setRotation}
+              onScaleChange={(scale) => {
+                // La escala se maneja internamente en LeafletMap
+                console.log('Escala del plano:', scale);
+              }}
+              onOpacityChange={setOverlayOpacity}
+              onPanChange={(x, y) => {
+                // El pan se maneja internamente en LeafletMap
+                console.log('Posición del plano:', { x, y });
+              }}
               onToggleFull={() => {
                 const el = document.fullscreenElement;
                 const container = document.querySelector('#mapeo-lotes-container') as HTMLElement | null;
@@ -633,8 +649,8 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
             </div>
           )}
 
-          {/* Lista de coordenadas generales */}
-          {coordenadas.length > 0 && (
+          {/* Lista de coordenadas generales - solo si no hay plano */}
+          {!planUrl && coordenadas.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Coordenadas generales ({coordenadas.length})</h4>

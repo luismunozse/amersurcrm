@@ -4,6 +4,7 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
 import MapeoLotes from "./_MapeoLotes";
+import DeleteProjectButton from "./_DeleteProjectButton";
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -70,13 +71,17 @@ export default async function ProyLotesPage({
   if (eLotes) throw eLotes;
 
   // Agregar información del proyecto a cada lote
-  const lotesConProyecto = lotes?.map(lote => ({
-    ...lote,
-    proyecto: {
-      id: proyecto.id,
-      nombre: proyecto.nombre
-    }
-  })) || [];
+  const lotesConProyecto = lotes?.map(lote => {
+    // Buscar el proyecto real al que pertenece el lote
+    const proyectoReal = todosLosProyectos?.find(p => p.id === lote.proyecto_id);
+    return {
+      ...lote,
+      proyecto: {
+        id: lote.proyecto_id,
+        nombre: proyectoReal?.nombre || proyecto.nombre
+      }
+    };
+  }) || [];
 
   // Conteo total (mismos filtros)
   let countQuery = supabase
@@ -106,27 +111,36 @@ export default async function ProyLotesPage({
   return (
     <div className="w-full p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link 
-          href="/dashboard/proyectos" 
-          className="flex items-center gap-2 px-4 py-2 text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-          </svg>
-          Volver
-        </Link>
-        <div>
-          <h1 className="text-3xl font-display font-bold text-crm-text-primary">Proyecto: {proyecto.nombre}</h1>
-          <p className="text-crm-text-muted mt-1">
-            {proyecto.ubicacion && `${proyecto.ubicacion} • `}
-            Estado: <span className={`font-medium ${
-              proyecto.estado === 'activo' ? 'text-crm-success' :
-              proyecto.estado === 'pausado' ? 'text-crm-warning' :
-              'text-crm-danger'
-            }`}>{proyecto.estado}</span>
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link 
+            href="/dashboard/proyectos" 
+            className="flex items-center gap-2 px-4 py-2 text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+            </svg>
+            Volver
+          </Link>
+          <div>
+            <h1 className="text-3xl font-display font-bold text-crm-text-primary">Proyecto: {proyecto.nombre}</h1>
+            <p className="text-crm-text-muted mt-1">
+              {proyecto.ubicacion && `${proyecto.ubicacion} • `}
+              Estado: <span className={`font-medium ${
+                proyecto.estado === 'activo' ? 'text-crm-success' :
+                proyecto.estado === 'pausado' ? 'text-crm-warning' :
+                'text-crm-danger'
+              }`}>{proyecto.estado}</span>
+            </p>
+          </div>
         </div>
+        
+        {/* Botón de eliminar proyecto */}
+        <DeleteProjectButton 
+          proyectoId={proyecto.id}
+          proyectoNombre={proyecto.nombre}
+          lotesCount={lotesConProyecto?.length || 0}
+        />
       </div>
 
       {/* Filtros */}

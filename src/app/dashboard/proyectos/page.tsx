@@ -103,7 +103,7 @@ export default async function ProyectosPage() {
             return (
               <div
                 key={p.id}
-                className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group"
+                className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative"
               >
                 {/* Header con gradiente */}
                 <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 text-white px-6 py-4">
@@ -212,7 +212,20 @@ export default async function ProyectosPage() {
 
                   {/* Acciones rápidas + CTA */}
                   <div className="space-y-3">
-                    <QuickActions id={p.id} nombre={p.nombre} ubicacion={p.ubicacion || undefined} />
+                    <QuickActions 
+                      id={p.id} 
+                      nombre={p.nombre} 
+                      ubicacion={p.ubicacion || undefined} 
+                      lotesCount={stats.total}
+                      proyecto={{
+                        id: p.id,
+                        nombre: p.nombre,
+                        estado: p.estado,
+                        ubicacion: p.ubicacion,
+                        descripcion: p.descripcion,
+                        imagen_url: p.imagen_url
+                      }}
+                    />
                     <Link
                       className="w-full crm-button-primary inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold group-hover:shadow-crm-xl transition-all duration-300"
                       href={`/dashboard/proyectos/${p.id}`}

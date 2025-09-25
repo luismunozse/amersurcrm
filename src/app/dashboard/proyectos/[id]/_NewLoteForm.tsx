@@ -18,6 +18,9 @@ export default function NewLoteForm({
   proyectos: Proyecto[];
 }) {
   const [showWizard, setShowWizard] = useState(false);
+  
+  // Encontrar el proyecto actual
+  const proyectoActual = proyectos.find(p => p.id === proyectoId);
 
   return (
     <>
@@ -48,6 +51,8 @@ export default function NewLoteForm({
       {showWizard && (
         <LoteWizard
           proyectoId={proyectoId}
+          proyectoNombre={proyectoActual?.nombre}
+          proyectoUbicacion={proyectoActual?.ubicacion || undefined}
           proyectos={proyectos}
           onClose={() => setShowWizard(false)}
         />

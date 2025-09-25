@@ -41,6 +41,10 @@ interface LeafletMapProps {
     estado?: string;
     data?: any;
   }>;
+  onRotationChange?: (rotation: number) => void;
+  onScaleChange?: (scale: number) => void;
+  onOpacityChange?: (opacity: number) => void;
+  onPanChange?: (panX: number, panY: number) => void;
 }
 
 function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
@@ -58,12 +62,47 @@ function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number
 }
 
 // Componente auxiliar para overlay rotado usando una imagen absoluta sobre el mapa
-function RotatedOverlay({ url, bounds, rotationDeg }: { url: string; bounds: [[number, number],[number, number]]; rotationDeg: number; }) {
+function RotatedOverlay({ url, bounds, rotationDeg, scale = 1, panX = 0, panY = 0 }: { 
+  url: string; 
+  bounds: [[number, number],[number, number]]; 
+  rotationDeg: number; 
+  scale?: number; 
+  panX?: number; 
+  panY?: number; 
+}) {
   // Usamos SVGOverlay para que Leaflet mantenga el layer correctamente y rotamos el contenido dentro del SVG
   // Definimos un viewBox lógico 0..100 x 0..100 y rotamos alrededor del centro (50,50)
+  const centerX = 50;
+  const centerY = 50;
+  
+  // Para escalas menores a 1, expandimos el viewBox para mantener el plano completo visible
+  const viewBoxSize = Math.max(100, 100 / scale);
+  const viewBoxOffset = (viewBoxSize - 100) / 2;
+  
+  // La imagen siempre ocupa 100x100 en el viewBox expandido, con pan aplicado
+  const imageX = viewBoxOffset + panX;
+  const imageY = viewBoxOffset + panY;
+  const imageWidth = 100;
+  const imageHeight = 100;
+  
   return (
-    <SVGOverlay bounds={bounds as any} attributes={{ viewBox: "0 0 100 100", preserveAspectRatio: "none" }} opacity={0.7 as any}>
-      <image href={url} x="0" y="0" width="100" height="100" preserveAspectRatio="none" transform={`rotate(${rotationDeg}, 50, 50)`} />
+    <SVGOverlay 
+      bounds={bounds as any} 
+      attributes={{ 
+        viewBox: `0 0 ${viewBoxSize} ${viewBoxSize}`, 
+        preserveAspectRatio: "none" 
+      }} 
+      opacity={0.7 as any}
+    >
+      <image 
+        href={url} 
+        x={imageX} 
+        y={imageY} 
+        width={imageWidth} 
+        height={imageHeight} 
+        preserveAspectRatio="none" 
+        transform={`rotate(${rotationDeg}, ${centerX + viewBoxOffset}, ${centerY + viewBoxOffset})`} 
+      />
     </SVGOverlay>
   );
 }
@@ -81,7 +120,16 @@ export default function LeafletMap({
   overlayOpacity = 0.7,
   onToggleFull,
   lotesConUbicacion = [],
+  onRotationChange,
+  onScaleChange,
+  onOpacityChange,
+  onPanChange,
 }: LeafletMapProps) {
+  // Estado local para la escala del plano
+  const [planeScale, setPlaneScale] = useState(1);
+  // Estado local para el pan (desplazamiento) del plano
+  const [planePan, setPlanePan] = useState({ x: 0, y: 0 });
+  
   // Bounds por defecto (caja de ~1-2km alrededor del centro)
   const defaultBounds: [[number, number], [number, number]] = [
     [defaultCenter[0] - 0.01, defaultCenter[1] - 0.01],
@@ -112,15 +160,22 @@ export default function LeafletMap({
       {/* Overlay de imagen si existe plano */}
       {planosUrl && (
         <>
-          {Math.abs(rotationDeg) < 0.01 && (
+          {Math.abs(rotationDeg) < 0.01 && Math.abs(planeScale - 1) < 0.01 && (
             <ImageOverlay
               url={planosUrl}
               bounds={overlayBounds || defaultBounds}
               opacity={overlayOpacity}
             />
           )}
-          {Math.abs(rotationDeg) >= 0.01 && (
-            <RotatedOverlay url={planosUrl} bounds={overlayBounds || defaultBounds} rotationDeg={rotationDeg} opacity={overlayOpacity} />
+          {(Math.abs(rotationDeg) >= 0.01 || Math.abs(planeScale - 1) >= 0.01 || Math.abs(planePan.x) >= 0.01 || Math.abs(planePan.y) >= 0.01) && (
+            <RotatedOverlay 
+              url={planosUrl} 
+              bounds={overlayBounds || defaultBounds} 
+              rotationDeg={rotationDeg} 
+              scale={planeScale}
+              panX={planePan.x}
+              panY={planePan.y}
+            />
           )}
         </>
       )}
@@ -159,8 +214,8 @@ export default function LeafletMap({
         </>
       )}
 
-      {/* Marcadores de coordenadas generales */}
-      {coordenadas.map((c) => (
+      {/* Marcadores de coordenadas generales - solo si no hay plano */}
+      {!planosUrl && coordenadas.map((c) => (
         <Marker key={c.id} position={[c.lat, c.lng]}>
           <Popup>
             <div className="text-sm">
@@ -311,6 +366,24 @@ export default function LeafletMap({
       <FitOnUpdate bounds={overlayBounds} markers={coordenadas} />
       <ZoomFullControl onToggleFull={onToggleFull} />
       <ZoomLevelIndicator />
+      {planosUrl && (
+        <Plane3DControl 
+          rotationDeg={rotationDeg}
+          overlayOpacity={overlayOpacity}
+          planeScale={planeScale}
+          planePan={planePan}
+          onRotationChange={onRotationChange}
+          onScaleChange={(scale) => {
+            setPlaneScale(scale);
+            onScaleChange?.(scale);
+          }}
+          onOpacityChange={onOpacityChange}
+          onPanChange={(x, y) => {
+            setPlanePan({ x, y });
+            onPanChange?.(x, y);
+          }}
+        />
+      )}
     </MapContainer>
   );
 }
@@ -418,6 +491,285 @@ function ZoomLevelIndicator() {
     map.addControl(ctl as any);
     return () => { map.removeControl(ctl as any); };
   }, [map, zoomLevel]);
+
+  return null;
+}
+
+// Control 3D para el plano - rotación, escala, opacidad y posición
+function Plane3DControl({ 
+  rotationDeg, 
+  overlayOpacity, 
+  planeScale,
+  planePan,
+  onRotationChange, 
+  onScaleChange, 
+  onOpacityChange,
+  onPanChange
+}: { 
+  rotationDeg: number; 
+  overlayOpacity: number; 
+  planeScale: number;
+  planePan: { x: number; y: number };
+  onRotationChange?: (rotation: number) => void; 
+  onScaleChange?: (scale: number) => void; 
+  onOpacityChange?: (opacity: number) => void; 
+  onPanChange?: (x: number, y: number) => void; 
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const Control = L.Control.extend({
+      onAdd: function () {
+        const div = L.DomUtil.create('div', 'leaflet-bar plane-3d-control');
+        div.style.background = 'var(--crm-card)';
+        div.style.border = `1px solid var(--crm-border)`;
+        div.style.borderRadius = '8px';
+        div.style.padding = '12px';
+        div.style.minWidth = '200px';
+        div.style.fontSize = '12px';
+        div.style.color = 'var(--crm-text-primary)';
+        div.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+
+        // Título
+        const title = L.DomUtil.create('div', '', div);
+        title.innerHTML = '<strong>🎯 Control 3D del Plano</strong>';
+        title.style.marginBottom = '8px';
+        title.style.textAlign = 'center';
+
+        // Control de Rotación
+        const rotationDiv = L.DomUtil.create('div', '', div);
+        rotationDiv.style.marginBottom = '8px';
+        
+        const rotationLabel = L.DomUtil.create('label', '', rotationDiv);
+        rotationLabel.innerHTML = `🔄 Rotación: ${rotationDeg.toFixed(0)}°`;
+        rotationLabel.style.display = 'block';
+        rotationLabel.style.marginBottom = '4px';
+        rotationLabel.style.fontSize = '11px';
+        
+        const rotationSlider = L.DomUtil.create('input', '', rotationDiv);
+        rotationSlider.type = 'range';
+        rotationSlider.min = '0';
+        rotationSlider.max = '360';
+        rotationSlider.value = rotationDeg.toString();
+        rotationSlider.style.width = '100%';
+        rotationSlider.style.height = '4px';
+        rotationSlider.style.background = 'var(--crm-border)';
+        rotationSlider.style.outline = 'none';
+        rotationSlider.style.borderRadius = '2px';
+        
+        rotationSlider.oninput = (e: any) => {
+          const value = parseFloat(e.target.value);
+          onRotationChange?.(value);
+        };
+
+        // Control de Escala
+        const scaleDiv = L.DomUtil.create('div', '', div);
+        scaleDiv.style.marginBottom = '8px';
+        
+        const scaleLabel = L.DomUtil.create('label', '', scaleDiv);
+        scaleLabel.innerHTML = `📏 Escala: ${(planeScale * 100).toFixed(0)}%`;
+        scaleLabel.style.display = 'block';
+        scaleLabel.style.marginBottom = '4px';
+        scaleLabel.style.fontSize = '11px';
+        
+        const scaleSlider = L.DomUtil.create('input', '', scaleDiv);
+        scaleSlider.type = 'range';
+        scaleSlider.min = '0.1';
+        scaleSlider.max = '3';
+        scaleSlider.step = '0.1';
+        scaleSlider.value = planeScale.toString();
+        scaleSlider.style.width = '100%';
+        scaleSlider.style.height = '4px';
+        scaleSlider.style.background = 'var(--crm-border)';
+        scaleSlider.style.outline = 'none';
+        scaleSlider.style.borderRadius = '2px';
+        
+        scaleSlider.oninput = (e: any) => {
+          const value = parseFloat(e.target.value);
+          onScaleChange?.(value);
+        };
+
+        // Control de Opacidad
+        const opacityDiv = L.DomUtil.create('div', '', div);
+        opacityDiv.style.marginBottom = '8px';
+        
+        const opacityLabel = L.DomUtil.create('label', '', opacityDiv);
+        opacityLabel.innerHTML = `👁️ Opacidad: ${(overlayOpacity * 100).toFixed(0)}%`;
+        opacityLabel.style.display = 'block';
+        opacityLabel.style.marginBottom = '4px';
+        opacityLabel.style.fontSize = '11px';
+        
+        const opacitySlider = L.DomUtil.create('input', '', opacityDiv);
+        opacitySlider.type = 'range';
+        opacitySlider.min = '0';
+        opacitySlider.max = '1';
+        opacitySlider.step = '0.1';
+        opacitySlider.value = overlayOpacity.toString();
+        opacitySlider.style.width = '100%';
+        opacitySlider.style.height = '4px';
+        opacitySlider.style.background = 'var(--crm-border)';
+        opacitySlider.style.outline = 'none';
+        opacitySlider.style.borderRadius = '2px';
+        
+        opacitySlider.oninput = (e: any) => {
+          const value = parseFloat(e.target.value);
+          onOpacityChange?.(value);
+        };
+
+        // Control de Posición (Pan)
+        const panDiv = L.DomUtil.create('div', '', div);
+        panDiv.style.marginBottom = '8px';
+        
+        const panLabel = L.DomUtil.create('label', '', panDiv);
+        panLabel.innerHTML = `📍 Posición: X:${planePan.x.toFixed(1)} Y:${planePan.y.toFixed(1)}`;
+        panLabel.style.display = 'block';
+        panLabel.style.marginBottom = '4px';
+        panLabel.style.fontSize = '11px';
+        
+        // Controles de Pan con botones direccionales
+        const panControlsDiv = L.DomUtil.create('div', '', panDiv);
+        panControlsDiv.style.display = 'grid';
+        panControlsDiv.style.gridTemplateColumns = '1fr 1fr 1fr';
+        panControlsDiv.style.gap = '2px';
+        panControlsDiv.style.marginBottom = '4px';
+        
+        // Botones de dirección
+        const directions = [
+          { key: 'up', label: '↑', x: 0, y: -5 },
+          { key: 'left', label: '←', x: -5, y: 0 },
+          { key: 'center', label: '⌂', x: 0, y: 0 },
+          { key: 'right', label: '→', x: 5, y: 0 },
+          { key: 'down', label: '↓', x: 0, y: 5 }
+        ];
+        
+        directions.forEach(dir => {
+          const btn = L.DomUtil.create('button', '', panControlsDiv);
+          btn.innerHTML = dir.label;
+          btn.style.padding = '4px';
+          btn.style.fontSize = '10px';
+          btn.style.border = '1px solid var(--crm-border)';
+          btn.style.borderRadius = '4px';
+          btn.style.background = 'var(--crm-card)';
+          btn.style.color = 'var(--crm-text-primary)';
+          btn.style.cursor = 'pointer';
+          btn.style.minHeight = '24px';
+          
+          if (dir.key === 'center') {
+            btn.style.gridColumn = '2';
+            btn.style.gridRow = '2';
+          } else if (dir.key === 'up') {
+            btn.style.gridColumn = '2';
+            btn.style.gridRow = '1';
+          } else if (dir.key === 'down') {
+            btn.style.gridColumn = '2';
+            btn.style.gridRow = '3';
+          } else if (dir.key === 'left') {
+            btn.style.gridColumn = '1';
+            btn.style.gridRow = '2';
+          } else if (dir.key === 'right') {
+            btn.style.gridColumn = '3';
+            btn.style.gridRow = '2';
+          }
+          
+          btn.onclick = () => {
+            const newX = dir.x === 0 ? 0 : planePan.x + dir.x;
+            const newY = dir.y === 0 ? 0 : planePan.y + dir.y;
+            onPanChange?.(newX, newY);
+          };
+        });
+
+        // Botones de reset
+        const resetDiv = L.DomUtil.create('div', '', div);
+        resetDiv.style.display = 'flex';
+        resetDiv.style.gap = '4px';
+        resetDiv.style.marginTop = '8px';
+        
+        const resetRotation = L.DomUtil.create('button', '', resetDiv);
+        resetRotation.innerHTML = '🔄';
+        resetRotation.style.flex = '1';
+        resetRotation.style.padding = '4px 8px';
+        resetRotation.style.fontSize = '10px';
+        resetRotation.style.border = '1px solid var(--crm-border)';
+        resetRotation.style.borderRadius = '4px';
+        resetRotation.style.background = 'var(--crm-card)';
+        resetRotation.style.color = 'var(--crm-text-primary)';
+        resetRotation.style.cursor = 'pointer';
+        resetRotation.title = 'Reset Rotación';
+        
+        resetRotation.onclick = () => {
+          rotationSlider.value = '0';
+          onRotationChange?.(0);
+        };
+
+        const resetScale = L.DomUtil.create('button', '', resetDiv);
+        resetScale.innerHTML = '📏';
+        resetScale.style.flex = '1';
+        resetScale.style.padding = '4px 8px';
+        resetScale.style.fontSize = '10px';
+        resetScale.style.border = '1px solid var(--crm-border)';
+        resetScale.style.borderRadius = '4px';
+        resetScale.style.background = 'var(--crm-card)';
+        resetScale.style.color = 'var(--crm-text-primary)';
+        resetScale.style.cursor = 'pointer';
+        resetScale.title = 'Reset Escala';
+        
+        resetScale.onclick = () => {
+          scaleSlider.value = '1';
+          onScaleChange?.(1);
+        };
+
+        const resetPan = L.DomUtil.create('button', '', resetDiv);
+        resetPan.innerHTML = '📍';
+        resetPan.style.flex = '1';
+        resetPan.style.padding = '4px 8px';
+        resetPan.style.fontSize = '10px';
+        resetPan.style.border = '1px solid var(--crm-border)';
+        resetPan.style.borderRadius = '4px';
+        resetPan.style.background = 'var(--crm-card)';
+        resetPan.style.color = 'var(--crm-text-primary)';
+        resetPan.style.cursor = 'pointer';
+        resetPan.title = 'Reset Posición';
+        
+        resetPan.onclick = () => {
+          onPanChange?.(0, 0);
+        };
+
+        // Estilos para los sliders
+        const style = L.DomUtil.create('style', '', div);
+        style.innerHTML = `
+          .plane-3d-control input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--crm-primary);
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          }
+          .plane-3d-control input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--crm-primary);
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          }
+          .plane-3d-control button:hover {
+            background: var(--crm-card-hover);
+          }
+        `;
+
+        return div;
+      },
+      onRemove: function () {}
+    });
+    
+    const ctl = new Control({ position: 'topleft' });
+    map.addControl(ctl as any);
+    return () => { map.removeControl(ctl as any); };
+  }, [map, rotationDeg, overlayOpacity, planeScale, planePan, onRotationChange, onScaleChange, onOpacityChange, onPanChange]);
 
   return null;
 }

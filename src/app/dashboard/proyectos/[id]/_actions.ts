@@ -430,3 +430,86 @@ export async function obtenerCoordenadasProyecto(proyectoId: string) {
 
   return lotes || [];
 }
+
+export async function eliminarProyecto(proyectoId: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  try {
+    // 1. Obtener información del proyecto para eliminar archivos relacionados
+    const { data: proyecto, error: proyectoError } = await supabase
+      .from("proyecto")
+      .select("id, nombre, planos_url")
+      .eq("id", proyectoId)
+      .single();
+
+    if (proyectoError) {
+      throw new Error(`Error obteniendo proyecto: ${proyectoError.message}`);
+    }
+
+    if (!proyecto) {
+      throw new Error("Proyecto no encontrado");
+    }
+
+    // 2. Eliminar archivos del storage si existen
+    if (proyecto.planos_url) {
+      try {
+        // Extraer la ruta del archivo de la URL
+        const urlParts = proyecto.planos_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        const filePath = `proyectos/${proyectoId}/${fileName}`;
+        
+        const { error: deleteError } = await supabase.storage
+          .from('imagenes')
+          .remove([filePath]);
+        
+        if (deleteError) {
+          console.warn(`Error eliminando archivo del storage: ${deleteError.message}`);
+        }
+      } catch (storageError) {
+        console.warn(`Error procesando archivo del storage: ${storageError}`);
+      }
+    }
+
+    // 3. Eliminar lotes asociados al proyecto
+    const { error: lotesError } = await supabase
+      .from("lote")
+      .delete()
+      .eq("proyecto_id", proyectoId);
+
+    if (lotesError) {
+      console.warn(`Error eliminando lotes: ${lotesError.message}`);
+    }
+
+    // 4. Eliminar el proyecto
+    const { error: deleteError } = await supabase
+      .from("proyecto")
+      .delete()
+      .eq("id", proyectoId);
+
+    if (deleteError) {
+      throw new Error(`Error eliminando proyecto: ${deleteError.message}`);
+    }
+
+    // 5. Revalidar las páginas relacionadas
+    revalidatePath("/dashboard/proyectos");
+    revalidatePath("/dashboard");
+
+    return { success: true, message: `Proyecto "${proyecto.nombre}" eliminado correctamente` };
+
+  } catch (error) {
+    console.error("Error eliminando proyecto:", error);
+    throw new Error(error instanceof Error ? error.message : "Error eliminando proyecto");
+  }
+}
