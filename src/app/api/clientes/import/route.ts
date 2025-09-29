@@ -57,20 +57,22 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < clientesData.length; i++) {
       try {
         const cliente = ClienteImportSchema.parse(clientesData[i]);
-        
-        // Preparar datos para inserción
+
+        // Preparar datos para inserción (solo columnas existentes en la tabla)
         const insertData = {
-          ...cliente,
+          codigo_cliente: cliente.codigo_cliente || null,
+          nombre: cliente.nombre,
+          tipo_cliente: cliente.tipo_cliente || 'persona',
+          documento_identidad: cliente.documento_identidad && cliente.documento_identidad.trim() !== '' ? cliente.documento_identidad : null,
+          estado_civil: cliente.estado_civil ?? null,
           email: cliente.email && cliente.email.trim() !== '' ? cliente.email : null,
           telefono: cliente.telefono && cliente.telefono.trim() !== '' ? cliente.telefono : null,
           telefono_whatsapp: cliente.telefono_whatsapp && cliente.telefono_whatsapp.trim() !== '' ? cliente.telefono_whatsapp : null,
-          documento_identidad: cliente.documento_identidad && cliente.documento_identidad.trim() !== '' ? cliente.documento_identidad : null,
-          estado_civil: cliente.estado_civil ?? null,
           origen_lead: cliente.origen_lead && cliente.origen_lead.trim() !== '' ? cliente.origen_lead : null,
           vendedor_asignado: cliente.vendedor_asignado && cliente.vendedor_asignado.trim() !== '' ? cliente.vendedor_asignado : null,
           proxima_accion: cliente.proxima_accion && cliente.proxima_accion.trim() !== '' ? cliente.proxima_accion : null,
           interes_principal: cliente.interes_principal && cliente.interes_principal.trim() !== '' ? cliente.interes_principal : null,
-          capacidad_compra_estimada: cliente.capacidad_compra_estimada || null,
+          capacidad_compra_estimada: (typeof cliente.capacidad_compra_estimada === 'number' ? cliente.capacidad_compra_estimada : null),
           forma_pago_preferida: cliente.forma_pago_preferida && cliente.forma_pago_preferida.trim() !== '' ? cliente.forma_pago_preferida : null,
           notas: cliente.notas && cliente.notas.trim() !== '' ? cliente.notas : null,
           direccion: {
@@ -82,9 +84,9 @@ export async function POST(request: NextRequest) {
             pais: cliente.direccion_pais || 'Perú',
           },
           created_by: user.id,
-        };
+        } as const;
 
-        validatedClientes.push(insertData);
+        validatedClientes.push(insertData as any);
       } catch (error) {
         if (error instanceof z.ZodError) {
           errors.push({
@@ -100,39 +102,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (errors.length > 0) {
-      return NextResponse.json({ 
-        error: "Validation errors", 
-        errors 
-      }, { status: 400 });
-    }
-
-    // Insertar en lotes para mejor rendimiento
-    const BATCH_SIZE = 50;
-    const results = [];
-
-    for (let i = 0; i < validatedClientes.length; i += BATCH_SIZE) {
-      const batch = validatedClientes.slice(i, i + BATCH_SIZE);
-      
-      const { error } = await supabase
-        .from("cliente")
-        .insert(batch);
-
-      if (error) {
-        return NextResponse.json({ 
-          error: "Database error", 
-          details: error.message 
-        }, { status: 500 });
+    // Inserción fila por fila para saltar duplicados por constraint único de teléfono normalizado
+    let importedCount = 0;
+    let skippedDuplicates = 0;
+    if (validatedClientes.length > 0) {
+      for (const row of validatedClientes) {
+        const { error } = await supabase
+          .from("cliente")
+          .insert(row as any);
+        if (error) {
+          const msg = String(error.message || '');
+          if (msg.includes('duplicate key value') && msg.includes('uniq_cliente_phone_normalized')) {
+            skippedDuplicates++;
+            continue; // ignorar duplicados y seguir
+          }
+          return NextResponse.json({ 
+            error: "Database error", 
+            details: error.message 
+          }, { status: 500 });
+        }
+        importedCount++;
       }
-
-      results.push(batch.length);
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      imported: validatedClientes.length,
-      batches: results.length
-    });
+    const responsePayload: any = {
+      success: true,
+      imported: importedCount,
+      skippedDuplicates,
+      received: (clientesData as any[]).length,
+    };
+
+    if (errors.length > 0) {
+      responsePayload.partial = true;
+      responsePayload.errors = errors;
+      responsePayload.invalid = errors.length;
+      responsePayload.received = (clientesData as any[]).length;
+    }
+
+    return NextResponse.json(responsePayload);
 
   } catch (error) {
     console.error("Import error:", error);

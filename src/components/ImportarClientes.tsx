@@ -282,14 +282,28 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   };
 
   const isValidPhone = (phone: string): boolean => {
-    // Limpiar el número de teléfono
-    const cleanPhone = String(phone).replace(/[\s\-\(\)]/g, '');
-    
-    // Validar números peruanos (9 dígitos) o internacionales (7-15 dígitos)
-    const peruvianPhoneRegex = /^51[0-9]{9}$/; // +51 + 9 dígitos
-    const internationalPhoneRegex = /^[\+]?[0-9]{7,15}$/; // Internacional
-    
-    return peruvianPhoneRegex.test(cleanPhone) || internationalPhoneRegex.test(cleanPhone);
+    const raw = String(phone || '');
+    const minimal = raw.replace(/[\s\-\(\)]/g, '');
+
+    // Detectar candidatos peruanos: 51..., +51..., 0051...
+    const isPeruCandidate = minimal.startsWith('51') || minimal.startsWith('+51') || minimal.startsWith('0051');
+
+    // Reglas de limpieza avanzadas SOLO para Perú
+    // - eliminar puntos, comas, slashes, guiones bajos, punto y coma, dos puntos
+    // - eliminar extensiones: ext, anexo, x, int y lo que siga
+    let cleanForCheck = minimal;
+    if (isPeruCandidate) {
+      const withoutExtension = raw.replace(/(?:\s|^)(?:ext|anexo|x|int)\.?\s*\d+.*/i, '');
+      cleanForCheck = withoutExtension
+        .replace(/[\s\-\(\)\.\/,;:_]/g, '')
+        .replace(/\D/g, ''); // dejar solo dígitos
+    }
+
+    const peruvianPhoneRegex = /^51[0-9]{9}$/; // 51 + 9 dígitos
+    const internationalPhoneRegex = /^[\+]?[0-9]{7,15}$/; // 7–15 dígitos, opcional +
+
+    // Para Perú usamos la cadena super-limpia; para internacional respetamos formato con +
+    return peruvianPhoneRegex.test(cleanForCheck) || internationalPhoneRegex.test(minimal);
   };
 
   const handleImport = async () => {
@@ -301,16 +315,43 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       const validation = validateData(data);
       setResult(validation);
 
-      if (validation.errors > 0) {
+      // Filtrar filas válidas y continuar con importación parcial
+      const invalidRowNumbers = new Set(validation.errorsList.map(e => e.row));
+      const validRows = data.filter((_, idx) => !invalidRowNumbers.has(idx + 2));
+
+      if (validRows.length === 0) {
         setStep(4);
+        toast.error('No hay filas válidas para importar');
         return;
       }
 
-      // Importar datos
-      await importData(data);
-      toast.success(`Importación exitosa: ${validation.success} clientes importados`);
+      // Deduplicar por teléfono dentro del lote (normalizando a solo dígitos)
+      const normalizePhoneForKey = (value: unknown): string => String(value || '').replace(/\D/g, '');
+      const seenPhones = new Set<string>();
+      const dedupedRows = validRows.filter((row) => {
+        if (!row.telefono) return true; // sin teléfono no se deduplica
+        const key = normalizePhoneForKey(row.telefono);
+        if (!key) return true;
+        if (seenPhones.has(key)) return false;
+        seenPhones.add(key);
+        return true;
+      });
+
+      // Importar solo las filas válidas y deduplicadas
+      await importData(dedupedRows);
+
+      if (validation.errors > 0) {
+        const removedDup = validRows.length - dedupedRows.length;
+        const suffix = removedDup > 0 ? ` (eliminados ${removedDup} duplicados por teléfono)` : '';
+        toast.success(`Importados ${dedupedRows.length} registros. Omitidos ${validation.errors}.${suffix}`);
+      } else {
+        const removedDup = validRows.length - dedupedRows.length;
+        const suffix = removedDup > 0 ? ` (eliminados ${removedDup} duplicados por teléfono)` : '';
+        toast.success(`Importación exitosa: ${dedupedRows.length} clientes importados${suffix}`);
+      }
+
       router.refresh();
-      onClose();
+      setStep(4);
     } catch (error) {
       toast.error(getErrorMessage(error) || 'Error durante la importación');
     } finally {
@@ -320,6 +361,8 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
 
   const importData = async (data: ClienteImportData[]) => {
     const BATCH_SIZE = 100; // Procesar en lotes de 100
+    let totalImported = 0;
+    let totalSkippedDuplicates = 0;
     
     for (let i = 0; i < data.length; i += BATCH_SIZE) {
       const batch = data.slice(i, i + BATCH_SIZE);
@@ -333,15 +376,53 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       });
       
       if (!response.ok) {
-        throw new Error('Error en el lote de importación');
+        let msg = `Error en el lote de importación (HTTP ${response.status} ${response.statusText})`;
+        try {
+          const clone = response.clone();
+          let apiMsg = '';
+          let details = '';
+          let firstErrors = '';
+          const contentType = clone.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const payload = await clone.json();
+            apiMsg = payload?.error || payload?.message || '';
+            details = payload?.details || '';
+            if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+              firstErrors = ` | Ejemplo: ${payload.errors[0].errors?.join(', ')}`;
+            }
+            console.error('Import batch error payload:', payload);
+          } else {
+            const text = await clone.text();
+            details = text?.slice(0, 500) || '';
+            console.error('Import batch error text:', details);
+          }
+          msg = [msg, apiMsg, details, firstErrors].filter(Boolean).join(' - ');
+        } catch (_) {
+          // Ignorar fallo al leer cuerpo y usar mensaje con status
+        }
+        toast.dismiss('import-progress');
+        throw new Error(msg);
       }
       
+      // Acumular métricas del backend
+      try {
+        const payload = await response.json();
+        totalImported += Number(payload?.imported || 0);
+        totalSkippedDuplicates += Number(payload?.skippedDuplicates || 0);
+      } catch (_) {
+        // si no es JSON, ignorar
+      }
+
       // Mostrar progreso
       const progress = Math.round(((i + batch.length) / data.length) * 100);
       toast.loading(`Importando... ${progress}%`, { id: 'import-progress' });
     }
     
     toast.dismiss('import-progress');
+    // Mostrar resumen acumulado
+    if (totalSkippedDuplicates > 0) {
+      toast.success(`Importados ${totalImported}. Omitidos por duplicado existente: ${totalSkippedDuplicates}.`);
+    }
   };
 
   const getExcelHeaders = () => {
