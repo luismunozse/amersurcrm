@@ -6,7 +6,9 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import toast from "react-hot-toast";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [loginType, setLoginType] = useState<'admin' | 'vendedor'>('admin');
+  const [username, setUsername] = useState("");
+  const [dni, setDni] = useState("");
   const [pass, setPass] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
@@ -18,30 +20,68 @@ export default function LoginForm() {
     
     try {
       const s = supabaseBrowser();
-      console.log("Intentando login con:", email);
       
-      const { data, error } = await s.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password: pass 
-      });
-      
-      console.log("Respuesta de Supabase:", { data, error });
-      
-      if (error) {
-        console.error("Error de autenticación:", error);
-        toast.error(`Error: ${error.message}`);
-        setPending(false);
-        return;
-      }
-      
-      if (data.user) {
-        console.log("Login exitoso, redirigiendo...");
-        toast.success("¡Login exitoso!");
-        router.replace("/dashboard");
+      if (loginType === 'admin') {
+        // Login para administradores con username/contraseña
+        console.log("Intentando login admin con:", username);
+        
+        const { data, error } = await s.auth.signInWithPassword({ 
+          email: username.trim(), 
+          password: pass 
+        });
+        
+        if (error) {
+          console.error("Error de autenticación admin:", error);
+          toast.error(`Error: ${error.message}`);
+          setPending(false);
+          return;
+        }
+        
+        if (data.user) {
+          console.log("Login admin exitoso, redirigiendo...");
+          toast.success("¡Login exitoso!");
+          router.replace("/dashboard");
+        }
       } else {
-        console.error("No se recibió usuario");
-        toast.error("Error: No se pudo autenticar");
-        setPending(false);
+        // Login para vendedores con DNI/contraseña
+        console.log("Intentando login vendedor con DNI:", dni);
+        
+        const response = await fetch('/api/auth/login-dni', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            dni: dni.trim(),
+            password: pass
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          toast.error(result.error || 'Error de autenticación');
+          setPending(false);
+          return;
+        }
+        
+        if (result.success && result.email) {
+          // Realizar el sign-in real en el cliente para establecer la sesión
+          const { data: authData, error: authError } = await s.auth.signInWithPassword({
+            email: result.email,
+            password: pass
+          });
+
+          if (authError || !authData.user) {
+            toast.error("Credenciales inválidas");
+            setPending(false);
+            return;
+          }
+
+          console.log("Login vendedor exitoso, redirigiendo...");
+          toast.success("¡Login exitoso!");
+          router.replace("/dashboard");
+        }
       }
     } catch (err) {
       console.error("Error inesperado:", err);
@@ -84,25 +124,69 @@ export default function LoginForm() {
             </p>
           </div>
 
+          {/* Selector de tipo de usuario */}
+          <div className="mb-6">
+            <div className="flex bg-crm-card-hover rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setLoginType('admin')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                  loginType === 'admin'
+                    ? 'bg-crm-primary text-white shadow-sm'
+                    : 'text-crm-text-secondary hover:text-crm-text-primary'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <span>Administrador</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginType('vendedor')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                  loginType === 'vendedor'
+                    ? 'bg-crm-primary text-white shadow-sm'
+                    : 'text-crm-text-secondary hover:text-crm-text-primary'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>Vendedor</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Formulario */}
           <form onSubmit={onSubmit} className="space-y-4">
-            {/* Email */}
+            {/* Campo de usuario o DNI */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Correo electrónico
+                {loginType === 'admin' ? 'Usuario' : 'DNI'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                  </svg>
+                  {loginType === 'admin' ? (
+                    <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                    </svg>
+                  )}
                 </div>
                 <input
-                  type="email"
-                  autoComplete="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type={loginType === 'admin' ? 'text' : 'text'}
+                  autoComplete={loginType === 'admin' ? 'username' : 'off'}
+                  placeholder={loginType === 'admin' ? 'admin' : '12345678'}
+                  value={loginType === 'admin' ? username : dni}
+                  onChange={(e) => loginType === 'admin' ? setUsername(e.target.value) : setDni(e.target.value)}
                   disabled={pending}
                   className="w-full pl-10 pr-4 py-3 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary transition-all duration-200"
                 />

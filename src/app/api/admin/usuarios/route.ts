@@ -136,14 +136,17 @@ export async function POST(request: NextRequest) {
     const meta_mensual = formData.get("meta_mensual") as string;
     const comision_porcentaje = formData.get("comision_porcentaje") as string;
 
-    if (!nombre_completo || !dni || !email || !password || !rol_id) {
-      return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
+    if (!nombre_completo || !dni || !password || !rol_id) {
+      return NextResponse.json({ error: "Faltan campos requeridos: nombre, DNI, contraseña y rol son obligatorios" }, { status: 400 });
     }
 
+    // Generar email temporal si no se proporciona (para vendedores con DNI)
+    const emailFinal = email || `${dni}@amersur.temp`;
+    
     // Crear usuario en auth con client de service role (requiere key SRV)
     const srv = createServiceRoleClient();
     const { data: authData, error: authError } = await srv.auth.admin.createUser({
-      email,
+      email: emailFinal,
       password,
       email_confirm: true
     });
@@ -175,6 +178,7 @@ export async function POST(request: NextRequest) {
       .from('usuario_perfil')
       .insert({
         id: authData.user.id,
+        email: emailFinal,
         nombre_completo: nombre_completo,
         dni: dni,
         telefono: telefono || null,
@@ -196,7 +200,7 @@ export async function POST(request: NextRequest) {
       message: "Usuario creado exitosamente",
       usuario: {
         id: authData.user.id,
-        email,
+        email: emailFinal,
         nombre_completo,
         dni,
         telefono,

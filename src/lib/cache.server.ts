@@ -48,7 +48,6 @@ export const getCachedClientes = cache(async (searchTerm?: string): Promise<Clie
       direccion,
       created_at
     `)
-    .eq("created_by", userId)
     .order("created_at", { ascending: false });
 
   if (searchTerm) {

@@ -200,15 +200,17 @@ function GestionUsuarios() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Email *
+                  Email (Opcional)
                 </label>
                 <input
                   type="email"
                   name="email"
-                  required
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="usuario@amersur.com"
+                  placeholder="usuario@amersur.com (opcional)"
                 />
+                <p className="text-xs text-crm-text-muted mt-1">
+                  Si no se proporciona, se generará automáticamente usando el DNI
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">

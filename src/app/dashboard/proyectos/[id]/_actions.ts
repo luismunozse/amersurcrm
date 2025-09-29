@@ -182,14 +182,44 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario(user.id);
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para actualizar lotes. Solo los administradores pueden realizar esta acción.");
+  // Verificar permisos y ruta según rol
+  const perfil = await obtenerPerfilUsuario(user.id);
+  if (!perfil) {
+    throw new Error("Perfil no encontrado");
+  }
+
+  // Si es vendedor: solo puede cambiar estado mediante RPC seguras
+  if (perfil.rol?.nombre === 'ROL_VENDEDOR') {
+    // Validar que no intente modificar otros campos
+    const quiereCambiarOtrosCampos = Boolean(
+      (codigo && codigo.trim() !== "") ||
+      sup_m2 !== null ||
+      precio !== null ||
+      (moneda && moneda !== "ARS") ||
+      (data && data.trim() !== "")
+    );
+    if (quiereCambiarOtrosCampos) {
+      throw new Error("No tienes permisos para editar datos del lote. Solo puedes cambiar el estado.");
     }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+
+    // Ejecutar transición de estado vía funciones RPC (ya otorgadas a authenticated)
+    let rpcName: 'reservar_lote' | 'vender_lote' | 'liberar_lote' | null = null;
+    if (estado === 'reservado') rpcName = 'reservar_lote';
+    else if (estado === 'vendido') rpcName = 'vender_lote';
+    else if (estado === 'disponible') rpcName = 'liberar_lote';
+
+    if (!rpcName) {
+      throw new Error("Estado destino no permitido");
+    }
+
+    const { data: ok, error: rpcError } = await supabase.rpc(rpcName as any, { p_lote: loteId });
+    if (rpcError) {
+      throw new Error(`No se pudo cambiar el estado: ${rpcError.message}`);
+    }
+
+    // Forzar revalidación de la página del proyecto
+    revalidatePath(`/dashboard/proyectos/${fd.get("proyecto_id")}`);
+    return { success: true };
   }
 
   // Construir objeto de actualización dinámicamente
@@ -210,6 +240,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
     }
   }
 
+  // Admin (u otros roles con privilegio) pueden actualizar directamente
   const { error } = await supabase
     .from("lote")
     .update(updateData)

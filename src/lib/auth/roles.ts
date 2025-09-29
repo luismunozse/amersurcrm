@@ -4,6 +4,7 @@ export interface UsuarioPerfil {
   id: string;
   email: string;
   nombre?: string;
+  dni?: string;
   rol?: {
     id: string;
     nombre: string;
@@ -29,7 +30,7 @@ export async function obtenerPerfilUsuario(): Promise<UsuarioPerfil | null> {
         // Obtener perfil del usuario
         const { data: perfil, error: perfilError } = await supabase
           .from('usuario_perfil')
-          .select('*')
+          .select('*, dni')
           .eq('id', user.id)
           .single();
 
@@ -54,6 +55,7 @@ export async function obtenerPerfilUsuario(): Promise<UsuarioPerfil | null> {
           id: perfil.id,
           email: user.email || '',
           nombre: perfil.nombre_completo,
+          dni: perfil.dni,
           rol: rol ? {
             id: rol.id,
             nombre: rol.nombre,
