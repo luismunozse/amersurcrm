@@ -13,6 +13,7 @@ import {
   ESTADO_CIVIL_OPTIONS
 } from "@/lib/types/clientes";
 import UbicacionSelector from "./UbicacionSelector";
+import PhoneInput from "./PhoneInput";
 
 interface ClienteFormProps {
   cliente?: {
@@ -60,6 +61,19 @@ export default function ClienteForm({
     setPending(true);
     const form = e.currentTarget;
     const fd = new FormData(form);
+    
+    // Procesar números de teléfono para incluir código de país
+    const telefonoFull = fd.get("telefono_full") as string;
+    const telefonoWhatsappFull = fd.get("telefono_whatsapp_full") as string;
+    
+    // Usar el número completo con código de país si está disponible
+    if (telefonoFull) {
+      fd.set("telefono", telefonoFull);
+    }
+    
+    if (telefonoWhatsappFull) {
+      fd.set("telefono_whatsapp", telefonoWhatsappFull);
+    }
     
     try {
       if (isEditing && cliente?.id) {
@@ -209,35 +223,35 @@ export default function ClienteForm({
           </div>
 
           {/* Contacto y Estado Civil */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Teléfono */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-crm-text-primary">Teléfono</label>
-              <input 
-                name="telefono" 
+          <div className="space-y-6">
+            {/* Teléfonos en una fila */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Teléfono */}
+              <PhoneInput
+                name="telefono"
                 defaultValue={cliente?.telefono || ""}
-                className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
+                placeholder="Número de teléfono"
                 disabled={pending}
-                placeholder="+51 987 654 321"
+                label="Teléfono"
+                required
               />
-            </div>
 
-            {/* WhatsApp */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-crm-text-primary">WhatsApp</label>
-              <input 
-                name="telefono_whatsapp" 
+              {/* WhatsApp */}
+              <PhoneInput
+                name="telefono_whatsapp"
                 defaultValue={cliente?.telefono_whatsapp || ""}
-                className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all" 
+                placeholder="Número de WhatsApp"
                 disabled={pending}
-                placeholder="+51 987 654 321"
+                label="WhatsApp"
               />
             </div>
 
-            {/* Estado Civil */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-crm-text-primary">Estado Civil</label>
-              <select 
+            {/* Estado Civil en su propia fila */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Estado Civil */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-crm-text-primary">Estado Civil</label>
+                <select 
                 name="estado_civil" 
                 defaultValue={cliente?.estado_civil || ""}
                 className="w-full px-4 py-3 border border-crm-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
@@ -248,6 +262,7 @@ export default function ClienteForm({
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
+              </div>
             </div>
           </div>
         </div>

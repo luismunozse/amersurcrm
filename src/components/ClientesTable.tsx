@@ -414,9 +414,12 @@ type Cliente = {
 
 interface ClientesTableProps {
   clientes: Cliente[];
+  searchQuery?: string;
+  searchTelefono?: string;
+  searchDni?: string;
 }
 
-export default function ClientesTable({ clientes }: ClientesTableProps) {
+export default function ClientesTable({ clientes, searchQuery = '', searchTelefono = '', searchDni = '' }: ClientesTableProps) {
   const [editing, setEditing] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState<{ open: boolean; id: string | null; nombre?: string }>({
@@ -438,6 +441,18 @@ export default function ClientesTable({ clientes }: ClientesTableProps) {
   // Filtrar y ordenar clientes
   const filteredAndSortedClientes = useMemo(() => {
     let filtered = clientes.filter(cliente => {
+      // Filtros de búsqueda desde URL
+      const matchesSearchQuery = !searchQuery || 
+        cliente.nombre.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesSearchTelefono = !searchTelefono || 
+        cliente.telefono?.includes(searchTelefono) ||
+        cliente.telefono_whatsapp?.includes(searchTelefono);
+      
+      const matchesSearchDni = !searchDni || 
+        cliente.documento_identidad?.includes(searchDni);
+      
+      // Filtros locales del componente
       const matchesSearch = !filters.search || 
         cliente.nombre.toLowerCase().includes(filters.search.toLowerCase()) ||
         cliente.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -447,7 +462,8 @@ export default function ClientesTable({ clientes }: ClientesTableProps) {
       const matchesTipo = !filters.tipo || cliente.tipo_cliente === filters.tipo;
       const matchesVendedor = !filters.vendedor || cliente.vendedor_asignado === filters.vendedor;
       
-      return matchesSearch && matchesEstado && matchesTipo && matchesVendedor;
+      return matchesSearchQuery && matchesSearchTelefono && matchesSearchDni && 
+             matchesSearch && matchesEstado && matchesTipo && matchesVendedor;
     });
 
     // Ordenar
@@ -472,7 +488,7 @@ export default function ClientesTable({ clientes }: ClientesTableProps) {
     });
 
     return filtered;
-  }, [clientes, filters, sortBy, sortOrder]);
+  }, [clientes, searchQuery, searchTelefono, searchDni, filters, sortBy, sortOrder]);
 
   // Paginación
   const {

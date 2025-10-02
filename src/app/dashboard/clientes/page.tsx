@@ -3,13 +3,24 @@ import { getCachedClientes } from "@/lib/cache.server";
 import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
 import AdvancedClientSearch from "@/components/AdvancedClientSearch";
+import PhoneNormalizationTool from "@/components/PhoneNormalizationTool";
 
-type SP = Promise<{ q?: string | string[]; page?: string | string[] }>;
+type SP = Promise<{ 
+  q?: string | string[]; 
+  telefono?: string | string[];
+  dni?: string | string[];
+  page?: string | string[] 
+}>;
 
 export default async function ClientesPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const qRaw = sp.q;
+  const telefonoRaw = sp.telefono;
+  const dniRaw = sp.dni;
+  
   const q = (Array.isArray(qRaw) ? qRaw[0] : qRaw ?? "").trim();
+  const telefono = (Array.isArray(telefonoRaw) ? telefonoRaw[0] : telefonoRaw ?? "").trim();
+  const dni = (Array.isArray(dniRaw) ? dniRaw[0] : dniRaw ?? "").trim();
 
   try {
     // Usar caché para obtener todos los clientes
@@ -31,12 +42,20 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
           </div>
         </div>
 
+        {/* Herramienta de normalización de teléfonos */}
+        <PhoneNormalizationTool clientes={allClientes} />
+
         {/* Buscador Avanzado */}
         <AdvancedClientSearch clientes={allClientes} />
 
         <NewClienteForm />
 
-        <ClientesTable clientes={allClientes} />
+        <ClientesTable 
+          clientes={allClientes} 
+          searchQuery={q}
+          searchTelefono={telefono}
+          searchDni={dni}
+        />
       </div>
     );
   } catch (error) {
