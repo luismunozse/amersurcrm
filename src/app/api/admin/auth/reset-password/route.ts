@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase.server";
+import { createServiceRoleClient, createServerOnlyClient } from "@/lib/supabase.server";
+import { esAdmin } from "@/lib/auth/roles";
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseServer = await createServerOnlyClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const isAdmin = await esAdmin();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "No tienes permisos de administrador" },
+        { status: 403 }
+      );
+    }
+
     const { dni, newPassword } = await request.json();
 
     if (!dni || !newPassword) {
@@ -50,6 +69,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 

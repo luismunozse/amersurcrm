@@ -5,6 +5,22 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
 
+function buildStoragePathFromUrl(url: string | null, proyectoId: string) {
+  if (!url) return null;
+
+  const marker = "/storage/v1/object/public/imagenes/";
+  const markerIndex = url.indexOf(marker);
+
+  if (markerIndex !== -1) {
+    return decodeURIComponent(url.slice(markerIndex + marker.length));
+  }
+
+  const fileName = url.split("/").pop();
+  if (!fileName) return null;
+
+  return `proyectos/${proyectoId}/${fileName}`;
+}
+
 export async function crearProyecto(formData: FormData) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,7 +41,7 @@ export async function crearProyecto(formData: FormData) {
     const estado = String(formData.get("estado") || "activo");
     const descripcion = String(formData.get("descripcion") || "").trim();
     const imagenFile = formData.get("imagen") as File | null;
-    
+
     // Datos de ubigeo
     const departamento = String(formData.get("departamento") || "").trim();
     const provincia = String(formData.get("provincia") || "").trim();
@@ -35,57 +51,27 @@ export async function crearProyecto(formData: FormData) {
     if (!nombre) {
       throw new Error("El nombre del proyecto es requerido");
     }
-    
-    // Validar que se haya seleccionado al menos el distrito
+
     if (!distrito) {
       throw new Error("Debe seleccionar al menos el distrito para la ubicación del proyecto");
     }
 
-    // Subir imagen si existe
-    let imagenUrl = null;
     if (imagenFile && imagenFile.size > 0) {
-      // Validar tipo de archivo
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
       if (!allowedTypes.includes(imagenFile.type)) {
-        throw new Error('Formato de imagen no válido. Use JPG, PNG o WEBP');
+        throw new Error("Formato de imagen no válido. Use JPG, PNG o WEBP");
       }
 
-      // Validar tamaño (5MB máximo)
       const maxSize = 5 * 1024 * 1024; // 5MB
       if (imagenFile.size > maxSize) {
-        throw new Error('La imagen es muy grande. Máximo 5MB');
-      }
-
-      try {
-        const fileExt = imagenFile.name.split('.').pop();
-        const fileName = `proyecto-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `proyectos/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('imagenes')
-          .upload(filePath, imagenFile);
-
-        if (uploadError) {
-          throw new Error(`Error subiendo imagen: ${uploadError.message}`);
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('imagenes')
-          .getPublicUrl(filePath);
-
-        imagenUrl = publicUrl;
-      } catch (imageError) {
-        console.warn('Error subiendo imagen:', imageError);
-        // Continuar sin imagen si falla la subida
+        throw new Error("La imagen es muy grande. Máximo 5MB");
       }
     }
 
-    // Construir ubicación completa con ubigeo
     const ubicacionFinal = [distrito, provincia, departamento]
       .filter(Boolean)
-      .join(', ');
+      .join(", ");
 
-    // Crear el proyecto
     const { data: proyecto, error: insertError } = await supabase
       .from("proyecto")
       .insert({
@@ -93,23 +79,60 @@ export async function crearProyecto(formData: FormData) {
         estado: estado as "activo" | "pausado" | "cerrado",
         ubicacion: ubicacionFinal,
         descripcion: descripcion || null,
-        imagen_url: imagenUrl,
-        created_by: user.id
+        imagen_url: null,
+        created_by: user.id,
       })
       .select()
       .single();
 
-    if (insertError) {
-      throw new Error(`Error creando proyecto: ${insertError.message}`);
+    if (insertError || !proyecto) {
+      throw new Error(`Error creando proyecto: ${insertError?.message || "Desconocido"}`);
     }
 
-    // Revalidar las páginas relacionadas
+    let proyectoFinal = proyecto;
+
+    if (imagenFile && imagenFile.size > 0) {
+      try {
+        const fileExt = imagenFile.name.split(".").pop() || "jpg";
+        const fileName = `proyecto-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `proyectos/${proyecto.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("imagenes")
+          .upload(filePath, imagenFile, { upsert: true });
+
+        if (uploadError) {
+          throw new Error(`Error subiendo imagen: ${uploadError.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("imagenes")
+          .getPublicUrl(filePath);
+
+        const { data: updatedProject, error: updateError } = await supabase
+          .from("proyecto")
+          .update({ imagen_url: publicUrl })
+          .eq("id", proyecto.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          await supabase.storage.from("imagenes").remove([filePath]);
+          throw new Error(`Error asignando imagen al proyecto: ${updateError.message}`);
+        }
+
+        if (updatedProject) {
+          proyectoFinal = updatedProject;
+        }
+      } catch (imageError) {
+        console.warn("Error procesando imagen del proyecto:", imageError);
+      }
+    }
+
     revalidatePath("/dashboard/proyectos");
     revalidatePath("/dashboard");
 
-    // Retornar éxito sin redirigir (la redirección se maneja en el cliente)
-    return { success: true, proyecto };
-
+    return { success: true, proyecto: proyectoFinal };
   } catch (error) {
     // No capturar NEXT_REDIRECT como error
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
@@ -166,13 +189,12 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       // Eliminar imagen actual del storage si existe
       if (imagenUrl) {
         try {
-          const urlParts = imagenUrl.split('/');
-          const fileName = urlParts[urlParts.length - 1];
-          const filePath = `proyectos/${proyectoId}/${fileName}`;
-
-          await supabase.storage
-            .from('imagenes')
-            .remove([filePath]);
+          const storagePath = buildStoragePathFromUrl(imagenUrl, proyectoId);
+          if (storagePath) {
+            await supabase.storage
+              .from('imagenes')
+              .remove([storagePath]);
+          }
         } catch (storageError) {
           console.warn(`Error eliminando imagen del storage: ${storageError}`);
         }
@@ -194,13 +216,12 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       try {
         // Eliminar imagen anterior si existe
         if (imagenUrl) {
-          const urlParts = imagenUrl.split('/');
-          const fileName = urlParts[urlParts.length - 1];
-          const filePath = `proyectos/${proyectoId}/${fileName}`;
-
-          await supabase.storage
-            .from('imagenes')
-            .remove([filePath]);
+          const storagePath = buildStoragePathFromUrl(imagenUrl, proyectoId);
+          if (storagePath) {
+            await supabase.storage
+              .from('imagenes')
+              .remove([storagePath]);
+          }
         }
 
         // Subir nueva imagen
@@ -291,17 +312,15 @@ export async function eliminarProyecto(proyectoId: string) {
     // 2. Eliminar archivos del storage si existen
     if (proyecto.planos_url) {
       try {
-        // Extraer la ruta del archivo de la URL
-        const urlParts = proyecto.planos_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        const filePath = `proyectos/${proyectoId}/${fileName}`;
-        
-        const { error: deleteError } = await supabase.storage
-          .from('imagenes')
-          .remove([filePath]);
-        
-        if (deleteError) {
-          console.warn(`Error eliminando archivo del storage: ${deleteError.message}`);
+        const storagePath = buildStoragePathFromUrl(proyecto.planos_url, proyectoId);
+        if (storagePath) {
+          const { error: deleteError } = await supabase.storage
+            .from('imagenes')
+            .remove([storagePath]);
+
+          if (deleteError) {
+            console.warn(`Error eliminando archivo del storage: ${deleteError.message}`);
+          }
         }
       } catch (storageError) {
         console.warn(`Error procesando archivo del storage: ${storageError}`);

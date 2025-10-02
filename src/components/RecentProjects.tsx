@@ -48,9 +48,29 @@ export async function RecentProjects() {
                       </p>
                     ) : null}
 
-                    <div className="flex items-center space-x-4 mt-2">
+                    <div className="mt-2 flex items-center space-x-4">
                       <span className="text-xs text-crm-text-muted">Estado: {proyecto.estado}</span>
-                      {proyecto.ubicacion && <span className="text-xs text-crm-text-muted">📍 {proyecto.ubicacion}</span>}
+                      {proyecto.ubicacion && (
+                        <span className="inline-flex items-center gap-1 text-xs text-crm-text-muted">
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M10 18s6-4.35 6-10a6 6 0 1 0-12 0c0 5.65 6 10 6 10z"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <circle cx="10" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+                          </svg>
+                          {proyecto.ubicacion}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <svg className="w-4 h-4 text-crm-text-muted ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -74,4 +94,3 @@ export async function RecentProjects() {
     </Card>
   );
 }
-
