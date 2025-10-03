@@ -297,7 +297,7 @@ export default function GoogleMap({
       }
       overlayCompleteListener.remove();
     };
-  }, [projectDrawingActive, onProjectPolygonChange, onProjectDrawingFinished, attachProjectPolygonListeners, loteDrawingActive]);
+  }, [projectDrawingActive, onProjectPolygonChange, onProjectDrawingFinished, attachProjectPolygonListeners, loteDrawingActive, isLoaded]);
 
   // Sincronizar polígono del proyecto recibido por props
   useEffect(() => {
@@ -345,7 +345,7 @@ export default function GoogleMap({
         polygonFitRef.current = true;
       }
     }
-  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners]);
+  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners, isLoaded]);
 
   // Dibujo manual de lotes
   useEffect(() => {
@@ -391,7 +391,7 @@ export default function GoogleMap({
         drawingContextRef.current = null;
       }
     };
-  }, [loteDrawingActive, onLotePolygonComplete, onLoteDrawingFinished]);
+  }, [loteDrawingActive, onLotePolygonComplete, onLoteDrawingFinished, isLoaded]);
 
   // Gestionar overlay del plano
   useEffect(() => {
@@ -507,7 +507,7 @@ export default function GoogleMap({
         overlayRef.current = null;
       }
     };
-  }, [planosUrl, overlayBounds, rotationDeg, overlayOpacity]);
+  }, [planosUrl, overlayBounds, rotationDeg, overlayOpacity, isLoaded]);
 
   useEffect(() => {
     if (!overlayBounds) {
@@ -705,7 +705,7 @@ export default function GoogleMap({
         removeMarker(id);
       }
     });
-  }, [lotes, highlightLoteId]);
+  }, [lotes, highlightLoteId, isLoaded]);
 
   const loadingFallback = useMemo(
     () => (
