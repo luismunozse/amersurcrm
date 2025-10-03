@@ -177,6 +177,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   const moneda = String(fd.get("moneda") || "ARS");
   const estado = String(fd.get("estado") || "disponible");
   const data = fd.get("data") ? String(fd.get("data")) : null;
+  const planoPoligonoRaw = fd.has("plano_poligono") ? fd.get("plano_poligono") : null;
 
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -196,7 +197,8 @@ export async function actualizarLote(loteId: string, fd: FormData) {
       sup_m2 !== null ||
       precio !== null ||
       (moneda && moneda !== "ARS") ||
-      (data && data.trim() !== "")
+      (data && data.trim() !== "") ||
+      planoPoligonoRaw !== null
     );
     if (quiereCambiarOtrosCampos) {
       throw new Error("No tienes permisos para editar datos del lote. Solo puedes cambiar el estado.");
@@ -239,6 +241,16 @@ export async function actualizarLote(loteId: string, fd: FormData) {
       console.warn("Error parsing data JSON:", e);
     }
   }
+  if (planoPoligonoRaw !== null) {
+    try {
+      const parsed = typeof planoPoligonoRaw === "string" && planoPoligonoRaw.trim().length > 0
+        ? JSON.parse(planoPoligonoRaw)
+        : null;
+      updateData.plano_poligono = parsed;
+    } catch (e) {
+      console.warn("Error parsing plano_poligono JSON:", e);
+    }
+  }
 
   // Admin (u otros roles con privilegio) pueden actualizar directamente
   const { error } = await supabase
@@ -249,6 +261,104 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/proyectos/${fd.get("proyecto_id")}`);
+}
+
+export async function guardarPoligonoProyecto(
+  proyectoId: string,
+  vertices: Array<{ lat: number; lng: number }>
+) {
+  const supabase = await createServerActionClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
+      throw new Error("No tienes permisos para actualizar el perímetro del proyecto");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const sanitized = (vertices || []).map((v) => ({
+    lat: Number(v.lat),
+    lng: Number(v.lng)
+  }));
+
+  const { error } = await supabase
+    .from("proyecto")
+    .update({ poligono: sanitized })
+    .eq("id", proyectoId);
+
+  if (error) throw new Error(`Error guardando polígono: ${error.message}`);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { success: true, vertices: sanitized };
+}
+
+export async function eliminarPoligonoProyecto(proyectoId: string) {
+  const supabase = await createServerActionClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
+      throw new Error("No tienes permisos para eliminar el perímetro del proyecto");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const { error } = await supabase
+    .from("proyecto")
+    .update({ poligono: null })
+    .eq("id", proyectoId);
+
+  if (error) throw new Error(`Error eliminando polígono: ${error.message}`);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { success: true };
+}
+
+export async function guardarPoligonoLote(
+  loteId: string,
+  proyectoId: string,
+  vertices: Array<[number, number]>
+) {
+  const supabase = await createServerActionClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  try {
+    const perfil = await obtenerPerfilUsuario(user.id);
+    if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
+      throw new Error("No tienes permisos para actualizar lotes");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const sanitized = (vertices || [])
+    .filter((pair) => Array.isArray(pair) && pair.length === 2)
+    .map((pair) => [Number(pair[0]), Number(pair[1])] as [number, number]);
+
+  const { error } = await supabase
+    .from("lote")
+    .update({ plano_poligono: sanitized.length > 0 ? sanitized : null })
+    .eq("id", loteId)
+    .eq("proyecto_id", proyectoId);
+
+  if (error) throw new Error(`Error guardando polígono del lote: ${error.message}`);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { success: true, vertices: sanitized };
 }
 
 export async function eliminarLote(loteId: string, proyectoId: string) {

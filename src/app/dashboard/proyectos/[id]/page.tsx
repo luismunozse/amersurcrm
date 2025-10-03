@@ -40,11 +40,25 @@ export default async function ProyLotesPage({
   const supabase = await createServerOnlyClient();
 
   // Proyecto (para título/404)
-  const { data: proyecto, error: eProyecto } = await supabase
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,created_at";
+  const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
-    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,created_at")
+    .select(`${proyectoSelectBase},poligono`)
     .eq("id", id)
     .maybeSingle();
+
+  let proyecto = proyectoWithPolygon;
+  let eProyecto = eProyectoWithPolygon;
+
+  if (eProyectoWithPolygon?.code === "42703") {
+    const fallback = await supabase
+      .from("proyecto")
+      .select(proyectoSelectBase)
+      .eq("id", id)
+      .maybeSingle();
+    proyecto = fallback.data as typeof proyecto;
+    eProyecto = fallback.error;
+  }
 
   if (eProyecto) throw eProyecto;
   if (!proyecto) return notFound();
@@ -102,6 +116,99 @@ export default async function ProyLotesPage({
 
   const total = count ?? 0;
   const lastPage = Math.max(1, Math.ceil(total / perPage));
+
+  const isLatLngTupleArray = (value: unknown): value is [number, number][] =>
+    Array.isArray(value) &&
+    value.every(
+      (pair) =>
+        Array.isArray(pair) &&
+        pair.length === 2 &&
+        typeof pair[0] === 'number' &&
+        typeof pair[1] === 'number'
+    );
+
+  const isLatLngObjectArray = (value: unknown): value is { lat: number; lng: number }[] =>
+    Array.isArray(value) &&
+    value.every(
+      (point) =>
+        typeof point === 'object' &&
+        point !== null &&
+        typeof (point as { lat?: unknown }).lat === 'number' &&
+        typeof (point as { lng?: unknown }).lng === 'number'
+    );
+
+  const proyectoPolygon = isLatLngObjectArray((proyecto as { poligono?: unknown } | null)?.poligono)
+    ? (proyecto as { poligono: { lat: number; lng: number }[] }).poligono
+    : undefined;
+
+  const toLatLngTuple = (value: unknown): [number, number] | undefined => {
+    if (Array.isArray(value) && value.length === 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
+      return [value[0], value[1]];
+    }
+    if (value && typeof value === 'object') {
+      const candidate = value as { lat?: unknown; lng?: unknown };
+      if (typeof candidate.lat === 'number' && typeof candidate.lng === 'number') {
+        return [candidate.lat, candidate.lng];
+      }
+    }
+    return undefined;
+  };
+
+  const parseOverlayBounds = (value: unknown): [[number, number], [number, number]] | undefined => {
+    let candidate: unknown = value;
+    if (typeof candidate === 'string') {
+      try {
+        candidate = JSON.parse(candidate);
+      } catch {
+        return undefined;
+      }
+    }
+
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      const obj = candidate as Record<string, unknown>;
+      if ('bounds' in obj) {
+        candidate = obj.bounds;
+      } else if ('sw' in obj && 'ne' in obj) {
+        candidate = [obj.sw, obj.ne];
+      } else if ('southWest' in obj && 'northEast' in obj) {
+        candidate = [obj.southWest, obj.northEast];
+      } else if ('0' in obj && '1' in obj) {
+        candidate = [obj['0'], obj['1']];
+      }
+    }
+
+    if (!Array.isArray(candidate) || candidate.length !== 2) return undefined;
+    const sw = toLatLngTuple(candidate[0]);
+    const ne = toLatLngTuple(candidate[1]);
+    if (!sw || !ne) return undefined;
+    return [sw, ne];
+  };
+
+  const overlayBoundsValue = parseOverlayBounds((proyecto as { overlay_bounds?: unknown } | null)?.overlay_bounds);
+
+  const overlayRotationRaw = (proyecto as { overlay_rotation?: unknown } | null)?.overlay_rotation;
+  const overlayRotationValue = typeof overlayRotationRaw === 'number'
+    ? overlayRotationRaw
+    : typeof overlayRotationRaw === 'string'
+      ? Number(overlayRotationRaw)
+      : undefined;
+
+  const lotesForMapeo = (lotesConProyecto || []).map((lote) => {
+    const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
+    const latValue = (lote as { coordenada_lat?: number | null }).coordenada_lat;
+    const lngValue = (lote as { coordenada_lng?: number | null }).coordenada_lng;
+    return {
+      id: lote.id,
+      codigo: lote.codigo,
+      estado: lote.estado,
+      data: lote.data,
+      plano_poligono: isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : undefined,
+      ubicacion:
+        typeof latValue === 'number' && typeof lngValue === 'number'
+          ? { lat: latValue, lng: lngValue }
+          : null,
+    };
+  });
 
   // Helper de URLs
   const makeHref = (p: number) => {
@@ -193,10 +300,11 @@ export default async function ProyLotesPage({
         proyectoId={proyecto.id}
         planosUrl={proyecto.planos_url}
         proyectoNombre={proyecto.nombre}
-        initialBounds={proyecto.overlay_bounds as any}
-        initialRotation={proyecto.overlay_rotation as any}
-        lotes={(lotesConProyecto || []).map(l => ({ id: l.id, codigo: l.codigo, estado: l.estado, data: l.data }))}
+        initialBounds={overlayBoundsValue}
+        initialRotation={overlayRotationValue}
+        lotes={lotesForMapeo}
         ubigeo={undefined}
+        initialPolygon={proyectoPolygon}
       />
 
       <NewLoteForm 

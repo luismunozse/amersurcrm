@@ -1,136 +1,145 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { importLibrary } from '@googlemaps/js-api-loader';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-interface Coordenada {
-  id: string;
+interface LatLngLiteral {
   lat: number;
   lng: number;
-  nombre: string;
 }
 
-interface LoteConUbicacion {
+interface LoteOverlay {
   id: string;
   codigo: string;
   estado?: string;
-  data?: any;
+  data?: unknown;
+  plano_poligono?: [number, number][] | null;
+  ubicacion?: {
+    lat: number;
+    lng: number;
+  } | null;
 }
 
 interface GoogleMapProps {
   defaultCenter: [number, number];
   defaultZoom: number;
-  coordenadas: Coordenada[];
-  onMapClick: (lat: number, lng: number) => void;
   planosUrl?: string | null;
   overlayBounds?: [[number, number], [number, number]];
-  calibrating?: boolean;
-  onBoundsChange?: (bounds: [[number, number], [number, number]]) => void;
-  rotationDeg?: number;
   overlayOpacity?: number;
+  rotationDeg?: number;
+  overlayEditable?: boolean;
+  onOverlayBoundsChange?: (bounds: [[number, number], [number, number]]) => void;
+  projectPolygon?: LatLngLiteral[];
+  onProjectPolygonChange?: (vertices: LatLngLiteral[]) => void;
+  projectDrawingActive?: boolean;
+  onProjectDrawingFinished?: () => void;
+  lotes?: LoteOverlay[];
+  highlightLoteId?: string | null;
+  loteDrawingActive?: boolean;
+  onLoteDrawingFinished?: () => void;
+  onLotePolygonComplete?: (vertices: [number, number][]) => void;
+  fullScreenActive?: boolean;
   onToggleFull?: () => void;
-  lotesConUbicacion?: LoteConUbicacion[];
-  onRotationChange?: (rotation: number) => void;
-  onScaleChange?: (scale: number) => void;
-  onOpacityChange?: (opacity: number) => void;
-  onPanChange?: (x: number, y: number) => void;
 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
+const ESTADO_COLORES: Record<string, string> = {
+  disponible: '#10B981',
+  reservado: '#F59E0B',
+  vendido: '#EF4444',
+  desconocido: '#6B7280',
+};
+
+const ESTADO_TEXTOS: Record<string, string> = {
+  disponible: 'Disponible',
+  reservado: 'Reservado',
+  vendido: 'Vendido',
+  desconocido: 'Sin estado',
+};
+
 export default function GoogleMap({
   defaultCenter,
   defaultZoom,
-  coordenadas,
-  onMapClick,
   planosUrl,
   overlayBounds,
-  calibrating = false,
-  onBoundsChange,
-  rotationDeg = 0,
   overlayOpacity = 0.7,
+  rotationDeg = 0,
+  overlayEditable = false,
+  onOverlayBoundsChange,
+  projectPolygon = [],
+  onProjectPolygonChange,
+  projectDrawingActive = false,
+  onProjectDrawingFinished,
+  lotes = [],
+  highlightLoteId,
+  loteDrawingActive = false,
+  onLoteDrawingFinished,
+  onLotePolygonComplete,
+  fullScreenActive = false,
   onToggleFull,
-  lotesConUbicacion = [],
-  onRotationChange,
-  onScaleChange,
-  onOpacityChange,
-  onPanChange,
 }: GoogleMapProps) {
+  const [centerLat, centerLng] = defaultCenter;
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const overlayRef = useRef<google.maps.GroundOverlay | null>(null);
-  const calibrationRectangleRef = useRef<google.maps.Rectangle | null>(null);
-  
+  const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+  const projectPolygonRef = useRef<google.maps.Polygon | null>(null);
+  const projectPolygonListenersRef = useRef<google.maps.MapsEventListener[]>([]);
+  const projectPolygonSilentUpdateRef = useRef(false);
+  const overlayRef = useRef<google.maps.OverlayView | null>(null);
+  const overlayRectangleRef = useRef<google.maps.Rectangle | null>(null);
+  const overlayListenersRef = useRef<google.maps.MapsEventListener[]>([]);
+  const overlaySilentRef = useRef(false);
+  const lotesMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const markerAnimationTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const drawingContextRef = useRef<'project' | 'lote' | null>(null);
+  const overlayFitRef = useRef(false);
+  const polygonFitRef = useRef(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [firstCorner, setFirstCorner] = useState<google.maps.LatLng | null>(null);
-  const [planeScale, setPlaneScale] = useState(1);
-  const [planePan, setPlanePan] = useState({ x: 0, y: 0 });
 
-  // Inicializar Google Maps
-  useEffect(() => {
-    const initMap = async () => {
-      if (!GOOGLE_MAPS_API_KEY) {
-        console.error('Google Maps API Key no configurada');
-        return;
-      }
-
-      try {
-        // Verificar si Google Maps ya está cargado
-        if ((window as any).google?.maps) {
-          setIsLoaded(true);
-          return;
-        }
-
-        // Verificar si el script ya existe
-        const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`);
-        if (existingScript) {
-          // Si existe, solo esperar a que cargue
-          const checkLoaded = () => {
-            if ((window as any).google?.maps) {
-              setIsLoaded(true);
-            } else {
-              setTimeout(checkLoaded, 100);
-            }
-          };
-          checkLoaded();
-          return;
-        }
-
-        // Crear y cargar el script de Google Maps
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,drawing&v=weekly`;
-        script.async = true;
-        script.defer = true;
-        script.id = 'google-maps-script';
-        
-        script.onload = () => {
-          setIsLoaded(true);
-        };
-        
-        script.onerror = () => {
-          console.error('Error cargando Google Maps Script');
-        };
-
-        document.head.appendChild(script);
-
-        return () => {
-          // Cleanup: remover script si es necesario
-          if (script.parentNode) {
-            script.parentNode.removeChild(script);
-          }
-        };
-      } catch (error) {
-        console.error('Error inicializando Google Maps:', error);
-      }
-    };
-
-    initMap();
+  useEffect(() => () => {
+    markerAnimationTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    markerAnimationTimeoutsRef.current.clear();
   }, []);
 
-  // Crear mapa cuando esté cargado
+  // Cargar script de Google Maps cuando no esté presente
   useEffect(() => {
-    if (!isLoaded || !mapRef.current) return;
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.error('Google Maps API Key no configurada');
+      return;
+    }
+
+    const initialize = () => setIsLoaded(true);
+
+    const globalWindow = window as typeof window & { google?: typeof google };
+    if (globalWindow.google?.maps) {
+      initialize();
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>(`script[src*="maps.googleapis.com"]`);
+    if (existingScript) {
+      existingScript.addEventListener('load', initialize, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,drawing,places&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    script.onload = initialize;
+    script.onerror = () => console.error('Error cargando Google Maps Script');
+    document.head.appendChild(script);
+
+    return () => {
+      script.onload = null;
+      script.onerror = null;
+    };
+  }, []);
+
+  // Inicializar mapa y DrawingManager
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current || mapInstanceRef.current) return;
 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: defaultCenter[0], lng: defaultCenter[1] },
@@ -138,270 +147,387 @@ export default function GoogleMap({
       mapTypeId: google.maps.MapTypeId.SATELLITE,
       mapTypeControl: true,
       mapTypeControlOptions: {
-        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-        position: google.maps.ControlPosition.TOP_CENTER,
-        mapTypeIds: [
-          google.maps.MapTypeId.ROADMAP,
-          google.maps.MapTypeId.SATELLITE,
-          google.maps.MapTypeId.HYBRID,
-          google.maps.MapTypeId.TERRAIN
-        ]
+        position: google.maps.ControlPosition.TOP_RIGHT,
       },
-      zoomControl: true,
       streetViewControl: true,
-      fullscreenControl: true,
-      gestureHandling: 'greedy'
+      zoomControl: true,
+      fullscreenControl: false,
+      gestureHandling: 'greedy',
     });
 
     mapInstanceRef.current = map;
 
-    // Agregar listener para clics en el mapa
-    map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        const lat = e.latLng.lat();
-        const lng = e.latLng.lng();
-        
-        if (calibrating) {
-          handleCalibrationClick(e.latLng);
-        } else {
-          onMapClick(lat, lng);
-        }
-      }
+    const drawingManager = new google.maps.drawing.DrawingManager({
+      drawingControl: false,
+      polygonOptions: {
+        fillColor: '#2563EB',
+        fillOpacity: 0.1,
+        strokeColor: '#1D4ED8',
+        strokeOpacity: 0.9,
+        strokeWeight: 2,
+        editable: true,
+        draggable: true,
+      },
     });
+    drawingManager.setMap(map);
+    drawingManagerRef.current = drawingManager;
 
     return () => {
-      // Cleanup
-      if (mapInstanceRef.current) {
-        google.maps.event.clearInstanceListeners(mapInstanceRef.current);
+      drawingManager.setMap(null);
+      google.maps.event.clearInstanceListeners(map);
+      mapInstanceRef.current = null;
+    };
+  }, [isLoaded, defaultCenter, defaultZoom]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.panTo({ lat: centerLat, lng: centerLng });
+  }, [centerLat, centerLng]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.setZoom(defaultZoom);
+  }, [defaultZoom]);
+
+  // Configurar Autocomplete para búsqueda de ubicaciones
+  useEffect(() => {
+    if (!isLoaded || !mapInstanceRef.current || !searchInputRef.current) return;
+
+    const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
+      fields: ['geometry', 'name'],
+      componentRestrictions: { country: ['pe'] },
+    });
+    autocomplete.bindTo('bounds', mapInstanceRef.current);
+
+    const listener = autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place || !place.geometry) return;
+
+      if (place.geometry.viewport) {
+        mapInstanceRef.current?.fitBounds(place.geometry.viewport);
+      } else if (place.geometry.location) {
+        mapInstanceRef.current?.panTo(place.geometry.location);
+      }
+    });
+
+    return () => listener.remove();
+  }, [isLoaded]);
+
+  const cleanupProjectPolygonListeners = useCallback(() => {
+    projectPolygonListenersRef.current.forEach((listener) => listener.remove());
+    projectPolygonListenersRef.current = [];
+  }, []);
+
+  const attachProjectPolygonListeners = useCallback(
+    (polygon: google.maps.Polygon) => {
+      cleanupProjectPolygonListeners();
+    const path = polygon.getPath();
+    const handleChange = () => {
+      if (projectPolygonSilentUpdateRef.current) return;
+      if (!onProjectPolygonChange) return;
+      const updated = path.getArray().map((latLng) => ({ lat: latLng.lat(), lng: latLng.lng() }));
+      onProjectPolygonChange(updated);
+    };
+
+    projectPolygonListenersRef.current = [
+      google.maps.event.addListener(path, 'set_at', handleChange),
+      google.maps.event.addListener(path, 'insert_at', handleChange),
+      google.maps.event.addListener(path, 'remove_at', handleChange),
+      google.maps.event.addListener(polygon, 'dragend', handleChange),
+    ];
+    },
+    [cleanupProjectPolygonListeners, onProjectPolygonChange]
+  );
+
+  // Gestionar dibujo del polígono del proyecto
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const drawingManager = drawingManagerRef.current;
+    if (!map || !drawingManager) return;
+    if (loteDrawingActive) return;
+
+    if (!projectDrawingActive) {
+      if (drawingContextRef.current === 'project') {
+        drawingManager.setDrawingMode(null);
+        drawingContextRef.current = null;
+      }
+      return;
+    }
+
+    drawingContextRef.current = 'project';
+    drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+
+    const overlayCompleteListener = google.maps.event.addListener(
+      drawingManager,
+      'overlaycomplete',
+      (event: google.maps.drawing.OverlayCompleteEvent) => {
+        if (event.type !== google.maps.drawing.OverlayType.POLYGON) return;
+
+        const polygon = event.overlay as google.maps.Polygon;
+        event.overlay = null as unknown as google.maps.Polygon;
+
+        polygon.setEditable(true);
+        polygon.setDraggable(true);
+        polygon.setMap(map);
+
+        if (projectPolygonRef.current) {
+          projectPolygonRef.current.setMap(null);
+        }
+
+        projectPolygonRef.current = polygon;
+        attachProjectPolygonListeners(polygon);
+
+        const path = polygon
+          .getPath()
+          .getArray()
+          .map((latLng) => ({ lat: latLng.lat(), lng: latLng.lng() }));
+        onProjectPolygonChange?.(path);
+        drawingManager.setDrawingMode(null);
+        drawingContextRef.current = null;
+        onProjectDrawingFinished?.();
+      }
+    );
+
+    return () => {
+      if (drawingContextRef.current === 'project') {
+        drawingManager.setDrawingMode(null);
+        drawingContextRef.current = null;
+      }
+      overlayCompleteListener.remove();
+    };
+  }, [projectDrawingActive, onProjectPolygonChange, onProjectDrawingFinished, attachProjectPolygonListeners, loteDrawingActive]);
+
+  // Sincronizar polígono del proyecto recibido por props
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!projectPolygon || projectPolygon.length < 3) {
+      cleanupProjectPolygonListeners();
+      if (projectPolygonRef.current) {
+        projectPolygonRef.current.setMap(null);
+        projectPolygonRef.current = null;
+      }
+      polygonFitRef.current = false;
+      return;
+    }
+
+    const path = projectPolygon.map((vertex) => new google.maps.LatLng(vertex.lat, vertex.lng));
+    const bounds = new google.maps.LatLngBounds();
+    path.forEach((latLng) => bounds.extend(latLng));
+
+    if (!projectPolygonRef.current) {
+      const polygon = new google.maps.Polygon({
+        map,
+        paths: path,
+        fillColor: '#2563EB',
+        fillOpacity: 0.1,
+        strokeColor: '#1D4ED8',
+        strokeOpacity: 0.9,
+        strokeWeight: 2,
+        editable: true,
+        draggable: true,
+      });
+      projectPolygonRef.current = polygon;
+      attachProjectPolygonListeners(polygon);
+      if (!polygonFitRef.current) {
+        map.fitBounds(bounds);
+        polygonFitRef.current = true;
+      }
+    } else {
+      projectPolygonSilentUpdateRef.current = true;
+      projectPolygonRef.current.setPath(path);
+      projectPolygonSilentUpdateRef.current = false;
+      if (!polygonFitRef.current) {
+        map.fitBounds(bounds);
+        polygonFitRef.current = true;
+      }
+    }
+  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners]);
+
+  // Dibujo manual de lotes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const drawingManager = drawingManagerRef.current;
+    if (!map || !drawingManager) return;
+
+    if (!loteDrawingActive) {
+      if (drawingContextRef.current === 'lote') {
+        drawingManager.setDrawingMode(null);
+        drawingContextRef.current = null;
+      }
+      return;
+    }
+
+    drawingContextRef.current = 'lote';
+    drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+
+    const listener = google.maps.event.addListener(
+      drawingManager,
+      'overlaycomplete',
+      (event: google.maps.drawing.OverlayCompleteEvent) => {
+        if (event.type !== google.maps.drawing.OverlayType.POLYGON) return;
+
+        const polygon = event.overlay as google.maps.Polygon;
+        const vertices = polygon
+          .getPath()
+          .getArray()
+          .map((latLng) => [latLng.lat(), latLng.lng()] as [number, number]);
+
+        polygon.setMap(null);
+        drawingManager.setDrawingMode(null);
+        drawingContextRef.current = null;
+        onLotePolygonComplete?.(vertices);
+        onLoteDrawingFinished?.();
+      }
+    );
+
+    return () => {
+      listener.remove();
+      if (drawingContextRef.current === 'lote') {
+        drawingManager.setDrawingMode(null);
+        drawingContextRef.current = null;
       }
     };
-  }, [isLoaded, defaultCenter, defaultZoom, calibrating, onMapClick]);
+  }, [loteDrawingActive, onLotePolygonComplete, onLoteDrawingFinished]);
 
-  // Manejar clics durante calibración
-  const handleCalibrationClick = useCallback((latLng: google.maps.LatLng) => {
-    if (!mapInstanceRef.current) return;
+  // Gestionar overlay del plano
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
 
-    if (!firstCorner) {
-      setFirstCorner(latLng);
-      console.log('Primera esquina seleccionada:', latLng.toString());
-    } else {
-      // Segunda esquina: crear bounds
-      const bounds = new google.maps.LatLngBounds();
-      bounds.extend(firstCorner);
-      bounds.extend(latLng);
-
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      
-      const boundsArray: [[number, number], [number, number]] = [
-        [sw.lat(), sw.lng()],
-        [ne.lat(), ne.lng()]
-      ];
-
-      if (onBoundsChange) {
-        onBoundsChange(boundsArray);
+    if (!planosUrl || !overlayBounds) {
+      if (overlayRef.current) {
+        overlayRef.current.setMap(null);
+        overlayRef.current = null;
       }
-
-      setFirstCorner(null);
-      console.log('Bounds definidos:', boundsArray);
+      return;
     }
-  }, [firstCorner, onBoundsChange]);
 
-  // Actualizar marcadores de coordenadas
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (typeof window === 'undefined') return;
+    const googleNamespace = (window as typeof window & { google?: typeof google }).google;
+    if (!googleNamespace?.maps?.OverlayView) return;
 
-    // Limpiar marcadores existentes
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = [];
+    const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+    const bounds = new googleNamespace.maps.LatLngBounds(
+      new googleNamespace.maps.LatLng(swLat, swLng),
+      new googleNamespace.maps.LatLng(neLat, neLng)
+    );
 
-    // Crear nuevos marcadores
-    coordenadas.forEach(coord => {
-      const marker = new google.maps.Marker({
-        position: { lat: coord.lat, lng: coord.lng },
-        map: mapInstanceRef.current,
-        title: coord.nombre,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#DC2626"/>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(24, 24),
-        }
-      });
+    class GroundOverlayWithRotation extends googleNamespace.maps.OverlayView {
+      private url: string;
+      private bounds: google.maps.LatLngBounds;
+      private rotation: number;
+      private opacity: number;
+      private container?: HTMLDivElement;
+      private image?: HTMLImageElement;
 
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="padding: 8px;">
-            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">${coord.nombre}</h3>
-            <p style="margin: 0; font-size: 12px; color: #666;">
-              Lat: ${coord.lat.toFixed(6)}<br>
-              Lng: ${coord.lng.toFixed(6)}
-            </p>
-            <button onclick="window.eliminarCoordenada('${coord.id}')" 
-                    style="margin-top: 8px; background: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-              Eliminar
-            </button>
-          </div>
-        `
-      });
-
-      marker.addListener('click', () => {
-        infoWindow.open(mapInstanceRef.current, marker);
-      });
-
-      markersRef.current.push(marker);
-    });
-  }, [coordenadas]);
-
-  // Actualizar marcadores de lotes
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-
-    lotesConUbicacion.forEach(lote => {
-      const data = lote.data ? 
-        (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-      
-      const planoPoint = data.plano_point;
-      if (!planoPoint || !Array.isArray(planoPoint) || planoPoint.length !== 2) {
-        return;
+      constructor(url: string, bounds: google.maps.LatLngBounds, rotation = 0, opacity = 0.7) {
+        super();
+        this.url = url;
+        this.bounds = bounds;
+        this.rotation = rotation;
+        this.opacity = opacity;
       }
 
-      const [lat, lng] = planoPoint;
-      
-      // Determinar color según el estado del lote
-      const getEstadoColor = (estado: string) => {
-        switch (estado) {
-          case 'disponible': return '#10B981';
-          case 'reservado': return '#F59E0B';
-          case 'vendido': return '#EF4444';
-          default: return '#6B7280';
+      onAdd() {
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.overflow = 'visible';
+
+        const img = document.createElement('img');
+        img.src = this.url;
+        img.style.position = 'absolute';
+        img.style.top = '50%';
+        img.style.left = '50%';
+        img.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
+        img.style.transformOrigin = 'center center';
+        img.style.opacity = `${this.opacity}`;
+        img.style.pointerEvents = 'none';
+
+        div.appendChild(img);
+        this.container = div;
+        this.image = img;
+
+        const panes = this.getPanes();
+        if (!panes || !panes.overlayLayer) {
+          console.warn('No se pudo obtener el overlayLayer para el plano');
+          return;
         }
-      };
+        panes.overlayLayer.appendChild(div);
+      }
 
-      const color = getEstadoColor(lote.estado || 'disponible');
+      draw() {
+        if (!this.container) return;
+        const projection = this.getProjection();
+        if (!projection) return;
 
-      const marker = new google.maps.Marker({
-        position: { lat, lng },
-        map: mapInstanceRef.current,
-        title: `${lote.codigo} - ${lote.estado || 'Sin estado'}`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="40" height="50" viewBox="0 0 40 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <!-- Sombra -->
-              <ellipse cx="20" cy="47" rx="8" ry="3" fill="rgba(0,0,0,0.2)"/>
-              <!-- Pin principal -->
-              <path d="M20 2C12.8 2 7 7.8 7 15c0 10.5 13 31 13 31s13-20.5 13-31c0-7.2-5.8-13-13-13z" fill="${color}" stroke="white" stroke-width="2"/>
-              <!-- Círculo interior -->
-              <circle cx="20" cy="15" r="8" fill="white" opacity="0.9"/>
-              <!-- Texto del lote -->
-              <text x="20" y="19" text-anchor="middle" fill="${color}" font-size="8" font-weight="bold">${lote.codigo.slice(-3)}</text>
-              <!-- Indicador de estado -->
-              <circle cx="20" cy="15" r="3" fill="${color}"/>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(40, 50),
-          anchor: new google.maps.Point(20, 50)
+        const sw = projection.fromLatLngToDivPixel(this.bounds.getSouthWest());
+        const ne = projection.fromLatLngToDivPixel(this.bounds.getNorthEast());
+        if (!sw || !ne) return;
+
+        const width = ne.x - sw.x;
+        const height = sw.y - ne.y;
+
+        this.container.style.left = `${sw.x}px`;
+        this.container.style.top = `${ne.y}px`;
+        this.container.style.width = `${width}px`;
+        this.container.style.height = `${height}px`;
+
+        if (this.image) {
+          this.image.style.width = `${width}px`;
+          this.image.style.height = `${height}px`;
+          this.image.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
+          this.image.style.opacity = `${this.opacity}`;
         }
-      });
+      }
 
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="padding: 16px; min-width: 280px; font-family: system-ui;">
-            <!-- Header del lote -->
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5;">
-              <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
-                📍 ${lote.codigo}
-              </h3>
-              <span style="background: ${color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">
-                ${lote.estado || 'Sin estado'}
-              </span>
-            </div>
-            
-            <!-- Información de ubicación -->
-            <div style="margin-bottom: 16px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
-                <div>
-                  <div style="color: #6b7280; margin-bottom: 2px;">Latitud</div>
-                  <div style="font-weight: 600; color: #374151;">${lat.toFixed(6)}</div>
-                </div>
-                <div>
-                  <div style="color: #6b7280; margin-bottom: 2px;">Longitud</div>
-                  <div style="font-weight: 600; color: #374151;">${lng.toFixed(6)}</div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Gestión de estados -->
-            <div style="margin-bottom: 16px;">
-              <div style="color: #6b7280; font-size: 12px; margin-bottom: 8px;">Cambiar Estado:</div>
-              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <button 
-                  onclick="window.cambiarEstadoLote('${lote.id}', 'disponible')" 
-                  style="background: #10B981; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
-                  onmouseover="this.style.background='#059669'"
-                  onmouseout="this.style.background='#10B981'"
-                >
-                  🟢 Disponible
-                </button>
-                <button 
-                  onclick="window.cambiarEstadoLote('${lote.id}', 'reservado')" 
-                  style="background: #F59E0B; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
-                  onmouseover="this.style.background='#D97706'"
-                  onmouseout="this.style.background='#F59E0B'"
-                >
-                  🟡 Reservado
-                </button>
-                <button 
-                  onclick="window.cambiarEstadoLote('${lote.id}', 'vendido')" 
-                  style="background: #EF4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
-                  onmouseover="this.style.background='#DC2626'"
-                  onmouseout="this.style.background='#EF4444'"
-                >
-                  🔴 Vendido
-                </button>
-              </div>
-            </div>
-            
-            <!-- Acciones adicionales -->
-            <div style="display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid #e5e5e5;">
-              <button 
-                onclick="window.editarLoteInfo('${lote.id}')" 
-                style="flex: 1; background: #3B82F6; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s;"
-                onmouseover="this.style.background='#2563EB'"
-                onmouseout="this.style.background='#3B82F6'"
-              >
-                ✏️ Editar Info
-              </button>
-              <button 
-                onclick="window.removerUbicacionLote('${lote.id}')" 
-                style="background: #EF4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s;"
-                onmouseover="this.style.background='#DC2626'"
-                onmouseout="this.style.background='#EF4444'"
-              >
-                🗑️ Quitar
-              </button>
-            </div>
-          </div>
-        `
-      });
+      onRemove() {
+        if (this.container?.parentNode) {
+          this.container.parentNode.removeChild(this.container);
+        }
+        this.container = undefined;
+        this.image = undefined;
+      }
+    }
 
-      marker.addListener('click', () => {
-        infoWindow.open(mapInstanceRef.current, marker);
-      });
+    const overlay = new GroundOverlayWithRotation(planosUrl, bounds, rotationDeg, overlayOpacity);
+    overlay.setMap(map);
+    overlayRef.current = overlay;
+    if (!overlayFitRef.current) {
+      map.fitBounds(bounds);
+      overlayFitRef.current = true;
+    }
 
-      markersRef.current.push(marker);
-    });
-  }, [lotesConUbicacion]);
+    return () => {
+      overlay.setMap(null);
+      if (overlayRef.current === overlay) {
+        overlayRef.current = null;
+      }
+    };
+  }, [planosUrl, overlayBounds, rotationDeg, overlayOpacity]);
 
-  // Actualizar overlay del plano
   useEffect(() => {
-    if (!mapInstanceRef.current || !planosUrl || !overlayBounds) return;
+    if (!overlayBounds) {
+      overlayFitRef.current = false;
+    }
+  }, [overlayBounds]);
 
-    // Remover overlay anterior si existe
-    if (overlayRef.current) {
-      overlayRef.current.setMap(null);
+  // Permitir edición del rectángulo del overlay
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!overlayEditable || !overlayBounds) {
+      overlayListenersRef.current.forEach((listener) => listener.remove());
+      overlayListenersRef.current = [];
+      if (overlayRectangleRef.current) {
+        overlayRectangleRef.current.setMap(null);
+        overlayRectangleRef.current = null;
+      }
+      return;
     }
 
     const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
@@ -410,170 +536,236 @@ export default function GoogleMap({
       new google.maps.LatLng(neLat, neLng)
     );
 
-    const overlay = new google.maps.GroundOverlay(planosUrl, bounds, {
-      opacity: overlayOpacity,
-      clickable: false
-    });
-
-    overlay.setMap(mapInstanceRef.current);
-    overlayRef.current = overlay;
-
-    return () => {
-      if (overlayRef.current) {
-        overlayRef.current.setMap(null);
-      }
-    };
-  }, [planosUrl, overlayBounds, overlayOpacity]);
-
-  // Mostrar rectángulo durante calibración
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-
-    if (calibrating && overlayBounds) {
-      // Remover rectángulo anterior
-      if (calibrationRectangleRef.current) {
-        calibrationRectangleRef.current.setMap(null);
-      }
-
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-      const bounds = new google.maps.LatLngBounds(
-        new google.maps.LatLng(swLat, swLng),
-        new google.maps.LatLng(neLat, neLng)
-      );
-
+    if (!overlayRectangleRef.current) {
       const rectangle = new google.maps.Rectangle({
-        bounds: bounds,
+        bounds,
+        map,
         editable: true,
         draggable: true,
-        fillColor: '#FF0000',
-        fillOpacity: 0.1,
-        strokeColor: '#FF0000',
+        fillOpacity: 0,
+        strokeColor: '#2563EB',
         strokeOpacity: 0.8,
         strokeWeight: 2,
       });
+      overlayRectangleRef.current = rectangle;
 
-      rectangle.setMap(mapInstanceRef.current);
-      calibrationRectangleRef.current = rectangle;
+      const notifyBounds = () => {
+        if (overlaySilentRef.current) return;
+        if (!onOverlayBoundsChange) return;
+        const rectBounds = rectangle.getBounds();
+        if (!rectBounds) return;
+        const ne = rectBounds.getNorthEast();
+        const sw = rectBounds.getSouthWest();
+        onOverlayBoundsChange([
+          [sw.lat(), sw.lng()],
+          [ne.lat(), ne.lng()],
+        ]);
+      };
 
-      // Listener para cambios en el rectángulo
-      rectangle.addListener('bounds_changed', () => {
-        const newBounds = rectangle.getBounds();
-        if (newBounds && onBoundsChange) {
-          const ne = newBounds.getNorthEast();
-          const sw = newBounds.getSouthWest();
-          onBoundsChange([
-            [sw.lat(), sw.lng()],
-            [ne.lat(), ne.lng()]
-          ]);
-        }
-      });
+      overlayListenersRef.current = [
+        google.maps.event.addListener(rectangle, 'bounds_changed', notifyBounds),
+        google.maps.event.addListener(rectangle, 'dragend', notifyBounds),
+      ];
     } else {
-      // Remover rectángulo cuando no estamos calibrando
-      if (calibrationRectangleRef.current) {
-        calibrationRectangleRef.current.setMap(null);
-        calibrationRectangleRef.current = null;
-      }
+      overlaySilentRef.current = true;
+      overlayRectangleRef.current.setBounds(bounds);
+      overlaySilentRef.current = false;
     }
 
     return () => {
-      if (calibrationRectangleRef.current) {
-        calibrationRectangleRef.current.setMap(null);
+      overlayListenersRef.current.forEach((listener) => listener.remove());
+      overlayListenersRef.current = [];
+    };
+  }, [overlayEditable, overlayBounds, onOverlayBoundsChange]);
+
+  // Actualizar marcadores de lotes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const removeMarker = (id: string) => {
+      const marker = lotesMarkersRef.current.get(id);
+      if (marker) {
+        marker.setMap(null);
+        lotesMarkersRef.current.delete(id);
+      }
+      const timeoutId = markerAnimationTimeoutsRef.current.get(id);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+        markerAnimationTimeoutsRef.current.delete(id);
       }
     };
-  }, [calibrating, overlayBounds, onBoundsChange]);
 
-  if (!isLoaded) {
-    return (
+    const seen = new Set<string>();
+
+    lotes.forEach((lote) => {
+      seen.add(lote.id);
+
+      let ubicacion = lote.ubicacion ?? null;
+
+      if (!ubicacion && lote.plano_poligono && lote.plano_poligono.length >= 3) {
+        const [latSum, lngSum] = lote.plano_poligono.reduce(
+          (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
+          [0, 0]
+        );
+        ubicacion = {
+          lat: latSum / lote.plano_poligono.length,
+          lng: lngSum / lote.plano_poligono.length,
+        };
+      }
+
+      if (!ubicacion && lote.data) {
+        let parsed: Record<string, unknown> | undefined;
+        if (typeof lote.data === 'string') {
+          try {
+            parsed = JSON.parse(lote.data) as Record<string, unknown>;
+          } catch (error) {
+            console.warn('No se pudo parsear la data del lote', error);
+          }
+        } else if (typeof lote.data === 'object') {
+          parsed = lote.data as Record<string, unknown>;
+        }
+
+        if (parsed && Array.isArray(parsed.plano_poligono) && parsed.plano_poligono.length >= 3) {
+          const coords = parsed.plano_poligono as [number, number][];
+          const [latSum, lngSum] = coords.reduce(
+            (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
+            [0, 0]
+          );
+          ubicacion = {
+            lat: latSum / coords.length,
+            lng: lngSum / coords.length,
+          };
+        }
+      }
+
+      if (!ubicacion) {
+        removeMarker(lote.id);
+        return;
+      }
+
+      const color = ESTADO_COLORES[lote.estado || 'desconocido'] || ESTADO_COLORES.desconocido;
+      const labelText = lote.codigo.slice(-3);
+
+      const markerIcon: google.maps.Icon = {
+        path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 1.5,
+        scale: 1.6,
+        anchor: new google.maps.Point(12, 24),
+      };
+
+      if (!lotesMarkersRef.current.has(lote.id)) {
+        const marker = new google.maps.Marker({
+          position: ubicacion,
+          map,
+          title: `${lote.codigo} - ${lote.estado || 'Sin estado'}`,
+          icon: markerIcon,
+          label: {
+            text: labelText,
+            color: '#ffffff',
+            fontWeight: 'bold',
+          },
+        });
+        lotesMarkersRef.current.set(lote.id, marker);
+      }
+
+      const marker = lotesMarkersRef.current.get(lote.id)!;
+      marker.setOptions({
+        position: ubicacion,
+        icon: markerIcon,
+        label: {
+          text: labelText,
+          color: '#ffffff',
+          fontWeight: 'bold',
+        },
+        zIndex: highlightLoteId === lote.id ? 1000 : undefined,
+      });
+
+      if (highlightLoteId === lote.id) {
+        marker.setAnimation(google.maps.Animation.BOUNCE);
+        const prevTimeout = markerAnimationTimeoutsRef.current.get(lote.id);
+        if (prevTimeout) {
+          window.clearTimeout(prevTimeout);
+        }
+        const timeoutId = window.setTimeout(() => {
+          marker.setAnimation(null);
+          markerAnimationTimeoutsRef.current.delete(lote.id);
+        }, 1600);
+        markerAnimationTimeoutsRef.current.set(lote.id, timeoutId);
+      } else {
+        marker.setAnimation(null);
+      }
+    });
+
+    Array.from(lotesMarkersRef.current.keys()).forEach((id) => {
+      if (!seen.has(id)) {
+        removeMarker(id);
+      }
+    });
+  }, [lotes, highlightLoteId]);
+
+  const loadingFallback = useMemo(
+    () => (
       <div className="w-full h-full flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Cargando Google Maps...</p>
         </div>
       </div>
-    );
+    ),
+    []
+  );
+
+  const legendItems = useMemo(
+    () => ['disponible', 'reservado', 'vendido'] as const,
+    []
+  );
+
+  if (!isLoaded) {
+    return loadingFallback;
   }
 
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full" />
-      
-      {/* Controles de overlay */}
-      {planosUrl && (
-        <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 space-y-2 min-w-[200px]">
-          <div className="text-sm font-medium text-gray-700">Controles del Plano</div>
-          
-          {/* Control de opacidad */}
-          <div>
-            <label className="text-xs text-gray-600">Opacidad</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={overlayOpacity}
-              onChange={(e) => onOpacityChange?.(parseFloat(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          
-          {/* Control de rotación */}
-          <div>
-            <label className="text-xs text-gray-600">Rotación (°)</label>
-            <input
-              type="range"
-              min="-180"
-              max="180"
-              step="1"
-              value={rotationDeg}
-              onChange={(e) => onRotationChange?.(parseFloat(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          
-          {/* Control de escala */}
-          <div>
-            <label className="text-xs text-gray-600">Escala</label>
-            <input
-              type="range"
-              min="0.1"
-              max="3"
-              step="0.1"
-              value={planeScale}
-              onChange={(e) => {
-                const scale = parseFloat(e.target.value);
-                setPlaneScale(scale);
-                onScaleChange?.(scale);
-              }}
-              className="w-full"
-            />
-          </div>
-          
-          {/* Botón de pantalla completa */}
-          {onToggleFull && (
-            <button
-              onClick={onToggleFull}
-              className="w-full bg-blue-600 text-white text-sm py-2 px-3 rounded hover:bg-blue-700 transition-colors"
-            >
-              Pantalla Completa
-            </button>
-          )}
-        </div>
-      )}
 
-      {/* Instrucciones durante calibración */}
-      {calibrating && (
-        <div className="absolute bottom-4 left-4 bg-yellow-100 border border-yellow-400 rounded-lg p-3 max-w-md">
-          <div className="text-sm font-medium text-yellow-800 mb-1">
-            Modo Calibración Activo
-          </div>
-          <div className="text-xs text-yellow-700">
-            {!firstCorner 
-              ? "Haz clic en la primera esquina donde quieres posicionar el plano"
-              : "Haz clic en la esquina opuesta para definir el área"
-            }
-          </div>
+      {/* Barra de búsqueda */}
+      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 flex flex-col gap-2 w-72 z-[1000]">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Buscar ubicación</div>
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Buscar dirección o referencia"
+          className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {onToggleFull && (
+          <button
+            onClick={onToggleFull}
+            className="text-sm text-blue-600 hover:text-blue-700 text-left"
+          >
+            {fullScreenActive ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          </button>
+        )}
+      </div>
+
+      {/* Leyenda */}
+      <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow flex flex-col gap-2 px-4 py-3 text-xs text-gray-700">
+        <span className="font-semibold text-gray-900 text-sm">Estados de lotes</span>
+        <div className="flex flex-col gap-1">
+          {legendItems.map((estado) => (
+            <div key={estado} className="flex items-center gap-2">
+              <span
+                className="w-4 h-4 rounded-full border border-white shadow"
+                style={{ backgroundColor: ESTADO_COLORES[estado] }}
+              />
+              <span>{ESTADO_TEXTOS[estado]}</span>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

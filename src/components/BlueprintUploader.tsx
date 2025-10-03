@@ -176,6 +176,18 @@ export default function BlueprintUploader({
     return <FileText className="w-8 h-8 text-gray-500" />;
   };
 
+  useEffect(() => {
+    if (currentFile) {
+      setPreview(currentFile);
+      if (!fileInfo) {
+        const guessedName = currentFile.split('/').pop() || 'plano-actual';
+        setFileInfo({ name: guessedName, size: 0, type: 'image/*' });
+      }
+    } else if (!fileInfo) {
+      setPreview(null);
+    }
+  }, [currentFile, fileInfo]);
+
   return (
     <div className="w-full">
       {/* Zona de carga principal */}

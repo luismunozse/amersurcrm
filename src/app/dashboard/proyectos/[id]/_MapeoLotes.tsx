@@ -1,24 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Upload, MapPin, Trash2, Save } from 'lucide-react';
+import { Upload, MapPin, Trash2, Save, PenLine, Ruler, Layers, Wand2, RefreshCcw } from 'lucide-react';
 import BlueprintUploader from '@/components/BlueprintUploader';
 import { toast } from 'sonner';
-import { subirPlanos, eliminarPlanos, guardarCoordenadasMultiples, obtenerCoordenadasProyecto, guardarOverlayBounds, actualizarLote } from './_actions';
+import {
+  subirPlanos,
+  eliminarPlanos,
+  guardarOverlayBounds,
+  guardarPoligonoProyecto,
+  eliminarPoligonoProyecto,
+  guardarPoligonoLote,
+} from './_actions';
 import { obtenerCoordenadasUbicacion } from '@/lib/geocoding';
 
-// Google Maps se carga dinámicamente en el cliente
+interface LatLngLiteral {
+  lat: number;
+  lng: number;
+}
+
+interface LoteState {
+  id: string;
+  codigo: string;
+  estado?: string;
+  data?: unknown;
+  plano_poligono?: [number, number][] | null;
+  ubicacion?: {
+    lat: number;
+    lng: number;
+  } | null;
+}
 
 interface MapeoLotesProps {
   proyectoId: string;
   planosUrl: string | null;
   proyectoNombre: string;
-  initialBounds?: [[number, number],[number, number]] | null;
+  initialBounds?: [[number, number], [number, number]] | null;
   initialRotation?: number | null;
-  lotes?: Array<{ id: string; codigo: string; estado?: string; data?: any }>;
+  initialPolygon?: LatLngLiteral[] | null;
+  lotes?: LoteState[];
   ubigeo?: {
     departamento: string;
     provincia: string;
@@ -26,183 +50,434 @@ interface MapeoLotesProps {
   };
 }
 
-interface Coordenada {
-  id: string;
-  lat: number;
-  lng: number;
-  nombre: string;
-}
-
 const GoogleMap = dynamic(() => import('./GoogleMap'), { ssr: false });
 
-export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation, lotes = [], ubigeo }: MapeoLotesProps) {
-  const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [calibrating, setCalibrating] = useState(false);
-  const [overlayBounds, setOverlayBounds] = useState<[[number, number],[number, number]] | undefined>(initialBounds || undefined);
-  const [placing, setPlacing] = useState(false);
-  const [firstCorner, setFirstCorner] = useState<[number, number] | null>(null);
-  const [rotation, setRotation] = useState(initialRotation ?? 0);
-  // Permite seguir el flujo seleccionar zona -> subir plano sin recargar
-  const [planUrl, setPlanUrl] = useState<string | null>(planosUrl);
-  const [keepAspect, setKeepAspect] = useState(true);
-  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
-  const [overlayOpacity, setOverlayOpacity] = useState(0.7);
-  const [lotesState, setLotesState] = useState(lotes);
-  const [coordenadasUbigeo, setCoordenadasUbigeo] = useState<{ lat: number; lng: number } | null>(null);
+const DEFAULT_CENTER: [number, number] = [-12.0464, -77.0428];
+const DEFAULT_ZOOM = 17;
 
-  // Sincronizar lotes cuando cambien los props
+const getBoundsFromPolygon = (
+  polygon: LatLngLiteral[]
+): [[number, number], [number, number]] | undefined => {
+  if (!polygon.length) return undefined;
+  let minLat = Number.POSITIVE_INFINITY;
+  let maxLat = Number.NEGATIVE_INFINITY;
+  let minLng = Number.POSITIVE_INFINITY;
+  let maxLng = Number.NEGATIVE_INFINITY;
+
+  polygon.forEach(({ lat, lng }) => {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+  });
+
+  if (!Number.isFinite(minLat) || !Number.isFinite(minLng) || !Number.isFinite(maxLat) || !Number.isFinite(maxLng)) {
+    return undefined;
+  }
+
+  return [[minLat, minLng], [maxLat, maxLng]];
+};
+
+const getCentroidFromPolygon = (polygon: LatLngLiteral[]): [number, number] | null => {
+  if (polygon.length === 0) return null;
+  let area = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const current = polygon[i];
+    const next = polygon[(i + 1) % polygon.length];
+    const factor = current.lat * next.lng - next.lat * current.lng;
+    area += factor;
+    cx += (current.lat + next.lat) * factor;
+    cy += (current.lng + next.lng) * factor;
+  }
+  area *= 0.5;
+  if (Math.abs(area) < 1e-7) {
+    const avgLat = polygon.reduce((acc, p) => acc + p.lat, 0) / polygon.length;
+    const avgLng = polygon.reduce((acc, p) => acc + p.lng, 0) / polygon.length;
+    return [avgLat, avgLng];
+  }
+  cx = cx / (6 * area);
+  cy = cy / (6 * area);
+  return [cx, cy];
+};
+
+const polygonToTextarea = (polygon: LatLngLiteral[]): string => {
+  if (!polygon.length) return '';
+  return polygon.map((vertex) => `${vertex.lat.toFixed(6)}, ${vertex.lng.toFixed(6)}`).join('\n');
+};
+
+const parsePolygonFromText = (value: string): LatLngLiteral[] => {
+  const lines = value
+    .split(/\n|;/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    throw new Error('Ingresa al menos tres pares lat,lng (uno por línea)');
+  }
+
+  const vertices: LatLngLiteral[] = [];
+
+  lines.forEach((line, index) => {
+    const withoutIndex = line.replace(/^\d+\.\s*/, '');
+    const parts = withoutIndex.split(/\s|,/).filter(Boolean);
+    if (parts.length < 2) {
+      throw new Error(`Formato inválido en la línea ${index + 1}: "${line}"`);
+    }
+    const lat = Number(parts[0]);
+    const lng = Number(parts[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new Error(`Coordenadas inválidas en la línea ${index + 1}: "${line}"`);
+    }
+    vertices.push({ lat, lng });
+  });
+
+  if (vertices.length < 3) {
+    throw new Error('Necesitas al menos 3 vértices para definir el perímetro');
+  }
+
+  return vertices;
+};
+
+const snapAngle = (deg: number) => {
+  const targets = [-180, -135, -90, -45, 0, 45, 90, 135, 180];
+  const threshold = 4;
+  for (const target of targets) {
+    if (Math.abs(deg - target) <= threshold) return target;
+  }
+  return deg;
+};
+
+const obtenerPoligonoLote = (lote: LoteState): [number, number][] | null => {
+  if (Array.isArray(lote.plano_poligono) && lote.plano_poligono.length >= 3) {
+    return lote.plano_poligono;
+  }
+  if (!lote.data) return null;
+  try {
+    const parsed = typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data;
+    if (parsed?.plano_poligono && Array.isArray(parsed.plano_poligono) && parsed.plano_poligono.length >= 3) {
+      return parsed.plano_poligono;
+    }
+  } catch (error) {
+    console.warn('No se pudo parsear la data del lote', error);
+  }
+  return null;
+};
+
+const computeOverlayFromPolygon = (polygon: LatLngLiteral[]) => {
+  if (polygon.length < 3) return null;
+
+  const latMean = polygon.reduce((sum, p) => sum + p.lat, 0) / polygon.length;
+  const lngMean = polygon.reduce((sum, p) => sum + p.lng, 0) / polygon.length;
+  const metersPerLat = 110_574; // approximate meters per degree latitude
+  const metersPerLng = 111_320 * Math.cos((latMean * Math.PI) / 180);
+  if (Math.abs(metersPerLng) < 1e-6) return null;
+
+  const points = polygon.map((p) => ({
+    x: (p.lng - lngMean) * metersPerLng,
+    y: (p.lat - latMean) * metersPerLat,
+  }));
+
+  const meanX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+  const meanY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  points.forEach((p) => {
+    const dx = p.x - meanX;
+    const dy = p.y - meanY;
+    sxx += dx * dx;
+    syy += dy * dy;
+    sxy += dx * dy;
+  });
+
+  const covXX = sxx / points.length;
+  const covYY = syy / points.length;
+  const covXY = sxy / points.length;
+
+  const angle = 0.5 * Math.atan2(2 * covXY, covXX - covYY);
+  const sinAngle = Math.sin(angle);
+  const cosAngle = Math.cos(angle);
+
+  const rotated = points.map((p) => {
+    const dx = p.x - meanX;
+    const dy = p.y - meanY;
+    const rx = dx * cosAngle + dy * sinAngle;
+    const ry = -dx * sinAngle + dy * cosAngle;
+    return { x: rx, y: ry };
+  });
+
+  const minX = Math.min(...rotated.map((p) => p.x));
+  const maxX = Math.max(...rotated.map((p) => p.x));
+  const minY = Math.min(...rotated.map((p) => p.y));
+  const maxY = Math.max(...rotated.map((p) => p.y));
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (width <= 0 || height <= 0) return null;
+
+  const cxPrime = (maxX + minX) / 2;
+  const cyPrime = (maxY + minY) / 2;
+
+  const centerX = cxPrime * cosAngle - cyPrime * sinAngle + meanX;
+  const centerY = cxPrime * sinAngle + cyPrime * cosAngle + meanY;
+
+  const centerLat = centerY / metersPerLat + latMean;
+  const centerLng = centerX / metersPerLng + lngMean;
+
+  const halfLat = (height / metersPerLat) / 2;
+  const halfLng = (width / metersPerLng) / 2;
+
+  const bounds: [[number, number], [number, number]] = [
+    [centerLat - halfLat, centerLng - halfLng],
+    [centerLat + halfLat, centerLng + halfLng],
+  ];
+
+  const rotationDeg = (angle * 180) / Math.PI;
+
+  return { bounds, rotationDeg };
+};
+
+export default function MapeoLotes({
+  proyectoId,
+  planosUrl,
+  proyectoNombre,
+  initialBounds,
+  initialRotation,
+  initialPolygon,
+  lotes = [],
+  ubigeo,
+}: MapeoLotesProps) {
+  const [planUrl, setPlanUrl] = useState<string | null>(planosUrl);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const [projectPolygon, setProjectPolygon] = useState<LatLngLiteral[]>(initialPolygon ?? []);
+  const [projectPolygonDirty, setProjectPolygonDirty] = useState(false);
+  const [drawingProject, setDrawingProject] = useState(false);
+  const [manualPolygonOpen, setManualPolygonOpen] = useState(false);
+  const [manualPolygonValue, setManualPolygonValue] = useState(polygonToTextarea(initialPolygon ?? []));
+
+  const [overlayBounds, setOverlayBounds] = useState<[[number, number], [number, number]] | undefined>(
+    initialBounds ?? undefined
+  );
+  const [overlayRotation, setOverlayRotation] = useState<number>(initialRotation ?? 0);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.7);
+  const [overlayEditable, setOverlayEditable] = useState(false);
+  const [overlayDirty, setOverlayDirty] = useState(false);
+
+  const [lotesState, setLotesState] = useState<LoteState[]>(lotes);
+  const [centerOverride, setCenterOverride] = useState<[number, number] | null>(null);
+  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
+  const [loteDrawing, setLoteDrawing] = useState(false);
+  const [savingLotePolygon, setSavingLotePolygon] = useState(false);
+  const [mapFullScreen, setMapFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (!overlayBounds && typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(`mapeo:${proyectoId}:overlay`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as {
+            bounds?: [[number, number], [number, number]];
+            rotation?: number;
+          };
+          if (parsed.bounds && parsed.bounds.length === 2) {
+            setOverlayBounds(parsed.bounds);
+          }
+          if (typeof parsed.rotation === 'number') {
+            setOverlayRotation(parsed.rotation);
+          }
+        } catch (error) {
+          console.warn('No se pudo restaurar overlay desde storage local:', error);
+        }
+      }
+    }
+  }, [overlayBounds, proyectoId]);
+
+  useEffect(() => {
+    if (overlayBounds && typeof window !== 'undefined') {
+      const payload = JSON.stringify({ bounds: overlayBounds, rotation: overlayRotation });
+      window.localStorage.setItem(`mapeo:${proyectoId}:overlay`, payload);
+    }
+  }, [overlayBounds, overlayRotation, proyectoId]);
+
+  useEffect(() => {
+    if (!planUrl && typeof window !== 'undefined') {
+      const storedPlan = window.localStorage.getItem(`mapeo:${proyectoId}:plan-url`);
+      if (storedPlan) {
+        setPlanUrl(storedPlan);
+      }
+    }
+  }, [planUrl, proyectoId]);
+
+  useEffect(() => {
+    if (!planUrl || typeof window === 'undefined') return;
+    window.localStorage.setItem(`mapeo:${proyectoId}:plan-url`, planUrl);
+  }, [planUrl, proyectoId]);
+
+  useEffect(() => {
+    setPlanUrl(planosUrl);
+  }, [planosUrl]);
+
   useEffect(() => {
     setLotesState(lotes);
   }, [lotes]);
 
-  // Obtener coordenadas del ubigeo del proyecto
   useEffect(() => {
-    if (ubigeo && ubigeo.distrito) {
-      obtenerCoordenadasUbicacion(
-        ubigeo.departamento,
-        ubigeo.provincia,
-        ubigeo.distrito
-      ).then(coords => {
+    if (initialPolygon && initialPolygon.length >= 3) {
+      setProjectPolygon(initialPolygon);
+      setProjectPolygonDirty(false);
+      setManualPolygonValue(polygonToTextarea(initialPolygon));
+    }
+  }, [initialPolygon]);
+
+  useEffect(() => {
+    if (initialBounds) {
+      setOverlayBounds(initialBounds);
+      setOverlayDirty(false);
+    }
+  }, [initialBounds]);
+
+  useEffect(() => {
+    if (typeof initialRotation === 'number') {
+      setOverlayRotation(initialRotation);
+      setOverlayDirty(false);
+    }
+  }, [initialRotation]);
+
+  useEffect(() => {
+    if (manualPolygonOpen) return;
+    setManualPolygonValue(polygonToTextarea(projectPolygon));
+  }, [projectPolygon, manualPolygonOpen]);
+
+  useEffect(() => {
+    if (!ubigeo || !ubigeo.departamento || !ubigeo.provincia || !ubigeo.distrito) return;
+    obtenerCoordenadasUbicacion(ubigeo.departamento, ubigeo.provincia, ubigeo.distrito)
+      .then((coords) => {
         if (coords) {
-          setCoordenadasUbigeo(coords);
-          console.log(`📍 Coordenadas del distrito ${ubigeo.distrito}:`, coords);
+          setCenterOverride([coords.lat, coords.lng]);
         }
-      }).catch(error => {
+      })
+      .catch((error) => {
         console.error('Error obteniendo coordenadas del ubigeo:', error);
       });
-    }
   }, [ubigeo]);
 
-  // Exponer funciones globales para los info windows
   useEffect(() => {
-    (window as any).cambiarEstadoLote = async (loteId: string, nuevoEstado: string) => {
-      try {
-        const fd = new FormData();
-        fd.append('estado', nuevoEstado);
-        fd.append('proyecto_id', proyectoId);
-        
-        await actualizarLote(loteId, fd as any);
-        
-        // Actualizar estado local
-        setLotesState(prev => 
-          prev.map(lote => 
-            lote.id === loteId 
-              ? { ...lote, estado: nuevoEstado }
-              : lote
-          )
-        );
-        
-        toast.success(`Estado del lote actualizado a ${nuevoEstado}`);
-      } catch (error) {
-        toast.error('Error actualizando estado del lote');
-        console.error('Error:', error);
-      }
-    };
-
-    (window as any).removerUbicacionLote = async (loteId: string) => {
-      try {
-        const lote = lotesState.find(l => l.id === loteId);
-        if (!lote) return;
-
-        const dataExistente = lote.data ? 
-          (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-        
-        // Remover la ubicación del plano
-        const { plano_point, ubicacion_plano, ...dataSinUbicacion } = dataExistente;
-        
-        const fd = new FormData();
-        fd.append('data', JSON.stringify(dataSinUbicacion));
-        fd.append('proyecto_id', proyectoId);
-        
-        await actualizarLote(loteId, fd as any);
-        
-        // Actualizar estado local
-        setLotesState(prev => 
-          prev.map(l => 
-            l.id === loteId 
-              ? { ...l, data: dataSinUbicacion }
-              : l
-          )
-        );
-        
-        toast.success('Ubicación del lote removida');
-      } catch (error) {
-        toast.error('Error removiendo ubicación del lote');
-        console.error('Error:', error);
-      }
-    };
-
-    (window as any).editarLoteInfo = (loteId: string) => {
-      const lote = lotesState.find(l => l.id === loteId);
-      if (lote) {
-        toast.info(`Editando información del lote ${lote.codigo}`);
-        // Aquí puedes agregar lógica para abrir un modal de edición
-      }
-    };
-  }, [lotesState, proyectoId]);
-
-  // Función para actualizar el estado de un lote específico
-  const updateLoteState = (loteId: string, newEstado: string) => {
-    setLotesState(prevLotes => 
-      prevLotes.map(lote => 
-        lote.id === loteId 
-          ? { ...lote, estado: newEstado }
-          : lote
-      )
-    );
-  };
-
-  // Exponer la función para que pueda ser llamada desde otros componentes
-  useEffect(() => {
-    (window as any).updateLoteState = updateLoteState;
+    if (!mapFullScreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
-      delete (window as any).updateLoteState;
+      document.body.style.overflow = previousOverflow;
     };
-  }, []);
+  }, [mapFullScreen]);
 
-  // Snap de rotación a ángulos cardinales si está cerca del umbral
-  const snapAngle = (deg: number) => {
-    const targets = [ -180, -90, 0, 90, 180 ];
-    const threshold = 5; // grados
-    for (const t of targets) {
-      if (Math.abs(deg - t) <= threshold) return t;
+  useEffect(() => {
+    if (!overlayBounds && projectPolygon.length >= 3) {
+      const bounds = getBoundsFromPolygon(projectPolygon);
+      if (bounds) setOverlayBounds(bounds);
     }
-    return deg;
-  };
+  }, [projectPolygon, overlayBounds]);
 
-  // Coordenadas de Lima, Perú como centro por defecto
-  const defaultCenter: [number, number] = [-12.0464, -77.0428];
-  const defaultZoom = 15; // Aumentado de 13 a 15 para más zoom
+  const stats = useMemo(() => {
+    const disponibles = lotesState.filter((l) => l.estado === 'disponible').length;
+    const reservados = lotesState.filter((l) => l.estado === 'reservado').length;
+    const vendidos = lotesState.filter((l) => l.estado === 'vendido').length;
+    const conPlano = lotesState.filter((l) => obtenerPoligonoLote(l)).length;
+    return {
+      total: lotesState.length,
+      disponibles,
+      reservados,
+      vendidos,
+      conPlano,
+    };
+  }, [lotesState]);
 
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
+  const lotesSinPoligono = useMemo(
+    () => lotesState.filter((lote) => !obtenerPoligonoLote(lote)),
+    [lotesState]
+  );
 
-    // Validar tipo de archivo
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Formato no válido. Use JPG, PNG o WEBP');
-      return;
+  const lotesConPoligono = useMemo(
+    () => lotesState.filter((lote) => obtenerPoligonoLote(lote)),
+    [lotesState]
+  );
+
+  const selectedLote = useMemo(
+    () => lotesState.find((lote) => lote.id === selectedLoteId) ?? null,
+    [lotesState, selectedLoteId]
+  );
+
+  const selectedLoteData = useMemo<Record<string, unknown> | null>(() => {
+    if (!selectedLote?.data) return null;
+    if (typeof selectedLote.data === 'string') {
+      try {
+        return JSON.parse(selectedLote.data);
+      } catch (error) {
+        console.warn('No se pudo parsear la data del lote seleccionado', error);
+        return null;
+      }
     }
-
-    // Validar tamaño (5MB máximo)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      toast.error('El archivo es muy grande. Máximo 5MB');
-      return;
+    if (typeof selectedLote.data === 'object') {
+      return selectedLote.data as Record<string, unknown>;
     }
+    return null;
+  }, [selectedLote]);
 
+  const selectedLoteSup = useMemo(() => {
+    const sup = selectedLoteData && (selectedLoteData as { sup_m2?: unknown }).sup_m2;
+    return typeof sup === 'number' ? sup : null;
+  }, [selectedLoteData]);
+
+  const mapCenter = useMemo(() => {
+    if (centerOverride) return centerOverride;
+    if (overlayBounds) {
+      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+      return [
+        (swLat + neLat) / 2,
+        (swLng + neLng) / 2,
+      ] as [number, number];
+    }
+    if (projectPolygon.length >= 3) {
+      const centroid = getCentroidFromPolygon(projectPolygon);
+      if (centroid) return centroid;
+    }
+    return DEFAULT_CENTER;
+  }, [centerOverride, overlayBounds, projectPolygon]);
+
+  const mapZoom = useMemo(() => {
+    if (centerOverride) return 15;
+    if (overlayBounds) {
+      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+      const latDiff = Math.abs(neLat - swLat);
+      const lngDiff = Math.abs(neLng - swLng);
+      const span = Math.max(latDiff, lngDiff);
+      if (span > 0.08) return 14;
+      if (span > 0.05) return 15;
+      if (span > 0.02) return 16;
+      if (span > 0.01) return 17;
+      return 18;
+    }
+    if (projectPolygon.length >= 3) return 17;
+    return DEFAULT_ZOOM;
+  }, [centerOverride, overlayBounds, projectPolygon]);
+
+  const handleUploadPlano = async (file: File) => {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('planos', file);
 
     try {
-      const res = await subirPlanos(proyectoId, formData) as unknown as { success: boolean; url?: string };
-      if (res && (res as any).url) {
-        setPlanUrl((res as any).url);
+      const response = (await subirPlanos(proyectoId, formData)) as unknown as { success: boolean; url?: string };
+      if (response?.url) {
+        setPlanUrl(response.url);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`mapeo:${proyectoId}:plan-url`, response.url);
+        }
+        toast.success('Plano subido correctamente');
       }
-      toast.success('Plano subido correctamente');
-      // Si ya hay bounds marcados, se mostrará sobre esa zona automáticamente
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error subiendo plano');
     } finally {
@@ -211,192 +486,166 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
   };
 
   const handleDeletePlano = async () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar el plano?')) return;
-
+    if (!planUrl) return;
+    if (!confirm('¿Seguro que deseas eliminar el plano?')) return;
     try {
       await eliminarPlanos(proyectoId);
+      setPlanUrl(null);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(`mapeo:${proyectoId}:plan-url`);
+      }
       toast.success('Plano eliminado correctamente');
-      window.location.reload();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error eliminando plano');
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el plano');
     }
   };
 
-  const handleMapClick = (lat: number, lng: number) => {
-    const nuevaCoordenada: Coordenada = {
-      id: Date.now().toString(),
-      lat,
-      lng,
-      nombre: `Lote ${coordenadas.length + 1}`
-    };
-    
-    setCoordenadas(prev => [...prev, nuevaCoordenada]);
-    toast.success(`Coordenada agregada: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+  const handleProjectPolygonChange = (vertices: LatLngLiteral[]) => {
+    setProjectPolygon(vertices);
+    setProjectPolygonDirty(true);
   };
 
-  const eliminarCoordenada = (id: string) => {
-    setCoordenadas(prev => prev.filter(coord => coord.id !== id));
-    toast.success('Coordenada eliminada');
+  const handleManualPolygonApply = () => {
+    try {
+      const parsed = parsePolygonFromText(manualPolygonValue);
+      setProjectPolygon(parsed);
+      setProjectPolygonDirty(true);
+      toast.success(`Polígono actualizado con ${parsed.length} vértices`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Formato de coordenadas inválido');
+    }
   };
 
-  const guardarCoordenadas = async () => {
-    if (coordenadas.length === 0) {
-      toast.error('No hay coordenadas para guardar');
+  const handleSaveProjectPolygon = async () => {
+    if (projectPolygon.length < 3) {
+      toast.error('Dibuja el perímetro antes de guardarlo');
       return;
     }
-
     try {
-      const coordenadasParaGuardar = coordenadas.map(coord => ({
-        loteId: coord.id,
-        lat: coord.lat,
-        lng: coord.lng,
-        nombre: coord.nombre
-      }));
-
-      await guardarCoordenadasMultiples(proyectoId, coordenadasParaGuardar);
-      toast.success(`${coordenadas.length} coordenadas guardadas correctamente`);
+      await guardarPoligonoProyecto(proyectoId, projectPolygon);
+      toast.success('Perímetro del proyecto guardado');
+      setProjectPolygonDirty(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error guardando coordenadas');
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el perímetro');
     }
   };
 
-  const guardarBounds = async () => {
+  const handleRemoveProjectPolygon = async () => {
+    if (!projectPolygon.length) return;
+    if (!confirm('Esto eliminará el perímetro actual. ¿Deseas continuar?')) return;
+    try {
+      await eliminarPoligonoProyecto(proyectoId);
+      setProjectPolygon([]);
+      setProjectPolygonDirty(false);
+      toast.success('Perímetro eliminado');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el perímetro');
+    }
+  };
+
+  const handleOverlayBoundsChange = (bounds: [[number, number], [number, number]]) => {
+    setOverlayBounds(bounds);
+    setOverlayDirty(true);
+  };
+
+  const handleApplyPolygonBoundsToOverlay = () => {
+    const bounds = getBoundsFromPolygon(projectPolygon);
+    if (!bounds) {
+      toast.error('Primero define el perímetro del proyecto');
+      return;
+    }
+    const oriented = computeOverlayFromPolygon(projectPolygon);
+    if (oriented) {
+      setOverlayBounds(oriented.bounds);
+      setOverlayRotation(snapAngle(oriented.rotationDeg));
+    } else {
+      setOverlayBounds(bounds);
+    }
+    setOverlayDirty(true);
+    toast.success('El plano se ajustó al perímetro dibujado');
+  };
+
+  const handleSaveOverlay = async () => {
     if (!overlayBounds) {
       toast.error('Ajusta las esquinas del plano antes de guardar');
       return;
     }
     try {
-      await guardarOverlayBounds(proyectoId, overlayBounds, rotation);
-      toast.success('Calibración del plano guardada');
-      setCalibrating(false);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error guardando calibración');
+      await guardarOverlayBounds(proyectoId, overlayBounds, Math.round(overlayRotation));
+      toast.success('Ajuste del plano guardado');
+      setOverlayDirty(false);
+      setOverlayEditable(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el ajuste del plano');
     }
   };
 
-  const onMapClickCoord = (lat: number, lng: number) => {
-    // Si estamos marcando zona para el plano, usar los dos clics para fijar bounds
-    if (calibrating && placing) {
-      if (!firstCorner) {
-        setFirstCorner([lat, lng]);
-        toast.success('Esquina 1 fijada. Haz clic para fijar esquina 2');
-      } else {
-        const swLat = Math.min(firstCorner[0], lat);
-        const swLng = Math.min(firstCorner[1], lng);
-        const neLat = Math.max(firstCorner[0], lat);
-        const neLng = Math.max(firstCorner[1], lng);
-        const bounds: [[number, number], [number, number]] = [[swLat, swLng], [neLat, neLng]];
-        setOverlayBounds(bounds);
-        setFirstCorner(null);
-        setPlacing(false);
-        toast.success('Zona del plano establecida. Puedes guardar la calibración');
-      }
+  const handleStartLoteDrawing = () => {
+    if (!selectedLoteId) {
+      toast.error('Selecciona un lote para dibujar');
       return;
     }
-    
-    // Si estamos asignando un pin a un lote seleccionado
-    if (selectedLoteId) {
-      const loteSeleccionado = lotesState.find(l => l.id === selectedLoteId);
-      if (!loteSeleccionado) {
-        toast.error('Lote no encontrado');
-        return;
-      }
+    if (!planUrl) {
+      toast.error('Sube el plano del proyecto antes de ubicar lotes');
+      return;
+    }
+    setLoteDrawing(true);
+    toast.info('Modo dibujo activo', {
+      description: 'Haz clic en el plano para marcar los vértices del lote',
+    });
+  };
 
-      console.log('Lote seleccionado:', loteSeleccionado);
-      console.log('Coordenadas del clic:', { lat, lng });
+  const handleLotePolygonComplete = async (vertices: [number, number][]) => {
+    if (!selectedLoteId) {
+      toast.error('Selecciona un lote antes de dibujar');
+      return;
+    }
+    if (vertices.length < 3) {
+      toast.error('Se necesitan al menos 3 puntos para un lote');
+      return;
+    }
 
-      // Mostrar confirmación antes de guardar
-      const confirmar = confirm(
-        `¿Ubicar el lote ${loteSeleccionado.codigo} en las coordenadas ${lat.toFixed(6)}, ${lng.toFixed(6)}?`
+    setSavingLotePolygon(true);
+    try {
+      await guardarPoligonoLote(selectedLoteId, proyectoId, vertices);
+      setLotesState((prev) =>
+        prev.map((lote) =>
+          lote.id === selectedLoteId ? { ...lote, plano_poligono: vertices } : lote
+        )
       );
-      
-      if (confirmar) {
-        // Crear FormData con los datos del lote
-        const fd = new FormData();
-        
-        // Obtener datos existentes del lote
-        const dataExistente = loteSeleccionado.data ? 
-          (typeof loteSeleccionado.data === 'string' ? 
-            JSON.parse(loteSeleccionado.data) : 
-            loteSeleccionado.data) : {};
-        
-        console.log('Datos existentes del lote:', dataExistente);
-        
-        // Agregar la nueva ubicación en el plano
-        const nuevaData = {
-          ...dataExistente,
-          plano_point: [lat, lng],
-          ubicacion_plano: {
-            lat: lat,
-            lng: lng,
-            fecha_ubicacion: new Date().toISOString()
-          }
-        };
-        
-        console.log('Nueva data a guardar:', nuevaData);
-        
-        fd.append('data', JSON.stringify(nuevaData));
-        fd.append('proyecto_id', proyectoId);
-        
-        actualizarLote(selectedLoteId, fd as any)
-          .then(() => {
-            console.log('Lote actualizado exitosamente');
-            toast.success(`Lote ${loteSeleccionado.codigo} ubicado exitosamente en el plano`);
-            setSelectedLoteId(null); // Deseleccionar el lote
-            // Forzar recarga de la página para mostrar el pin
-            window.location.reload();
-          })
-          .catch((error) => {
-            console.error('Error actualizando lote:', error);
-            toast.error(`Error ubicando el lote: ${error.message || 'Error desconocido'}`);
-          });
-      }
-      return;
+      toast.success('Geometría del lote guardada');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la geometría del lote');
+    } finally {
+      setSavingLotePolygon(false);
+      setLoteDrawing(false);
     }
-    
-    // Si hay un plano activo, no permitir agregar coordenadas generales
-    if (planUrl) {
-      toast.info('Para ubicar lotes en el plano, selecciona un lote específico primero');
-      return;
-    }
-    
-    // Comportamiento normal: agregar coordenadas de lotes (solo si no hay plano)
-    handleMapClick(lat, lng);
   };
 
-  // Helpers de bounds
-  const getCenterFromBounds = (b: [[number, number],[number, number]]) => {
-    const lat = (b[0][0] + b[1][0]) / 2;
-    const lng = (b[0][1] + b[1][1]) / 2;
-    return [lat, lng] as [number, number];
-  };
-  const scaleBounds = (b: [[number, number],[number, number]], factor: number) => {
-    const [clat, clng] = getCenterFromBounds(b);
-    const halfLat = (b[1][0] - b[0][0]) / 2 * factor;
-    const halfLng = (b[1][1] - b[0][1]) / 2 * factor;
-    const sw: [number, number] = [clat - halfLat, clng - halfLng];
-    const ne: [number, number] = [clat + halfLat, clng + halfLng];
-    return [sw, ne] as [[number, number],[number, number]];
-  };
-  const onBoundsChangeWithAspect = (b: [[number, number],[number, number]]) => {
-    if (!keepAspect || !overlayBounds) { setOverlayBounds(b); return; }
-    const prev = overlayBounds;
-    const swPrev = prev[0];
-    const nePrev = prev[1];
-    const sw = [...b[0]] as [number, number];
-    const ne = [...b[1]] as [number, number];
-    const prevLatSpan = Math.max(1e-9, nePrev[0] - swPrev[0]);
-    const prevLngSpan = Math.max(1e-9, nePrev[1] - swPrev[1]);
-    const ratio = prevLatSpan / prevLngSpan;
-    const movedNE = Math.abs(ne[0]-nePrev[0]) + Math.abs(ne[1]-nePrev[1]) > Math.abs(sw[0]-swPrev[0]) + Math.abs(sw[1]-swPrev[1]);
-    const lngSpan = Math.max(1e-9, ne[1] - sw[1]);
-    const latSpan = ratio * lngSpan;
-    if (movedNE) {
-      ne[0] = sw[0] + latSpan;
-    } else {
-      sw[0] = ne[0] - latSpan;
+  const handleRemoveLotePolygon = async (loteId: string) => {
+    if (!confirm('¿Quitar la geometría asignada a este lote?')) return;
+    setSavingLotePolygon(true);
+    try {
+      await guardarPoligonoLote(loteId, proyectoId, []);
+      setLotesState((prev) =>
+        prev.map((lote) =>
+          lote.id === loteId ? { ...lote, plano_poligono: null } : lote
+        )
+      );
+      if (selectedLoteId === loteId) {
+        setSelectedLoteId(null);
+      }
+      toast.success('Se removió la geometría del lote');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo remover la geometría');
+    } finally {
+      setSavingLotePolygon(false);
+      setLoteDrawing(false);
     }
-    setOverlayBounds([sw, ne]);
+  };
+
+  const handleToggleFullMap = () => {
+    setMapFullScreen((prev) => !prev);
   };
 
   return (
@@ -404,670 +653,468 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Mapeo de Lotes - {proyectoNombre}
+            <Layers className="w-5 h-5" />
+            Estado general de lotes en {proyectoNombre}
           </CardTitle>
-          <div className="text-sm text-gray-600">
-            Sistema de localización y gestión de lotes en el proyecto
-          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Panel de estadísticas del proyecto */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {lotesState.filter(l => l.estado === 'disponible').length}
-              </div>
-              <div className="text-sm text-gray-600">Disponibles</div>
-              <div className="w-full bg-green-200 h-2 rounded-full mt-1">
-                <div 
-                  className="bg-green-600 h-2 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${(lotesState.filter(l => l.estado === 'disponible').length / Math.max(1, lotesState.length)) * 100}%` 
-                  }}
-                ></div>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+              <div className="text-2xl font-bold text-green-600">{stats.disponibles}</div>
+              <div className="text-sm text-green-800">Disponibles</div>
+            </div>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+              <div className="text-2xl font-bold text-yellow-600">{stats.reservados}</div>
+              <div className="text-sm text-yellow-800">Reservados</div>
+            </div>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+              <div className="text-2xl font-bold text-red-600">{stats.vendidos}</div>
+              <div className="text-sm text-red-800">Vendidos</div>
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <div className="text-2xl font-bold text-blue-600">{stats.conPlano}</div>
+              <div className="text-sm text-blue-800">Con geometría en plano</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wand2 className="w-5 h-5" />
+            Guía rápida de mapeo
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold">1</span>
+              <div>
+                <p className="font-medium text-gray-800">Dibuja el perímetro</p>
+                <p className="text-sm text-gray-600">Marca las esquinas del terreno y ajusta los vértices hasta que coincidan con la geografía real.</p>
               </div>
             </div>
-            
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {lotesState.filter(l => l.estado === 'reservado').length}
-              </div>
-              <div className="text-sm text-gray-600">Reservados</div>
-              <div className="w-full bg-yellow-200 h-2 rounded-full mt-1">
-                <div 
-                  className="bg-yellow-600 h-2 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${(lotesState.filter(l => l.estado === 'reservado').length / Math.max(1, lotesState.length)) * 100}%` 
-                  }}
-                ></div>
+            <div className="flex gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold">2</span>
+              <div>
+                <p className="font-medium text-gray-800">Calibra el plano</p>
+                <p className="text-sm text-gray-600">Apoya el plano en el perímetro, regula rotación, escala y opacidad y confirma el ajuste.</p>
               </div>
             </div>
-            
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {lotesState.filter(l => l.estado === 'vendido').length}
-              </div>
-              <div className="text-sm text-gray-600">Vendidos</div>
-              <div className="w-full bg-red-200 h-2 rounded-full mt-1">
-                <div 
-                  className="bg-red-600 h-2 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${(lotesState.filter(l => l.estado === 'vendido').length / Math.max(1, lotesState.length)) * 100}%` 
-                  }}
-                ></div>
-              </div>
-            </div>
-            
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {lotesState.filter(l => {
-                  const data = l.data ? (typeof l.data === 'string' ? JSON.parse(l.data) : l.data) : {};
-                  return data.plano_point;
-                }).length}
-              </div>
-              <div className="text-sm text-gray-600">Ubicados en Mapa</div>
-              <div className="w-full bg-blue-200 h-2 rounded-full mt-1">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${(lotesState.filter(l => {
-                      const data = l.data ? (typeof l.data === 'string' ? JSON.parse(l.data) : l.data) : {};
-                      return data.plano_point;
-                    }).length / Math.max(1, lotesState.length)) * 100}%` 
-                  }}
-                ></div>
+            <div className="flex gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold">3</span>
+              <div>
+                <p className="font-medium text-gray-800">Ubica los lotes</p>
+                <p className="text-sm text-gray-600">Selecciona cada lote, dibuja su contorno o coloca el pin y guarda para mantener el estado.</p>
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Carga de plano mejorada */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <Upload className="w-5 h-5 mr-2 text-blue-600" />
-                Cargar Plano del Proyecto
-              </h3>
-              
-              <BlueprintUploader
-                onFileSelect={handleFileUpload}
-                isUploading={isUploading}
-                currentFile={planUrl}
-                onDelete={handleDeletePlano}
-                maxSize={10}
-                acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Perímetro del proyecto
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant={drawingProject ? 'secondary' : 'outline'}
+              onClick={() => setDrawingProject((prev) => !prev)}
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              {drawingProject ? 'Cancelar dibujo' : 'Dibujar perímetro'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setManualPolygonOpen((prev) => !prev)}
+            >
+              <Ruler className="w-4 h-4 mr-2" />
+              {manualPolygonOpen ? 'Ocultar ingreso manual' : 'Ingresar coordenadas manualmente'}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveProjectPolygon}
+              disabled={!projectPolygonDirty || projectPolygon.length < 3}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Guardar perímetro
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleRemoveProjectPolygon}
+              disabled={!projectPolygon.length}
+              className="text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar perímetro
+            </Button>
+          </div>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+            1. Usa la búsqueda para encontrar el proyecto · 2. Presiona el botón Dibujar perímetro y marca los vértices · 3. Ajusta los puntos arrastrándolos · 4. Guarda el perímetro cuando estés conforme.
+          </div>
+
+          {manualPolygonOpen && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Coordenadas (lat,lng por línea)</label>
+              <textarea
+                className="w-full min-h-[140px] border rounded-lg px-3 py-2 text-sm font-mono"
+                value={manualPolygonValue}
+                onChange={(event) => setManualPolygonValue(event.target.value)}
+                placeholder={"-12.046400, -77.042800"}
               />
-            </div>
-
-            {/* Controles de calibración - Solo si hay plano */}
-            {planUrl && (
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-6">
-                <h4 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
-                  <MapPin className="w-5 h-5 mr-2" />
-                  Calibrar Posición del Plano
-                </h4>
-                
-                <div className="space-y-4">
-                  {/* Botones principales de calibración */}
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setCalibrating((v) => !v)}
-                      className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                        calibrating 
-                          ? 'bg-yellow-600 text-white shadow-lg transform scale-105' 
-                          : 'bg-yellow-500 text-white hover:bg-yellow-600 hover:shadow-md'
-                      }`}
-                    >
-                      {calibrating ? '🔄 Calibrando...' : '🎯 Iniciar Calibración'}
-                    </button>
-                    
-                    {calibrating && (
-                      <button
-                        type="button"
-                        onClick={() => { 
-                          setPlacing(true); 
-                          setFirstCorner(null); 
-                          toast.info('Haz dos clics en el mapa para definir el área del plano'); 
-                        }}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                      >
-                        📍 Marcar Área en Mapa
-                      </button>
-                    )}
-                    
-                    {calibrating && overlayBounds && (
-                      <button
-                        type="button"
-                        onClick={guardarBounds}
-                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                      >
-                        ✅ Guardar Calibración
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Controles de ajuste - Solo si está calibrando */}
-                  {calibrating && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white rounded-lg border border-yellow-200">
-                      {/* Control de rotación */}
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">
-                          🔄 Rotación del Plano
-                        </label>
-                        <div className="space-y-2">
-                          <input
-                            type="range"
-                            min={-180}
-                            max={180}
-                            step={1}
-                            value={rotation}
-                            onChange={(e) => setRotation(snapAngle(parseInt(e.target.value)))}
-                            onMouseUp={(e) => setRotation(snapAngle(parseInt((e.target as HTMLInputElement).value)))}
-                            onTouchEnd={(e) => setRotation(snapAngle(rotation))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <div className="flex items-center justify-between text-sm text-gray-600">
-                            <span>-180°</span>
-                            <span className="font-bold text-lg">{rotation}°</span>
-                            <span>180°</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <button 
-                              type="button" 
-                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
-                              onClick={() => setRotation(0)}
-                            >
-                              0°
-                            </button>
-                            <button 
-                              type="button" 
-                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
-                              onClick={() => setRotation(90)}
-                            >
-                              90°
-                            </button>
-                            <button 
-                              type="button" 
-                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
-                              onClick={() => setRotation(-90)}
-                            >
-                              -90°
-                            </button>
-                            <button 
-                              type="button" 
-                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
-                              onClick={() => setRotation(180)}
-                            >
-                              180°
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Control de escala */}
-                      {overlayBounds && (
-                        <div className="space-y-3">
-                          <label className="block text-sm font-medium text-gray-700">
-                            📏 Escala del Plano
-                          </label>
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <button 
-                                type="button" 
-                                className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded border text-sm font-medium"
-                                onClick={() => setOverlayBounds(scaleBounds(overlayBounds!, 0.95))}
-                              >
-                                🔍 Acercar
-                              </button>
-                              <button 
-                                type="button" 
-                                className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border text-sm font-medium"
-                                onClick={() => setOverlayBounds(scaleBounds(overlayBounds!, 1.05))}
-                              >
-                                🔍 Alejar
-                              </button>
-                            </div>
-                            <label className="flex items-center gap-2 text-sm text-gray-600">
-                              <input 
-                                type="checkbox" 
-                                checked={keepAspect} 
-                                onChange={(e) => setKeepAspect(e.target.checked)}
-                                className="rounded"
-                              />
-                              Mantener proporción original
-                            </label>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Instrucciones de calibración */}
-                  {calibrating && !overlayBounds && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-blue-600 font-bold text-sm">1</span>
-                        </div>
-                        <div>
-                          <h5 className="font-medium text-blue-800 mb-1">Paso 1: Marcar Área del Plano</h5>
-                          <p className="text-sm text-blue-700">
-                            Haz clic en "Marcar Área en Mapa" y luego haz dos clics en el mapa para definir 
-                            la zona donde se ubicará el plano (esquina superior izquierda y esquina inferior derecha).
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {calibrating && overlayBounds && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-green-600 font-bold text-sm">2</span>
-                        </div>
-                        <div>
-                          <h5 className="font-medium text-green-800 mb-1">Paso 2: Ajustar Posición</h5>
-                          <p className="text-sm text-green-700">
-                            Usa los controles de rotación y escala para ajustar la posición del plano. 
-                            Cuando esté correcto, haz clic en "Guardar Calibración".
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Selector de lotes para ubicar - Mejorado */}
-          {planUrl && overlayBounds && (
-            <div className="p-4 border rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                  <MapPin className="w-4 h-4 text-green-600" />
-                </div>
-                <h4 className="font-medium text-green-900">Ubicar Lotes en el Plano</h4>
-                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                  Paso 3 de 3
-                </span>
-              </div>
-              
-              {/* Grid de lotes sin ubicar */}
-              {lotesState.filter(lote => {
-                const data = lote.data ? (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-                return !data.plano_point;
-              }).length > 0 ? (
-                <div className="space-y-4">
-                  <div className="text-sm text-green-800 font-medium">
-                    Lotes pendientes de ubicar ({lotesState.filter(lote => {
-                      const data = lote.data ? (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-                      return !data.plano_point;
-                    }).length})
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {lotesState
-                      .filter(lote => {
-                        const data = lote.data ? (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-                        return !data.plano_point;
-                      })
-                      .map(lote => (
-                        <button
-                          key={lote.id}
-                          onClick={() => setSelectedLoteId(selectedLoteId === lote.id ? null : lote.id)}
-                          className={`p-3 rounded-lg border-2 transition-all duration-200 ${
-                            selectedLoteId === lote.id
-                              ? 'border-green-500 bg-green-100 shadow-lg transform scale-105'
-                              : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50'
-                          }`}
-                        >
-                          <div className="font-bold text-sm text-gray-800">{lote.codigo}</div>
-                          <div className={`text-xs px-2 py-1 rounded-full mt-1 ${
-                            lote.estado === 'disponible' ? 'bg-green-100 text-green-800' :
-                            lote.estado === 'reservado' ? 'bg-yellow-100 text-yellow-800' :
-                            lote.estado === 'vendido' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {lote.estado || 'sin estado'}
-                          </div>
-                        </button>
-                      ))
-                    }
-                  </div>
-                  
-                  {selectedLoteId && (
-                    <div className="bg-green-100 border border-green-300 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                          <MapPin className="w-3 h-3 text-white" />
-                        </div>
-                        <span className="font-medium text-green-800">
-                          Lote {lotesState.find(l => l.id === selectedLoteId)?.codigo} seleccionado
-                        </span>
-                      </div>
-                      <p className="text-sm text-green-700">
-                        🎯 Haz clic en el mapa donde quieres ubicar este lote. 
-                        Se creará un pin interactivo que puedes gestionar.
-                      </p>
-                      <button
-                        onClick={() => setSelectedLoteId(null)}
-                        className="mt-2 text-xs text-green-600 hover:text-green-800 underline"
-                      >
-                        Cancelar selección
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h3 className="font-medium text-green-800 mb-1">¡Todos los lotes ubicados!</h3>
-                  <p className="text-sm text-green-700">
-                    Todos los lotes han sido ubicados en el mapa correctamente.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Mensajes de ayuda por pasos */}
-          {!planUrl && (
-            <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
-                  <span className="text-yellow-600 font-bold text-sm">1</span>
-                </div>
-                <span className="font-medium text-yellow-800">Paso 1: Cargar Plano</span>
-              </div>
-              <p className="text-sm text-yellow-700 ml-8">
-                Carga el plano del proyecto para poder ubicar los lotes geográficamente.
-              </p>
-            </div>
-          )}
-          
-          {planUrl && !overlayBounds && (
-            <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-bold text-sm">2</span>
-                </div>
-                <span className="font-medium text-blue-800">Paso 2: Calibrar Plano</span>
-              </div>
-              <p className="text-sm text-blue-700 ml-8">
-                Calibra la posición del plano en el mapa para ubicar correctamente los lotes.
-              </p>
-            </div>
-          )}
-
-          {/* Vinculación de lotes a un punto en el plano - Original oculto temporalmente */}
-          <div className="p-4 border rounded-lg bg-blue-50 border-blue-200" style={{display: 'none'}}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <MapPin className="w-4 h-4 text-blue-600" />
-              </div>
-              <h4 className="font-medium text-blue-900">Vincular Lotes al Plano (Original)</h4>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <select
-                  value={selectedLoteId || ''}
-                  onChange={(e)=>setSelectedLoteId(e.target.value || null)}
-                  className="px-3 py-2 border border-blue-300 rounded-lg bg-white text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Seleccionar lote para ubicar</option>
-                  {lotesState.map(l => (
-                    <option key={l.id} value={l.id}>{l.codigo}</option>
-                  ))}
-                </select>
-                
-                {selectedLoteId && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-100 rounded-lg">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm text-blue-700 font-medium">
-                      Modo ubicación activo
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              {selectedLoteId && (
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Instrucciones:</strong> Haz clic en el plano donde quieres ubicar el lote <strong>{lotesState.find(l => l.id === selectedLoteId)?.codigo}</strong>. 
-                    Se colocará un pin en esa ubicación y se guardará automáticamente.
-                  </p>
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between pt-2 border-t border-blue-200">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-blue-700 font-medium">Opacidad del plano</label>
-                  <input 
-                    type="range" 
-                    min={0} 
-                    max={100} 
-                    value={overlayOpacity*100} 
-                    onChange={(e)=>setOverlayOpacity(parseInt(e.target.value)/100)} 
-                    className="w-20"
-                  />
-                  <span className="text-sm text-blue-600 w-10 text-right">{Math.round(overlayOpacity*100)}%</span>
-                </div>
-                
-                {selectedLoteId && (
-                  <button
-                    onClick={() => setSelectedLoteId(null)}
-                    className="px-3 py-1 text-xs text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
-                  >
-                    Cancelar ubicación
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Mapa */}
-          <div id="mapeo-lotes-container" className="h-96 border rounded-lg overflow-hidden">
-            <GoogleMap
-              defaultCenter={coordenadasUbigeo || defaultCenter}
-              defaultZoom={defaultZoom}
-              coordenadas={coordenadas}
-              onMapClick={onMapClickCoord}
-              planosUrl={planUrl}
-              overlayBounds={overlayBounds}
-              calibrating={calibrating}
-              onBoundsChange={onBoundsChangeWithAspect}
-              rotationDeg={rotation}
-              overlayOpacity={overlayOpacity}
-              lotesConUbicacion={lotesState}
-              onRotationChange={setRotation}
-              onScaleChange={(scale) => {
-                // La escala se maneja internamente en GoogleMap
-                console.log('Escala del plano:', scale);
-              }}
-              onOpacityChange={setOverlayOpacity}
-              onPanChange={(x, y) => {
-                // El pan se maneja internamente en GoogleMap
-                console.log('Posición del plano:', { x, y });
-              }}
-              onToggleFull={() => {
-                const el = document.fullscreenElement;
-                const container = document.querySelector('#mapeo-lotes-container') as HTMLElement | null;
-                if (!container) return;
-                if (el) {
-                  document.exitFullscreen().catch(()=>{});
-                } else {
-                  container.requestFullscreen().catch(()=>{});
-                }
-              }}
-            />
-          </div>
-
-          {/* Instrucciones */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-medium text-green-900 mb-2">📋 Instrucciones de Uso:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-green-800">
-              <div>
-                <h5 className="font-semibold mb-2">Para ubicar lotes en el plano:</h5>
-                <ul className="space-y-1">
-                  <li>• 1. Selecciona un lote del dropdown</li>
-                  <li>• 2. Haz clic en el plano donde quieres ubicarlo</li>
-                  <li>• 3. Confirma la ubicación</li>
-                  <li>• 4. El lote se guardará automáticamente</li>
-                </ul>
-              </div>
-              <div>
-                <h5 className="font-semibold mb-2">Para calibrar el plano:</h5>
-                <ul className="space-y-1">
-                  <li>• 1. Sube el plano del proyecto</li>
-                  <li>• 2. Haz clic en "Calibrar plano"</li>
-                  <li>• 3. Marca las dos esquinas del plano</li>
-                  <li>• 4. Ajusta rotación y escala</li>
-                  <li>• 5. Guarda la calibración</li>
-                </ul>
-              </div>
-            </div>
-            <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-700">
-              💡 <strong>Tip:</strong> Los lotes ubicados aparecen como pins de ubicación con colores según su estado:
-              <div className="flex items-center gap-4 mt-2">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span>Verde = Disponible</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span>Amarillo = Reservado</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span>Rojo = Vendido</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lotes ubicados en el plano */}
-          {lotesState.filter(lote => {
-            const data = lote.data ? 
-              (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-            return data.plano_point && Array.isArray(data.plano_point) && data.plano_point.length === 2;
-          }).length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor" style={{transform: 'rotate(45deg)'}}>
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                  </svg>
-                </div>
-                <h4 className="font-medium text-blue-900">
-                  Lotes ubicados en el plano ({lotesState.filter(lote => {
-                    const data = lote.data ? 
-                      (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-                    return data.plano_point && Array.isArray(data.plano_point) && data.plano_point.length === 2;
-                  }).length})
-                </h4>
-              </div>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {lotesState.filter(lote => {
-                  const data = lote.data ? 
-                    (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-                  return data.plano_point && Array.isArray(data.plano_point) && data.plano_point.length === 2;
-                }).map((lote) => {
-                  const data = lote.data ? 
-                    (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
-                  const [lat, lng] = data.plano_point;
-                  return (
-                    <div
-                      key={lote.id}
-                      className="flex items-center justify-between p-2 bg-blue-50 rounded text-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                          lote.estado === 'disponible' ? 'bg-gradient-to-br from-green-500 to-green-600' :
-                          lote.estado === 'reservado' ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' :
-                          lote.estado === 'vendido' ? 'bg-gradient-to-br from-red-500 to-red-600' :
-                          'bg-gradient-to-br from-gray-500 to-gray-600'
-                        }`}>
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor" style={{transform: 'rotate(45deg)'}}>
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                          </svg>
-                        </div>
-                        <span className="font-medium text-gray-900">
-                          Lote {lote.codigo}
-                        </span>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          lote.estado === 'disponible' ? 'bg-green-100 text-green-700' :
-                          lote.estado === 'reservado' ? 'bg-yellow-100 text-yellow-700' :
-                          lote.estado === 'vendido' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {lote.estado === 'disponible' ? 'Disponible' : 
-                           lote.estado === 'reservado' ? 'Reservado' : 
-                           lote.estado === 'vendido' ? 'Vendido' : 
-                           lote.estado || 'Desconocido'}
-                        </span>
-                        <span className="text-gray-600 text-xs">
-                          {lat.toFixed(4)}, {lng.toFixed(4)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-blue-600">
-                        {data.ubicacion_plano?.fecha_ubicacion ? 
-                          new Date(data.ubicacion_plano.fecha_ubicacion).toLocaleDateString() : 
-                          'Sin fecha'
-                        }
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Lista de coordenadas generales - solo si no hay plano */}
-          {!planUrl && coordenadas.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">Coordenadas generales ({coordenadas.length})</h4>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={handleManualPolygonApply}>
+                  Aplicar
+                </Button>
                 <Button
-                  onClick={guardarCoordenadas}
+                  type="button"
                   size="sm"
-                  className="bg-green-600 hover:bg-green-700"
+                  variant="ghost"
+                  onClick={() => {
+                    setManualPolygonOpen(false);
+                    setManualPolygonValue(polygonToTextarea(projectPolygon));
+                  }}
                 >
-                  <Save className="w-4 h-4 mr-1" />
-                  Guardar Coordenadas
+                  Cancelar
                 </Button>
               </div>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {coordenadas.map((coord) => (
-                  <div
-                    key={coord.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-gray-700">Vértices actuales ({projectPolygon.length})</h4>
+            <div className="max-h-40 overflow-y-auto border rounded-lg divide-y text-sm">
+              {projectPolygon.length === 0 && (
+                <div className="p-3 text-gray-500">Sin perímetro definido todavía</div>
+              )}
+              {projectPolygon.map((vertex, index) => (
+                <div key={`${vertex.lat}-${vertex.lng}-${index}`} className="p-3 flex justify-between text-gray-700">
+                  <span>V{index + 1}</span>
+                  <span className="font-mono">
+                    {vertex.lat.toFixed(6)}, {vertex.lng.toFixed(6)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5" />
+            Plano e integración con el mapa
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <BlueprintUploader
+            onFileSelect={handleUploadPlano}
+            isUploading={isUploading}
+            currentFile={planUrl}
+            onDelete={handleDeletePlano}
+            acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+            maxSize={10}
+          />
+
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" variant="outline" onClick={handleApplyPolygonBoundsToOverlay}>
+              <Wand2 className="w-4 h-4 mr-2" />
+              Ajustar plano al perímetro
+            </Button>
+            <Button
+              type="button"
+              variant={overlayEditable ? 'secondary' : 'outline'}
+              onClick={() => setOverlayEditable((prev) => !prev)}
+              disabled={!overlayBounds}
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              {overlayEditable ? 'Terminar ajuste manual' : 'Ajustar manualmente'}
+            </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSaveOverlay}
+                    disabled={!overlayDirty || !overlayBounds}
                   >
-                    <span>
-                      {coord.nombre}: {coord.lat.toFixed(6)}, {coord.lng.toFixed(6)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => eliminarCoordenada(coord.id)}
-                      className="text-red-600 hover:text-red-700 p-1"
+                    <Save className="w-4 h-4 mr-2" />
+                    Confirmar ajuste
+                  </Button>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs text-gray-600">Opacidad del plano</label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={overlayOpacity}
+                onChange={(event) => setOverlayOpacity(parseFloat(event.target.value))}
+                className="w-full"
+              />
+              <div className="text-xs text-gray-500">{Math.round(overlayOpacity * 100)}%</div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-gray-600">Rotación (°)</label>
+              <input
+                type="range"
+                min={-180}
+                max={180}
+                step={1}
+                value={overlayRotation}
+                onChange={(event) => {
+                  const value = parseFloat(event.target.value);
+                  setOverlayRotation(snapAngle(value));
+                  setOverlayDirty(true);
+                }}
+                className="w-full"
+              />
+              <div className="text-xs text-gray-500">{overlayRotation.toFixed(0)}°</div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-gray-600">Estado</label>
+              <div className={`text-xs font-medium ${overlayDirty ? 'text-orange-600' : 'text-green-600'}`}>
+                {overlayDirty ? 'Hay cambios sin guardar' : 'Cambios guardados'}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCcw className="w-5 h-5" />
+            Lotes dentro del plano
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800">Modo A · Dibujo manual</h4>
+                <p className="text-sm text-gray-600">
+                  Selecciona un lote de la lista, activa el modo dibujo y marca los vértices directamente sobre el plano.
+                  Finaliza con doble clic para guardar el polígono.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-700">Lotes pendientes</span>
+                  <span className="text-gray-500">{lotesSinPoligono.length}</span>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 max-h-44 overflow-y-auto">
+                  {lotesSinPoligono.length === 0 && (
+                    <div className="col-span-full text-sm text-gray-500 border border-dashed rounded-lg p-3 text-center">
+                      Todos los lotes tienen geometría asignada.
+                    </div>
+                  )}
+                  {lotesSinPoligono.map((lote) => (
+                    <button
+                      key={lote.id}
+                      onClick={() => setSelectedLoteId((current) => (current === lote.id ? null : lote.id))}
+                      className={`p-3 border rounded-lg text-sm text-left transition-all ${
+                        selectedLoteId === lote.id
+                          ? 'border-green-500 bg-green-50 shadow'
+                          : 'border-gray-200 hover:border-green-400 hover:bg-green-50'
+                      }`}
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <div className="font-semibold text-gray-800">{lote.codigo}</div>
+                      <div className="text-xs text-gray-500 capitalize">{lote.estado ?? 'sin estado'}</div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={handleStartLoteDrawing}
+                    disabled={!selectedLoteId || loteDrawing || savingLotePolygon}
+                  >
+                    {loteDrawing ? 'Haz clic en el plano…' : 'Dibujar lote seleccionado'}
+                  </Button>
+                  {loteDrawing && (
+                    <Button type="button" variant="ghost" onClick={() => setLoteDrawing(false)}>
+                      Cancelar dibujo
                     </Button>
+                  )}
+                </div>
+
+                {selectedLote && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-3 text-sm text-blue-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">Lote {selectedLote.codigo}</span>
+                      <span className="text-xs uppercase tracking-wide px-2 py-1 rounded-full bg-white text-blue-700 border border-blue-300">
+                        {selectedLote.estado ?? 'sin estado'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs text-blue-700">
+                      <div>
+                        <p className="font-semibold text-blue-800">Pin</p>
+                        <p>{selectedLote.ubicacion ? `${selectedLote.ubicacion.lat.toFixed(5)}, ${selectedLote.ubicacion.lng.toFixed(5)}` : 'Se calculará al guardar'}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-blue-800">Superficie</p>
+                        <p>{selectedLoteSup ? `${selectedLoteSup} m²` : 'Sin registrar'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs">Haz clic sobre el plano siguiendo el contorno del lote.</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLoteId(null)}
+                        className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {savingLotePolygon && (
+                  <div className="text-xs text-gray-500">Guardando geometría...</div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800">Lotes con geometría</h4>
+                <p className="text-sm text-gray-600">
+                  Puedes resaltar un lote en el mapa o quitar su polígono si necesitas volver a dibujarlo.
+                </p>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y">
+                {lotesConPoligono.length === 0 && (
+                  <div className="p-3 text-sm text-gray-500">Sin lotes asignados todavía.</div>
+                )}
+                {lotesConPoligono.map((lote) => (
+                  <div key={lote.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <div>
+                      <div className="font-semibold text-gray-800">{lote.codigo}</div>
+                      <div className="text-xs text-gray-500 capitalize">{lote.estado ?? 'sin estado'}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedLoteId(lote.id)}
+                      >
+                        Resaltar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleRemoveLotePolygon(lote.id)}
+                        disabled={savingLotePolygon}
+                      >
+                        Quitar
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              <div className="space-y-3 text-sm text-gray-600">
+                <div>
+                  <h4 className="font-semibold text-gray-800">Modo B · Grilla automática (próximamente)</h4>
+                  <p>
+                    Define un rectángulo, el número de filas/columnas y deja que el sistema genere todos los lotes de forma
+                    regular. Ideal para proyectos modulares.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-800">Modo C · Importación masiva (próximamente)</h4>
+                  <p>
+                    Carga un archivo GeoJSON o KML con las geometrías listas y las asignamos automáticamente a los lotes
+                    existentes.
+                  </p>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
+
+      <div
+        className={clsx(
+          'relative',
+          mapFullScreen && 'fixed inset-0 z-50 bg-white p-4 flex flex-col'
+        )}
+      >
+        {mapFullScreen && (
+          <button
+            type="button"
+            onClick={handleToggleFullMap}
+            className="absolute top-6 right-8 z-[1200] bg-black/60 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-black/80 transition-colors"
+          >
+            Cerrar mapa
+          </button>
+        )}
+        <Card
+          className={clsx(
+            'overflow-hidden',
+            mapFullScreen && 'flex-1 shadow-none border-none'
+          )}
+        >
+          <CardHeader className={mapFullScreen ? 'pb-2' : undefined}>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Mapa interactivo
+            </CardTitle>
+          </CardHeader>
+          <CardContent
+            className={clsx(
+              'p-0',
+              mapFullScreen ? 'flex-1' : undefined
+            )}
+          >
+            <div
+              className={clsx(
+                'h-[600px]',
+                mapFullScreen && 'h-full min-h-[calc(100vh-200px)]'
+              )}
+            >
+              <GoogleMap
+                defaultCenter={mapCenter}
+                defaultZoom={mapZoom}
+                planosUrl={planUrl}
+                overlayBounds={overlayBounds}
+                overlayOpacity={overlayOpacity}
+                rotationDeg={overlayRotation}
+                overlayEditable={overlayEditable}
+                onOverlayBoundsChange={handleOverlayBoundsChange}
+                projectPolygon={projectPolygon}
+                onProjectPolygonChange={handleProjectPolygonChange}
+                projectDrawingActive={drawingProject}
+                onProjectDrawingFinished={() => setDrawingProject(false)}
+                lotes={lotesState}
+                highlightLoteId={selectedLoteId}
+                loteDrawingActive={loteDrawing}
+                onLoteDrawingFinished={() => setLoteDrawing(false)}
+                onLotePolygonComplete={handleLotePolygonComplete}
+                fullScreenActive={mapFullScreen}
+                onToggleFull={handleToggleFullMap}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
