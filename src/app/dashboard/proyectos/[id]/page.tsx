@@ -5,6 +5,7 @@ import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
 import MapeoLotes from "./_MapeoLotes";
 import DeleteProjectButton from "./_DeleteProjectButton";
+import GoogleMapsDebug from "@/components/GoogleMapsDebug";
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -233,6 +234,9 @@ export default async function ProyLotesPage({
           </Link>
         </div>
       </div>
+      
+      {/* Debug component */}
+      <GoogleMapsDebug />
     </div>
   );
 }

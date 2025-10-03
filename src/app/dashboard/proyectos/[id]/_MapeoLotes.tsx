@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { subirPlanos, eliminarPlanos, guardarCoordenadasMultiples, obtenerCoordenadasProyecto, guardarOverlayBounds, actualizarLote } from './_actions';
 import { obtenerCoordenadasUbicacion } from '@/lib/geocoding';
 
-// (Leaflet se carga sólo en cliente dentro de LeafletMap)
+// Google Maps se carga dinámicamente en el cliente
 
 interface MapeoLotesProps {
   proyectoId: string;
@@ -32,7 +32,7 @@ interface Coordenada {
   nombre: string;
 }
 
-const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
+const GoogleMap = dynamic(() => import('./GoogleMap'), { ssr: false });
 
 export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, initialBounds, initialRotation, lotes = [], ubigeo }: MapeoLotesProps) {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
@@ -72,6 +72,74 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
       });
     }
   }, [ubigeo]);
+
+  // Exponer funciones globales para los info windows
+  useEffect(() => {
+    (window as any).cambiarEstadoLote = async (loteId: string, nuevoEstado: string) => {
+      try {
+        const fd = new FormData();
+        fd.append('estado', nuevoEstado);
+        fd.append('proyecto_id', proyectoId);
+        
+        await actualizarLote(loteId, fd as any);
+        
+        // Actualizar estado local
+        setLotesState(prev => 
+          prev.map(lote => 
+            lote.id === loteId 
+              ? { ...lote, estado: nuevoEstado }
+              : lote
+          )
+        );
+        
+        toast.success(`Estado del lote actualizado a ${nuevoEstado}`);
+      } catch (error) {
+        toast.error('Error actualizando estado del lote');
+        console.error('Error:', error);
+      }
+    };
+
+    (window as any).removerUbicacionLote = async (loteId: string) => {
+      try {
+        const lote = lotesState.find(l => l.id === loteId);
+        if (!lote) return;
+
+        const dataExistente = lote.data ? 
+          (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
+        
+        // Remover la ubicación del plano
+        const { plano_point, ubicacion_plano, ...dataSinUbicacion } = dataExistente;
+        
+        const fd = new FormData();
+        fd.append('data', JSON.stringify(dataSinUbicacion));
+        fd.append('proyecto_id', proyectoId);
+        
+        await actualizarLote(loteId, fd as any);
+        
+        // Actualizar estado local
+        setLotesState(prev => 
+          prev.map(l => 
+            l.id === loteId 
+              ? { ...l, data: dataSinUbicacion }
+              : l
+          )
+        );
+        
+        toast.success('Ubicación del lote removida');
+      } catch (error) {
+        toast.error('Error removiendo ubicación del lote');
+        console.error('Error:', error);
+      }
+    };
+
+    (window as any).editarLoteInfo = (loteId: string) => {
+      const lote = lotesState.find(l => l.id === loteId);
+      if (lote) {
+        toast.info(`Editando información del lote ${lote.codigo}`);
+        // Aquí puedes agregar lógica para abrir un modal de edición
+      }
+    };
+  }, [lotesState, proyectoId]);
 
   // Función para actualizar el estado de un lote específico
   const updateLoteState = (loteId: string, newEstado: string) => {
@@ -338,8 +406,80 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
             <MapPin className="w-5 h-5" />
             Mapeo de Lotes - {proyectoNombre}
           </CardTitle>
+          <div className="text-sm text-gray-600">
+            Sistema de localización y gestión de lotes en el proyecto
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Panel de estadísticas del proyecto */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {lotesState.filter(l => l.estado === 'disponible').length}
+              </div>
+              <div className="text-sm text-gray-600">Disponibles</div>
+              <div className="w-full bg-green-200 h-2 rounded-full mt-1">
+                <div 
+                  className="bg-green-600 h-2 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${(lotesState.filter(l => l.estado === 'disponible').length / Math.max(1, lotesState.length)) * 100}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {lotesState.filter(l => l.estado === 'reservado').length}
+              </div>
+              <div className="text-sm text-gray-600">Reservados</div>
+              <div className="w-full bg-yellow-200 h-2 rounded-full mt-1">
+                <div 
+                  className="bg-yellow-600 h-2 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${(lotesState.filter(l => l.estado === 'reservado').length / Math.max(1, lotesState.length)) * 100}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">
+                {lotesState.filter(l => l.estado === 'vendido').length}
+              </div>
+              <div className="text-sm text-gray-600">Vendidos</div>
+              <div className="w-full bg-red-200 h-2 rounded-full mt-1">
+                <div 
+                  className="bg-red-600 h-2 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${(lotesState.filter(l => l.estado === 'vendido').length / Math.max(1, lotesState.length)) * 100}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {lotesState.filter(l => {
+                  const data = l.data ? (typeof l.data === 'string' ? JSON.parse(l.data) : l.data) : {};
+                  return data.plano_point;
+                }).length}
+              </div>
+              <div className="text-sm text-gray-600">Ubicados en Mapa</div>
+              <div className="w-full bg-blue-200 h-2 rounded-full mt-1">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${(lotesState.filter(l => {
+                      const data = l.data ? (typeof l.data === 'string' ? JSON.parse(l.data) : l.data) : {};
+                      return data.plano_point;
+                    }).length / Math.max(1, lotesState.length)) * 100}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
           {/* Controles de subida/calibración de plano */}
           <div className="flex items-center gap-4 p-4 border rounded-lg">
             <div className="flex-1">
@@ -450,13 +590,137 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
             </div>
           </div>
 
-          {/* Vinculación de lotes a un punto en el plano */}
-          <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
+          {/* Selector de lotes para ubicar - Mejorado */}
+          {planUrl && overlayBounds && (
+            <div className="p-4 border rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                </div>
+                <h4 className="font-medium text-green-900">Ubicar Lotes en el Plano</h4>
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                  Paso 3 de 3
+                </span>
+              </div>
+              
+              {/* Grid de lotes sin ubicar */}
+              {lotesState.filter(lote => {
+                const data = lote.data ? (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
+                return !data.plano_point;
+              }).length > 0 ? (
+                <div className="space-y-4">
+                  <div className="text-sm text-green-800 font-medium">
+                    Lotes pendientes de ubicar ({lotesState.filter(lote => {
+                      const data = lote.data ? (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
+                      return !data.plano_point;
+                    }).length})
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {lotesState
+                      .filter(lote => {
+                        const data = lote.data ? (typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data) : {};
+                        return !data.plano_point;
+                      })
+                      .map(lote => (
+                        <button
+                          key={lote.id}
+                          onClick={() => setSelectedLoteId(selectedLoteId === lote.id ? null : lote.id)}
+                          className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                            selectedLoteId === lote.id
+                              ? 'border-green-500 bg-green-100 shadow-lg transform scale-105'
+                              : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50'
+                          }`}
+                        >
+                          <div className="font-bold text-sm text-gray-800">{lote.codigo}</div>
+                          <div className={`text-xs px-2 py-1 rounded-full mt-1 ${
+                            lote.estado === 'disponible' ? 'bg-green-100 text-green-800' :
+                            lote.estado === 'reservado' ? 'bg-yellow-100 text-yellow-800' :
+                            lote.estado === 'vendido' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {lote.estado || 'sin estado'}
+                          </div>
+                        </button>
+                      ))
+                    }
+                  </div>
+                  
+                  {selectedLoteId && (
+                    <div className="bg-green-100 border border-green-300 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                          <MapPin className="w-3 h-3 text-white" />
+                        </div>
+                        <span className="font-medium text-green-800">
+                          Lote {lotesState.find(l => l.id === selectedLoteId)?.codigo} seleccionado
+                        </span>
+                      </div>
+                      <p className="text-sm text-green-700">
+                        🎯 Haz clic en el mapa donde quieres ubicar este lote. 
+                        Se creará un pin interactivo que puedes gestionar.
+                      </p>
+                      <button
+                        onClick={() => setSelectedLoteId(null)}
+                        className="mt-2 text-xs text-green-600 hover:text-green-800 underline"
+                      >
+                        Cancelar selección
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="font-medium text-green-800 mb-1">¡Todos los lotes ubicados!</h3>
+                  <p className="text-sm text-green-700">
+                    Todos los lotes han sido ubicados en el mapa correctamente.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mensajes de ayuda por pasos */}
+          {!planUrl && (
+            <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <span className="text-yellow-600 font-bold text-sm">1</span>
+                </div>
+                <span className="font-medium text-yellow-800">Paso 1: Cargar Plano</span>
+              </div>
+              <p className="text-sm text-yellow-700 ml-8">
+                Carga el plano del proyecto para poder ubicar los lotes geográficamente.
+              </p>
+            </div>
+          )}
+          
+          {planUrl && !overlayBounds && (
+            <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">2</span>
+                </div>
+                <span className="font-medium text-blue-800">Paso 2: Calibrar Plano</span>
+              </div>
+              <p className="text-sm text-blue-700 ml-8">
+                Calibra la posición del plano en el mapa para ubicar correctamente los lotes.
+              </p>
+            </div>
+          )}
+
+          {/* Vinculación de lotes a un punto en el plano - Original oculto temporalmente */}
+          <div className="p-4 border rounded-lg bg-blue-50 border-blue-200" style={{display: 'none'}}>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                 <MapPin className="w-4 h-4 text-blue-600" />
               </div>
-              <h4 className="font-medium text-blue-900">Vincular Lotes al Plano</h4>
+              <h4 className="font-medium text-blue-900">Vincular Lotes al Plano (Original)</h4>
             </div>
             
             <div className="space-y-3">
@@ -519,7 +783,7 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
 
           {/* Mapa */}
           <div id="mapeo-lotes-container" className="h-96 border rounded-lg overflow-hidden">
-            <LeafletMap
+            <GoogleMap
               defaultCenter={coordenadasUbigeo || defaultCenter}
               defaultZoom={defaultZoom}
               coordenadas={coordenadas}
@@ -533,12 +797,12 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
               lotesConUbicacion={lotesState}
               onRotationChange={setRotation}
               onScaleChange={(scale) => {
-                // La escala se maneja internamente en LeafletMap
+                // La escala se maneja internamente en GoogleMap
                 console.log('Escala del plano:', scale);
               }}
               onOpacityChange={setOverlayOpacity}
               onPanChange={(x, y) => {
-                // El pan se maneja internamente en LeafletMap
+                // El pan se maneja internamente en GoogleMap
                 console.log('Posición del plano:', { x, y });
               }}
               onToggleFull={() => {
