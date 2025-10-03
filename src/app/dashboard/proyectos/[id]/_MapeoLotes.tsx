@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Upload, MapPin, Trash2, Save } from 'lucide-react';
+import BlueprintUploader from '@/components/BlueprintUploader';
 import { toast } from 'sonner';
 import { subirPlanos, eliminarPlanos, guardarCoordenadasMultiples, obtenerCoordenadasProyecto, guardarOverlayBounds, actualizarLote } from './_actions';
 import { obtenerCoordenadasUbicacion } from '@/lib/geocoding';
@@ -480,114 +481,205 @@ export default function MapeoLotes({ proyectoId, planosUrl, proyectoNombre, init
             </div>
           </div>
 
-          {/* Controles de subida/calibración de plano */}
-          <div className="flex items-center gap-4 p-4 border rounded-lg">
-            <div className="flex-1">
-              <h3 className="font-medium mb-2">Plano del Proyecto</h3>
-              {planUrl ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-green-600">✓ Plano cargado</span>
-                  <button
-                    type="button"
-                    onClick={() => setCalibrating((v) => !v)}
-                    className={`px-3 py-2 rounded-lg border ${calibrating ? 'bg-crm-primary text-white border-crm-primary' : 'text-crm-text-primary bg-crm-card hover:bg-crm-card-hover border-crm-border'}`}
-                  >
-                    {calibrating ? 'Calibrando…' : 'Calibrar plano'}
-                  </button>
-                  {calibrating && (
+          {/* Carga de plano mejorada */}
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <Upload className="w-5 h-5 mr-2 text-blue-600" />
+                Cargar Plano del Proyecto
+              </h3>
+              
+              <BlueprintUploader
+                onFileSelect={handleFileUpload}
+                isUploading={isUploading}
+                currentFile={planUrl}
+                onDelete={handleDeletePlano}
+                maxSize={10}
+                acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
+              />
+            </div>
+
+            {/* Controles de calibración - Solo si hay plano */}
+            {planUrl && (
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-6">
+                <h4 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
+                  <MapPin className="w-5 h-5 mr-2" />
+                  Calibrar Posición del Plano
+                </h4>
+                
+                <div className="space-y-4">
+                  {/* Botones principales de calibración */}
+                  <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => { setPlacing(true); setFirstCorner(null); toast('Haz dos clics en el mapa para ubicar el plano (esquina 1 y 2)'); }}
-                      className="px-3 py-2 rounded-lg border text-crm-text-primary bg-crm-card hover:bg-crm-card-hover border-crm-border"
+                      onClick={() => setCalibrating((v) => !v)}
+                      className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                        calibrating 
+                          ? 'bg-yellow-600 text-white shadow-lg transform scale-105' 
+                          : 'bg-yellow-500 text-white hover:bg-yellow-600 hover:shadow-md'
+                      }`}
                     >
-                      Marcar zona en mapa
+                      {calibrating ? '🔄 Calibrando...' : '🎯 Iniciar Calibración'}
                     </button>
-                  )}
+                    
+                    {calibrating && (
+                      <button
+                        type="button"
+                        onClick={() => { 
+                          setPlacing(true); 
+                          setFirstCorner(null); 
+                          toast.info('Haz dos clics en el mapa para definir el área del plano'); 
+                        }}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        📍 Marcar Área en Mapa
+                      </button>
+                    )}
+                    
+                    {calibrating && overlayBounds && (
+                      <button
+                        type="button"
+                        onClick={guardarBounds}
+                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      >
+                        ✅ Guardar Calibración
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Controles de ajuste - Solo si está calibrando */}
                   {calibrating && (
-                    <button
-                      type="button"
-                      onClick={guardarBounds}
-                      className="px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
-                    >
-                      Guardar calibración
-                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white rounded-lg border border-yellow-200">
+                      {/* Control de rotación */}
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          🔄 Rotación del Plano
+                        </label>
+                        <div className="space-y-2">
+                          <input
+                            type="range"
+                            min={-180}
+                            max={180}
+                            step={1}
+                            value={rotation}
+                            onChange={(e) => setRotation(snapAngle(parseInt(e.target.value)))}
+                            onMouseUp={(e) => setRotation(snapAngle(parseInt((e.target as HTMLInputElement).value)))}
+                            onTouchEnd={(e) => setRotation(snapAngle(rotation))}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <div className="flex items-center justify-between text-sm text-gray-600">
+                            <span>-180°</span>
+                            <span className="font-bold text-lg">{rotation}°</span>
+                            <span>180°</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              type="button" 
+                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
+                              onClick={() => setRotation(0)}
+                            >
+                              0°
+                            </button>
+                            <button 
+                              type="button" 
+                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
+                              onClick={() => setRotation(90)}
+                            >
+                              90°
+                            </button>
+                            <button 
+                              type="button" 
+                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
+                              onClick={() => setRotation(-90)}
+                            >
+                              -90°
+                            </button>
+                            <button 
+                              type="button" 
+                              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
+                              onClick={() => setRotation(180)}
+                            >
+                              180°
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Control de escala */}
+                      {overlayBounds && (
+                        <div className="space-y-3">
+                          <label className="block text-sm font-medium text-gray-700">
+                            📏 Escala del Plano
+                          </label>
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <button 
+                                type="button" 
+                                className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded border text-sm font-medium"
+                                onClick={() => setOverlayBounds(scaleBounds(overlayBounds!, 0.95))}
+                              >
+                                🔍 Acercar
+                              </button>
+                              <button 
+                                type="button" 
+                                className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border text-sm font-medium"
+                                onClick={() => setOverlayBounds(scaleBounds(overlayBounds!, 1.05))}
+                              >
+                                🔍 Alejar
+                              </button>
+                            </div>
+                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                              <input 
+                                type="checkbox" 
+                                checked={keepAspect} 
+                                onChange={(e) => setKeepAspect(e.target.checked)}
+                                className="rounded"
+                              />
+                              Mantener proporción original
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
-                  {calibrating && (
-                    <div className="flex items-center gap-2 ml-2">
-                      <label className="text-sm text-crm-text-muted">Rotación</label>
-                      <input
-                        type="range"
-                        min={-180}
-                        max={180}
-                        step={1}
-                        value={rotation}
-                        onChange={(e)=>setRotation(snapAngle(parseInt(e.target.value)))}
-                        onMouseUp={(e)=>setRotation(snapAngle(parseInt((e.target as HTMLInputElement).value)))}
-                        onTouchEnd={(e)=>setRotation(snapAngle(rotation))}
-                      />
-                      <span className="text-sm text-crm-text-primary w-12 text-right">{rotation}°</span>
-                      <div className="flex items-center gap-1">
-                        <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setRotation(0)}>0°</button>
-                        <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setRotation(90)}>90°</button>
-                        <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setRotation(-90)}>-90°</button>
+
+                  {/* Instrucciones de calibración */}
+                  {calibrating && !overlayBounds && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-blue-600 font-bold text-sm">1</span>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-blue-800 mb-1">Paso 1: Marcar Área del Plano</h5>
+                          <p className="text-sm text-blue-700">
+                            Haz clic en "Marcar Área en Mapa" y luego haz dos clics en el mapa para definir 
+                            la zona donde se ubicará el plano (esquina superior izquierda y esquina inferior derecha).
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
+
                   {calibrating && overlayBounds && (
-                    <div className="flex items-center gap-2 ml-2">
-                      <label className="text-sm text-crm-text-muted">Escala</label>
-                      <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setOverlayBounds(scaleBounds(overlayBounds!, 0.95))}>–</button>
-                      <button type="button" className="px-2 py-1 text-xs border border-crm-border rounded hover:bg-crm-card-hover" onClick={()=>setOverlayBounds(scaleBounds(overlayBounds!, 1.05))}>+</button>
-                      <label className="inline-flex items-center gap-1 text-sm ml-2">
-                        <input type="checkbox" checked={keepAspect} onChange={(e)=>setKeepAspect(e.target.checked)} />
-                        Mantener proporción
-                      </label>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 font-bold text-sm">2</span>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-green-800 mb-1">Paso 2: Ajustar Posición</h5>
+                          <p className="text-sm text-green-700">
+                            Usa los controles de rotación y escala para ajustar la posición del plano. 
+                            Cuando esté correcto, haz clic en "Guardar Calibración".
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDeletePlano}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Eliminar
-                  </Button>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file);
-                    }}
-                    className="hidden"
-                    id="plano-upload"
-                    disabled={isUploading}
-                  />
-                  <label
-                    htmlFor="plano-upload"
-                    className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg cursor-pointer hover:bg-crm-primary/90 disabled:opacity-50"
-                  >
-                    <Upload className="w-4 h-4" />
-                    {isUploading ? 'Subiendo...' : 'Subir Plano'}
-                  </label>
-                  <span className="text-sm text-gray-500">
-                    JPG, PNG, WEBP • Máx: 5MB
-                  </span>
-                  {/* Permitir marcar zona aun sin plano para seguir el flujo */}
-                  <button
-                    type="button"
-                    onClick={() => { setCalibrating(true); setPlacing(true); setFirstCorner(null); toast('Haz dos clics en el mapa para ubicar el plano (esquina 1 y 2)'); }}
-                    className="ml-2 px-3 py-2 rounded-lg border text-crm-text-primary bg-crm-card hover:bg-crm-card-hover border-crm-border"
-                  >
-                    Marcar zona primero
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Selector de lotes para ubicar - Mejorado */}
