@@ -59,6 +59,19 @@ export const getCachedClientes = cache(async (searchTerm?: string): Promise<Clie
   return (data ?? []) as ClienteCached[];
 });
 
+export const getCachedClientesTotal = cache(async (): Promise<number> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) return 0;
+
+  const { count, error } = await supabase
+    .from('cliente')
+    .select('*', { count: 'exact', head: true });
+
+  if (error) throw error;
+  return count ?? 0;
+});
+
 /* ========= Proyectos ========= */
 export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
   const supabase = await createOptimizedServerClient();

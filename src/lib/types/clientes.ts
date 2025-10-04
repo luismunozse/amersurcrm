@@ -4,7 +4,13 @@ export type TipoCliente = 'persona' | 'empresa';
 
 export type TipoDocumento = 'DNI' | 'PAS' | 'EXT' | 'RUC';
 
-export type EstadoCliente = 'por_contactar' | 'contactado' | 'transferido';
+export type EstadoCliente =
+  | 'por_contactar'
+  | 'contactado'
+  | 'transferido'
+  | 'intermedio'
+  | 'desestimado'
+  | 'potencial';
 
 export type OrigenLead = 
   | 'web' 
@@ -137,6 +143,9 @@ export const TIPOS_DOCUMENTO_OPTIONS = [
 export const ESTADOS_CLIENTE_OPTIONS = [
   { value: 'por_contactar', label: 'Por Contactar', color: 'blue' },
   { value: 'contactado', label: 'Contactado', color: 'yellow' },
+  { value: 'intermedio', label: 'Intermedio', color: 'cyan' },
+  { value: 'potencial', label: 'Potencial', color: 'purple' },
+  { value: 'desestimado', label: 'Desestimado', color: 'gray' },
   { value: 'transferido', label: 'Transferido', color: 'green' }
 ] as const;
 
@@ -191,6 +200,9 @@ export function getEstadoClienteColor(estado: EstadoCliente): string {
     case 'por_contactar': return 'blue';
     case 'contactado': return 'yellow';
     case 'transferido': return 'green';
+    case 'intermedio': return 'cyan';
+    case 'potencial': return 'purple';
+    case 'desestimado': return 'gray';
     default: return 'gray';
   }
 }
@@ -200,6 +212,9 @@ export function getEstadoClienteLabel(estado: EstadoCliente): string {
     case 'por_contactar': return 'Por Contactar';
     case 'contactado': return 'Contactado';
     case 'transferido': return 'Transferido';
+    case 'intermedio': return 'Intermedio';
+    case 'potencial': return 'Potencial';
+    case 'desestimado': return 'Desestimado';
     default: return estado;
   }
 }

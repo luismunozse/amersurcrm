@@ -351,7 +351,10 @@ export async function guardarPoligonoLote(
 
   const { error } = await supabase
     .from("lote")
-    .update({ plano_poligono: sanitized.length > 0 ? sanitized : null })
+    .update({
+      plano_poligono: sanitized.length > 0 ? sanitized : null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", loteId)
     .eq("proyecto_id", proyectoId);
 

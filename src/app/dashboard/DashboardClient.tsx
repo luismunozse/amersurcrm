@@ -3,13 +3,21 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
+import type { NotificacionNoLeida } from "@/types/crm";
+import type { ExchangeRate } from "@/lib/exchange";
 
 export default function DashboardClient({ 
   children, 
-  userEmail 
+  userEmail,
+  notifications = [],
+  notificationsCount = 0,
+  exchangeRates = [],
 }: { 
   children: React.ReactNode;
   userEmail?: string;
+  notifications?: NotificacionNoLeida[];
+  notificationsCount?: number;
+  exchangeRates?: ExchangeRate[];
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -31,7 +39,9 @@ export default function DashboardClient({
           onSidebarToggle={() => setOpen(true)} 
           userEmail={userEmail}
           sidebarCollapsed={collapsed}
-          onSidebarExpand={() => setCollapsed(false)}
+          notifications={notifications}
+          notificationsCount={notificationsCount}
+          exchangeRates={exchangeRates}
         />
         <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
       </div>

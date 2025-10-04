@@ -195,18 +195,27 @@ export default async function ProyLotesPage({
 
   const lotesForMapeo = (lotesConProyecto || []).map((lote) => {
     const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
-    const latValue = (lote as { coordenada_lat?: number | null }).coordenada_lat;
-    const lngValue = (lote as { coordenada_lng?: number | null }).coordenada_lng;
+    const planoPoligono = isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : undefined;
+
+    let ubicacion: { lat: number; lng: number } | null = null;
+    if (planoPoligono && planoPoligono.length > 0) {
+      const [sumLat, sumLng] = planoPoligono.reduce(
+        (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
+        [0, 0]
+      );
+      ubicacion = {
+        lat: sumLat / planoPoligono.length,
+        lng: sumLng / planoPoligono.length,
+      };
+    }
+
     return {
       id: lote.id,
       codigo: lote.codigo,
       estado: lote.estado,
       data: lote.data,
-      plano_poligono: isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : undefined,
-      ubicacion:
-        typeof latValue === 'number' && typeof lngValue === 'number'
-          ? { lat: latValue, lng: lngValue }
-          : null,
+      plano_poligono: planoPoligono,
+      ubicacion,
     };
   });
 

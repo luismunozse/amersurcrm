@@ -39,6 +39,9 @@ interface GoogleMapProps {
   onLotePolygonComplete?: (vertices: [number, number][]) => void;
   fullScreenActive?: boolean;
   onToggleFull?: () => void;
+  draggingLoteId?: string | null;
+  onPinDrop?: (loteId: string, lat: number, lng: number) => void;
+  onMarkerDragEnd?: (loteId: string, lat: number, lng: number) => void;
 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -77,6 +80,9 @@ export default function GoogleMap({
   onLotePolygonComplete,
   fullScreenActive = false,
   onToggleFull,
+  draggingLoteId = null,
+  onPinDrop,
+  onMarkerDragEnd,
 }: GoogleMapProps) {
   const [centerLat, centerLng] = defaultCenter;
   const mapRef = useRef<HTMLDivElement>(null);
@@ -90,12 +96,20 @@ export default function GoogleMap({
   const overlayListenersRef = useRef<google.maps.MapsEventListener[]>([]);
   const overlaySilentRef = useRef(false);
   const lotesMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const lotesMarkerListenersRef = useRef<Map<string, google.maps.MapsEventListener[]>>(new Map());
   const markerAnimationTimeoutsRef = useRef<Map<string, number>>(new Map());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const drawingContextRef = useRef<'project' | 'lote' | null>(null);
   const overlayFitRef = useRef(false);
   const polygonFitRef = useRef(false);
+  const dropOverlayRef = useRef<HTMLDivElement | null>(null);
+  const projectionOverlayRef = useRef<google.maps.OverlayView | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
+
+  useEffect(() => {
+    setIsDragActive(Boolean(draggingLoteId));
+  }, [draggingLoteId]);
 
   useEffect(() => () => {
     markerAnimationTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -178,6 +192,20 @@ export default function GoogleMap({
       mapInstanceRef.current = null;
     };
   }, [isLoaded, defaultCenter, defaultZoom]);
+
+  useEffect(() => {
+    if (!isLoaded || !mapInstanceRef.current) return;
+    const overlay = new google.maps.OverlayView();
+    overlay.onAdd = () => {};
+    overlay.draw = () => {};
+    overlay.onRemove = () => {};
+    overlay.setMap(mapInstanceRef.current);
+    projectionOverlayRef.current = overlay;
+    return () => {
+      overlay.setMap(null);
+      projectionOverlayRef.current = null;
+    };
+  }, [isLoaded]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -589,6 +617,11 @@ export default function GoogleMap({
         marker.setMap(null);
         lotesMarkersRef.current.delete(id);
       }
+      const listeners = lotesMarkerListenersRef.current.get(id);
+      if (listeners) {
+        listeners.forEach((listener) => listener.remove());
+        lotesMarkerListenersRef.current.delete(id);
+      }
       const timeoutId = markerAnimationTimeoutsRef.current.get(id);
       if (timeoutId) {
         window.clearTimeout(timeoutId);
@@ -668,6 +701,7 @@ export default function GoogleMap({
             color: '#ffffff',
             fontWeight: 'bold',
           },
+          draggable: true,
         });
         lotesMarkersRef.current.set(lote.id, marker);
       }
@@ -681,8 +715,22 @@ export default function GoogleMap({
           color: '#ffffff',
           fontWeight: 'bold',
         },
+        draggable: true,
         zIndex: highlightLoteId === lote.id ? 1000 : undefined,
       });
+
+      const existingListeners = lotesMarkerListenersRef.current.get(lote.id);
+      if (existingListeners) {
+        existingListeners.forEach((listener) => listener.remove());
+      }
+      const listeners: google.maps.MapsEventListener[] = [];
+      listeners.push(
+        marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+          if (!event.latLng) return;
+          onMarkerDragEnd?.(lote.id, event.latLng.lat(), event.latLng.lng());
+        })
+      );
+      lotesMarkerListenersRef.current.set(lote.id, listeners);
 
       if (highlightLoteId === lote.id) {
         marker.setAnimation(google.maps.Animation.BOUNCE);
@@ -705,7 +753,7 @@ export default function GoogleMap({
         removeMarker(id);
       }
     });
-  }, [lotes, highlightLoteId, isLoaded]);
+  }, [lotes, highlightLoteId, isLoaded, onMarkerDragEnd]);
 
   const loadingFallback = useMemo(
     () => (
@@ -719,6 +767,58 @@ export default function GoogleMap({
     []
   );
 
+  const hasDragData = useCallback((event: React.DragEvent) => {
+    if (draggingLoteId) return true;
+    const types = event.dataTransfer?.types;
+    return Boolean(types && (types.includes('application/x-lote-id') || types.includes('text/plain')));
+  }, [draggingLoteId]);
+
+  const handleMapDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!hasDragData(event)) return;
+    event.preventDefault();
+    setIsDragActive(true);
+  }, [hasDragData]);
+
+  const handleMapDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!hasDragData(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsDragActive(true);
+  }, [hasDragData]);
+
+  const handleMapDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+    setIsDragActive(false);
+  }, []);
+
+  const handleMapDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    const map = mapInstanceRef.current;
+    const projectionOverlay = projectionOverlayRef.current;
+    if (!map || !projectionOverlay) return;
+
+    const dataTransfer = event.dataTransfer;
+    const loteId = draggingLoteId || dataTransfer?.getData('application/x-lote-id') || dataTransfer?.getData('text/plain');
+    if (!loteId) {
+      setIsDragActive(false);
+      return;
+    }
+
+    event.preventDefault();
+    setIsDragActive(false);
+
+    const rect = dropOverlayRef.current?.getBoundingClientRect() ?? mapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+
+    const projection = projectionOverlay.getProjection();
+    if (!projection) return;
+    const latLng = projection.fromDivPixelToLatLng(new google.maps.Point(offsetX, offsetY));
+    if (!latLng) return;
+
+    onPinDrop?.(loteId, latLng.lat(), latLng.lng());
+  }, [draggingLoteId, onPinDrop]);
+
   const legendItems = useMemo(
     () => ['disponible', 'reservado', 'vendido'] as const,
     []
@@ -729,8 +829,27 @@ export default function GoogleMap({
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div
+      className="relative w-full h-full"
+      onDragEnter={handleMapDragEnter}
+      onDragOver={handleMapDragOver}
+      onDragLeave={handleMapDragLeave}
+      onDrop={handleMapDrop}
+    >
       <div ref={mapRef} className="w-full h-full" />
+
+      <div
+        ref={dropOverlayRef}
+        className="pointer-events-none absolute inset-0 z-[1100]"
+      >
+        {isDragActive && (
+          <div className="flex h-full w-full items-center justify-center bg-blue-500/10">
+            <div className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-blue-700 shadow">
+              Suelta aquí para ubicar el lote
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Barra de búsqueda */}
       <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 flex flex-col gap-2 w-72 z-[1000]">

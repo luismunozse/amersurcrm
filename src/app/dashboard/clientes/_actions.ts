@@ -50,7 +50,7 @@ const ClienteCompletoSchema = z.object({
   estado_civil: z.enum(['soltero','casado','viudo','divorciado']).optional(),
   
   // Estado comercial
-  estado_cliente: z.enum(['por_contactar', 'contactado', 'transferido']),
+  estado_cliente: z.enum(['por_contactar', 'contactado', 'transferido', 'intermedio', 'desestimado', 'potencial']),
   origen_lead: z.enum(['web', 'recomendacion', 'feria', 'campaña', 'redes_sociales', 'publicidad', 'referido', 'otro']).optional(),
   vendedor_asignado: z.string().optional().or(z.literal("")),
   proxima_accion: z.enum(['llamar', 'enviar_propuesta', 'reunion', 'seguimiento', 'cierre', 'nada']).optional(),

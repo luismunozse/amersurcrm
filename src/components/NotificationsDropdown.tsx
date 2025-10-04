@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Bell } from "lucide-react";
 import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifications";
 import type { NotificacionNoLeida } from "@/types/crm";
 
@@ -25,6 +26,22 @@ const tipoColors = {
 
 export default function NotificationsDropdown({ notificaciones, count }: NotificationsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
 
   const handleMarkAsRead = async (notificacionId: string) => {
     try {
@@ -55,29 +72,24 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover rounded-lg transition-colors"
         aria-label="Notificaciones"
       >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-6H4v6zM4 13h6V7H4v6z"/>
-        </svg>
+        <Bell className="h-5 w-5" aria-hidden="true" />
         {count > 0 && (
-          <span className="absolute top-1 right-1 h-2 w-2 bg-crm-danger rounded-full" />
+          <span className="absolute -top-1 -right-1 min-w-[18px] px-1 h-[18px] bg-crm-danger text-white rounded-full text-[10px] leading-[18px] font-semibold text-center">
+            {count > 9 ? "9+" : count}
+          </span>
         )}
       </button>
 
       {isOpen && (
         <>
           {/* Overlay */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          
           {/* Dropdown */}
           <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-crm-border z-50">
             <div className="p-4 border-b border-crm-border">

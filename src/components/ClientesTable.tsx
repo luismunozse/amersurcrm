@@ -10,11 +10,13 @@ import { Pagination } from "@/components/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
-import { 
-  getEstadoClienteColor, 
-  getEstadoClienteLabel, 
-  formatCapacidadCompra, 
-  formatSaldoPendiente 
+import {
+  getEstadoClienteColor,
+  getEstadoClienteLabel,
+  ESTADOS_CLIENTE_OPTIONS,
+  EstadoCliente,
+  formatCapacidadCompra,
+  formatSaldoPendiente,
 } from "@/lib/types/clientes";
 
 // Función para generar proforma PDF profesional
@@ -602,8 +604,11 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
                 <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider">
                   Contacto
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider">
-                  Propiedades
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
+                  onClick={() => handleSort('origen_lead')}
+                >
+                  Origen del lead {getSortIcon('origen_lead')}
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
@@ -702,81 +707,75 @@ const ClienteRow = memo(function ClienteRow({
     }
   };
 
-  const getEstadoButtons = (cliente: Cliente) => {
-    let currentEstado = cliente.estado_cliente || 'prospecto';
-    
-    // Normalizar el estado (convertir a minúsculas y manejar variaciones)
-    if (typeof currentEstado === 'string') {
-      currentEstado = currentEstado.toLowerCase().trim();
-      // Mapear variaciones comunes
-      if (currentEstado === 'transferido') currentEstado = 'transferido';
-      if (currentEstado === 'contactado') currentEstado = 'contactado';
-      if (currentEstado === 'por contactar' || currentEstado === 'por_contactar') currentEstado = 'por_contactar';
+  const getOrigenLeadLabel = (origen?: string | null) => {
+    switch (origen) {
+      case 'web':
+        return 'Web';
+      case 'recomendacion':
+        return 'Recomendación';
+      case 'feria':
+        return 'Feria';
+      case 'campaña':
+        return 'Campaña';
+      case 'redes_sociales':
+        return 'Redes sociales';
+      case 'publicidad':
+        return 'Publicidad';
+      case 'referido':
+        return 'Referido';
+      case 'otro':
+        return 'Otro';
+      case '':
+      case undefined:
+      case null:
+      default:
+        return 'Sin origen';
     }
-
-    // Mostrar solo un botón que avance al siguiente estado
-    if (currentEstado === 'prospecto' || currentEstado === '') {
-      return (
-        <button
-          onClick={() => handleEstadoChange(cliente.id, 'por_contactar')}
-          className="px-3 py-1 text-xs font-medium text-blue-800 bg-blue-100 border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-all duration-200 rounded-full flex items-center gap-1 group"
-        >
-          <span>Por Contactar</span>
-          <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </button>
-      );
-    }
-
-    if (currentEstado === 'por_contactar') {
-      return (
-        <button
-          onClick={() => handleEstadoChange(cliente.id, 'contactado')}
-          className="px-3 py-1 text-xs font-medium text-blue-800 bg-blue-100 border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-all duration-200 rounded-full flex items-center gap-1 group"
-        >
-          <span>Por Contactar</span>
-          <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </button>
-      );
-    }
-
-    if (currentEstado === 'contactado') {
-      return (
-        <button
-          onClick={() => handleEstadoChange(cliente.id, 'transferido')}
-          className="px-3 py-1 text-xs font-medium text-yellow-800 bg-yellow-100 border border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-all duration-200 rounded-full flex items-center gap-1 group"
-        >
-          <span>Contactado</span>
-          <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </button>
-      );
-    }
-
-    // Los clientes transferidos no tienen más acciones
-    if (currentEstado === 'transferido') {
-      return (
-        <span className="px-3 py-1 text-xs font-medium text-green-800 bg-green-100 border border-green-200 rounded-full flex items-center gap-1">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Transferido</span>
-        </span>
-      );
-    }
-
-    return null;
   };
 
-  const handleEstadoChange = async (clienteId: string, nuevoEstado: string) => {
-    console.log('Cambiando estado del cliente:', clienteId, 'a:', nuevoEstado);
+  const getEstadoSelectClasses = (estado: EstadoCliente) => {
+    switch (estado) {
+      case 'por_contactar':
+        return 'border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-200';
+      case 'contactado':
+        return 'border-yellow-200 bg-yellow-50 text-yellow-700 focus:ring-yellow-200';
+      case 'transferido':
+        return 'border-green-200 bg-green-50 text-green-700 focus:ring-green-200';
+      case 'intermedio':
+        return 'border-cyan-200 bg-cyan-50 text-cyan-700 focus:ring-cyan-200';
+      case 'potencial':
+        return 'border-purple-200 bg-purple-50 text-purple-700 focus:ring-purple-200';
+      case 'desestimado':
+      default:
+        return 'border-gray-200 bg-gray-50 text-gray-700 focus:ring-gray-200';
+    }
+  };
+
+  const renderEstadoSelect = (cliente: Cliente) => {
+    const estadoActual = (cliente.estado_cliente || 'por_contactar') as EstadoCliente;
+    return (
+      <select
+        value={estadoActual}
+        onChange={(event) => handleEstadoChange(cliente.id, event.target.value as EstadoCliente)}
+        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${getEstadoSelectClasses(estadoActual)}`}
+        disabled={isPending}
+      >
+        {ESTADOS_CLIENTE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  const router = useRouter();
+
+  const handleEstadoChange = async (clienteId: string, nuevoEstado: EstadoCliente) => {
     try {
       await actualizarEstadoCliente(clienteId, nuevoEstado);
-      toast.success(`Estado cambiado a ${getEstadoClienteLabel(nuevoEstado as any)}`);
+      toast.success(`Estado cambiado a ${getEstadoClienteLabel(nuevoEstado)}`);
+      router.refresh();
     } catch (error) {
       toast.error(getErrorMessage(error) || 'Error cambiando estado');
     }
@@ -812,9 +811,7 @@ const ClienteRow = memo(function ClienteRow({
 
       {/* Estado */}
       <td className="px-4 py-4 whitespace-nowrap">
-        <div className="flex items-center gap-2">
-          {getEstadoButtons(cliente)}
-        </div>
+        {renderEstadoSelect(cliente)}
       </td>
 
       {/* Contacto */}
@@ -843,22 +840,12 @@ const ClienteRow = memo(function ClienteRow({
       </td>
 
 
-      {/* Propiedades */}
+      {/* Origen del lead */}
       <td className="px-4 py-4 whitespace-nowrap">
-        <div className="flex space-x-4 text-sm">
-          <div className="text-center">
-            <div className="font-medium text-crm-text-primary">{cliente.propiedades_reservadas}</div>
-            <div className="text-xs text-crm-text-muted">Res.</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium text-crm-text-primary">{cliente.propiedades_compradas}</div>
-            <div className="text-xs text-crm-text-muted">Comp.</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium text-crm-text-primary">{cliente.propiedades_alquiladas}</div>
-            <div className="text-xs text-crm-text-muted">Alq.</div>
-          </div>
-        </div>
+        <span className="inline-flex items-center gap-2 rounded-full border border-crm-border bg-crm-card-hover px-3 py-1 text-xs font-medium text-crm-text-primary">
+          <span className="h-1.5 w-1.5 rounded-full bg-crm-primary" />
+          {getOrigenLeadLabel(cliente.origen_lead)}
+        </span>
       </td>
 
       {/* Fecha Alta */}

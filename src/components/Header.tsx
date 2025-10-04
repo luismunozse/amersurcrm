@@ -3,15 +3,28 @@
 import Image from "next/image";
 import ThemeToggle from "./ThemeToggle";
 import LogoutButton from "./LogoutButton";
+import NotificationsDropdown from "./NotificationsDropdown";
+import type { NotificacionNoLeida } from "@/types/crm";
+import type { ExchangeRate } from "@/lib/exchange";
+import CurrencyConverter from "./CurrencyConverter";
 
 type HeaderProps = {
   onSidebarToggle?: () => void;
   userEmail?: string;
   sidebarCollapsed?: boolean;
-  onSidebarExpand?: () => void;
+  notifications?: NotificacionNoLeida[];
+  notificationsCount?: number;
+  exchangeRates?: ExchangeRate[];
 };
 
-export default function Header({ onSidebarToggle = () => {}, userEmail, sidebarCollapsed = false, onSidebarExpand }: HeaderProps) {
+export default function Header({
+  onSidebarToggle = () => {},
+  userEmail,
+  sidebarCollapsed = false,
+  notifications = [],
+  notificationsCount = 0,
+  exchangeRates = [],
+}: HeaderProps) {
   return (
     <header className="bg-crm-card shadow-crm-lg border-b border-crm-border sticky top-0 z-30">
       <div className="w-full px-6">
@@ -66,7 +79,33 @@ export default function Header({ onSidebarToggle = () => {}, userEmail, sidebarC
               </div>
             </div>
 
+            {exchangeRates.length > 0 && (
+              <div className="hidden xl:flex items-center gap-2 rounded-2xl border border-crm-border/60 bg-crm-card-hover px-3 py-1.5 text-xs text-crm-text-muted">
+                {exchangeRates.map((rate) => (
+                  <div key={rate.currency} className="flex items-center gap-2 px-2">
+                    <span className="font-semibold text-crm-text-primary">{rate.currency}/PEN</span>
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-[10px] uppercase tracking-wide">Compra</span>
+                      <span className="font-semibold text-crm-text-primary">
+                        {rate.buy ? rate.buy.toFixed(3) : '--'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-[10px] uppercase tracking-wide">Venta</span>
+                      <span className="font-semibold text-crm-text-primary">
+                        {rate.sell ? rate.sell.toFixed(3) : '--'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <ThemeToggle />
+
+            <CurrencyConverter exchangeRates={exchangeRates} />
+
+            <NotificationsDropdown notificaciones={notifications} count={notificationsCount} />
 
             <div className="flex items-center space-x-3">
               {userEmail && (

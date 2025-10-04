@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useRef } from "react";
 import { crearCliente, actualizarCliente } from "@/app/dashboard/clientes/_actions";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -55,11 +55,74 @@ export default function ClienteForm({
     codigoProvincia: '',
     codigoDistrito: ''
   });
+  const formRef = useRef<HTMLFormElement>(null);
+  const [step, setStep] = useState(0);
+
+  const stepsConfig = [
+    {
+      title: "Datos básicos",
+      description: "Tipo de cliente, identificación y contacto principal",
+    },
+    {
+      title: "Contacto & Clasificación",
+      description: "Teléfonos, estado comercial y origen del lead",
+    },
+    {
+      title: "Ubicación & Notas",
+      description: "Dirección detallada y observaciones del cliente",
+    },
+  ];
+
+  const totalSteps = stepsConfig.length;
+
+  const validateStep = (index: number) => {
+    const form = formRef.current;
+    if (!form) return true;
+    const selectors = `[data-step="${index}"] input, [data-step="${index}"] select, [data-step="${index}"] textarea`;
+    const fields = Array.from(form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selectors));
+
+    for (const field of fields) {
+      if (field.disabled) continue;
+      const isRequired = field.hasAttribute('required') || field.dataset.required === 'true';
+      if (!isRequired) continue;
+      if (!field.value || (field.value && !field.value.toString().trim())) {
+        field.reportValidity();
+        field.focus();
+        return false;
+      }
+      if (!field.checkValidity()) {
+        field.reportValidity();
+        field.focus();
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const goToStep = (index: number) => {
+    setStep(Math.max(0, Math.min(index, totalSteps - 1)));
+  };
+
+  const goNext = () => {
+    if (!validateStep(step)) return;
+    goToStep(step + 1);
+  };
+
+  const goPrev = () => {
+    goToStep(step - 1);
+  };
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    for (let i = 0; i < totalSteps; i += 1) {
+      if (!validateStep(i)) {
+        goToStep(i);
+        return;
+      }
+    }
+
     setPending(true);
-    const form = e.currentTarget;
+    const form = formRef.current ?? e.currentTarget;
     const fd = new FormData(form);
     
     // Procesar números de teléfono para incluir código de país

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCachedClientes } from "@/lib/cache.server";
+import { getCachedClientes, getCachedClientesTotal } from "@/lib/cache.server";
 import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
 import AdvancedClientSearch from "@/components/AdvancedClientSearch";
@@ -24,8 +24,10 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
 
   try {
     // Usar caché para obtener todos los clientes
-    const allClientes = await getCachedClientes(q);
-    const total = allClientes.length;
+    const [allClientes, total] = await Promise.all([
+      getCachedClientes(q),
+      getCachedClientesTotal(),
+    ]);
 
     return (
       <div className="w-full p-6 space-y-6">

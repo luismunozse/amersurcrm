@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { DragEvent } from 'react';
 import clsx from 'clsx';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/Button';
@@ -150,19 +151,27 @@ const snapAngle = (deg: number) => {
 };
 
 const obtenerPoligonoLote = (lote: LoteState): [number, number][] | null => {
-  if (Array.isArray(lote.plano_poligono) && lote.plano_poligono.length >= 3) {
+  if (Array.isArray(lote.plano_poligono) && lote.plano_poligono.length >= 1) {
     return lote.plano_poligono;
   }
   if (!lote.data) return null;
   try {
     const parsed = typeof lote.data === 'string' ? JSON.parse(lote.data) : lote.data;
-    if (parsed?.plano_poligono && Array.isArray(parsed.plano_poligono) && parsed.plano_poligono.length >= 3) {
+    if (parsed?.plano_poligono && Array.isArray(parsed.plano_poligono) && parsed.plano_poligono.length >= 1) {
       return parsed.plano_poligono;
     }
   } catch (error) {
     console.warn('No se pudo parsear la data del lote', error);
   }
   return null;
+};
+
+const tieneUbicacion = (lote: LoteState) => {
+  if (lote.ubicacion && typeof lote.ubicacion.lat === 'number' && typeof lote.ubicacion.lng === 'number') {
+    return true;
+  }
+  const poligono = obtenerPoligonoLote(lote);
+  return Boolean(poligono && poligono.length >= 1);
 };
 
 const computeOverlayFromPolygon = (polygon: LatLngLiteral[]) => {
@@ -273,6 +282,7 @@ export default function MapeoLotes({
   const [loteDrawing, setLoteDrawing] = useState(false);
   const [savingLotePolygon, setSavingLotePolygon] = useState(false);
   const [mapFullScreen, setMapFullScreen] = useState(false);
+  const [draggingLoteId, setDraggingLoteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!overlayBounds && typeof window !== 'undefined') {
@@ -381,27 +391,27 @@ export default function MapeoLotes({
     }
   }, [projectPolygon, overlayBounds]);
 
-  const stats = useMemo(() => {
-    const disponibles = lotesState.filter((l) => l.estado === 'disponible').length;
-    const reservados = lotesState.filter((l) => l.estado === 'reservado').length;
-    const vendidos = lotesState.filter((l) => l.estado === 'vendido').length;
-    const conPlano = lotesState.filter((l) => obtenerPoligonoLote(l)).length;
-    return {
-      total: lotesState.length,
-      disponibles,
-      reservados,
-      vendidos,
+const stats = useMemo(() => {
+  const disponibles = lotesState.filter((l) => l.estado === 'disponible').length;
+  const reservados = lotesState.filter((l) => l.estado === 'reservado').length;
+  const vendidos = lotesState.filter((l) => l.estado === 'vendido').length;
+  const conPlano = lotesState.filter((l) => tieneUbicacion(l)).length;
+  return {
+    total: lotesState.length,
+    disponibles,
+    reservados,
+    vendidos,
       conPlano,
     };
   }, [lotesState]);
 
   const lotesSinPoligono = useMemo(
-    () => lotesState.filter((lote) => !obtenerPoligonoLote(lote)),
+    () => lotesState.filter((lote) => !tieneUbicacion(lote)),
     [lotesState]
   );
 
   const lotesConPoligono = useMemo(
-    () => lotesState.filter((lote) => obtenerPoligonoLote(lote)),
+    () => lotesState.filter((lote) => tieneUbicacion(lote)),
     [lotesState]
   );
 
@@ -644,9 +654,100 @@ export default function MapeoLotes({
     }
   };
 
+  const upsertLotePin = useCallback(async (loteId: string, lat: number, lng: number, showToast = true) => {
+    setSavingLotePolygon(true);
+    try {
+      const loteActual = lotesState.find((l) => l.id === loteId);
+      const poligonoNuevo: [number, number][] = [[lat, lng]];
+
+      await guardarPoligonoLote(loteId, proyectoId, poligonoNuevo);
+
+      const dataExistente = (() => {
+        if (!loteActual?.data) return {} as Record<string, unknown>;
+        if (typeof loteActual.data === 'string') {
+          try {
+            return JSON.parse(loteActual.data) as Record<string, unknown>;
+          } catch (error) {
+            console.warn('No se pudo parsear data existente del lote', error);
+            return {} as Record<string, unknown>;
+          }
+        }
+        if (typeof loteActual.data === 'object') {
+          return { ...(loteActual.data as Record<string, unknown>) };
+        }
+        return {} as Record<string, unknown>;
+      })();
+
+      const nuevaData = {
+        ...dataExistente,
+        plano_point: [lat, lng],
+        plano_poligono: poligonoNuevo,
+      };
+
+      const fd = new FormData();
+      fd.append('proyecto_id', proyectoId);
+      if (loteActual?.codigo) fd.append('codigo', loteActual.codigo);
+      fd.append('estado', loteActual?.estado ?? 'disponible');
+      fd.append('data', JSON.stringify(nuevaData));
+
+      await actualizarLote(loteId, fd as any);
+
+      setLotesState((prev) =>
+        prev.map((lote) =>
+          lote.id === loteId
+            ? {
+                ...lote,
+                plano_poligono: poligonoNuevo,
+                ubicacion: { lat, lng },
+                data: nuevaData,
+              }
+            : lote
+        )
+      );
+      if (showToast) toast.success('Ubicación del lote actualizada');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la ubicación del lote');
+    } finally {
+      setSavingLotePolygon(false);
+      setLoteDrawing(false);
+    }
+  }, [lotesState, proyectoId]);
+
+  const handlePinDrop = useCallback(async (loteId: string, lat: number, lng: number) => {
+    setSelectedLoteId(loteId);
+    setDraggingLoteId(null);
+    await upsertLotePin(loteId, lat, lng, true);
+  }, [upsertLotePin]);
+
+  const handleMarkerDragEnd = useCallback(async (loteId: string, lat: number, lng: number) => {
+    await upsertLotePin(loteId, lat, lng, false);
+  }, [upsertLotePin]);
+
   const handleToggleFullMap = () => {
     setMapFullScreen((prev) => !prev);
   };
+
+  const handleLoteDragStart = useCallback((event: DragEvent, loteId: string) => {
+    if (!planUrl) {
+      toast.error('Sube el plano para poder ubicar lotes');
+      event.preventDefault();
+      return;
+    }
+    setSelectedLoteId(loteId);
+    setDraggingLoteId(loteId);
+    try {
+      event.dataTransfer.setData('application/x-lote-id', loteId);
+      event.dataTransfer.setData('text/plain', loteId);
+      event.dataTransfer.effectAllowed = 'copyMove';
+    } catch (error) {
+      console.warn('No se pudo asignar dataTransfer', error);
+    }
+  }, [planUrl]);
+
+  const handleLoteDragEnd = useCallback(() => {
+    setDraggingLoteId(null);
+    setSavingLotePolygon(false);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -923,7 +1024,10 @@ export default function MapeoLotes({
                   {lotesSinPoligono.map((lote) => (
                     <button
                       key={lote.id}
+                      draggable
                       onClick={() => setSelectedLoteId((current) => (current === lote.id ? null : lote.id))}
+                      onDragStart={(event) => handleLoteDragStart(event, lote.id)}
+                      onDragEnd={handleLoteDragEnd}
                       className={`p-3 border rounded-lg text-sm text-left transition-all ${
                         selectedLoteId === lote.id
                           ? 'border-green-500 bg-green-50 shadow'
@@ -1011,7 +1115,10 @@ export default function MapeoLotes({
                         type="button"
                         variant="ghost"
                         size="sm"
+                        draggable
                         onClick={() => setSelectedLoteId(lote.id)}
+                        onDragStart={(event) => handleLoteDragStart(event, lote.id)}
+                        onDragEnd={handleLoteDragEnd}
                       >
                         Resaltar
                       </Button>
@@ -1110,6 +1217,9 @@ export default function MapeoLotes({
                 onLotePolygonComplete={handleLotePolygonComplete}
                 fullScreenActive={mapFullScreen}
                 onToggleFull={handleToggleFullMap}
+                draggingLoteId={draggingLoteId}
+                onPinDrop={handlePinDrop}
+                onMarkerDragEnd={handleMarkerDragEnd}
               />
             </div>
           </CardContent>
