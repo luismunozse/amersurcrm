@@ -140,23 +140,7 @@ export default function PhoneNormalizationTool({ clientes, onUpdate }: PhoneNorm
   });
 
   if (clientesNeedingUpdate.length === 0) {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-        <div className="flex items-center">
-          <svg className="h-5 w-5 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <div>
-            <h3 className="text-sm font-medium text-green-800">
-              ✅ Todos los números de teléfono están normalizados
-            </h3>
-            <p className="text-sm text-green-700 mt-1">
-              Todos los números tienen formato internacional correcto (+51XXXXXXXXX)
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

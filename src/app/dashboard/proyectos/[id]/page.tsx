@@ -6,6 +6,7 @@ import LotesList from "./_LotesList";
 import MapeoLotes from "./_MapeoLotes";
 import DeleteProjectButton from "./_DeleteProjectButton";
 import GoogleMapsDebug from "@/components/GoogleMapsDebug";
+import { PaginationClient } from "./_PaginationClient";
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -230,76 +231,106 @@ export default async function ProyLotesPage({
   };
 
   return (
-    <div className="w-full p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link 
-            href="/dashboard/proyectos" 
-            className="flex items-center gap-2 px-4 py-2 text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-            </svg>
-            Volver
-          </Link>
-          <div>
-            <h1 className="text-3xl font-display font-bold text-crm-text-primary">Proyecto: {proyecto.nombre}</h1>
-            <p className="text-crm-text-muted mt-1">
-              {proyecto.ubicacion && `${proyecto.ubicacion} • `}
-              Estado: <span className={`font-medium ${
-                proyecto.estado === 'activo' ? 'text-crm-success' :
-                proyecto.estado === 'pausado' ? 'text-crm-warning' :
-                'text-crm-danger'
-              }`}>{proyecto.estado}</span>
-            </p>
-          </div>
-        </div>
-        
-        {/* Botón de eliminar proyecto */}
-        <DeleteProjectButton 
-          proyectoId={proyecto.id}
-          proyectoNombre={proyecto.nombre}
-          lotesCount={lotesConProyecto?.length || 0}
-        />
-      </div>
+    <div className="w-full p-4 md:p-6 space-y-4 md:space-y-6">
+      {/* Header mejorado */}
+      <div className="crm-card p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Link
+              href="/dashboard/proyectos"
+              className="flex-shrink-0 flex items-center justify-center w-10 h-10 text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-colors"
+              title="Volver a proyectos"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+              </svg>
+            </Link>
 
-      {/* Filtros */}
-      <div className="crm-card p-6">
-        <div className="flex items-center space-x-2 mb-4">
-          <div className="w-8 h-8 bg-crm-info/10 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-crm-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"/>
-            </svg>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <h1 className="text-xl md:text-2xl font-bold text-crm-text-primary">{proyecto.nombre}</h1>
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    proyecto.estado === 'activo'
+                      ? 'bg-green-100 text-green-700 border border-green-300'
+                      : proyecto.estado === 'pausado'
+                      ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                      : 'bg-red-100 text-red-700 border border-red-300'
+                  }`}>
+                    {proyecto.estado === 'activo' ? '● Activo' : proyecto.estado === 'pausado' ? '● Pausado' : '● Cerrado'}
+                  </span>
+
+                  {proyecto.tipo && (
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      proyecto.tipo === 'propio'
+                        ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                        : 'bg-purple-100 text-purple-700 border border-purple-300'
+                    }`}>
+                      {proyecto.tipo === 'propio' ? '📋 Propio' : '🤝 Corretaje'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {proyecto.ubicacion && (
+                <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
+                  <svg className="w-4 h-4 text-crm-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                  <span>{proyecto.ubicacion}</span>
+                </div>
+              )}
+            </div>
           </div>
-          <h3 className="text-lg font-semibold text-crm-text-primary">Filtros de Búsqueda</h3>
-        </div>
-        
-        <form action={`/dashboard/proyectos/${proyecto.id}`} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-          <div className="sm:col-span-2 space-y-2">
-            <label className="block text-sm font-medium text-crm-text-primary">Buscar por código</label>
-            <input 
-              name="q" 
-              defaultValue={q} 
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary" 
-              placeholder="Ej: MzA-01" 
+
+          {/* Botón de eliminar proyecto */}
+          <div className="flex-shrink-0">
+            <DeleteProjectButton
+              proyectoId={proyecto.id}
+              proyectoNombre={proyecto.nombre}
+              lotesCount={lotesConProyecto?.length || 0}
             />
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-crm-text-primary">Estado</label>
-            <select 
-              name="estado" 
-              defaultValue={estado || "all"} 
+        </div>
+      </div>
+
+      {/* Filtros compactos */}
+      <div className="crm-card p-4 md:p-5">
+        <form action={`/dashboard/proyectos/${proyecto.id}`} className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <input
+                name="q"
+                defaultValue={q}
+                className="w-full pl-10 pr-4 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
+                placeholder="Buscar por código de lote..."
+              />
+            </div>
+          </div>
+
+          <div className="w-full sm:w-48">
+            <select
+              name="estado"
+              defaultValue={estado || "all"}
               className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
             >
               <option value="all">Todos los estados</option>
-              <option value="disponible">Disponible</option>
-              <option value="reservado">Reservado</option>
-              <option value="vendido">Vendido</option>
+              <option value="disponible">✅ Disponible</option>
+              <option value="reservado">🔒 Reservado</option>
+              <option value="vendido">💰 Vendido</option>
             </select>
           </div>
-          <button className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium">
-            Filtrar
+
+          <button className="crm-button-primary px-6 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+            Buscar
           </button>
         </form>
       </div>
@@ -323,34 +354,16 @@ export default async function ProyLotesPage({
 
       <LotesList proyectoId={proyecto.id} lotes={lotesConProyecto} />
 
-      {/* Paginación */}
-      <div className="crm-card p-4">
-        <div className="flex items-center justify-between">
-          <Link
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              page <= 1 
-                ? "pointer-events-none opacity-50 bg-crm-card-hover text-crm-text-muted border-crm-border" 
-                : "bg-crm-card text-crm-text-primary border-crm-border hover:bg-crm-card-hover"
-            }`}
-            href={makeHref(page - 1)}
-          >
-            ← Anterior
-          </Link>
-          <div className="text-sm text-crm-text-muted">
-            Página {page} de {lastPage} · {total} lotes
-          </div>
-          <Link
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              page >= lastPage 
-                ? "pointer-events-none opacity-50 bg-crm-card-hover text-crm-text-muted border-crm-border" 
-                : "bg-crm-card text-crm-text-primary border-crm-border hover:bg-crm-card-hover"
-            }`}
-            href={makeHref(page + 1)}
-          >
-            Siguiente →
-          </Link>
-        </div>
-      </div>
+      {/* Paginación mejorada */}
+      {total > perPage && (
+        <PaginationClient
+          currentPage={page}
+          totalPages={lastPage}
+          proyectoId={proyecto.id}
+          q={q}
+          estado={estado}
+        />
+      )}
       
       {/* Debug component */}
       <GoogleMapsDebug />

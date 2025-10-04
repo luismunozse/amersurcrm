@@ -103,119 +103,97 @@ export default async function ProyectosPage() {
             return (
               <div
                 key={p.id}
-                className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative"
+                className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative flex flex-col"
               >
-                {/* Header con gradiente */}
-                <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 text-white px-6 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-bold text-lg truncate">{p.nombre}</h3>
+                {/* Imagen del proyecto con overlay */}
+                <div className="relative w-full h-56 overflow-hidden bg-gradient-to-br from-crm-primary/15 to-crm-primary/8">
+                  {p.imagen_url ? (
+                    <img
+                      src={p.imagen_url}
+                      alt={p.nombre}
+                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="h-full w-full grid place-items-center">
+                      <BuildingOffice2Icon className="h-20 w-20 text-crm-primary/40" />
+                    </div>
+                  )}
+
+                  {/* Badges - Estado y Tipo */}
+                  <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur-sm border ${
                         p.estado === "activo"
-                          ? "bg-white/20 text-white"
+                          ? "bg-green-500/90 text-white border-green-400"
                           : p.estado === "pausado"
-                          ? "bg-yellow-400/30 text-yellow-100"
-                          : "bg-red-400/30 text-red-100"
+                          ? "bg-yellow-500/90 text-white border-yellow-400"
+                          : "bg-red-500/90 text-white border-red-400"
                       }`}
-                      title="Estado"
                     >
-                      {p.estado}
+                      {p.estado === "activo" ? "● Activo" : p.estado === "pausado" ? "● Pausado" : "● Cerrado"}
+                    </span>
+                    <span
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur-sm border ${
+                        p.tipo === "propio"
+                          ? "bg-blue-500/90 text-white border-blue-400"
+                          : "bg-purple-500/90 text-white border-purple-400"
+                      }`}
+                    >
+                      {p.tipo === "propio" ? "📋 Propio" : "🤝 Corretaje"}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-6 space-y-6">
-                  {/* Imagen del proyecto o ícono por defecto */}
-                  <div className="w-full h-48 rounded-2xl overflow-hidden ring-4 ring-[#86901F]/30 bg-gradient-to-br from-[#86901F]/15 to-[#86901F]/8">
-                    {p.imagen_url ? (
-                      <img 
-                        src={p.imagen_url} 
-                        alt={p.nombre}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-full w-full grid place-items-center">
-                        <BuildingOffice2Icon className="h-16 w-16 text-[#86901F]" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Información del proyecto */}
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-crm-text-muted font-medium uppercase tracking-wide">
-                      Proyecto Inmobiliario
-                    </p>
+                <div className="p-5 space-y-4 flex-1 flex flex-col">
+                  {/* Título y ubicación */}
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-xl text-crm-text-primary line-clamp-2 group-hover:text-crm-primary transition-colors">
+                      {p.nombre}
+                    </h3>
                     {p.ubicacion && (
-                      <p className="text-sm text-crm-text-secondary flex items-center gap-2 justify-center">
-                        <MapPinIcon className="h-4 w-4 text-crm-accent" /> 
-                        <span className="truncate">{p.ubicacion}</span>
-                      </p>
+                      <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
+                        <MapPinIcon className="h-4 w-4 text-crm-accent flex-shrink-0" />
+                        <span className="line-clamp-1">{p.ubicacion}</span>
+                      </div>
                     )}
                   </div>
 
-                  {/* Métricas de ventas */}
-                  <div className="space-y-4">
-                    {/* Vendidos */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-crm-text-primary">
-                          <ChartBarIcon className="h-4 w-4 text-crm-primary" />
-                          <span className="font-medium">Vendidas</span>
-                        </div>
-                        <div className="text-sm text-crm-text-primary font-bold">
-                          {vendidoPct}%
-                        </div>
-                      </div>
-                      <div className="h-3 rounded-full bg-crm-border/30 overflow-hidden">
-                        <div
-                          className="h-3 rounded-full bg-gradient-to-r from-crm-primary to-crm-primary/80 transition-all duration-500"
-                          style={{ width: `${vendidoPct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Disponibles */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-crm-text-primary">
-                          <PresentationChartLineIcon className="h-4 w-4 text-crm-accent" />
-                          <span className="font-medium">Disponibles</span>
-                        </div>
-                        <div className="text-sm text-crm-text-primary font-bold">
-                          {dispPct}%
-                        </div>
-                      </div>
-                      <div className="h-3 rounded-full bg-crm-border/30 overflow-hidden">
-                        <div
-                          className="h-3 rounded-full bg-gradient-to-r from-crm-accent to-crm-accent/80 transition-all duration-500"
-                          style={{ width: `${dispPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Estadísticas */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="crm-card p-4 text-center">
-                      <p className="text-xs text-crm-text-muted font-medium uppercase tracking-wide mb-1">
-                        Total
-                      </p>
+                  {/* Estadísticas en grid */}
+                  <div className="grid grid-cols-3 gap-3 py-4 border-y border-crm-border">
+                    <div className="text-center">
                       <p className="text-2xl font-bold text-crm-text-primary">{stats.total}</p>
+                      <p className="text-xs text-crm-text-muted font-medium mt-1">Total Lotes</p>
                     </div>
-                    <div className="crm-card p-4 text-center">
-                      <p className="text-xs text-crm-text-muted font-medium uppercase tracking-wide mb-1">
-                        Disponibles
-                      </p>
+                    <div className="text-center border-x border-crm-border">
+                      <p className="text-2xl font-bold text-crm-primary">{stats.vendidos}</p>
+                      <p className="text-xs text-crm-text-muted font-medium mt-1">Vendidos</p>
+                    </div>
+                    <div className="text-center">
                       <p className="text-2xl font-bold text-crm-accent">{stats.disponibles}</p>
+                      <p className="text-xs text-crm-text-muted font-medium mt-1">Disponibles</p>
                     </div>
                   </div>
 
-                  {/* Acciones rápidas + CTA */}
-                  <div className="space-y-3">
-                    <QuickActions 
-                      id={p.id} 
-                      nombre={p.nombre} 
-                      ubicacion={p.ubicacion || undefined} 
+                  {/* Barra de progreso de ventas */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-crm-text-muted font-medium">Progreso de ventas</span>
+                      <span className="text-crm-primary font-bold">{vendidoPct}%</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-crm-border/30 overflow-hidden">
+                      <div
+                        className="h-2.5 rounded-full bg-gradient-to-r from-crm-primary to-crm-accent transition-all duration-500"
+                        style={{ width: `${vendidoPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Acciones - Flex-1 para empujar al final */}
+                  <div className="mt-auto space-y-2 pt-2">
+                    <QuickActions
+                      id={p.id}
+                      nombre={p.nombre}
+                      ubicacion={p.ubicacion || undefined}
                       lotesCount={stats.total}
                       proyecto={{
                         id: p.id,
@@ -227,7 +205,7 @@ export default async function ProyectosPage() {
                       }}
                     />
                     <Link
-                      className="w-full crm-button-primary inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold group-hover:shadow-crm-xl transition-all duration-300"
+                      className="w-full crm-button-primary inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold group-hover:shadow-lg transition-all duration-300"
                       href={`/dashboard/proyectos/${p.id}`}
                     >
                       Ver Proyecto

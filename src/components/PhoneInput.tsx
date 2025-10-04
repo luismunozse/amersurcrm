@@ -113,13 +113,13 @@ export default function PhoneInput({
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={`space-y-1.5 ${className}`}>
       {label && (
-        <label className="block text-sm font-medium text-crm-text-primary">
-          {label} {required && <span className="text-crm-danger">*</span>}
+        <label className="block text-xs font-medium text-crm-text-primary">
+          {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
-      
+
       <div className="relative">
         <div className="flex">
           {/* Selector de país */}
@@ -128,26 +128,26 @@ export default function PhoneInput({
               type="button"
               onClick={() => setIsOpen(!isOpen)}
               disabled={disabled}
-              className="flex items-center space-x-2 px-4 py-3 border border-crm-border rounded-l-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all min-w-[120px]"
+              className="flex items-center space-x-1.5 px-2.5 py-2 border border-crm-border rounded-l-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all min-w-[100px]"
             >
-              <span className="text-lg">{selectedCountry.flag}</span>
+              <span className="text-sm">{selectedCountry.flag}</span>
               <span className="text-xs font-medium">{selectedCountry.dialCode}</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {/* Dropdown de países */}
             {isOpen && (
-              <div className="absolute top-full left-0 z-50 w-80 bg-crm-card border border-crm-border rounded-xl shadow-crm-xl mt-1 max-h-60 overflow-hidden">
+              <div className="absolute top-full left-0 z-50 w-72 bg-crm-card border border-crm-border rounded-lg shadow-crm-xl mt-1 max-h-60 overflow-hidden">
                 {/* Búsqueda */}
-                <div className="p-3 border-b border-crm-border">
+                <div className="p-2 border-b border-crm-border">
                   <input
                     type="text"
                     placeholder="Buscar país..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
+                    className="w-full px-2 py-1.5 text-xs border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
                   />
                 </div>
 
@@ -158,19 +158,19 @@ export default function PhoneInput({
                       key={country.code}
                       type="button"
                       onClick={() => handleCountrySelect(country)}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-crm-card-hover transition-colors"
+                      className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-crm-card-hover transition-colors"
                     >
-                      <span className="text-lg">{country.flag}</span>
+                      <span className="text-sm">{country.flag}</span>
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-crm-text-primary">
+                        <div className="text-xs font-medium text-crm-text-primary">
                           {country.name}
                         </div>
-                        <div className="text-xs text-crm-text-muted">
+                        <div className="text-[10px] text-crm-text-muted">
                           {country.dialCode}
                         </div>
                       </div>
                       {selectedCountry.code === country.code && (
-                        <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
@@ -190,9 +190,9 @@ export default function PhoneInput({
             placeholder={placeholder}
             disabled={disabled}
             required={required}
-            className="flex-1 px-4 py-3 border border-crm-border rounded-r-xl text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
+            className="flex-1 px-3 py-2 border border-crm-border rounded-r-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
           />
-          
+
           {/* Input oculto con el número completo para el formulario */}
           <input
             type="hidden"
@@ -200,13 +200,6 @@ export default function PhoneInput({
             value={getFullPhoneNumber()}
           />
         </div>
-
-        {/* Número completo formateado */}
-        {phoneNumber && (
-          <div className="mt-2 text-xs text-crm-text-muted">
-            Número completo: <span className="font-medium text-crm-text-primary">{getFullPhoneNumber()}</span>
-          </div>
-        )}
       </div>
 
       {/* Overlay para cerrar dropdown */}

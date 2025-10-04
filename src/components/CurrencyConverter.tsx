@@ -41,7 +41,14 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-crm-border/70 bg-white/95 p-4 text-sm text-crm-text-primary shadow-xl backdrop-blur z-50">
+        <>
+          {/* Overlay para cerrar al hacer click fuera */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div className="fixed sm:absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-16 sm:top-auto mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-72 rounded-2xl border border-crm-border/70 bg-white/95 p-4 text-sm text-crm-text-primary shadow-xl backdrop-blur z-50">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-crm-text-primary">Conversor USD ⇄ PEN</h3>
             <button
@@ -103,6 +110,7 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
             </p>
           )}
         </div>
+        </>
       )}
     </div>
   );

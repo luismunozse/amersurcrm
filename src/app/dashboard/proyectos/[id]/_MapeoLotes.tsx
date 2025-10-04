@@ -1015,10 +1015,13 @@ const stats = useMemo(() => {
                   <span className="font-medium text-gray-700">Lotes pendientes</span>
                   <span className="text-gray-500">{lotesSinPoligono.length}</span>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 max-h-44 overflow-y-auto">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto p-2">
                   {lotesSinPoligono.length === 0 && (
-                    <div className="col-span-full text-sm text-gray-500 border border-dashed rounded-lg p-3 text-center">
-                      Todos los lotes tienen geometría asignada.
+                    <div className="col-span-full text-sm text-gray-500 border border-dashed rounded-lg p-4 text-center bg-gray-50">
+                      <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <p>Todos los lotes tienen ubicación asignada</p>
                     </div>
                   )}
                   {lotesSinPoligono.map((lote) => (
@@ -1028,14 +1031,53 @@ const stats = useMemo(() => {
                       onClick={() => setSelectedLoteId((current) => (current === lote.id ? null : lote.id))}
                       onDragStart={(event) => handleLoteDragStart(event, lote.id)}
                       onDragEnd={handleLoteDragEnd}
-                      className={`p-3 border rounded-lg text-sm text-left transition-all ${
-                        selectedLoteId === lote.id
-                          ? 'border-green-500 bg-green-50 shadow'
-                          : 'border-gray-200 hover:border-green-400 hover:bg-green-50'
+                      className={`group relative p-4 border-2 rounded-xl text-sm text-left transition-all duration-200 ${
+                        draggingLoteId === lote.id
+                          ? 'opacity-40 scale-95 border-crm-primary cursor-grabbing shadow-xl'
+                          : selectedLoteId === lote.id
+                          ? 'border-crm-primary bg-gradient-to-br from-crm-primary/10 to-crm-primary/5 shadow-lg ring-2 ring-crm-primary/30 cursor-grab'
+                          : 'border-gray-200 hover:border-crm-primary hover:bg-gradient-to-br hover:from-crm-primary/5 hover:to-transparent hover:shadow-md hover:scale-[1.02] cursor-grab'
                       }`}
                     >
-                      <div className="font-semibold text-gray-800">{lote.codigo}</div>
-                      <div className="text-xs text-gray-500 capitalize">{lote.estado ?? 'sin estado'}</div>
+                      {/* Icono de arrastre mejorado */}
+                      <div className={`absolute top-3 right-3 transition-all duration-200 ${
+                        draggingLoteId === lote.id ? 'opacity-100 scale-110' : 'opacity-30 group-hover:opacity-60'
+                      }`}>
+                        <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+
+                      <div className="font-bold text-lg text-crm-text-primary mb-2 pr-8">{lote.codigo}</div>
+
+                      {/* Badge de estado mejorado */}
+                      <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm border ${
+                        lote.estado === 'disponible' ? 'bg-green-50 text-green-700 border-green-200' :
+                        lote.estado === 'reservado' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        lote.estado === 'vendido' ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}>
+                        <span className="text-sm">
+                          {lote.estado === 'disponible' ? '✅' :
+                           lote.estado === 'reservado' ? '🔒' :
+                           lote.estado === 'vendido' ? '💰' :
+                           '⚪'}
+                        </span>
+                        {lote.estado === 'disponible' ? 'Disponible' :
+                         lote.estado === 'reservado' ? 'Reservado' :
+                         lote.estado === 'vendido' ? 'Vendido' :
+                         'Sin estado'}
+                      </div>
+
+                      {/* Indicador de drag mejorado */}
+                      <div className={`mt-3 pt-3 border-t border-gray-200 text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                        draggingLoteId === lote.id ? 'text-crm-primary' : 'text-gray-500 group-hover:text-crm-primary'
+                      }`}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                        Arrastra al mapa para ubicar
+                      </div>
                     </button>
                   ))}
                 </div>

@@ -45,26 +45,26 @@ export default function Header({
             {/* Logo - Visible en mobile o cuando sidebar está colapsado */}
             <div className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} flex items-center space-x-3`}>
               <div className="relative">
-                <Image 
-                  src="/logo-amersur.png" 
-                  alt="AMERSUR" 
-                  width={48} 
-                  height={48} 
-                  className="h-12 w-12 object-contain" 
+                <Image
+                  src="/logo-amersur.png"
+                  alt="AMERSUR"
+                  width={48}
+                  height={48}
+                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
                   priority
                 />
                 {/* Efecto de resplandor sutil */}
                 <div className="absolute inset-0 bg-crm-primary/15 rounded-full blur-md -z-10"></div>
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <span className="text-xl font-bold text-crm-text-primary">AMERSUR CRM</span>
               </div>
             </div>
           </div>
 
           {/* Right: búsqueda + acciones */}
-          <div className="flex items-center space-x-3">
-            <div className="hidden sm:block">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 md:space-x-3">
+            <div className="hidden lg:block">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-4 w-4 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -107,9 +107,10 @@ export default function Header({
 
             <NotificationsDropdown notificaciones={notifications} count={notificationsCount} />
 
-            <div className="flex items-center space-x-3">
-              {userEmail && (
-                <div className="hidden sm:block text-right">
+            {/* Avatar y menú del usuario */}
+            {userEmail && (
+              <>
+                <div className="hidden lg:block text-right">
                   <p className="text-sm font-medium text-crm-text-primary">
                     {userEmail.split('@')[0]}
                   </p>
@@ -117,7 +118,18 @@ export default function Header({
                     {userEmail}
                   </p>
                 </div>
-              )}
+                <div className="relative flex-shrink-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md ring-2 ring-crm-border hover:ring-crm-primary transition-all cursor-pointer">
+                    <span className="text-white text-sm font-bold">
+                      {userEmail.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 border-2 border-crm-card rounded-full" />
+                </div>
+              </>
+            )}
+
+            <div className="flex-shrink-0">
               <LogoutButton />
             </div>
           </div>

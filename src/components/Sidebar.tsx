@@ -275,26 +275,6 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
             )}
           </nav>
 
-          {/* Footer */}
-          <div className={cn(
-            "p-4 sm:p-6 border-t border-crm-sidebar-hover/50 bg-gradient-to-r from-crm-sidebar-hover/30 to-transparent",
-            collapsed && "lg:flex lg:items-center lg:justify-center"
-          )}>
-            <div className={cn("flex items-center space-x-3", collapsed && "lg:space-x-0 lg:flex-col")}>
-              <div className="relative">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-crm-primary to-crm-accent rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                  <span className="text-white text-sm sm:text-base font-bold">
-                    {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
-                  </span>
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 border-2 border-crm-sidebar rounded-full" />
-              </div>
-              <div className={cn("flex-1 min-w-0", collapsed && "hidden lg:hidden")}>
-                <p className="text-sm font-semibold text-white truncate">{userEmail ? userEmail.split("@")[0] : "Usuario"}</p>
-                <p className="text-xs text-crm-text-muted truncate hidden sm:block">{userEmail || "usuario@amersur.com"}</p>
-              </div>
-            </div>
-          </div>
         </div>
       </aside>
     </>
