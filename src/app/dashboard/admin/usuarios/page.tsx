@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import UserEditModal from "@/components/UserEditModal";
+import EstadoUsuarioModal from "@/components/EstadoUsuarioModal";
+import ResetPasswordModal from "@/components/ResetPasswordModal";
+import { cambiarEstadoUsuario, resetearPasswordUsuario } from "./_actions";
 
 interface Usuario {
   id: string;
@@ -20,6 +23,8 @@ interface Usuario {
   created_at: string;
   meta_mensual?: number;
   comision_porcentaje?: number;
+  requiere_cambio_password?: boolean;
+  motivo_estado?: string;
 }
 
 interface Rol {
@@ -35,6 +40,11 @@ function GestionUsuarios() {
   const [cargando, setCargando] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [userEditing, setUserEditing] = useState<Usuario | null>(null);
+  const [estadoModalOpen, setEstadoModalOpen] = useState(false);
+  const [userCambiandoEstado, setUserCambiandoEstado] = useState<Usuario | null>(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [passwordTemporal, setPasswordTemporal] = useState<string | null>(null);
+  const [userResetPassword, setUserResetPassword] = useState<Usuario | null>(null);
 
   useEffect(() => {
     cargarUsuarios();
@@ -109,10 +119,39 @@ function GestionUsuarios() {
   };
 
   const toggleActivo = async (u: Usuario) => {
-    const ok = await patchUsuario({ id: u.id, activo: !u.activo });
-    if (ok) {
-      toast.success(u.activo ? 'Usuario desactivado' : 'Usuario activado');
+    setUserCambiandoEstado(u);
+    setEstadoModalOpen(true);
+  };
+
+  const handleCambiarEstado = async (motivo: string) => {
+    if (!userCambiandoEstado) return;
+
+    const result = await cambiarEstadoUsuario(
+      userCambiandoEstado.id,
+      !userCambiandoEstado.activo,
+      motivo
+    );
+
+    if (result.success) {
+      toast.success(result.message);
       cargarUsuarios();
+      setEstadoModalOpen(false);
+      setUserCambiandoEstado(null);
+    } else {
+      toast.error(result.error || 'Error cambiando estado');
+    }
+  };
+
+  const handleResetPassword = async (u: Usuario) => {
+    const result = await resetearPasswordUsuario(u.id);
+
+    if (result.success && result.passwordTemporal) {
+      setUserResetPassword(u);
+      setPasswordTemporal(result.passwordTemporal);
+      setResetModalOpen(true);
+      cargarUsuarios();
+    } else {
+      toast.error(result.error || 'Error reseteando contraseña');
     }
   };
 
@@ -329,7 +368,14 @@ function GestionUsuarios() {
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-crm-text-primary">{usuario.nombre_completo || 'Sin nombre'}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-crm-text-primary">{usuario.nombre_completo || 'Sin nombre'}</p>
+                            {usuario.requiere_cambio_password && (
+                              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded" title="Requiere cambio de contraseña">
+                                🔑
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-crm-text-muted">{usuario.email}</p>
                         </div>
                       </div>
@@ -373,11 +419,21 @@ function GestionUsuarios() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-800 text-sm" onClick={() => editarUsuarioPrompt(usuario)}>
+                      <div className="flex flex-wrap gap-2">
+                        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium" onClick={() => editarUsuarioPrompt(usuario)}>
                           Editar
                         </button>
-                        <button className="text-red-600 hover:text-red-800 text-sm" onClick={() => toggleActivo(usuario)}>
+                        <button
+                          className="text-orange-600 hover:text-orange-800 text-sm font-medium"
+                          onClick={() => handleResetPassword(usuario)}
+                          title="Resetear contraseña"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          className={`text-sm font-medium ${usuario.activo ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}
+                          onClick={() => toggleActivo(usuario)}
+                        >
                           {usuario.activo ? 'Desactivar' : 'Activar'}
                         </button>
                       </div>
@@ -403,6 +459,30 @@ function GestionUsuarios() {
             return true;
           }
           return false;
+        }}
+      />
+
+      {/* Modal de cambio de estado */}
+      <EstadoUsuarioModal
+        open={estadoModalOpen}
+        userName={userCambiandoEstado?.nombre_completo || userCambiandoEstado?.email || ''}
+        currentState={userCambiandoEstado?.activo || false}
+        onConfirm={handleCambiarEstado}
+        onClose={() => {
+          setEstadoModalOpen(false);
+          setUserCambiandoEstado(null);
+        }}
+      />
+
+      {/* Modal de reset password */}
+      <ResetPasswordModal
+        open={resetModalOpen}
+        userName={userResetPassword?.nombre_completo || userResetPassword?.email || ''}
+        passwordTemporal={passwordTemporal}
+        onClose={() => {
+          setResetModalOpen(false);
+          setUserResetPassword(null);
+          setPasswordTemporal(null);
         }}
       />
     </div>

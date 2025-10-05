@@ -29,6 +29,8 @@ export async function GET() {
         meta_mensual_ventas,
         comision_porcentaje,
         activo,
+        requiere_cambio_password,
+        motivo_estado,
         created_at,
         rol:rol!usuario_perfil_rol_fk (
           id,
@@ -173,7 +175,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Rol no válido" }, { status: 400 });
     }
 
-    // Crear perfil de usuario
+    // Crear perfil de usuario con requiere_cambio_password = true
     const { error: perfilError } = await supabase
       .from('usuario_perfil')
       .insert({
@@ -185,7 +187,8 @@ export async function POST(request: NextRequest) {
         rol_id: rol.id,
         meta_mensual_ventas: meta_mensual ? parseInt(meta_mensual, 10) : null,
         comision_porcentaje: comision_porcentaje ? parseFloat(comision_porcentaje) : null,
-        activo: true
+        activo: true,
+        requiere_cambio_password: true // Siempre true para nuevos usuarios
       });
 
     if (perfilError) {
