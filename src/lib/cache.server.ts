@@ -15,10 +15,36 @@ async function getUserIdOrNull(s: Awaited<ReturnType<typeof createOptimizedServe
 }
 
 /* ========= Clientes ========= */
-export const getCachedClientes = cache(async (searchTerm?: string): Promise<ClienteCached[]> => {
+interface GetClientesParams {
+  page?: number;
+  pageSize?: number;
+  searchTerm?: string;
+  searchTelefono?: string;
+  searchDni?: string;
+  estado?: string;
+  tipo?: string;
+  vendedor?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export const getCachedClientes = cache(async (params?: GetClientesParams): Promise<{ data: ClienteCached[], total: number }> => {
   const supabase = await createOptimizedServerClient();
   const userId = await getUserIdOrNull(supabase);
-  if (!userId) return [];
+  if (!userId) return { data: [], total: 0 };
+
+  const {
+    page = 1,
+    pageSize = 20,
+    searchTerm = '',
+    searchTelefono = '',
+    searchDni = '',
+    estado = '',
+    tipo = '',
+    vendedor = '',
+    sortBy = 'fecha_alta',
+    sortOrder = 'desc'
+  } = params || {};
 
   let q = supabase
     .from("cliente")
@@ -47,16 +73,49 @@ export const getCachedClientes = cache(async (searchTerm?: string): Promise<Clie
       notas,
       direccion,
       created_at
-    `)
-    .order("created_at", { ascending: false });
+    `, { count: 'exact' });
 
+  // Aplicar filtros
   if (searchTerm) {
-    q = q.or(`nombre.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+    q = q.or(`nombre.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,codigo_cliente.ilike.%${searchTerm}%`);
   }
 
-  const { data, error } = await q;
+  if (searchTelefono) {
+    q = q.or(`telefono.ilike.%${searchTelefono}%,telefono_whatsapp.ilike.%${searchTelefono}%`);
+  }
+
+  if (searchDni) {
+    q = q.ilike('documento_identidad', `%${searchDni}%`);
+  }
+
+  if (estado) {
+    q = q.eq('estado_cliente', estado);
+  }
+
+  if (tipo) {
+    q = q.eq('tipo_cliente', tipo);
+  }
+
+  if (vendedor) {
+    q = q.eq('vendedor_asignado', vendedor);
+  }
+
+  // Ordenar
+  q = q.order(sortBy, { ascending: sortOrder === 'asc' });
+
+  // Paginación
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize - 1;
+  q = q.range(start, end);
+
+  const { data, error, count } = await q;
+
   if (error) throw error;
-  return (data ?? []) as ClienteCached[];
+
+  return {
+    data: (data ?? []) as ClienteCached[],
+    total: count ?? 0
+  };
 });
 
 export const getCachedClientesTotal = cache(async (): Promise<number> => {

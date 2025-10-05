@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 // Cliente de Supabase para Server Actions - SÍ puede modificar cookies
-export async function createServerActionClient(p0: unknown) {
+export async function createServerActionClient() {
   const cookieStore = await cookies();
   
   return createServerClient(

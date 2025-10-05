@@ -4,16 +4,17 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { crearNotificacion } from "@/app/_actionsNotifications";
-import { 
-  TipoCliente, 
+import { getCachedClientes } from "@/lib/cache.server";
+import {
+  TipoCliente,
   TipoDocumento,
-  EstadoCliente, 
-  OrigenLead, 
-  FormaPago, 
-  InteresPrincipal, 
+  EstadoCliente,
+  OrigenLead,
+  FormaPago,
+  InteresPrincipal,
   ProximaAccion,
   DireccionCliente,
-  EstadoCivil 
+  EstadoCivil
 } from "@/lib/types/clientes";
 
 const DireccionSchema = z.object({
@@ -215,4 +216,77 @@ export async function eliminarCliente(id: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/clientes");
+}
+
+// Server Action para obtener clientes con paginación y filtros
+export async function obtenerClientesPaginados(params: {
+  page?: number;
+  pageSize?: number;
+  searchTerm?: string;
+  searchTelefono?: string;
+  searchDni?: string;
+  estado?: string;
+  tipo?: string;
+  vendedor?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}) {
+  try {
+    const result = await getCachedClientes(params);
+    return result;
+  } catch (error) {
+    console.error('Error obteniendo clientes:', error);
+    throw error;
+  }
+}
+
+// Eliminar múltiples clientes
+export async function eliminarClientesMasivo(ids: string[]) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { error } = await supabase
+    .from("cliente")
+    .delete()
+    .in("id", ids);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/clientes");
+  return { success: true, count: ids.length };
+}
+
+// Asignar vendedor a múltiples clientes
+export async function asignarVendedorMasivo(ids: string[], vendedorEmail: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { error } = await supabase
+    .from("cliente")
+    .update({ vendedor_asignado: vendedorEmail })
+    .in("id", ids);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/clientes");
+  return { success: true, count: ids.length };
+}
+
+// Cambiar estado a múltiples clientes
+export async function cambiarEstadoMasivo(ids: string[], nuevoEstado: EstadoCliente) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { error } = await supabase
+    .from("cliente")
+    .update({ estado_cliente: nuevoEstado })
+    .in("id", ids);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard/clientes");
+  return { success: true, count: ids.length };
 }

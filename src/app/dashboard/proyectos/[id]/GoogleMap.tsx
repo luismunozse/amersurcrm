@@ -95,9 +95,9 @@ export default function GoogleMap({
   const overlayRectangleRef = useRef<google.maps.Rectangle | null>(null);
   const overlayListenersRef = useRef<google.maps.MapsEventListener[]>([]);
   const overlaySilentRef = useRef(false);
-  const lotesMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
-  const lotesMarkerListenersRef = useRef<Map<string, google.maps.MapsEventListener[]>>(new Map());
-  const markerAnimationTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const lotesPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
+  const lotesPolygonListenersRef = useRef<Map<string, google.maps.MapsEventListener[]>>(new Map());
+  const lotesLabelsRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const drawingContextRef = useRef<'project' | 'lote' | null>(null);
   const overlayFitRef = useRef(false);
@@ -112,8 +112,11 @@ export default function GoogleMap({
   }, [draggingLoteId]);
 
   useEffect(() => () => {
-    markerAnimationTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    markerAnimationTimeoutsRef.current.clear();
+    // Cleanup de polígonos al desmontar
+    lotesPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+    lotesPolygonsRef.current.clear();
+    lotesLabelsRef.current.forEach((label) => label.setMap(null));
+    lotesLabelsRef.current.clear();
   }, []);
 
   // Cargar script de Google Maps cuando no esté presente
@@ -606,26 +609,26 @@ export default function GoogleMap({
     };
   }, [overlayEditable, overlayBounds, onOverlayBoundsChange]);
 
-  // Actualizar marcadores de lotes
+  // Renderizar polígonos de lotes
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map || !isLoaded) return;
 
-    const removeMarker = (id: string) => {
-      const marker = lotesMarkersRef.current.get(id);
-      if (marker) {
-        marker.setMap(null);
-        lotesMarkersRef.current.delete(id);
+    const removeLote = (id: string) => {
+      const polygon = lotesPolygonsRef.current.get(id);
+      if (polygon) {
+        polygon.setMap(null);
+        lotesPolygonsRef.current.delete(id);
       }
-      const listeners = lotesMarkerListenersRef.current.get(id);
+      const label = lotesLabelsRef.current.get(id);
+      if (label) {
+        label.setMap(null);
+        lotesLabelsRef.current.delete(id);
+      }
+      const listeners = lotesPolygonListenersRef.current.get(id);
       if (listeners) {
         listeners.forEach((listener) => listener.remove());
-        lotesMarkerListenersRef.current.delete(id);
-      }
-      const timeoutId = markerAnimationTimeoutsRef.current.get(id);
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-        markerAnimationTimeoutsRef.current.delete(id);
+        lotesPolygonListenersRef.current.delete(id);
       }
     };
 
@@ -634,126 +637,112 @@ export default function GoogleMap({
     lotes.forEach((lote) => {
       seen.add(lote.id);
 
-      let ubicacion = lote.ubicacion ?? null;
-
-      if (!ubicacion && lote.plano_poligono && lote.plano_poligono.length >= 3) {
-        const [latSum, lngSum] = lote.plano_poligono.reduce(
-          (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
-          [0, 0]
-        );
-        ubicacion = {
-          lat: latSum / lote.plano_poligono.length,
-          lng: lngSum / lote.plano_poligono.length,
-        };
-      }
-
-      if (!ubicacion && lote.data) {
-        let parsed: Record<string, unknown> | undefined;
-        if (typeof lote.data === 'string') {
-          try {
-            parsed = JSON.parse(lote.data) as Record<string, unknown>;
-          } catch (error) {
-            console.warn('No se pudo parsear la data del lote', error);
-          }
-        } else if (typeof lote.data === 'object') {
-          parsed = lote.data as Record<string, unknown>;
-        }
-
-        if (parsed && Array.isArray(parsed.plano_poligono) && parsed.plano_poligono.length >= 3) {
-          const coords = parsed.plano_poligono as [number, number][];
-          const [latSum, lngSum] = coords.reduce(
-            (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
-            [0, 0]
-          );
-          ubicacion = {
-            lat: latSum / coords.length,
-            lng: lngSum / coords.length,
-          };
-        }
-      }
-
-      if (!ubicacion) {
-        removeMarker(lote.id);
+      // Solo renderizar lotes que tienen polígono
+      if (!lote.plano_poligono || lote.plano_poligono.length < 3) {
+        removeLote(lote.id);
         return;
       }
 
       const color = ESTADO_COLORES[lote.estado || 'desconocido'] || ESTADO_COLORES.desconocido;
-      const labelText = lote.codigo.slice(-3);
+      const isHighlighted = highlightLoteId === lote.id;
 
-      const markerIcon: google.maps.Icon = {
-        path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-        fillColor: color,
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 1.5,
-        scale: 1.6,
-        anchor: new google.maps.Point(12, 24),
-      };
+      // Convertir coordenadas a formato Google Maps
+      const path = lote.plano_poligono.map(([lat, lng]) => ({ lat, lng }));
 
-      if (!lotesMarkersRef.current.has(lote.id)) {
-        const marker = new google.maps.Marker({
-          position: ubicacion,
+      // Crear o actualizar polígono
+      if (!lotesPolygonsRef.current.has(lote.id)) {
+        const polygon = new google.maps.Polygon({
+          paths: path,
+          strokeColor: color,
+          strokeOpacity: isHighlighted ? 1 : 0.8,
+          strokeWeight: isHighlighted ? 3 : 2,
+          fillColor: color,
+          fillOpacity: isHighlighted ? 0.5 : 0.35,
           map,
-          title: `${lote.codigo} - ${lote.estado || 'Sin estado'}`,
-          icon: markerIcon,
-          label: {
-            text: labelText,
-            color: '#ffffff',
-            fontWeight: 'bold',
-          },
-          draggable: true,
+          draggable: false,
+          editable: false,
+          clickable: true,
         });
-        lotesMarkersRef.current.set(lote.id, marker);
+        lotesPolygonsRef.current.set(lote.id, polygon);
+      } else {
+        const polygon = lotesPolygonsRef.current.get(lote.id)!;
+        polygon.setOptions({
+          paths: path,
+          strokeColor: color,
+          strokeOpacity: isHighlighted ? 1 : 0.8,
+          strokeWeight: isHighlighted ? 3 : 2,
+          fillColor: color,
+          fillOpacity: isHighlighted ? 0.5 : 0.35,
+        });
       }
 
-      const marker = lotesMarkersRef.current.get(lote.id)!;
-      marker.setOptions({
-        position: ubicacion,
-        icon: markerIcon,
-        label: {
-          text: labelText,
-          color: '#ffffff',
-          fontWeight: 'bold',
-        },
-        draggable: true,
-        zIndex: highlightLoteId === lote.id ? 1000 : undefined,
-      });
+      // Calcular centro del polígono para la etiqueta
+      const [latSum, lngSum] = lote.plano_poligono.reduce(
+        (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
+        [0, 0]
+      );
+      const center = {
+        lat: latSum / lote.plano_poligono.length,
+        lng: lngSum / lote.plano_poligono.length,
+      };
 
-      const existingListeners = lotesMarkerListenersRef.current.get(lote.id);
+      // Crear o actualizar label
+      if (!lotesLabelsRef.current.has(lote.id)) {
+        const label = new google.maps.Marker({
+          position: center,
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0,
+          },
+          label: {
+            text: lote.codigo,
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            className: 'lote-label',
+          },
+          clickable: false,
+          zIndex: 1000,
+        });
+        lotesLabelsRef.current.set(lote.id, label);
+      } else {
+        const label = lotesLabelsRef.current.get(lote.id)!;
+        label.setOptions({
+          position: center,
+          label: {
+            text: lote.codigo,
+            color: '#ffffff',
+            fontSize: isHighlighted ? '12px' : '11px',
+            fontWeight: 'bold',
+          },
+        });
+      }
+
+      // Agregar event listeners al polígono
+      const polygon = lotesPolygonsRef.current.get(lote.id)!;
+      const existingListeners = lotesPolygonListenersRef.current.get(lote.id);
       if (existingListeners) {
         existingListeners.forEach((listener) => listener.remove());
       }
+
       const listeners: google.maps.MapsEventListener[] = [];
       listeners.push(
-        marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
-          if (!event.latLng) return;
-          onMarkerDragEnd?.(lote.id, event.latLng.lat(), event.latLng.lng());
+        polygon.addListener('click', () => {
+          // Aquí se puede agregar lógica para seleccionar el lote
+          console.log('Lote clickeado:', lote.codigo);
         })
       );
-      lotesMarkerListenersRef.current.set(lote.id, listeners);
-
-      if (highlightLoteId === lote.id) {
-        marker.setAnimation(google.maps.Animation.BOUNCE);
-        const prevTimeout = markerAnimationTimeoutsRef.current.get(lote.id);
-        if (prevTimeout) {
-          window.clearTimeout(prevTimeout);
-        }
-        const timeoutId = window.setTimeout(() => {
-          marker.setAnimation(null);
-          markerAnimationTimeoutsRef.current.delete(lote.id);
-        }, 1600);
-        markerAnimationTimeoutsRef.current.set(lote.id, timeoutId);
-      } else {
-        marker.setAnimation(null);
-      }
+      lotesPolygonListenersRef.current.set(lote.id, listeners);
     });
 
-    Array.from(lotesMarkersRef.current.keys()).forEach((id) => {
+    // Remover polígonos que ya no existen
+    Array.from(lotesPolygonsRef.current.keys()).forEach((id) => {
       if (!seen.has(id)) {
-        removeMarker(id);
+        removeLote(id);
       }
     });
-  }, [lotes, highlightLoteId, isLoaded, onMarkerDragEnd]);
+  }, [lotes, highlightLoteId, isLoaded]);
 
   const loadingFallback = useMemo(
     () => (

@@ -5,29 +5,47 @@ import ClientesTable from "@/components/ClientesTable";
 import AdvancedClientSearch from "@/components/AdvancedClientSearch";
 import PhoneNormalizationTool from "@/components/PhoneNormalizationTool";
 
-type SP = Promise<{ 
-  q?: string | string[]; 
+type SP = Promise<{
+  q?: string | string[];
   telefono?: string | string[];
   dni?: string | string[];
-  page?: string | string[] 
+  estado?: string | string[];
+  tipo?: string | string[];
+  vendedor?: string | string[];
+  page?: string | string[];
+  sortBy?: string | string[];
+  sortOrder?: string | string[];
 }>;
 
 export default async function ClientesPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
-  const qRaw = sp.q;
-  const telefonoRaw = sp.telefono;
-  const dniRaw = sp.dni;
-  
-  const q = (Array.isArray(qRaw) ? qRaw[0] : qRaw ?? "").trim();
-  const telefono = (Array.isArray(telefonoRaw) ? telefonoRaw[0] : telefonoRaw ?? "").trim();
-  const dni = (Array.isArray(dniRaw) ? dniRaw[0] : dniRaw ?? "").trim();
+
+  const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q ?? "").trim();
+  const telefono = (Array.isArray(sp.telefono) ? sp.telefono[0] : sp.telefono ?? "").trim();
+  const dni = (Array.isArray(sp.dni) ? sp.dni[0] : sp.dni ?? "").trim();
+  const estado = (Array.isArray(sp.estado) ? sp.estado[0] : sp.estado ?? "").trim();
+  const tipo = (Array.isArray(sp.tipo) ? sp.tipo[0] : sp.tipo ?? "").trim();
+  const vendedor = (Array.isArray(sp.vendedor) ? sp.vendedor[0] : sp.vendedor ?? "").trim();
+  const page = parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page ?? "1"), 10);
+  const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "fecha_alta").trim();
+  const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
 
   try {
-    // Usar caché para obtener todos los clientes
-    const [allClientes, total] = await Promise.all([
-      getCachedClientes(q),
-      getCachedClientesTotal(),
-    ]);
+    // Obtener clientes paginados con filtros
+    const { data: clientes, total } = await getCachedClientes({
+      page,
+      pageSize: 20,
+      searchTerm: q,
+      searchTelefono: telefono,
+      searchDni: dni,
+      estado,
+      tipo,
+      vendedor,
+      sortBy,
+      sortOrder
+    });
+
+    const totalPages = Math.ceil(total / 20);
 
     return (
       <div className="w-full p-6 space-y-6">
@@ -39,24 +57,26 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
           </div>
           <div className="flex items-center space-x-3">
             <div className="text-sm text-crm-text-muted">
-              {total} {total === 1 ? 'cliente' : 'clientes'} total
+              {total.toLocaleString()} {total === 1 ? 'cliente' : 'clientes'} total
             </div>
           </div>
         </div>
 
-        {/* Herramienta de normalización de teléfonos */}
-        <PhoneNormalizationTool clientes={allClientes} />
-
-        {/* Buscador Avanzado */}
-        <AdvancedClientSearch clientes={allClientes} />
-
         <NewClienteForm />
 
-        <ClientesTable 
-          clientes={allClientes} 
+        <ClientesTable
+          clientes={clientes}
+          total={total}
+          currentPage={page}
+          totalPages={totalPages}
           searchQuery={q}
           searchTelefono={telefono}
           searchDni={dni}
+          estado={estado}
+          tipo={tipo}
+          vendedor={vendedor}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
         />
       </div>
     );

@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         if (error instanceof z.ZodError) {
           errors.push({
             row: i + 1,
-            errors: error.errors.map(e => e.message)
+            errors: (error as any).errors.map((e: any) => e.message)
           });
         } else {
           errors.push({

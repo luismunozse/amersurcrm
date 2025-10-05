@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 type Props = {
   open: boolean;
   title: string;
-  description?: string;
+  description?: string | React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   disabled?: boolean;
@@ -48,7 +48,7 @@ export default function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       aria-modal="true"
       role="dialog"
       aria-labelledby="confirm-title"
@@ -57,18 +57,37 @@ export default function ConfirmDialog({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-sm bg-bg-card border rounded-2xl shadow-card p-5">
-        <h2 id="confirm-title" className="text-base font-semibold mb-1">{title}</h2>
-        {description && (
-          <p className="text-sm text-text-muted mb-4">{description}</p>
-        )}
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
 
-        <div className="flex justify-end gap-2">
+      {/* Dialog */}
+      <div className="relative z-10 w-full max-w-md bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+        {/* Icono de advertencia */}
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h2 id="confirm-title" className="text-lg font-semibold text-crm-text-primary mb-2">
+              {title}
+            </h2>
+            {description && (
+              <div className="text-sm text-crm-text-secondary leading-relaxed">
+                {description}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Botones */}
+        <div className="flex justify-end gap-3 mt-6">
           <button
             ref={cancelRef}
             type="button"
-            className="border rounded-xl px-3 py-1.5 text-sm hover:bg-neutral-50"
+            className="px-4 py-2 text-sm font-medium text-crm-text-primary bg-crm-card-hover border border-crm-border rounded-lg hover:bg-crm-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onClose}
             disabled={disabled}
           >
@@ -76,7 +95,7 @@ export default function ConfirmDialog({
           </button>
           <button
             type="button"
-            className="rounded-xl px-3 py-1.5 text-sm text-white bg-danger hover:opacity-90 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-600/20"
             onClick={onConfirm}
             disabled={disabled}
           >

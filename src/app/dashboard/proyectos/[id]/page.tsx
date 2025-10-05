@@ -7,6 +7,7 @@ import MapeoLotes from "./_MapeoLotes";
 import DeleteProjectButton from "./_DeleteProjectButton";
 import GoogleMapsDebug from "@/components/GoogleMapsDebug";
 import { PaginationClient } from "./_PaginationClient";
+import ProjectTabs from "./_ProjectTabs";
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -297,73 +298,80 @@ export default async function ProyLotesPage({
         </div>
       </div>
 
-      {/* Filtros compactos */}
-      <div className="crm-card p-4 md:p-5">
-        <form action={`/dashboard/proyectos/${proyecto.id}`} className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-              </div>
-              <input
-                name="q"
-                defaultValue={q}
-                className="w-full pl-10 pr-4 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-                placeholder="Buscar por código de lote..."
-              />
+      {/* Tabs Navigation */}
+      <ProjectTabs
+        lotesSection={
+          <>
+            {/* Filtros compactos */}
+            <div className="crm-card p-4 md:p-5">
+              <form action={`/dashboard/proyectos/${proyecto.id}`} className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                      </svg>
+                    </div>
+                    <input
+                      name="q"
+                      defaultValue={q}
+                      className="w-full pl-10 pr-4 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
+                      placeholder="Buscar por código de lote..."
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-48">
+                  <select
+                    name="estado"
+                    defaultValue={estado || "all"}
+                    className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="disponible">✅ Disponible</option>
+                    <option value="reservado">🔒 Reservado</option>
+                    <option value="vendido">💰 Vendido</option>
+                  </select>
+                </div>
+
+                <button className="crm-button-primary px-6 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+                  Buscar
+                </button>
+              </form>
             </div>
-          </div>
 
-          <div className="w-full sm:w-48">
-            <select
-              name="estado"
-              defaultValue={estado || "all"}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="disponible">✅ Disponible</option>
-              <option value="reservado">🔒 Reservado</option>
-              <option value="vendido">💰 Vendido</option>
-            </select>
-          </div>
+            <NewLoteForm
+              proyectoId={proyecto.id}
+              proyectos={todosLosProyectos || []}
+            />
 
-          <button className="crm-button-primary px-6 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
-            Buscar
-          </button>
-        </form>
-      </div>
+            <LotesList proyectoId={proyecto.id} lotes={lotesConProyecto} />
 
-      {/* Mapeo de Lotes */}
-      <MapeoLotes 
-        proyectoId={proyecto.id}
-        planosUrl={proyecto.planos_url}
-        proyectoNombre={proyecto.nombre}
-        initialBounds={overlayBoundsValue}
-        initialRotation={overlayRotationValue}
-        lotes={lotesForMapeo}
-        ubigeo={undefined}
-        initialPolygon={proyectoPolygon}
+            {/* Paginación mejorada */}
+            {total > perPage && (
+              <PaginationClient
+                currentPage={page}
+                totalPages={lastPage}
+                proyectoId={proyecto.id}
+                q={q}
+                estado={estado}
+              />
+            )}
+          </>
+        }
+        mapeoSection={
+          <MapeoLotes
+            proyectoId={proyecto.id}
+            planosUrl={proyecto.planos_url}
+            proyectoNombre={proyecto.nombre}
+            initialBounds={overlayBoundsValue}
+            initialRotation={overlayRotationValue}
+            lotes={lotesForMapeo}
+            ubigeo={undefined}
+            initialPolygon={proyectoPolygon}
+          />
+        }
       />
-
-      <NewLoteForm 
-        proyectoId={proyecto.id} 
-        proyectos={todosLosProyectos || []} 
-      />
-
-      <LotesList proyectoId={proyecto.id} lotes={lotesConProyecto} />
-
-      {/* Paginación mejorada */}
-      {total > perPage && (
-        <PaginationClient
-          currentPage={page}
-          totalPages={lastPage}
-          proyectoId={proyecto.id}
-          q={q}
-          estado={estado}
-        />
-      )}
       
       {/* Debug component */}
       <GoogleMapsDebug />

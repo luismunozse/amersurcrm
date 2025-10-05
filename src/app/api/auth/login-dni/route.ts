@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       .eq("activo", true)
       .single();
 
-    if (perfilError || !perfil || perfil.rol?.nombre !== "ROL_VENDEDOR") {
+    if (perfilError || !perfil || !perfil.rol || (perfil.rol as any).nombre !== "ROL_VENDEDOR") {
       return NextResponse.json(
         { error: "Credenciales inválidas" },
         { status: 401 }

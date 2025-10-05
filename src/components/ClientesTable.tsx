@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useTransition, memo, useMemo } from "react";
-import { actualizarCliente, eliminarCliente, actualizarEstadoCliente } from "@/app/dashboard/clientes/_actions";
+import { useState, useTransition, memo, useMemo, useEffect } from "react";
+import {
+  actualizarCliente,
+  eliminarCliente,
+  actualizarEstadoCliente,
+  eliminarClientesMasivo,
+  asignarVendedorMasivo,
+  cambiarEstadoMasivo
+} from "@/app/dashboard/clientes/_actions";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -416,12 +423,33 @@ type Cliente = {
 
 interface ClientesTableProps {
   clientes: Cliente[];
+  total: number;
+  currentPage: number;
+  totalPages: number;
   searchQuery?: string;
   searchTelefono?: string;
   searchDni?: string;
+  estado?: string;
+  tipo?: string;
+  vendedor?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
-export default function ClientesTable({ clientes, searchQuery = '', searchTelefono = '', searchDni = '' }: ClientesTableProps) {
+export default function ClientesTable({
+  clientes,
+  total,
+  currentPage,
+  totalPages,
+  searchQuery = '',
+  searchTelefono = '',
+  searchDni = '',
+  estado = '',
+  tipo = '',
+  vendedor = '',
+  sortBy: initialSortBy = 'fecha_alta',
+  sortOrder: initialSortOrder = 'desc'
+}: ClientesTableProps) {
   const [editing, setEditing] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState<{ open: boolean; id: string | null; nombre?: string }>({
@@ -430,78 +458,108 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
   });
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [filters, setFilters] = useState({
-    estado: '',
-    tipo: '',
-    vendedor: '',
-    search: ''
-  });
-  const [sortBy, setSortBy] = useState<keyof Cliente>('fecha_alta');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const router = useRouter();
+  const [sortBy, setSortBy] = useState<keyof Cliente>(initialSortBy as keyof Cliente);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(initialSortOrder);
 
-  // Filtrar y ordenar clientes
-  const filteredAndSortedClientes = useMemo(() => {
-    let filtered = clientes.filter(cliente => {
-      // Filtros de búsqueda desde URL
-      const matchesSearchQuery = !searchQuery || 
-        cliente.nombre.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesSearchTelefono = !searchTelefono || 
-        cliente.telefono?.includes(searchTelefono) ||
-        cliente.telefono_whatsapp?.includes(searchTelefono);
-      
-      const matchesSearchDni = !searchDni || 
-        cliente.documento_identidad?.includes(searchDni);
-      
-      // Filtros locales del componente
-      const matchesSearch = !filters.search || 
-        cliente.nombre.toLowerCase().includes(filters.search.toLowerCase()) ||
-        cliente.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
-        cliente.codigo_cliente.toLowerCase().includes(filters.search.toLowerCase());
-      
-      const matchesEstado = !filters.estado || cliente.estado_cliente === filters.estado;
-      const matchesTipo = !filters.tipo || cliente.tipo_cliente === filters.tipo;
-      const matchesVendedor = !filters.vendedor || cliente.vendedor_asignado === filters.vendedor;
-      
-      return matchesSearchQuery && matchesSearchTelefono && matchesSearchDni && 
-             matchesSearch && matchesEstado && matchesTipo && matchesVendedor;
-    });
+  // Estado para selección múltiple
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [bulkAction, setBulkAction] = useState<'delete' | 'assignVendedor' | 'changeEstado' | null>(null);
+  const [bulkVendedor, setBulkVendedor] = useState('');
+  const [bulkEstado, setBulkEstado] = useState<EstadoCliente>('por_contactar');
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
-    // Ordenar
-    filtered.sort((a, b) => {
-      const aVal = a[sortBy];
-      const bVal = b[sortBy];
-      
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
-      
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortOrder === 'asc' 
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
+  // Ya no necesitamos filtrar ni ordenar localmente, el servidor lo hace
+  // Los clientes vienen ya filtrados, ordenados y paginados del servidor
+
+  // Funciones de selección múltiple
+  const toggleSelectAll = () => {
+    if (selectedIds.size === clientes.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(clientes.map(c => c.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const isAllSelected = clientes.length > 0 && selectedIds.size === clientes.length;
+  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < clientes.length;
+
+  // Ejecutar acciones masivas
+  useEffect(() => {
+    if (!bulkAction) return;
+
+    const executeAction = async () => {
+      const idsArray = Array.from(selectedIds);
+
+      if (idsArray.length === 0) {
+        toast.error('No hay clientes seleccionados');
+        setBulkAction(null);
+        return;
       }
-      
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+
+      startTransition(async () => {
+        try {
+          if (bulkAction === 'delete') {
+            // Mostrar diálogo de confirmación personalizado
+            setConfirmBulkDelete(true);
+            setBulkAction(null);
+            return;
+          } else if (bulkAction === 'assignVendedor') {
+            if (!bulkVendedor) {
+              toast.error('Debes ingresar el email del vendedor');
+              setBulkAction(null);
+              return;
+            }
+
+            await asignarVendedorMasivo(idsArray, bulkVendedor);
+            toast.success(`Vendedor asignado a ${idsArray.length} ${idsArray.length === 1 ? 'cliente' : 'clientes'}`);
+            setSelectedIds(new Set());
+            setBulkVendedor('');
+            router.refresh();
+          } else if (bulkAction === 'changeEstado') {
+            await cambiarEstadoMasivo(idsArray, bulkEstado);
+            toast.success(`Estado cambiado a "${getEstadoClienteLabel(bulkEstado)}" para ${idsArray.length} ${idsArray.length === 1 ? 'cliente' : 'clientes'}`);
+            setSelectedIds(new Set());
+            router.refresh();
+          }
+        } catch (error) {
+          toast.error(getErrorMessage(error) || 'Error ejecutando la acción');
+        } finally {
+          setBulkAction(null);
+        }
+      });
+    };
+
+    executeAction();
+  }, [bulkAction, selectedIds, bulkVendedor, bulkEstado, router]);
+
+  // Ejecutar eliminación masiva después de confirmación
+  const handleConfirmBulkDelete = async () => {
+    const idsArray = Array.from(selectedIds);
+
+    startTransition(async () => {
+      try {
+        await eliminarClientesMasivo(idsArray);
+        toast.success(`${idsArray.length} ${idsArray.length === 1 ? 'cliente eliminado' : 'clientes eliminados'} exitosamente`);
+        setSelectedIds(new Set());
+        setConfirmBulkDelete(false);
+        router.refresh();
+      } catch (error) {
+        toast.error(getErrorMessage(error) || 'Error eliminando clientes');
       }
-      
-      return 0;
     });
-
-    return filtered;
-  }, [clientes, searchQuery, searchTelefono, searchDni, filters, sortBy, sortOrder]);
-
-  // Paginación
-  const {
-    currentPage,
-    totalPages,
-    paginatedItems,
-    goToPage,
-  } = usePagination({
-    items: filteredAndSortedClientes,
-    itemsPerPage: 20,
-  });
+  };
 
   // Memoizar funciones para evitar re-renders innecesarios
   const handleEdit = useMemo(() => (id: string) => setEditing(id), []);
@@ -539,12 +597,36 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
   };
 
   const handleSort = (column: keyof Cliente) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('asc');
-    }
+    const newSortOrder = sortBy === column ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
+
+    // Construir URL params manteniendo los filtros actuales
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (searchTelefono) params.set('telefono', searchTelefono);
+    if (searchDni) params.set('dni', searchDni);
+    if (estado) params.set('estado', estado);
+    if (tipo) params.set('tipo', tipo);
+    if (vendedor) params.set('vendedor', vendedor);
+    params.set('sortBy', column);
+    params.set('sortOrder', newSortOrder);
+    params.set('page', '1'); // Resetear a página 1 al ordenar
+
+    router.push(`/dashboard/clientes?${params.toString()}`);
+  };
+
+  const goToPage = (page: number) => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (searchTelefono) params.set('telefono', searchTelefono);
+    if (searchDni) params.set('dni', searchDni);
+    if (estado) params.set('estado', estado);
+    if (tipo) params.set('tipo', tipo);
+    if (vendedor) params.set('vendedor', vendedor);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    params.set('page', page.toString());
+
+    router.push(`/dashboard/clientes?${params.toString()}`);
   };
 
   const getSortIcon = (column: keyof Cliente) => {
@@ -558,11 +640,6 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
       month: '2-digit',
       year: 'numeric'
     });
-  };
-
-  const getVendedores = () => {
-    const vendedores = [...new Set(clientes.map(c => c.vendedor_asignado).filter(Boolean))];
-    return vendedores;
   };
 
   if (editing) {
@@ -581,7 +658,84 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
 
   return (
     <div className="space-y-6">
-      {/* Los filtros ahora están en el componente AdvancedClientSearch */}
+      {/* Barra de acciones masivas */}
+      {selectedIds.size > 0 && (
+        <div className="crm-card p-4 bg-crm-card-hover border border-crm-border">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-semibold text-crm-text-primary">
+                {selectedIds.size} {selectedIds.size === 1 ? 'cliente seleccionado' : 'clientes seleccionados'}
+              </span>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-sm text-crm-text-muted hover:text-crm-primary transition-colors underline"
+              >
+                Deseleccionar todo
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Cambiar Estado */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={bulkEstado}
+                  onChange={(e) => setBulkEstado(e.target.value as EstadoCliente)}
+                  className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all"
+                >
+                  {ESTADOS_CLIENTE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setBulkAction('changeEstado')}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Cambiar Estado
+                </button>
+              </div>
+
+              {/* Asignar Vendedor */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Email del vendedor"
+                  value={bulkVendedor}
+                  onChange={(e) => setBulkVendedor(e.target.value)}
+                  className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary placeholder:text-crm-text-muted focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all w-48"
+                />
+                <button
+                  onClick={() => setBulkAction('assignVendedor')}
+                  disabled={isPending || !bulkVendedor}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  </svg>
+                  Asignar Vendedor
+                </button>
+              </div>
+
+              {/* Eliminar */}
+              <button
+                onClick={() => setBulkAction('delete')}
+                disabled={isPending}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-danger hover:bg-crm-danger/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabla */}
       <div className="crm-card overflow-hidden">
@@ -589,7 +743,20 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
           <table className="w-full">
             <thead className="bg-crm-card-hover border-b border-crm-border">
               <tr>
-                <th 
+                <th className="px-4 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(input) => {
+                      if (input) {
+                        input.indeterminate = isSomeSelected;
+                      }
+                    }}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
+                  />
+                </th>
+                <th
                   className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
                   onClick={() => handleSort('nombre')}
                 >
@@ -622,7 +789,7 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
               </tr>
             </thead>
             <tbody className="divide-y divide-crm-border">
-              {paginatedItems.map((cliente) => (
+              {clientes.map((cliente) => (
                 <ClienteRow
                   key={cliente.id}
                   cliente={cliente}
@@ -630,13 +797,15 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
                   onDelete={askDelete}
                   onShowDetail={handleShowDetail}
                   isPending={isPending}
+                  isSelected={selectedIds.has(cliente.id)}
+                  onToggleSelect={toggleSelectOne}
                 />
               ))}
             </tbody>
           </table>
         </div>
 
-        {paginatedItems.length === 0 && (
+        {clientes.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -645,7 +814,7 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
             </div>
             <h4 className="text-lg font-medium text-crm-text-primary mb-2">No hay clientes</h4>
             <p className="text-crm-text-muted">
-              {filters.search || filters.estado || filters.tipo || filters.vendedor
+              {searchQuery || estado || tipo || vendedor
                 ? "No se encontraron clientes con los filtros aplicados"
                 : "Comienza agregando tu primer cliente"
               }
@@ -680,6 +849,24 @@ export default function ClientesTable({ clientes, searchQuery = '', searchTelefo
         onClose={handleCloseDetail}
         cliente={selectedCliente}
       />
+
+      {/* Diálogo de confirmación de eliminación masiva */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Eliminar clientes"
+        description={
+          <>
+            ¿Estás seguro de eliminar <span className="font-bold text-crm-danger">{selectedIds.size}</span>{' '}
+            {selectedIds.size === 1 ? 'cliente' : 'clientes'}?
+            <br />
+            <span className="text-crm-danger font-semibold">Esta acción no se puede deshacer.</span>
+          </>
+        }
+        confirmText={isPending ? "Eliminando…" : "Eliminar"}
+        onConfirm={handleConfirmBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
+        disabled={isPending}
+      />
     </div>
   );
 }
@@ -691,12 +878,16 @@ const ClienteRow = memo(function ClienteRow({
   onDelete,
   onShowDetail,
   isPending,
+  isSelected,
+  onToggleSelect,
 }: {
   cliente: Cliente;
   onEdit: (id: string) => void;
   onDelete: (c: Cliente) => void;
   onShowDetail: (c: Cliente) => void;
   isPending: boolean;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
 }) {
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -790,7 +981,16 @@ const ClienteRow = memo(function ClienteRow({
   };
 
   return (
-    <tr className="hover:bg-crm-card-hover transition-colors">
+    <tr className={`hover:bg-crm-card-hover transition-colors ${isSelected ? 'bg-crm-primary/5' : ''}`}>
+      {/* Checkbox */}
+      <td className="px-4 py-4">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(cliente.id)}
+          className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
+        />
+      </td>
       {/* Cliente */}
       <td className="px-4 py-4">
         <div className="flex items-center">

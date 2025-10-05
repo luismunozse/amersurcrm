@@ -55,10 +55,13 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
-      case 'por_contactar': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'contactado': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'transferido': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'por_contactar': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      case 'contactado': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
+      case 'transferido': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800';
+      case 'intermedio': return 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800';
+      case 'potencial': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+      case 'desestimado': return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-crm-border dark:border-gray-700';
+      default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-crm-border dark:border-gray-700';
     }
   };
 
@@ -102,10 +105,10 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
   };
 
   const getNivelCliente = (capacidad: number | null) => {
-    if (!capacidad) return { nivel: 'No especificado', color: 'text-gray-600 bg-gray-100' };
-    if (capacidad >= 500000) return { nivel: 'Alto', color: 'text-green-700 bg-green-100' };
-    if (capacidad >= 100000) return { nivel: 'Medio', color: 'text-yellow-700 bg-yellow-100' };
-    return { nivel: 'Desestimado', color: 'text-red-700 bg-red-100' };
+    if (!capacidad) return { nivel: 'No especificado', color: 'text-crm-text-secondary bg-crm-card-hover' };
+    if (capacidad >= 500000) return { nivel: 'Alto', color: 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30' };
+    if (capacidad >= 100000) return { nivel: 'Medio', color: 'text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30' };
+    return { nivel: 'Bajo', color: 'text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30' };
   };
 
   return (
@@ -134,7 +137,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
               leaveFrom="opacity-100 scale-100 translate-y-0"
               leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all">
+              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-crm-card border-2 border-crm-border text-left align-middle shadow-2xl transition-all">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 px-6 py-6">
                   <div className="flex items-start justify-between">
@@ -185,41 +188,41 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       
                       <div className="space-y-3">
                         {cliente.email && (
-                          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                            <EnvelopeIcon className="w-5 h-5 text-crm-text-muted" />
+                          <div className="flex items-center space-x-3 p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors">
+                            <EnvelopeIcon className="w-5 h-5 text-crm-primary" />
                             <div>
                               <p className="text-sm font-medium text-crm-text-primary">Email</p>
-                              <p className="text-sm text-crm-text-muted">{cliente.email}</p>
+                              <p className="text-sm text-crm-text-secondary">{cliente.email}</p>
                             </div>
                           </div>
                         )}
-                        
+
                         {cliente.telefono && (
-                          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                            <PhoneIcon className="w-5 h-5 text-crm-text-muted" />
+                          <div className="flex items-center space-x-3 p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors">
+                            <PhoneIcon className="w-5 h-5 text-crm-primary" />
                             <div>
                               <p className="text-sm font-medium text-crm-text-primary">Teléfono</p>
-                              <p className="text-sm text-crm-text-muted">{cliente.telefono}</p>
+                              <p className="text-sm text-crm-text-secondary">{cliente.telefono}</p>
                             </div>
                           </div>
                         )}
-                        
+
                         {cliente.telefono_whatsapp && (
-                          <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                            <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-600" />
+                          <div className="flex items-center space-x-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-colors">
+                            <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
                             <div>
                               <p className="text-sm font-medium text-crm-text-primary">WhatsApp</p>
-                              <p className="text-sm text-crm-text-muted">{cliente.telefono_whatsapp}</p>
+                              <p className="text-sm text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
                             </div>
                           </div>
                         )}
-                        
+
                         {cliente.documento_identidad && (
-                          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                            <DocumentTextIcon className="w-5 h-5 text-crm-text-muted" />
+                          <div className="flex items-center space-x-3 p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors">
+                            <DocumentTextIcon className="w-5 h-5 text-crm-primary" />
                             <div>
                               <p className="text-sm font-medium text-crm-text-primary">Documento</p>
-                              <p className="text-sm text-crm-text-muted">{cliente.documento_identidad}</p>
+                              <p className="text-sm text-crm-text-secondary">{cliente.documento_identidad}</p>
                             </div>
                           </div>
                         )}
@@ -235,37 +238,37 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       
                       <div className="space-y-3">
                         {cliente.interes_principal && (
-                          <div className="p-3 bg-blue-50 rounded-lg">
+                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
                             <p className="text-sm font-medium text-crm-text-primary">Interés Principal</p>
-                            <p className="text-sm text-crm-text-muted">{cliente.interes_principal}</p>
+                            <p className="text-sm text-crm-text-secondary">{cliente.interes_principal}</p>
                           </div>
                         )}
-                        
+
+                        {cliente.origen_lead && (
+                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
+                            <p className="text-sm font-medium text-crm-text-primary">Origen del Lead</p>
+                            <p className="text-sm text-crm-text-secondary">{cliente.origen_lead}</p>
+                          </div>
+                        )}
+
                         {cliente.capacidad_compra_estimada && (
-                          <div className="p-3 bg-green-50 rounded-lg">
+                          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                             <p className="text-sm font-medium text-crm-text-primary">Capacidad de Compra</p>
-                            <p className="text-sm text-crm-text-muted font-semibold">{formatCapacidad(cliente.capacidad_compra_estimada)}</p>
+                            <p className="text-lg font-bold text-green-700 dark:text-green-400">{formatCapacidad(cliente.capacidad_compra_estimada)}</p>
                           </div>
                         )}
                         
                         {cliente.forma_pago_preferida && (
-                          <div className="p-3 bg-yellow-50 rounded-lg">
+                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
                             <p className="text-sm font-medium text-crm-text-primary">Forma de Pago Preferida</p>
-                            <p className="text-sm text-crm-text-muted">{cliente.forma_pago_preferida}</p>
-                          </div>
-                        )}
-                        
-                        {cliente.origen_lead && (
-                          <div className="p-3 bg-purple-50 rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Origen del Lead</p>
-                            <p className="text-sm text-crm-text-muted">{cliente.origen_lead}</p>
+                            <p className="text-sm text-crm-text-secondary">{cliente.forma_pago_preferida}</p>
                           </div>
                         )}
 
                         {cliente.vendedor_asignado && (
-                          <div className="p-3 bg-indigo-50 rounded-lg">
+                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
                             <p className="text-sm font-medium text-crm-text-primary">Vendedor Asignado</p>
-                            <p className="text-sm text-crm-text-muted">{cliente.vendedor_asignado}</p>
+                            <p className="text-sm text-crm-text-secondary">{cliente.vendedor_asignado}</p>
                           </div>
                         )}
                       </div>
@@ -278,8 +281,8 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                         Dirección
                       </h4>
                       
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-crm-text-muted">{formatDireccion(cliente.direccion)}</p>
+                      <div className="p-3 bg-crm-card-hover rounded-lg">
+                        <p className="text-sm text-crm-text-secondary">{formatDireccion(cliente.direccion)}</p>
                       </div>
                     </div>
 
@@ -291,22 +294,22 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       </h4>
                       
                       <div className="space-y-3">
-                        <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="p-3 bg-crm-card-hover rounded-lg">
                           <p className="text-sm font-medium text-crm-text-primary">Fecha de Alta</p>
-                          <p className="text-sm text-crm-text-muted">{formatDate(cliente.fecha_alta)}</p>
+                          <p className="text-sm text-crm-text-secondary">{formatDate(cliente.fecha_alta)}</p>
                         </div>
                         
                         {cliente.ultimo_contacto && (
-                          <div className="p-3 bg-blue-50 rounded-lg">
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <p className="text-sm font-medium text-crm-text-primary">Último Contacto</p>
-                            <p className="text-sm text-crm-text-muted">{formatDate(cliente.ultimo_contacto)}</p>
+                            <p className="text-sm text-crm-text-secondary">{formatDate(cliente.ultimo_contacto)}</p>
                           </div>
                         )}
-                        
+
                         {cliente.proxima_accion && (
-                          <div className="p-3 bg-orange-50 rounded-lg">
+                          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                             <p className="text-sm font-medium text-crm-text-primary">Próxima Acción</p>
-                            <p className="text-sm text-crm-text-muted">{cliente.proxima_accion}</p>
+                            <p className="text-sm text-crm-text-secondary">{cliente.proxima_accion}</p>
                           </div>
                         )}
                       </div>
@@ -314,54 +317,54 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                   </div>
 
                   {/* Estadísticas de Propiedades */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="mt-6 pt-6 border-t border-crm-border">
                     <h4 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center">
                       <CurrencyDollarIcon className="w-5 h-5 mr-2 text-crm-primary" />
                       Estadísticas de Propiedades
                     </h4>
                     
                     <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">{cliente.propiedades_reservadas}</div>
-                        <div className="text-sm text-blue-800">Reservadas</div>
+                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cliente.propiedades_reservadas}</div>
+                        <div className="text-sm text-blue-800 dark:text-blue-300">Reservadas</div>
                       </div>
-                      <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{cliente.propiedades_compradas}</div>
-                        <div className="text-sm text-green-800">Compradas</div>
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{cliente.propiedades_compradas}</div>
+                        <div className="text-sm text-green-800 dark:text-green-300">Compradas</div>
                       </div>
-                      <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600">{cliente.propiedades_alquiladas}</div>
-                        <div className="text-sm text-yellow-800">Alquiladas</div>
+                      <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{cliente.propiedades_alquiladas}</div>
+                        <div className="text-sm text-yellow-800 dark:text-yellow-300">Alquiladas</div>
                       </div>
                     </div>
                     
                     {cliente.saldo_pendiente > 0 && (
-                      <div className="mt-4 p-3 bg-red-50 rounded-lg">
-                        <p className="text-sm font-medium text-red-800">Saldo Pendiente</p>
-                        <p className="text-lg font-bold text-red-600">{formatCapacidad(cliente.saldo_pendiente)}</p>
+                      <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                        <p className="text-sm font-medium text-red-800 dark:text-red-300">Saldo Pendiente</p>
+                        <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatCapacidad(cliente.saldo_pendiente)}</p>
                       </div>
                     )}
                   </div>
 
                   {/* Notas */}
                   {cliente.notas && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="mt-6 pt-6 border-t border-crm-border">
                       <h4 className="text-lg font-semibold text-crm-text-primary mb-3 flex items-center">
                         <DocumentTextIcon className="w-5 h-5 mr-2 text-crm-primary" />
                         Notas
                       </h4>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-crm-text-muted whitespace-pre-wrap">{cliente.notas}</p>
+                      <div className="p-4 bg-crm-card-hover rounded-lg">
+                        <p className="text-sm text-crm-text-secondary whitespace-pre-wrap">{cliente.notas}</p>
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+                <div className="px-6 py-4 bg-crm-card-hover border-t border-crm-border flex justify-end">
                   <button
                     onClick={onClose}
-                    className="px-6 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary/90 transition-colors duration-200"
+                    className="px-6 py-2.5 bg-crm-primary text-white rounded-lg hover:bg-crm-primary/90 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
                   >
                     Cerrar
                   </button>
