@@ -1,152 +1,388 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addDays, isToday, isTomorrow, isYesterday } from "date-fns";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  addMonths,
+  subMonths,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addWeeks,
+  subWeeks,
+  isToday,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 import { es } from "date-fns/locale";
-import { crearEvento, obtenerEventos } from "./_actions";
-import { EventoCalendario } from "@/lib/types/agenda";
-import EventoForm from "@/components/EventoForm";
+import { obtenerEventos } from "./actions";
+import { Evento } from "@/lib/types/agenda";
+import EventoModal from "./_EventoModal";
 import RecordatoriosPanel from "@/components/RecordatoriosPanel";
 import NotificacionesPanel from "@/components/NotificacionesPanel";
 import toast from "react-hot-toast";
 
+type VistaCalendario = "mes" | "semana" | "dia";
+type VistaTab = "calendario" | "recordatorios" | "notificaciones";
+
 export default function AgendaDashboard() {
   const [fechaActual, setFechaActual] = useState(new Date());
-  const [eventos, setEventos] = useState<EventoCalendario[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [vista, setVista] = useState<'mes' | 'semana' | 'dia'>('mes');
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
-  const [vistaActual, setVistaActual] = useState<'calendario' | 'recordatorios' | 'notificaciones'>('calendario');
-  const [vendedorId, setVendedorId] = useState<string>('');
+  const [vista, setVista] = useState<VistaCalendario>("mes");
+  const [vistaActualTab, setVistaActualTab] = useState<VistaTab>("calendario");
+  const [mostrarModalEvento, setMostrarModalEvento] = useState(false);
+  const [eventoActivo, setEventoActivo] = useState<Evento | null>(null);
 
-  // Cargar eventos al montar el componente
-  useEffect(() => {
-    cargarEventos();
-    // Simular ID de vendedor - en producción esto vendría del contexto de autenticación
-    setVendedorId('vendedor-123');
-  }, [fechaActual, vista]);
-
-  const cargarEventos = async () => {
+  const cargarEventos = useCallback(async () => {
     try {
       setCargando(true);
-      const eventosData = await obtenerEventos(fechaActual);
-      setEventos(eventosData);
+      const data = await obtenerEventos(fechaActual, vista);
+      setEventos(data);
     } catch (error) {
       console.error("Error cargando eventos:", error);
       toast.error("Error cargando eventos");
     } finally {
       setCargando(false);
     }
-  };
+  }, [fechaActual, vista]);
 
-  const navegarMes = (direccion: 'anterior' | 'siguiente') => {
-    setFechaActual(prev => 
-      direccion === 'anterior' 
-        ? subMonths(prev, 1)
-        : addMonths(prev, 1)
-    );
+  useEffect(() => {
+    cargarEventos();
+  }, [cargarEventos]);
+
+  const navegarPeriodo = (direccion: "anterior" | "siguiente") => {
+    setFechaActual((prev) => {
+      if (vista === "semana") {
+        return direccion === "anterior" ? subWeeks(prev, 1) : addWeeks(prev, 1);
+      }
+      if (vista === "dia") {
+        return direccion === "anterior" ? addDays(prev, -1) : addDays(prev, 1);
+      }
+      return direccion === "anterior" ? subMonths(prev, 1) : addMonths(prev, 1);
+    });
   };
 
   const irHoy = () => {
     setFechaActual(new Date());
   };
 
-  // Generar días del mes
-  const primerDia = startOfMonth(fechaActual);
-  const ultimoDia = endOfMonth(fechaActual);
-  const dias = eachDayOfInterval({ start: primerDia, end: ultimoDia });
-
-  // Obtener eventos para un día específico
-  const obtenerEventosDia = (fecha: Date) => {
-    return eventos.filter(evento => 
-      isSameDay(new Date(evento.fecha_inicio), fecha)
-    );
-  };
-
-  // Obtener color del evento
-  const obtenerColorEvento = (tipo: string) => {
-    const colores: Record<string, string> = {
-      cita: 'bg-blue-100 text-blue-800 border-blue-200',
-      llamada: 'bg-green-100 text-green-800 border-green-200',
-      email: 'bg-purple-100 text-purple-800 border-purple-200',
-      visita: 'bg-orange-100 text-orange-800 border-orange-200',
-      seguimiento: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      recordatorio: 'bg-red-100 text-red-800 border-red-200',
-      tarea: 'bg-gray-100 text-gray-800 border-gray-200'
+  const rangoFechas = useMemo(() => {
+    if (vista === "semana") {
+      return {
+        inicio: startOfWeek(fechaActual, { weekStartsOn: 1 }),
+        fin: endOfWeek(fechaActual, { weekStartsOn: 1 }),
+      };
+    }
+    if (vista === "dia") {
+      return {
+        inicio: startOfDay(fechaActual),
+        fin: endOfDay(fechaActual),
+      };
+    }
+    return {
+      inicio: startOfMonth(fechaActual),
+      fin: endOfMonth(fechaActual),
     };
-    return colores[tipo] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
+  }, [fechaActual, vista]);
 
-  // Calcular estadísticas
-  const eventosHoy = eventos.filter(evento => isToday(new Date(evento.fecha_inicio))).length;
-  const eventosEstaSemana = eventos.filter(evento => {
-    const fechaEvento = new Date(evento.fecha_inicio);
+  const dias = useMemo(
+    () => eachDayOfInterval({ start: rangoFechas.inicio, end: rangoFechas.fin }),
+    [rangoFechas]
+  );
+
+  const ordenarEventos = useCallback((lista: Evento[]) => {
+    return [...lista].sort(
+      (a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime()
+    );
+  }, []);
+
+  const obtenerEventosDia = useCallback(
+    (fecha: Date) =>
+      eventos.filter((evento) => isSameDay(new Date(evento.fecha_inicio), fecha)),
+    [eventos]
+  );
+
+  const obtenerColorEvento = useCallback((tipo: string) => {
+    const colores: Record<string, string> = {
+      cita: "bg-blue-100 text-blue-800 border-blue-200",
+      llamada: "bg-green-100 text-green-800 border-green-200",
+      email: "bg-purple-100 text-purple-800 border-purple-200",
+      visita: "bg-orange-100 text-orange-800 border-orange-200",
+      seguimiento: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      recordatorio: "bg-red-100 text-red-800 border-red-200",
+      tarea: "bg-gray-100 text-gray-800 border-gray-200",
+    };
+    return colores[tipo] || "bg-gray-100 text-gray-800 border-gray-200";
+  }, []);
+
+  const tituloVista = useMemo(() => {
+    if (vista === "semana") {
+      const inicio = startOfWeek(fechaActual, { weekStartsOn: 1 });
+      const fin = endOfWeek(fechaActual, { weekStartsOn: 1 });
+      const inicioTexto = format(inicio, "d MMM", { locale: es });
+      const finTexto = format(fin, "d MMM yyyy", { locale: es });
+      return `${inicioTexto} – ${finTexto}`;
+    }
+    if (vista === "dia") {
+      return format(fechaActual, "EEEE d 'de' MMMM yyyy", { locale: es });
+    }
+    return format(fechaActual, "MMMM yyyy", { locale: es });
+  }, [fechaActual, vista]);
+
+  const eventosHoy = useMemo(
+    () => eventos.filter((evento) => isToday(new Date(evento.fecha_inicio))).length,
+    [eventos]
+  );
+
+  const eventosEstaSemana = useMemo(() => {
     const inicioSemana = startOfWeek(new Date(), { weekStartsOn: 1 });
     const finSemana = endOfWeek(new Date(), { weekStartsOn: 1 });
-    return fechaEvento >= inicioSemana && fechaEvento <= finSemana;
-  }).length;
-  const eventosPendientes = eventos.filter(evento => new Date(evento.fecha_inicio) > new Date()).length;
+    return eventos.filter((evento) => {
+      const fechaEvento = new Date(evento.fecha_inicio);
+      return fechaEvento >= inicioSemana && fechaEvento <= finSemana;
+    }).length;
+  }, [eventos]);
 
-  return (
-    <div className="space-y-6">
-      {/* Pestañas de navegación - Responsive */}
-      <div className="crm-card p-1">
-        <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-1">
+  const eventosPendientes = useMemo(
+    () => eventos.filter((evento) => new Date(evento.fecha_inicio) > new Date()).length,
+    [eventos]
+  );
+
+  const eventosDiaSeleccionado = useMemo(
+    () => ordenarEventos(obtenerEventosDia(fechaActual)),
+    [obtenerEventosDia, ordenarEventos, fechaActual]
+  );
+
+  const abrirModalNuevoEvento = () => {
+    setEventoActivo(null);
+    setMostrarModalEvento(true);
+  };
+
+  const abrirModalEvento = (evento: Evento) => {
+    setEventoActivo(evento);
+    setMostrarModalEvento(true);
+  };
+
+  const handleCerrarModal = () => {
+    setEventoActivo(null);
+    setMostrarModalEvento(false);
+  };
+
+  const handleEventoGuardado = () => {
+    handleCerrarModal();
+    cargarEventos();
+  };
+
+  const eventosFuturos = useMemo(
+    () =>
+      ordenarEventos(
+        eventos.filter((evento) => new Date(evento.fecha_inicio) >= new Date())
+      ).slice(0, 5),
+    [eventos, ordenarEventos]
+  );
+
+  const renderMes = () => (
+    <div className="grid grid-cols-7 gap-1 sm:gap-2">
+      {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((dia) => (
+        <div
+          key={dia}
+          className="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-crm-text-muted bg-crm-border/50 rounded-lg"
+        >
+          <span className="hidden sm:inline">{dia}</span>
+          <span className="sm:hidden">{dia.charAt(0)}</span>
+        </div>
+      ))}
+      {dias.map((dia) => {
+        const eventosDia = obtenerEventosDia(dia);
+        const esHoy = isToday(dia);
+        const esMesActual = isSameMonth(dia, fechaActual);
+        const esSeleccionado = isSameDay(dia, fechaActual);
+
+        return (
           <button
-            onClick={() => setVistaActual('calendario')}
-            className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-              vistaActual === 'calendario'
-                ? 'bg-crm-primary text-white shadow-lg'
-                : 'text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border'
+            type="button"
+            onClick={() => setFechaActual(dia)}
+            key={dia.toISOString()}
+            className={`min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border border-crm-border rounded-lg transition-all duration-200 hover:shadow-md text-left ${
+              esMesActual ? "bg-crm-card" : "bg-crm-border/30"
+            } ${esHoy ? "ring-2 ring-crm-primary bg-crm-primary/5" : ""} ${
+              esSeleccionado && !esHoy ? "border-crm-primary" : ""
             }`}
           >
-            <div className="flex items-center justify-center space-x-2">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="hidden xs:inline">Calendario</span>
-              <span className="xs:hidden">📅</span>
+            <div
+              className={`text-xs sm:text-sm font-medium mb-1 sm:mb-2 ${
+                esHoy ? "text-crm-primary font-bold" : "text-crm-text-primary"
+              }`}
+            >
+              {format(dia, "d")}
+            </div>
+
+            <div className="space-y-1">
+              {ordenarEventos(eventosDia)
+                .slice(0, 2)
+                .map((evento) => (
+                  <div
+                    key={evento.id}
+                    className={`text-xs p-1 rounded border cursor-pointer hover:shadow-sm transition-all duration-200 ${obtenerColorEvento(evento.tipo)}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      abrirModalEvento(evento);
+                    }}
+                  >
+                    <div className="truncate font-medium text-xs">{evento.titulo}</div>
+                    <div className="text-xs opacity-75 hidden sm:block">
+                      {format(new Date(evento.fecha_inicio), "HH:mm")}
+                    </div>
+                  </div>
+                ))}
+              {eventosDia.length > 2 && (
+                <div className="text-xs text-crm-text-muted text-center">
+                  +{eventosDia.length - 2} más
+                </div>
+              )}
             </div>
           </button>
-          <button
-            onClick={() => setVistaActual('recordatorios')}
-            className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-              vistaActual === 'recordatorios'
-                ? 'bg-crm-primary text-white shadow-lg'
-                : 'text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border'
-            }`}
-          >
-            <div className="flex items-center justify-center space-x-2">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="hidden xs:inline">Recordatorios</span>
-              <span className="xs:hidden">⏰</span>
+        );
+      })}
+    </div>
+  );
+
+  const renderSemana = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+      {dias.map((dia) => {
+        const eventosDia = ordenarEventos(obtenerEventosDia(dia));
+        return (
+          <div key={dia.toISOString()} className="crm-card p-3 sm:p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-crm-text-muted uppercase">
+                  {format(dia, "EEE", { locale: es })}
+                </p>
+                <p className="text-lg font-semibold text-crm-text-primary">
+                  {format(dia, "d")}
+                </p>
+              </div>
+              {isToday(dia) && (
+                <span className="text-xs px-2 py-1 bg-crm-primary/10 text-crm-primary rounded-full">
+                  Hoy
+                </span>
+              )}
             </div>
-          </button>
-          <button
-            onClick={() => setVistaActual('notificaciones')}
-            className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-              vistaActual === 'notificaciones'
-                ? 'bg-crm-primary text-white shadow-lg'
-                : 'text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border'
-            }`}
-          >
-            <div className="flex items-center justify-center space-x-2">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.828 7l2.586 2.586a2 2 0 002.828 0L16 7l-6 6-6-6z" />
-              </svg>
-              <span className="hidden xs:inline">Notificaciones</span>
-              <span className="xs:hidden">🔔</span>
+
+            <div className="space-y-2">
+              {eventosDia.length === 0 ? (
+                <p className="text-xs text-crm-text-muted">Sin eventos</p>
+              ) : (
+                eventosDia.map((evento) => (
+                  <div
+                    key={evento.id}
+                    className={`p-2 border rounded-lg cursor-pointer transition-colors ${obtenerColorEvento(evento.tipo)}`}
+                    onClick={() => abrirModalEvento(evento)}
+                  >
+                    <p className="text-xs font-semibold truncate">{evento.titulo}</p>
+                    <p className="text-[11px] opacity-80">
+                      {format(new Date(evento.fecha_inicio), "HH:mm")}
+                      {evento.fecha_fin
+                        ? ` - ${format(new Date(evento.fecha_fin), "HH:mm")}`
+                        : ""}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
-          </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderDia = () => (
+    <div className="crm-card p-4 sm:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm text-crm-text-muted uppercase">
+            {format(fechaActual, "EEEE", { locale: es })}
+          </p>
+          <h3 className="text-2xl font-bold text-crm-text-primary">
+            {format(fechaActual, "d 'de' MMMM yyyy", { locale: es })}
+          </h3>
+        </div>
+        <div className="text-sm text-crm-text-muted">
+          {eventosDiaSeleccionado.length} eventos programados
         </div>
       </div>
 
-      {vistaActual === 'calendario' ? (
+      <div className="space-y-3">
+        {eventosDiaSeleccionado.length === 0 ? (
+          <p className="text-crm-text-muted text-sm">No hay eventos para este día</p>
+        ) : (
+          eventosDiaSeleccionado.map((evento) => (
+            <div
+              key={evento.id}
+              className={`p-3 border rounded-lg hover:shadow transition-colors cursor-pointer ${obtenerColorEvento(evento.tipo)}`}
+              onClick={() => abrirModalEvento(evento)}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">{evento.titulo}</p>
+                  <p className="text-xs opacity-80">
+                    {format(new Date(evento.fecha_inicio), "HH:mm")}
+                    {evento.fecha_fin
+                      ? ` - ${format(new Date(evento.fecha_fin), "HH:mm")}`
+                      : ""}
+                  </p>
+                </div>
+                <span className="text-xs px-2 py-1 bg-white/50 rounded-full">
+                  {evento.tipo}
+                </span>
+              </div>
+              {evento.descripcion && (
+                <p className="text-xs mt-2 opacity-80 line-clamp-2">
+                  {evento.descripcion}
+                </p>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="crm-card p-1">
+        <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-1">
+          {([
+            { key: "calendario", label: "Calendario", icon: "📅" },
+            { key: "recordatorios", label: "Recordatorios", icon: "⏰" },
+            { key: "notificaciones", label: "Notificaciones", icon: "🔔" },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setVistaActualTab(tab.key)}
+              className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                vistaActualTab === tab.key
+                  ? "bg-crm-primary text-white shadow-lg"
+                  : "text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border"
+              }`}
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <span className="hidden xs:inline">{tab.label}</span>
+                <span className="xs:hidden">{tab.icon}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {vistaActualTab === "calendario" ? (
         <>
-          {/* Estadísticas rápidas - Responsive */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div className="crm-card p-3 sm:p-4 hover:shadow-lg transition-all duration-200">
               <div className="flex items-center space-x-3">
@@ -191,48 +427,45 @@ export default function AgendaDashboard() {
             </div>
           </div>
 
-          {/* Header del calendario - Responsive */}
           <div className="crm-card p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
               <h2 className="text-xl sm:text-2xl font-bold text-crm-text-primary text-center sm:text-left">
-                {format(fechaActual, 'MMMM yyyy', { locale: es })}
+                {tituloVista.charAt(0).toUpperCase() + tituloVista.slice(1)}
               </h2>
-              
-              <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3">
-                {/* Selector de vista - Responsive */}
+
+              <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
                 <div className="flex bg-crm-border rounded-lg p-1 w-full sm:w-auto">
-                  {[
-                    { key: 'mes', label: 'Mes', icon: '📅' },
-                    { key: 'semana', label: 'Semana', icon: '📊' },
-                    { key: 'dia', label: 'Día', icon: '📋' }
-                  ].map((v) => (
+                  {([
+                    { key: "mes", label: "Mes", icon: "📅" },
+                    { key: "semana", label: "Semana", icon: "📊" },
+                    { key: "dia", label: "Día", icon: "📋" },
+                  ] as const).map((opcion) => (
                     <button
-                      key={v.key}
-                      onClick={() => setVista(v.key as 'mes' | 'semana' | 'dia')}
+                      key={opcion.key}
+                      onClick={() => setVista(opcion.key)}
                       className={`flex-1 sm:flex-none px-2 sm:px-3 py-1.5 sm:py-1 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
-                        vista === v.key
-                          ? 'bg-crm-primary text-white shadow-md'
-                          : 'text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-sidebar-hover'
+                        vista === opcion.key
+                          ? "bg-crm-primary text-white shadow-md"
+                          : "text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-sidebar-hover"
                       }`}
                     >
-                      <span className="hidden sm:inline">{v.label}</span>
-                      <span className="sm:hidden">{v.icon}</span>
+                      <span className="hidden sm:inline">{opcion.label}</span>
+                      <span className="sm:hidden">{opcion.icon}</span>
                     </button>
                   ))}
                 </div>
 
-                {/* Controles de navegación - Responsive */}
                 <div className="flex items-center space-x-2 w-full sm:w-auto">
                   <button
-                    onClick={() => navegarMes('anterior')}
-                    className="flex-1 sm:flex-none p-2 sm:p-2 text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border rounded-lg transition-colors"
-                    title="Mes anterior"
+                    onClick={() => navegarPeriodo("anterior")}
+                    className="flex-1 sm:flex-none p-2 text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border rounded-lg transition-colors"
+                    title="Periodo anterior"
                   >
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  
+
                   <button
                     onClick={irHoy}
                     className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors"
@@ -240,11 +473,11 @@ export default function AgendaDashboard() {
                     <span className="hidden sm:inline">Hoy</span>
                     <span className="sm:hidden">📅</span>
                   </button>
-                  
+
                   <button
-                    onClick={() => navegarMes('siguiente')}
-                    className="flex-1 sm:flex-none p-2 sm:p-2 text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border rounded-lg transition-colors"
-                    title="Mes siguiente"
+                    onClick={() => navegarPeriodo("siguiente")}
+                    className="flex-1 sm:flex-none p-2 text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-border rounded-lg transition-colors"
+                    title="Periodo siguiente"
                   >
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -254,113 +487,56 @@ export default function AgendaDashboard() {
               </div>
             </div>
 
-            {/* Grid del calendario - Responsive */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-              {/* Días de la semana - Responsive */}
-              {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(dia => (
-                <div key={dia} className="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-crm-text-muted bg-crm-border/50 rounded-lg">
-                  <span className="hidden sm:inline">{dia}</span>
-                  <span className="sm:hidden">{dia.charAt(0)}</span>
+            {vista === "mes" && renderMes()}
+            {vista === "semana" && renderSemana()}
+            {vista === "dia" && renderDia()}
+          </div>
+
+          <div className="crm-card p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-crm-text-primary mb-3 sm:mb-4">Próximos eventos</h3>
+            <div className="space-y-2 sm:space-y-3">
+              {eventosFuturos.map((evento) => (
+                <div
+                  key={evento.id}
+                  className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-crm-border/30 rounded-lg hover:bg-crm-border/50 transition-all duration-200 cursor-pointer"
+                  onClick={() => abrirModalEvento(evento)}
+                >
+                  <div
+                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${
+                      obtenerColorEvento(evento.tipo).split(" ")[0]
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-crm-text-primary truncate">
+                      {evento.titulo}
+                    </p>
+                    <p className="text-xs text-crm-text-muted">
+                      {format(new Date(evento.fecha_inicio), "dd/MM/yyyy HH:mm", { locale: es })}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${obtenerColorEvento(evento.tipo)}`}>
+                    <span className="hidden sm:inline">{evento.tipo}</span>
+                    <span className="sm:hidden">{evento.tipo.charAt(0).toUpperCase()}</span>
+                  </span>
                 </div>
               ))}
-
-              {/* Días del mes - Responsive */}
-              {dias.map((dia, index) => {
-                const eventosDia = obtenerEventosDia(dia);
-                const esHoy = isSameDay(dia, new Date());
-                const esMesActual = isSameMonth(dia, fechaActual);
-
-                return (
-                  <div
-                    key={index}
-                    className={`min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border border-crm-border rounded-lg transition-all duration-200 hover:shadow-md ${
-                      esMesActual ? 'bg-crm-card' : 'bg-crm-border/30'
-                    } ${esHoy ? 'ring-2 ring-crm-primary bg-crm-primary/5' : ''}`}
-                  >
-                    <div className={`text-xs sm:text-sm font-medium mb-1 sm:mb-2 ${
-                      esHoy ? 'text-crm-primary font-bold' : 'text-crm-text-primary'
-                    }`}>
-                      {format(dia, 'd')}
-                    </div>
-                    
-                    <div className="space-y-1">
-                      {eventosDia.slice(0, 2).map((evento, eventoIndex) => (
-                        <div
-                          key={eventoIndex}
-                          className={`text-xs p-1 rounded border cursor-pointer hover:shadow-sm transition-all duration-200 ${obtenerColorEvento(evento.tipo)}`}
-                          onClick={() => {
-                            // TODO: Abrir modal de evento
-                            console.log('Evento clickeado:', evento);
-                          }}
-                        >
-                          <div className="truncate font-medium text-xs">{evento.titulo}</div>
-                          <div className="text-xs opacity-75 hidden sm:block">
-                            {format(new Date(evento.fecha_inicio), 'HH:mm')}
-                          </div>
-                        </div>
-                      ))}
-                      {eventosDia.length > 2 && (
-                        <div className="text-xs text-crm-text-muted text-center">
-                          +{eventosDia.length - 2} más
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-      </div>
-
-          {/* Eventos próximos - Responsive */}
-          <div className="crm-card p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold text-crm-text-primary mb-3 sm:mb-4">Próximos Eventos</h3>
-            <div className="space-y-2 sm:space-y-3">
-              {eventos
-                .filter(evento => new Date(evento.fecha_inicio) >= new Date())
-                .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
-                .slice(0, 5)
-                .map((evento) => (
-                  <div
-                    key={evento.id}
-                    className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-crm-border/30 rounded-lg hover:bg-crm-border/50 transition-all duration-200 cursor-pointer"
-                    onClick={() => {
-                      // TODO: Abrir modal de evento
-                      console.log('Evento clickeado:', evento);
-                    }}
-                  >
-                    <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${obtenerColorEvento(evento.tipo).split(' ')[0]}`}></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-crm-text-primary truncate">
-                        {evento.titulo}
-                      </p>
-                      <p className="text-xs text-crm-text-muted">
-                        {format(new Date(evento.fecha_inicio), 'dd/MM/yyyy HH:mm', { locale: es })}
-                      </p>
-                    </div>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${obtenerColorEvento(evento.tipo)}`}>
-                      <span className="hidden sm:inline">{evento.tipo}</span>
-                      <span className="sm:hidden">{evento.tipo.charAt(0).toUpperCase()}</span>
-                    </span>
-                  </div>
-                ))}
-              {eventos.filter(evento => new Date(evento.fecha_inicio) >= new Date()).length === 0 && (
+              {eventosFuturos.length === 0 && (
                 <p className="text-crm-text-muted text-center py-4 text-sm">No hay eventos próximos</p>
               )}
             </div>
           </div>
 
-          {/* Botones de acción - Responsive */}
           <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
             <button
-              onClick={() => setMostrarFormulario(true)}
+              onClick={abrirModalNuevoEvento}
               className="crm-button-primary px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium flex items-center justify-center space-x-2 w-full sm:w-auto"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              <span>Crear Evento</span>
+              <span>Crear evento</span>
             </button>
-            
+
             <button
               onClick={cargarEventos}
               className="px-4 sm:px-6 py-2.5 sm:py-3 text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors w-full sm:w-auto"
@@ -372,7 +548,6 @@ export default function AgendaDashboard() {
             </button>
           </div>
 
-          {/* Estado de carga */}
           {cargando && (
             <div className="crm-card p-6">
               <div className="animate-pulse">
@@ -382,24 +557,18 @@ export default function AgendaDashboard() {
             </div>
           )}
         </>
-      ) : vistaActual === 'recordatorios' ? (
-        /* Panel de Recordatorios */
-        <RecordatoriosPanel vendedorId={vendedorId} />
+      ) : vistaActualTab === "recordatorios" ? (
+        <RecordatoriosPanel />
       ) : (
-        /* Panel de Notificaciones */
-        <NotificacionesPanel vendedorId={vendedorId} />
+        <NotificacionesPanel />
       )}
 
-      {/* Formulario de Evento */}
-      {mostrarFormulario && (
-        <EventoForm
-          onSuccess={() => {
-            setMostrarFormulario(false);
-            cargarEventos();
-          }}
-          onCancel={() => setMostrarFormulario(false)}
-        />
-      )}
+      <EventoModal
+        evento={eventoActivo ?? undefined}
+        isOpen={mostrarModalEvento}
+        onClose={handleCerrarModal}
+        onSuccess={handleEventoGuardado}
+      />
     </div>
   );
 }

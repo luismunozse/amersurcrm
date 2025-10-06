@@ -28,10 +28,14 @@ type ProyectoMin = Pick<ProyectoCached, 'id' | 'nombre' | 'descripcion'>;
 
 export async function RecentActivities() {
   // Obtener datos recientes
-  const [clientes, proyectos] = await Promise.all([
+  const [clientesData, proyectosData] = await Promise.all([
     getCachedClientes(),     // Ideal: que devuelva Promise<ClienteMin[]>
     getCachedProyectos(),    // Ideal: que devuelva Promise<ProyectoMin[]>
   ]);
+
+  // Ensure we have arrays, default to empty arrays if null/undefined
+  const clientes = Array.isArray(clientesData) ? clientesData : [];
+  const proyectos = Array.isArray(proyectosData) ? proyectosData : [];
 
   // Crear actividades recientes basadas en datos reales (máx 4)
   const activities: Activity[] = [

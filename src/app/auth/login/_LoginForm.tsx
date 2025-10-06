@@ -78,9 +78,9 @@ export default function LoginForm() {
             return;
           }
 
-          console.log("Login vendedor exitoso, redirigiendo...");
+          console.log("Login vendedor exitoso, redirigiendo a dashboard vendedor...");
           toast.success("¡Login exitoso!");
-          router.replace("/dashboard");
+          router.replace("/dashboard/vendedor");
         }
       }
     } catch (err) {

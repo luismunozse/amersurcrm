@@ -1,177 +1,221 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format, isToday, isYesterday, addDays } from "date-fns";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+
+type TipoNotificacionKey = "evento" | "recordatorio" | "sistema" | "venta" | "reserva";
+type Prioridad = "baja" | "media" | "alta" | "urgente";
+
+interface NotificacionDb {
+  id: string;
+  tipo: string;
+  titulo: string;
+  mensaje: string;
+  leida: boolean | null;
+  data: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string | null;
+}
 
 interface Notificacion {
   id: string;
-  tipo: 'evento' | 'recordatorio' | 'sistema' | 'venta' | 'reserva';
+  tipo: TipoNotificacionKey;
   titulo: string;
   mensaje: string;
   leida: boolean;
   fecha: string;
-  data?: any;
-  prioridad: 'baja' | 'media' | 'alta' | 'urgente';
+  prioridad: Prioridad;
+  data?: Record<string, unknown> | null;
 }
 
-interface NotificacionesPanelProps {
-  vendedorId: string;
-}
-
-const TIPOS_NOTIFICACION = {
-  'evento': { label: 'Evento', icon: '📅', color: 'bg-blue-100 text-blue-800' },
-  'recordatorio': { label: 'Recordatorio', icon: '⏰', color: 'bg-orange-100 text-orange-800' },
-  'sistema': { label: 'Sistema', icon: '⚙️', color: 'bg-gray-100 text-gray-800' },
-  'venta': { label: 'Venta', icon: '💰', color: 'bg-green-100 text-green-800' },
-  'reserva': { label: 'Reserva', icon: '🔒', color: 'bg-purple-100 text-purple-800' }
+const TIPOS_NOTIFICACION: Record<TipoNotificacionKey, { label: string; icon: string; color: string }> = {
+  evento: { label: "Evento", icon: "📅", color: "bg-blue-100 text-blue-800" },
+  recordatorio: { label: "Recordatorio", icon: "⏰", color: "bg-orange-100 text-orange-800" },
+  sistema: { label: "Sistema", icon: "⚙️", color: "bg-gray-100 text-gray-800" },
+  venta: { label: "Venta", icon: "💰", color: "bg-green-100 text-green-800" },
+  reserva: { label: "Reserva", icon: "🔒", color: "bg-purple-100 text-purple-800" },
 };
 
-const PRIORIDADES = {
-  'baja': { label: 'Baja', color: 'text-gray-600', bg: 'bg-gray-100' },
-  'media': { label: 'Media', color: 'text-blue-600', bg: 'bg-blue-100' },
-  'alta': { label: 'Alta', color: 'text-orange-600', bg: 'bg-orange-100' },
-  'urgente': { label: 'Urgente', color: 'text-red-600', bg: 'bg-red-100' }
+const PRIORIDADES: Record<Prioridad, { label: string; color: string; bg: string }> = {
+  baja: { label: "Baja", color: "text-gray-600", bg: "bg-gray-100" },
+  media: { label: "Media", color: "text-blue-600", bg: "bg-blue-100" },
+  alta: { label: "Alta", color: "text-orange-600", bg: "bg-orange-100" },
+  urgente: { label: "Urgente", color: "text-red-600", bg: "bg-red-100" },
 };
 
-export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelProps) {
+export default function NotificacionesPanel() {
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState<'todas' | 'no_leidas' | 'hoy' | 'sistema'>('todas');
+  const [filtro, setFiltro] = useState<"todas" | "no_leidas" | "hoy" | "sistema">("todas");
+  const supabase = useMemo(() => supabaseBrowser(), []);
+  const [accionEnProgreso, setAccionEnProgreso] = useState<string | null>(null);
+  const [marcarTodasLoading, setMarcarTodasLoading] = useState(false);
 
-  useEffect(() => {
-    cargarNotificaciones();
-  }, [vendedorId, filtro]);
-
-  const cargarNotificaciones = async () => {
+  const cargarNotificaciones = useCallback(async () => {
     try {
       setCargando(true);
-      // Simular carga de notificaciones - en producción esto vendría de la API
-      const notificacionesSimuladas: Notificacion[] = [
-        {
-          id: '1',
-          tipo: 'recordatorio',
-          titulo: 'Recordatorio: Llamar a Juan',
-          mensaje: 'Tienes programada una llamada con Juan Pérez mañana a las 10:00 AM',
-          leida: false,
-          fecha: new Date().toISOString(),
-          prioridad: 'alta'
-        },
-        {
-          id: '2',
-          tipo: 'evento',
-          titulo: 'Evento próximo: Visita con Ana',
-          mensaje: 'Visita programada con Ana García - Proyecto Central, Lote 5 en 2 horas',
-          leida: false,
-          fecha: new Date().toISOString(),
-          prioridad: 'media'
-        },
-        {
-          id: '3',
-          tipo: 'venta',
-          titulo: '¡Nueva venta confirmada!',
-          mensaje: 'Se ha confirmado la venta del Lote 8 por $150,000. ¡Felicitaciones!',
-          leida: true,
-          fecha: addDays(new Date(), -1).toISOString(),
-          prioridad: 'alta'
-        },
-        {
-          id: '4',
-          tipo: 'reserva',
-          titulo: 'Nueva reserva pendiente',
-          mensaje: 'Carlos López ha realizado una reserva del Lote 12. Revisar documentación.',
-          leida: false,
-          fecha: addDays(new Date(), -2).toISOString(),
-          prioridad: 'media'
-        },
-        {
-          id: '5',
-          tipo: 'sistema',
-          titulo: 'Actualización del sistema',
-          mensaje: 'El sistema se actualizará esta noche a las 2:00 AM. Guarda tu trabajo.',
-          leida: true,
-          fecha: addDays(new Date(), -3).toISOString(),
-          prioridad: 'baja'
-        },
-        {
-          id: '6',
-          tipo: 'recordatorio',
-          titulo: 'Recordatorio: Enviar documentos',
-          mensaje: 'Recordatorio para enviar los documentos de reserva a María González',
-          leida: false,
-          fecha: addDays(new Date(), -1).toISOString(),
-          prioridad: 'alta'
-        }
-      ];
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      setNotificaciones(notificacionesSimuladas);
+      if (userError) throw userError;
+      if (!user) {
+        setNotificaciones([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("notificacion")
+        .select("id, tipo, titulo, mensaje, leida, data, created_at, updated_at")
+        .eq("usuario_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const normalizadas: Notificacion[] = ((data ?? []) as NotificacionDb[]).map((item) => {
+        const tipoNormalizado = (Object.keys(TIPOS_NOTIFICACION).includes(item.tipo)
+          ? item.tipo
+          : "sistema") as TipoNotificacionKey;
+
+        const payload = (item.data ?? null) as { prioridad?: unknown } | null;
+        const prioridadRaw = typeof payload?.prioridad === "string" ? payload.prioridad : undefined;
+        const prioridad = (["baja", "media", "alta", "urgente"].includes(prioridadRaw as string)
+          ? (prioridadRaw as Prioridad)
+          : "media");
+
+        return {
+          id: item.id,
+          tipo: tipoNormalizado,
+          titulo: item.titulo,
+          mensaje: item.mensaje,
+          leida: Boolean(item.leida),
+          fecha: item.created_at,
+          prioridad,
+          data: item.data,
+        };
+      });
+
+      setNotificaciones(normalizadas);
     } catch (error) {
       console.error("Error cargando notificaciones:", error);
       toast.error("Error cargando notificaciones");
     } finally {
       setCargando(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    cargarNotificaciones();
+  }, [cargarNotificaciones]);
+
+  const obtenerUsuarioId = useCallback(async () => {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) throw error;
+    if (!user) throw new Error("Sesión inválida");
+    return user.id;
+  }, [supabase]);
 
   const marcarComoLeida = async (id: string) => {
     try {
-      setNotificaciones(prev => 
-        prev.map(n => n.id === id ? { ...n, leida: true } : n)
+      setAccionEnProgreso(id);
+      const userId = await obtenerUsuarioId();
+      const { error } = await supabase
+        .from("notificacion")
+        .update({ leida: true, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("usuario_id", userId);
+
+      if (error) throw error;
+
+      setNotificaciones((prev) =>
+        prev.map((noti) => (noti.id === id ? { ...noti, leida: true } : noti))
       );
       toast.success("Notificación marcada como leída");
     } catch (error) {
       console.error("Error marcando notificación:", error);
       toast.error("Error marcando notificación");
+    } finally {
+      setAccionEnProgreso(null);
     }
   };
 
   const marcarTodasComoLeidas = async () => {
     try {
-      setNotificaciones(prev => 
-        prev.map(n => ({ ...n, leida: true }))
-      );
+      setMarcarTodasLoading(true);
+      const userId = await obtenerUsuarioId();
+      const { error } = await supabase
+        .from("notificacion")
+        .update({ leida: true, updated_at: new Date().toISOString() })
+        .eq("usuario_id", userId)
+        .eq("leida", false);
+
+      if (error) throw error;
+
+      setNotificaciones((prev) => prev.map((noti) => ({ ...noti, leida: true })));
       toast.success("Todas las notificaciones marcadas como leídas");
     } catch (error) {
       console.error("Error marcando notificaciones:", error);
       toast.error("Error marcando notificaciones");
+    } finally {
+      setMarcarTodasLoading(false);
     }
   };
 
   const eliminarNotificacion = async (id: string) => {
     try {
-      setNotificaciones(prev => prev.filter(n => n.id !== id));
+      setAccionEnProgreso(id);
+      const userId = await obtenerUsuarioId();
+      const { error } = await supabase
+        .from("notificacion")
+        .delete()
+        .eq("id", id)
+        .eq("usuario_id", userId);
+
+      if (error) throw error;
+
+      setNotificaciones((prev) => prev.filter((noti) => noti.id !== id));
       toast.success("Notificación eliminada");
     } catch (error) {
       console.error("Error eliminando notificación:", error);
       toast.error("Error eliminando notificación");
+    } finally {
+      setAccionEnProgreso(null);
     }
   };
 
-  const obtenerFechaRelativa = (fecha: string) => {
-    const fechaNotificacion = new Date(fecha);
-    
-    if (isToday(fechaNotificacion)) {
-      return { texto: 'Hoy', color: 'text-blue-600', bg: 'bg-blue-100' };
-    } else if (isYesterday(fechaNotificacion)) {
-      return { texto: 'Ayer', color: 'text-gray-600', bg: 'bg-gray-100' };
-    } else {
-      return { 
-        texto: format(fechaNotificacion, 'dd/MM', { locale: es }), 
-        color: 'text-gray-600', 
-        bg: 'bg-gray-100' 
-      };
+  const obtenerFechaRelativa = (fechaIso: string) => {
+    const fecha = new Date(fechaIso);
+
+    if (isToday(fecha)) {
+      return { texto: "Hoy", color: "text-blue-600", bg: "bg-blue-100" };
     }
+    if (isYesterday(fecha)) {
+      return { texto: "Ayer", color: "text-gray-600", bg: "bg-gray-100" };
+    }
+
+    return {
+      texto: format(fecha, "dd/MM", { locale: es }),
+      color: "text-gray-600",
+      bg: "bg-gray-100",
+    };
   };
 
-  const notificacionesFiltradas = notificaciones.filter(notificacion => {
+  const notificacionesFiltradas = notificaciones.filter((noti) => {
     switch (filtro) {
-      case 'no_leidas':
-        return !notificacion.leida;
-      case 'hoy':
-        return isToday(new Date(notificacion.fecha));
-      case 'sistema':
-        return notificacion.tipo === 'sistema';
+      case "no_leidas":
+        return !noti.leida;
+      case "hoy":
+        return isToday(new Date(noti.fecha));
+      case "sistema":
+        return noti.tipo === "sistema";
       default:
         return true;
     }
@@ -179,9 +223,9 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
 
   const estadisticas = {
     total: notificaciones.length,
-    noLeidas: notificaciones.filter(n => !n.leida).length,
-    hoy: notificaciones.filter(n => isToday(new Date(n.fecha))).length,
-    urgentes: notificaciones.filter(n => n.prioridad === 'urgente' && !n.leida).length
+    noLeidas: notificaciones.filter((n) => !n.leida).length,
+    hoy: notificaciones.filter((n) => isToday(new Date(n.fecha))).length,
+    urgentes: notificaciones.filter((n) => n.prioridad === "urgente" && !n.leida).length,
   };
 
   if (cargando) {
@@ -190,8 +234,8 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-crm-border rounded"></div>
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-16 bg-crm-border rounded"></div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-crm-border rounded"></div>
             ))}
           </div>
         </div>
@@ -201,43 +245,41 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
 
   return (
     <div className="space-y-6">
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
-          <div className="text-sm text-crm-text-muted">Total</div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
+          <div className="text-xl sm:text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Total</div>
         </div>
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{estadisticas.noLeidas}</div>
-          <div className="text-sm text-crm-text-muted">No leídas</div>
+        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
+          <div className="text-xl sm:text-2xl font-bold text-orange-600">{estadisticas.noLeidas}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">No leídas</div>
         </div>
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{estadisticas.hoy}</div>
-          <div className="text-sm text-crm-text-muted">Hoy</div>
+        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
+          <div className="text-xl sm:text-2xl font-bold text-blue-600">{estadisticas.hoy}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Hoy</div>
         </div>
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{estadisticas.urgentes}</div>
-          <div className="text-sm text-crm-text-muted">Urgentes</div>
+        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
+          <div className="text-xl sm:text-2xl font-bold text-red-600">{estadisticas.urgentes}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Urgentes</div>
         </div>
       </div>
 
-      {/* Filtros y acciones */}
-      <div className="crm-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="crm-card p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-3 justify-between">
           <div className="flex flex-wrap gap-2">
             {[
-              { key: 'todas', label: 'Todas' },
-              { key: 'no_leidas', label: 'No leídas' },
-              { key: 'hoy', label: 'Hoy' },
-              { key: 'sistema', label: 'Sistema' }
-            ].map(f => (
+              { key: "todas", label: "Todas" },
+              { key: "no_leidas", label: "No leídas" },
+              { key: "hoy", label: "Hoy" },
+              { key: "sistema", label: "Sistema" },
+            ].map((f) => (
               <button
                 key={f.key}
-                onClick={() => setFiltro(f.key as any)}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                onClick={() => setFiltro(f.key as typeof filtro)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   filtro === f.key
-                    ? 'bg-crm-primary text-white'
-                    : 'bg-crm-border text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white'
+                    ? "bg-crm-primary text-white"
+                    : "bg-crm-border text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
                 }`}
               >
                 {f.label}
@@ -248,7 +290,8 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
           {estadisticas.noLeidas > 0 && (
             <button
               onClick={marcarTodasComoLeidas}
-              className="px-4 py-2 text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors"
+              disabled={marcarTodasLoading}
+              className="px-4 py-2 text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Marcar todas como leídas
             </button>
@@ -256,7 +299,6 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
         </div>
       </div>
 
-      {/* Lista de Notificaciones */}
       <div className="space-y-3">
         {notificacionesFiltradas.length === 0 ? (
           <div className="crm-card p-8 text-center">
@@ -270,23 +312,25 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
         ) : (
           notificacionesFiltradas.map((notificacion) => {
             const fechaRelativa = obtenerFechaRelativa(notificacion.fecha);
-            const tipoInfo = TIPOS_NOTIFICACION[notificacion.tipo];
-            const prioridadInfo = PRIORIDADES[notificacion.prioridad];
+            const tipoInfo = TIPOS_NOTIFICACION[notificacion.tipo] ?? TIPOS_NOTIFICACION.sistema;
+            const prioridadInfo = PRIORIDADES[notificacion.prioridad] ?? PRIORIDADES.media;
 
             return (
               <div
                 key={notificacion.id}
                 className={`crm-card p-4 hover:shadow-lg transition-all duration-200 ${
-                  !notificacion.leida ? 'border-l-4 border-l-crm-primary' : ''
+                  !notificacion.leida ? "border-l-4 border-l-crm-primary" : ""
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-3 mb-2">
                       <span className="text-lg">{tipoInfo.icon}</span>
-                      <h3 className={`text-sm font-medium ${
-                        !notificacion.leida ? 'text-crm-text-primary' : 'text-crm-text-muted'
-                      }`}>
+                      <h3
+                        className={`text-sm font-medium ${
+                          !notificacion.leida ? "text-crm-text-primary" : "text-crm-text-muted"
+                        }`}
+                      >
                         {notificacion.titulo}
                       </h3>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${tipoInfo.color}`}>
@@ -297,19 +341,21 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
                       )}
                     </div>
 
-                    <p className={`text-sm mb-2 ${
-                      !notificacion.leida ? 'text-crm-text-secondary' : 'text-crm-text-muted'
-                    }`}>
+                    <p
+                      className={`text-sm mb-2 ${
+                        !notificacion.leida ? "text-crm-text-secondary" : "text-crm-text-muted"
+                      }`}
+                    >
                       {notificacion.mensaje}
                     </p>
 
-                    <div className="flex items-center space-x-4 text-xs text-crm-text-muted">
+                    <div className="flex items-center flex-wrap gap-3 text-xs text-crm-text-muted">
                       <div className="flex items-center space-x-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className={`px-2 py-1 rounded-full ${fechaRelativa.bg} ${fechaRelativa.color}`}>
-                          {fechaRelativa.texto} {format(new Date(notificacion.fecha), 'HH:mm')}
+                          {fechaRelativa.texto} {format(new Date(notificacion.fecha), "HH:mm")}
                         </span>
                       </div>
 
@@ -323,7 +369,8 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
                     {!notificacion.leida && (
                       <button
                         onClick={() => marcarComoLeida(notificacion.id)}
-                        className="p-2 text-crm-text-muted hover:text-crm-primary transition-colors"
+                        disabled={accionEnProgreso === notificacion.id}
+                        className="p-2 text-crm-text-muted hover:text-crm-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Marcar como leída"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -334,7 +381,8 @@ export default function NotificacionesPanel({ vendedorId }: NotificacionesPanelP
                     )}
                     <button
                       onClick={() => eliminarNotificacion(notificacion.id)}
-                      className="p-2 text-crm-text-muted hover:text-red-600 transition-colors"
+                      disabled={accionEnProgreso === notificacion.id}
+                      className="p-2 text-crm-text-muted hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Eliminar notificación"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -6,15 +6,19 @@ import { Sidebar } from "@/components/Sidebar";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
 
-export default function DashboardClient({ 
-  children, 
+export default function DashboardClient({
+  children,
   userEmail,
+  userName,
+  userUsername,
   notifications = [],
   notificationsCount = 0,
   exchangeRates = [],
-}: { 
+}: {
   children: React.ReactNode;
   userEmail?: string;
+  userName?: string;
+  userUsername?: string;
   notifications?: NotificacionNoLeida[];
   notificationsCount?: number;
   exchangeRates?: ExchangeRate[];
@@ -25,9 +29,9 @@ export default function DashboardClient({
   return (
     <div className="min-h-dvh flex bg-crm-bg-primary">
       {/* Sidebar único */}
-      <Sidebar 
-        isOpen={open} 
-        onClose={() => setOpen(false)} 
+      <Sidebar
+        isOpen={open}
+        onClose={() => setOpen(false)}
         userEmail={userEmail}
         collapsed={collapsed}
         onCollapseChange={setCollapsed}
@@ -35,9 +39,11 @@ export default function DashboardClient({
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header recibe el estado del sidebar */}
-        <Header 
-          onSidebarToggle={() => setOpen(true)} 
+        <Header
+          onSidebarToggle={() => setOpen(true)}
           userEmail={userEmail}
+          userName={userName}
+          userUsername={userUsername}
           sidebarCollapsed={collapsed}
           notifications={notifications}
           notificationsCount={notificationsCount}

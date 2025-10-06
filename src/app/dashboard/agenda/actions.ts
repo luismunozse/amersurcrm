@@ -3,14 +3,21 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { 
-  EventoFormData, 
-  RecordatorioFormData, 
-  TipoEvento, 
-  EstadoEvento, 
+import {
+  Evento,
+  TipoEvento,
+  EstadoEvento,
   Prioridad,
-  TipoRecordatorio 
+  TipoRecordatorio,
 } from "@/lib/types/agenda";
+import { 
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 
 // =====================================================
 // SCHEMAS DE VALIDACIÓN
@@ -62,6 +69,104 @@ const RecordatorioSchema = z.object({
 // =====================================================
 // FUNCIONES DE EVENTOS
 // =====================================================
+
+type VistaCalendario = 'mes' | 'semana' | 'dia';
+
+export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'): Promise<Evento[]> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      throw authError;
+    }
+
+    if (!user) {
+      return [];
+    }
+
+    let inicioRango: Date;
+    let finRango: Date;
+
+    switch (vista) {
+      case 'semana':
+        inicioRango = startOfWeek(fecha, { weekStartsOn: 1 });
+        finRango = endOfWeek(fecha, { weekStartsOn: 1 });
+        break;
+      case 'dia':
+        inicioRango = startOfDay(fecha);
+        finRango = endOfDay(fecha);
+        break;
+      case 'mes':
+      default:
+        inicioRango = startOfMonth(fecha);
+        finRango = endOfMonth(fecha);
+        break;
+    }
+
+    const { data, error } = await supabase
+      .from('evento')
+      .select(`
+        id,
+        titulo,
+        descripcion,
+        tipo,
+        estado,
+        prioridad,
+        fecha_inicio,
+        fecha_fin,
+        duracion_minutos,
+        todo_el_dia,
+        vendedor_id,
+        cliente_id,
+        propiedad_id,
+        ubicacion,
+        direccion,
+        recordar_antes_minutos,
+        notificar_email,
+        notificar_push,
+        es_recurrente,
+        patron_recurrencia,
+        notas,
+        etiquetas,
+        color,
+        created_by,
+        created_at,
+        updated_at
+      `)
+      .eq('vendedor_id', user.id)
+      .gte('fecha_inicio', inicioRango.toISOString())
+      .lte('fecha_inicio', finRango.toISOString())
+      .order('fecha_inicio', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map((item) => ({
+      ...item,
+      descripcion: item.descripcion ?? undefined,
+      fecha_fin: item.fecha_fin ?? undefined,
+      cliente_id: item.cliente_id ?? undefined,
+      propiedad_id: item.propiedad_id ?? undefined,
+      ubicacion: item.ubicacion ?? undefined,
+      direccion: item.direccion ?? undefined,
+      recordar_antes_minutos: item.recordar_antes_minutos ?? 15,
+      notificar_email: item.notificar_email ?? true,
+      notificar_push: item.notificar_push ?? false,
+      es_recurrente: item.es_recurrente ?? false,
+      patron_recurrencia: item.patron_recurrencia ?? undefined,
+      notas: item.notas ?? undefined,
+      etiquetas: item.etiquetas ?? [],
+    })) as Evento[];
+  } catch (error) {
+    console.error('Error obteniendo eventos:', error);
+    return [];
+  }
+}
 
 export async function crearEvento(formData: FormData) {
   try {

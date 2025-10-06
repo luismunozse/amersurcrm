@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { crearEvento } from "@/app/dashboard/agenda/_actions";
+import { crearEvento } from "@/app/dashboard/agenda/actions";
 import { EventoFormState } from "@/lib/types/agenda";
 import toast from "react-hot-toast";
 
@@ -75,9 +75,13 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
         }
       });
 
-      await crearEvento(formDataToSend);
-      toast.success("Evento creado exitosamente");
-      onSuccess();
+      const result = await crearEvento(formDataToSend);
+      if (result?.success) {
+        toast.success(result.message || "Evento creado exitosamente");
+        onSuccess();
+      } else {
+        toast.error(result?.message || "No se pudo crear el evento");
+      }
     } catch (error) {
       console.error("Error creando evento:", error);
       toast.error("Error creando evento");

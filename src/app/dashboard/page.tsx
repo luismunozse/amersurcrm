@@ -72,11 +72,16 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
-  const [clientes, proyectos, notificaciones] = await Promise.all([
+  const [clientesData, proyectosData, notificacionesData] = await Promise.all([
     getCachedClientes(),
     getCachedProyectos(),
     getCachedNotificacionesNoLeidas(),
   ]);
+
+  // Ensure we have arrays, default to empty arrays if null/undefined
+  const clientes = Array.isArray(clientesData) ? clientesData : [];
+  const proyectos = Array.isArray(proyectosData) ? proyectosData : [];
+  const notificaciones = Array.isArray(notificacionesData) ? notificacionesData : [];
 
   const today = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
 

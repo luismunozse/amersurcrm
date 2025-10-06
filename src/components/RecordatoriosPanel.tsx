@@ -1,170 +1,268 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format, isToday, isTomorrow, isYesterday, addDays, subDays } from "date-fns";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { format, isToday, isTomorrow, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
 import toast from "react-hot-toast";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+
+type Prioridad = "baja" | "media" | "alta" | "urgente";
+type TipoRecordatorioKey =
+  | "seguimiento_cliente"
+  | "llamada_prospecto"
+  | "envio_documentos"
+  | "visita_propiedad"
+  | "reunion_equipo"
+  | "personalizado";
+
+interface RecordatorioQuery {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  tipo: string;
+  prioridad: Prioridad | null;
+  fecha_recordatorio: string;
+  fecha_completado: string | null;
+  completado: boolean | null;
+  leido: boolean | null;
+  notificar_email: boolean | null;
+  notificar_push: boolean | null;
+  created_at: string;
+  cliente: { id: string; nombre: string | null } | null;
+  propiedad: { id: string; identificacion_interna: string | null; tipo: string | null } | null;
+}
 
 interface Recordatorio {
   id: string;
   titulo: string;
   descripcion?: string;
-  tipo: string;
-  prioridad: 'baja' | 'media' | 'alta' | 'urgente';
+  tipo: TipoRecordatorioKey;
+  prioridad: Prioridad;
   fecha_recordatorio: string;
   cliente_nombre?: string;
   propiedad_nombre?: string;
-  estado: 'pendiente' | 'enviado' | 'leido' | 'completado' | 'cancelado';
+  completado: boolean;
+  leido: boolean;
   notificar_email: boolean;
   notificar_push: boolean;
   created_at: string;
+  fecha_completado?: string | null;
 }
 
-interface RecordatoriosPanelProps {
-  vendedorId: string;
-}
-
-const TIPOS_RECORDATORIO = {
-  'seguimiento_cliente': { label: 'Seguimiento Cliente', icon: '👥', color: 'bg-blue-100 text-blue-800' },
-  'llamada_prospecto': { label: 'Llamada Prospecto', icon: '📞', color: 'bg-green-100 text-green-800' },
-  'envio_documentos': { label: 'Envío Documentos', icon: '📄', color: 'bg-purple-100 text-purple-800' },
-  'visita_propiedad': { label: 'Visita Propiedad', icon: '🏠', color: 'bg-orange-100 text-orange-800' },
-  'reunion_equipo': { label: 'Reunión Equipo', icon: '👨‍💼', color: 'bg-indigo-100 text-indigo-800' },
-  'personalizado': { label: 'Personalizado', icon: '⏰', color: 'bg-gray-100 text-gray-800' }
+const TIPOS_RECORDATORIO: Record<TipoRecordatorioKey, { label: string; icon: string; color: string }> = {
+  seguimiento_cliente: { label: "Seguimiento Cliente", icon: "👥", color: "bg-blue-100 text-blue-800" },
+  llamada_prospecto: { label: "Llamada Prospecto", icon: "📞", color: "bg-green-100 text-green-800" },
+  envio_documentos: { label: "Envío Documentos", icon: "📄", color: "bg-purple-100 text-purple-800" },
+  visita_propiedad: { label: "Visita Propiedad", icon: "🏠", color: "bg-orange-100 text-orange-800" },
+  reunion_equipo: { label: "Reunión Equipo", icon: "👨‍💼", color: "bg-indigo-100 text-indigo-800" },
+  personalizado: { label: "Personalizado", icon: "⏰", color: "bg-gray-100 text-gray-800" },
 };
 
-const PRIORIDADES = {
-  'baja': { label: 'Baja', color: 'text-gray-600', bg: 'bg-gray-100' },
-  'media': { label: 'Media', color: 'text-blue-600', bg: 'bg-blue-100' },
-  'alta': { label: 'Alta', color: 'text-orange-600', bg: 'bg-orange-100' },
-  'urgente': { label: 'Urgente', color: 'text-red-600', bg: 'bg-red-100' }
+const PRIORIDADES: Record<Prioridad, { label: string; color: string; bg: string }> = {
+  baja: { label: "Baja", color: "text-gray-600", bg: "bg-gray-100" },
+  media: { label: "Media", color: "text-blue-600", bg: "bg-blue-100" },
+  alta: { label: "Alta", color: "text-orange-600", bg: "bg-orange-100" },
+  urgente: { label: "Urgente", color: "text-red-600", bg: "bg-red-100" },
 };
 
-export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelProps) {
+export default function RecordatoriosPanel() {
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState<'todos' | 'hoy' | 'pendientes' | 'completados'>('todos');
+  const [filtro, setFiltro] = useState<"todos" | "hoy" | "pendientes" | "completados">("todos");
+  const supabase = useMemo(() => supabaseBrowser(), []);
+  const [accionEnProgreso, setAccionEnProgreso] = useState<string | null>(null);
 
-  useEffect(() => {
-    cargarRecordatorios();
-  }, [vendedorId, filtro]);
-
-  const cargarRecordatorios = async () => {
+  const cargarRecordatorios = useCallback(async () => {
     try {
       setCargando(true);
-      // Simular carga de recordatorios - en producción esto vendría de la API
-      const recordatoriosSimulados: Recordatorio[] = [
-        {
-          id: '1',
-          titulo: 'Llamar a Juan mañana a las 10 hs',
-          descripcion: 'Seguimiento de propuesta para Lote 15',
-          tipo: 'llamada_prospecto',
-          prioridad: 'alta',
-          fecha_recordatorio: addDays(new Date(), 1).toISOString(),
-          cliente_nombre: 'Juan Pérez',
-          estado: 'pendiente',
-          notificar_email: true,
-          notificar_push: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          titulo: 'Visita con cliente Ana – Proyecto Central, Lote 5',
-          descripcion: 'Mostrar la propiedad y discutir condiciones de venta',
-          tipo: 'visita_propiedad',
-          prioridad: 'media',
-          fecha_recordatorio: addDays(new Date(), 2).toISOString(),
-          cliente_nombre: 'Ana García',
-          propiedad_nombre: 'Proyecto Central - Lote 5',
-          estado: 'pendiente',
-          notificar_email: true,
-          notificar_push: false,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          titulo: 'Enviar documentos de reserva',
-          descripcion: 'Enviar contrato de reserva para Lote 8',
-          tipo: 'envio_documentos',
-          prioridad: 'alta',
-          fecha_recordatorio: new Date().toISOString(),
-          cliente_nombre: 'Carlos López',
-          estado: 'pendiente',
-          notificar_email: true,
-          notificar_push: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '4',
-          titulo: 'Reunión de equipo semanal',
-          descripcion: 'Revisar metas y objetivos del mes',
-          tipo: 'reunion_equipo',
-          prioridad: 'media',
-          fecha_recordatorio: addDays(new Date(), 3).toISOString(),
-          estado: 'pendiente',
-          notificar_email: false,
-          notificar_push: true,
-          created_at: new Date().toISOString()
-        }
-      ];
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      setRecordatorios(recordatoriosSimulados);
+      if (userError) throw userError;
+      if (!user) {
+        setRecordatorios([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("recordatorio")
+        .select(`
+          id,
+          titulo,
+          descripcion,
+          tipo,
+          prioridad,
+          fecha_recordatorio,
+          fecha_completado,
+          completado,
+          leido,
+          notificar_email,
+          notificar_push,
+          created_at,
+          cliente:cliente_id ( id, nombre ),
+          propiedad:propiedad_id ( id, identificacion_interna, tipo )
+        `)
+        .eq("vendedor_id", user.id)
+        .order("fecha_recordatorio", { ascending: true });
+
+      if (error) throw error;
+
+      const normalizados: Recordatorio[] = ((data ?? []) as RecordatorioQuery[]).map((item) => {
+        const prioridad = (item.prioridad ?? "media") as Prioridad;
+        const tipoNormalizado = (Object.keys(TIPOS_RECORDATORIO).includes(item.tipo)
+          ? item.tipo
+          : "personalizado") as TipoRecordatorioKey;
+
+        return {
+          id: item.id,
+          titulo: item.titulo,
+          descripcion: item.descripcion ?? undefined,
+          tipo: tipoNormalizado,
+          prioridad,
+          fecha_recordatorio: item.fecha_recordatorio,
+          cliente_nombre: item.cliente?.nombre ?? undefined,
+          propiedad_nombre: item.propiedad?.identificacion_interna ?? undefined,
+          completado: Boolean(item.completado),
+          leido: Boolean(item.leido),
+          notificar_email: Boolean(item.notificar_email ?? true),
+          notificar_push: Boolean(item.notificar_push),
+          created_at: item.created_at,
+          fecha_completado: item.fecha_completado,
+        };
+      });
+
+      setRecordatorios(normalizados);
     } catch (error) {
       console.error("Error cargando recordatorios:", error);
       toast.error("Error cargando recordatorios");
     } finally {
       setCargando(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    cargarRecordatorios();
+  }, [cargarRecordatorios]);
+
+  const obtenerUsuarioId = useCallback(async () => {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) throw error;
+    if (!user) throw new Error("Sesión inválida");
+    return user.id;
+  }, [supabase]);
 
   const marcarCompletado = async (id: string) => {
     try {
-      setRecordatorios(prev => 
-        prev.map(r => r.id === id ? { ...r, estado: 'completado' } : r)
+      setAccionEnProgreso(id);
+      const userId = await obtenerUsuarioId();
+      const { error } = await supabase
+        .from("recordatorio")
+        .update({
+          completado: true,
+          fecha_completado: new Date().toISOString(),
+          leido: true,
+        })
+        .eq("id", id)
+        .eq("vendedor_id", userId);
+
+      if (error) throw error;
+
+      setRecordatorios((prev) =>
+        prev.map((recordatorio) =>
+          recordatorio.id === id
+            ? { ...recordatorio, completado: true, leido: true, fecha_completado: new Date().toISOString() }
+            : recordatorio
+        )
       );
       toast.success("Recordatorio marcado como completado");
     } catch (error) {
       console.error("Error marcando recordatorio:", error);
       toast.error("Error marcando recordatorio");
+    } finally {
+      setAccionEnProgreso(null);
     }
   };
 
   const marcarLeido = async (id: string) => {
     try {
-      setRecordatorios(prev => 
-        prev.map(r => r.id === id ? { ...r, estado: 'leido' } : r)
+      setAccionEnProgreso(id);
+      const userId = await obtenerUsuarioId();
+      const { error } = await supabase
+        .from("recordatorio")
+        .update({ leido: true })
+        .eq("id", id)
+        .eq("vendedor_id", userId);
+
+      if (error) throw error;
+
+      setRecordatorios((prev) =>
+        prev.map((recordatorio) =>
+          recordatorio.id === id ? { ...recordatorio, leido: true } : recordatorio
+        )
       );
     } catch (error) {
       console.error("Error marcando recordatorio:", error);
+      toast.error("Error marcando recordatorio");
+    } finally {
+      setAccionEnProgreso(null);
+    }
+  };
+
+  const eliminarRecordatorio = async (id: string) => {
+    try {
+      setAccionEnProgreso(id);
+      const userId = await obtenerUsuarioId();
+      const { error } = await supabase
+        .from("recordatorio")
+        .delete()
+        .eq("id", id)
+        .eq("vendedor_id", userId);
+
+      if (error) throw error;
+
+      setRecordatorios((prev) => prev.filter((recordatorio) => recordatorio.id !== id));
+      toast.success("Recordatorio eliminado");
+    } catch (error) {
+      console.error("Error eliminando recordatorio:", error);
+      toast.error("Error eliminando recordatorio");
+    } finally {
+      setAccionEnProgreso(null);
     }
   };
 
   const obtenerFechaRelativa = (fecha: string) => {
     const fechaRecordatorio = new Date(fecha);
-    
+
     if (isToday(fechaRecordatorio)) {
-      return { texto: 'Hoy', color: 'text-blue-600', bg: 'bg-blue-100' };
-    } else if (isTomorrow(fechaRecordatorio)) {
-      return { texto: 'Mañana', color: 'text-orange-600', bg: 'bg-orange-100' };
-    } else if (isYesterday(fechaRecordatorio)) {
-      return { texto: 'Ayer', color: 'text-gray-600', bg: 'bg-gray-100' };
-    } else {
-      return { 
-        texto: format(fechaRecordatorio, 'dd/MM', { locale: es }), 
-        color: 'text-gray-600', 
-        bg: 'bg-gray-100' 
-      };
+      return { texto: "Hoy", color: "text-blue-600", bg: "bg-blue-100" };
     }
+    if (isTomorrow(fechaRecordatorio)) {
+      return { texto: "Mañana", color: "text-orange-600", bg: "bg-orange-100" };
+    }
+    if (isYesterday(fechaRecordatorio)) {
+      return { texto: "Ayer", color: "text-gray-600", bg: "bg-gray-100" };
+    }
+
+    return {
+      texto: format(fechaRecordatorio, "dd/MM", { locale: es }),
+      color: "text-gray-600",
+      bg: "bg-gray-100",
+    };
   };
 
-  const recordatoriosFiltrados = recordatorios.filter(recordatorio => {
+  const recordatoriosFiltrados = recordatorios.filter((recordatorio) => {
     switch (filtro) {
-      case 'hoy':
+      case "hoy":
         return isToday(new Date(recordatorio.fecha_recordatorio));
-      case 'pendientes':
-        return recordatorio.estado === 'pendiente';
-      case 'completados':
-        return recordatorio.estado === 'completado';
+      case "pendientes":
+        return !recordatorio.completado;
+      case "completados":
+        return recordatorio.completado;
       default:
         return true;
     }
@@ -172,9 +270,9 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
 
   const estadisticas = {
     total: recordatorios.length,
-    pendientes: recordatorios.filter(r => r.estado === 'pendiente').length,
-    completados: recordatorios.filter(r => r.estado === 'completado').length,
-    hoy: recordatorios.filter(r => isToday(new Date(r.fecha_recordatorio))).length
+    pendientes: recordatorios.filter((r) => !r.completado).length,
+    completados: recordatorios.filter((r) => r.completado).length,
+    hoy: recordatorios.filter((r) => isToday(new Date(r.fecha_recordatorio))).length,
   };
 
   if (cargando) {
@@ -183,7 +281,7 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-crm-border rounded"></div>
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="h-20 bg-crm-border rounded"></div>
             ))}
           </div>
@@ -194,7 +292,6 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
 
   return (
     <div className="space-y-6">
-      {/* Estadísticas - Responsive */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
           <div className="text-xl sm:text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
@@ -214,22 +311,21 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
         </div>
       </div>
 
-      {/* Filtros - Responsive */}
       <div className="crm-card p-3 sm:p-4">
         <div className="flex flex-wrap gap-2">
           {[
-            { key: 'todos', label: 'Todos', icon: '📋' },
-            { key: 'hoy', label: 'Hoy', icon: '📅' },
-            { key: 'pendientes', label: 'Pendientes', icon: '⏳' },
-            { key: 'completados', label: 'Completados', icon: '✅' }
-          ].map(f => (
+            { key: "todos", label: "Todos", icon: "📋" },
+            { key: "hoy", label: "Hoy", icon: "📅" },
+            { key: "pendientes", label: "Pendientes", icon: "⏳" },
+            { key: "completados", label: "Completados", icon: "✅" },
+          ].map((f) => (
             <button
               key={f.key}
-              onClick={() => setFiltro(f.key as any)}
+              onClick={() => setFiltro(f.key as typeof filtro)}
               className={`px-2 sm:px-3 py-1.5 sm:py-1 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
                 filtro === f.key
-                  ? 'bg-crm-primary text-white shadow-md'
-                  : 'bg-crm-border text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white'
+                  ? "bg-crm-primary text-white shadow-md"
+                  : "bg-crm-border text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
               }`}
             >
               <span className="hidden sm:inline">{f.label}</span>
@@ -239,7 +335,6 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
         </div>
       </div>
 
-      {/* Lista de Recordatorios - Responsive */}
       <div className="space-y-2 sm:space-y-3">
         {recordatoriosFiltrados.length === 0 ? (
           <div className="crm-card p-6 sm:p-8 text-center">
@@ -253,14 +348,15 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
         ) : (
           recordatoriosFiltrados.map((recordatorio) => {
             const fechaRelativa = obtenerFechaRelativa(recordatorio.fecha_recordatorio);
-            const tipoInfo = TIPOS_RECORDATORIO[recordatorio.tipo as keyof typeof TIPOS_RECORDATORIO] || TIPOS_RECORDATORIO.personalizado;
-            const prioridadInfo = PRIORIDADES[recordatorio.prioridad];
+            const tipoInfo =
+              TIPOS_RECORDATORIO[recordatorio.tipo] ?? TIPOS_RECORDATORIO.personalizado;
+            const prioridadInfo = PRIORIDADES[recordatorio.prioridad] ?? PRIORIDADES.media;
 
             return (
               <div
                 key={recordatorio.id}
                 className={`crm-card p-3 sm:p-4 hover:shadow-lg transition-all duration-200 ${
-                  recordatorio.estado === 'completado' ? 'opacity-60' : ''
+                  recordatorio.completado ? "opacity-60" : ""
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -268,9 +364,13 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
                     <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2">
                       <div className="flex items-center space-x-2">
                         <span className="text-base sm:text-lg">{tipoInfo.icon}</span>
-                        <h3 className={`text-sm font-medium ${
-                          recordatorio.estado === 'completado' ? 'line-through text-crm-text-muted' : 'text-crm-text-primary'
-                        }`}>
+                        <h3
+                          className={`text-sm font-medium ${
+                            recordatorio.completado
+                              ? "line-through text-crm-text-muted"
+                              : "text-crm-text-primary"
+                          }`}
+                        >
                           {recordatorio.titulo}
                         </h3>
                       </div>
@@ -286,13 +386,13 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
                       </p>
                     )}
 
-                    <div className="flex items-center space-x-4 text-xs text-crm-text-muted">
+                    <div className="flex items-center flex-wrap gap-3 text-xs text-crm-text-muted">
                       <div className="flex items-center space-x-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className={`px-2 py-1 rounded-full ${fechaRelativa.bg} ${fechaRelativa.color}`}>
-                          {fechaRelativa.texto} {format(new Date(recordatorio.fecha_recordatorio), 'HH:mm')}
+                          {fechaRelativa.texto} {format(new Date(recordatorio.fecha_recordatorio), "HH:mm")}
                         </span>
                       </div>
 
@@ -321,21 +421,25 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
                   </div>
 
                   <div className="flex items-center space-x-2 ml-4">
-                    {recordatorio.estado === 'pendiente' && (
+                    {!recordatorio.completado && (
                       <>
-                        <button
-                          onClick={() => marcarLeido(recordatorio.id)}
-                          className="p-2 text-crm-text-muted hover:text-crm-primary transition-colors"
-                          title="Marcar como leído"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </button>
+                        {!recordatorio.leido && (
+                          <button
+                            onClick={() => marcarLeido(recordatorio.id)}
+                            disabled={accionEnProgreso === recordatorio.id}
+                            className="p-2 text-crm-text-muted hover:text-crm-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Marcar como leído"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </button>
+                        )}
                         <button
                           onClick={() => marcarCompletado(recordatorio.id)}
-                          className="p-2 text-green-600 hover:text-green-700 transition-colors"
+                          disabled={accionEnProgreso === recordatorio.id}
+                          className="p-2 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Marcar como completado"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -344,6 +448,16 @@ export default function RecordatoriosPanel({ vendedorId }: RecordatoriosPanelPro
                         </button>
                       </>
                     )}
+                    <button
+                      onClick={() => eliminarRecordatorio(recordatorio.id)}
+                      disabled={accionEnProgreso === recordatorio.id}
+                      className="p-2 text-red-600 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Eliminar"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>

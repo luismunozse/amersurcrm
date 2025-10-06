@@ -15,6 +15,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const { data: { user } } = await s.auth.getUser();
   if (!user) redirect("/auth/login");
 
+  // Obtener el perfil del usuario para nombre y username
+  const { data: perfil } = await s
+    .from('usuario_perfil')
+    .select('nombre_completo, username')
+    .eq('id', user.id)
+    .single();
+
   const [notifications, notificationsCount, exchangeRates] = await Promise.all([
     getCachedNotificacionesNoLeidas(),
     getCachedNotificacionesCount(),
@@ -24,6 +31,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <DashboardClient
       userEmail={user.email}
+      userName={perfil?.nombre_completo}
+      userUsername={perfil?.username}
       notifications={notifications}
       notificationsCount={notificationsCount}
       exchangeRates={exchangeRates}

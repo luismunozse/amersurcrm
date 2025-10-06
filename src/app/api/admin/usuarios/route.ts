@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
+import { generarUsername, generarUsernameConNumero, validarUsername } from "@/lib/utils/username-generator";
 
 // GET - Obtener lista de usuarios
 export async function GET() {
@@ -22,9 +23,11 @@ export async function GET() {
       .from('usuario_perfil')
       .select(`
         id,
+        username,
         nombre_completo,
         dni,
         telefono,
+        email,
         rol_id,
         meta_mensual_ventas,
         comision_porcentaje,
@@ -137,9 +140,56 @@ export async function POST(request: NextRequest) {
     const rol_id = formData.get("rol_id") as string;
     const meta_mensual = formData.get("meta_mensual") as string;
     const comision_porcentaje = formData.get("comision_porcentaje") as string;
+    let username = formData.get("username") as string;
 
     if (!nombre_completo || !dni || !password || !rol_id) {
       return NextResponse.json({ error: "Faltan campos requeridos: nombre, DNI, contraseña y rol son obligatorios" }, { status: 400 });
+    }
+
+    // Generar username si no se proporcionó
+    if (!username) {
+      username = generarUsername(nombre_completo);
+    }
+
+    // Validar formato de username
+    const validacion = validarUsername(username);
+    if (!validacion.valido) {
+      return NextResponse.json({ error: validacion.error }, { status: 400 });
+    }
+
+    // Verificar que el username no exista
+    const { data: existingUser, error: checkError } = await supabase
+      .from('usuario_perfil')
+      .select('username')
+      .eq('username', username)
+      .single();
+
+    if (existingUser) {
+      // Username ya existe, intentar con número incremental
+      let numero = 2;
+      let usernameDisponible = false;
+      let usernameConNumero = username;
+
+      while (!usernameDisponible && numero <= 99) {
+        usernameConNumero = generarUsernameConNumero(username, numero);
+        const { data } = await supabase
+          .from('usuario_perfil')
+          .select('username')
+          .eq('username', usernameConNumero)
+          .single();
+
+        if (!data) {
+          usernameDisponible = true;
+          username = usernameConNumero;
+        }
+        numero++;
+      }
+
+      if (!usernameDisponible) {
+        return NextResponse.json({
+          error: `El username "${username}" y sus variantes ya están en uso. Por favor, elige otro.`
+        }, { status: 400 });
+      }
     }
 
     // Generar email temporal si no se proporciona (para vendedores con DNI)
@@ -175,11 +225,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Rol no válido" }, { status: 400 });
     }
 
-    // Crear perfil de usuario con requiere_cambio_password = true
+    // Crear perfil de usuario con username y requiere_cambio_password = true
     const { error: perfilError } = await supabase
       .from('usuario_perfil')
       .insert({
         id: authData.user.id,
+        username: username,
         email: emailFinal,
         nombre_completo: nombre_completo,
         dni: dni,
@@ -198,11 +249,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Error creando perfil de usuario" }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: "Usuario creado exitosamente",
       usuario: {
         id: authData.user.id,
+        username: username,
         email: emailFinal,
         nombre_completo,
         dni,

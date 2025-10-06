@@ -10,6 +10,7 @@ import { cambiarEstadoUsuario, resetearPasswordUsuario } from "./_actions";
 
 interface Usuario {
   id: string;
+  username?: string;
   email: string;
   nombre_completo?: string;
   dni?: string;
@@ -211,17 +212,20 @@ function GestionUsuarios() {
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
                   placeholder="Juan Pérez García"
                 />
+                <p className="text-xs text-crm-text-muted mt-1">
+                  Se generará automáticamente el username (ej: jperez)
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  DNI *
+                  DNI * (usado para login)
                 </label>
                 <input
                   type="text"
                   name="dni"
                   required
                   pattern="[0-9]{8}"
-                  maxLength="8"
+                  maxLength={8}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
                   placeholder="12345678"
                 />
@@ -364,19 +368,27 @@ function GestionUsuarios() {
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-crm-accent rounded-full flex items-center justify-center">
                           <span className="text-white text-sm font-medium">
-                            {usuario.nombre_completo?.charAt(0) || usuario.email.charAt(0).toUpperCase()}
+                            {usuario.nombre_completo?.charAt(0) || usuario.username?.charAt(0).toUpperCase() || 'U'}
                           </span>
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-crm-text-primary">{usuario.nombre_completo || 'Sin nombre'}</p>
                             {usuario.requiere_cambio_password && (
-                              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded" title="Requiere cambio de contraseña">
-                                🔑
+                              <span
+                                className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded flex items-center gap-1"
+                                title="Debe cambiar su contraseña en el próximo inicio de sesión"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                <span className="hidden sm:inline">Reseteo pendiente</span>
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-crm-text-muted">{usuario.email}</p>
+                          <p className="text-sm text-crm-text-muted">
+                            {usuario.username || 'sin-username'}
+                          </p>
                         </div>
                       </div>
                     </td>

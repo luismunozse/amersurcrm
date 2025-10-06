@@ -11,6 +11,8 @@ import CurrencyConverter from "./CurrencyConverter";
 type HeaderProps = {
   onSidebarToggle?: () => void;
   userEmail?: string;
+  userName?: string;
+  userUsername?: string;
   sidebarCollapsed?: boolean;
   notifications?: NotificacionNoLeida[];
   notificationsCount?: number;
@@ -20,6 +22,8 @@ type HeaderProps = {
 export default function Header({
   onSidebarToggle = () => {},
   userEmail,
+  userName,
+  userUsername,
   sidebarCollapsed = false,
   notifications = [],
   notificationsCount = 0,
@@ -108,20 +112,20 @@ export default function Header({
             <NotificationsDropdown notificaciones={notifications} count={notificationsCount} />
 
             {/* Avatar y menú del usuario */}
-            {userEmail && (
+            {(userEmail || userName) && (
               <>
                 <div className="hidden lg:block text-right">
                   <p className="text-sm font-medium text-crm-text-primary">
-                    {userEmail.split('@')[0]}
+                    {userName || userEmail?.split('@')[0]}
                   </p>
                   <p className="text-xs text-crm-text-muted">
-                    {userEmail}
+                    {userUsername || userEmail}
                   </p>
                 </div>
                 <div className="relative flex-shrink-0">
                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md ring-2 ring-crm-border hover:ring-crm-primary transition-all cursor-pointer">
                     <span className="text-white text-sm font-bold">
-                      {userEmail.charAt(0).toUpperCase()}
+                      {userName?.charAt(0).toUpperCase() || userEmail?.charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 border-2 border-crm-card rounded-full" />

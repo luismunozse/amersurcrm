@@ -4,7 +4,9 @@ import { getCachedProyectos } from "@/lib/cache.server";
 import type { ProyectoCached } from "@/types/crm";
 
 export async function RecentProjects() {
-  const proyectos: ProyectoCached[] = await getCachedProyectos();
+  const proyectosData = await getCachedProyectos();
+  // Ensure we have an array, default to empty array if null/undefined
+  const proyectos: ProyectoCached[] = Array.isArray(proyectosData) ? proyectosData : [];
   const recentProjects = proyectos.slice(0, 3);
 
   return (
