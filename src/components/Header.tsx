@@ -4,6 +4,7 @@ import Image from "next/image";
 import ThemeToggle from "./ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import UserAvatarMenu from "./UserAvatarMenu";
+import GlobalSearch from "./GlobalSearch";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
 import CurrencyConverter from "./CurrencyConverter";
@@ -69,18 +70,7 @@ export default function Header({
           {/* Right: búsqueda + acciones */}
           <div className="flex items-center space-x-1.5 sm:space-x-2 md:space-x-3">
             <div className="hidden lg:block">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Buscar..."
-                  className="w-64 pl-10 pr-4 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
-                />
-              </div>
+              <GlobalSearch />
             </div>
 
             {exchangeRates.length > 0 && (
@@ -105,9 +95,9 @@ export default function Header({
               </div>
             )}
 
-            <ThemeToggle />
-
             <CurrencyConverter exchangeRates={exchangeRates} />
+
+            <ThemeToggle />
 
             <NotificationsDropdown notificaciones={notifications} count={notificationsCount} />
 
