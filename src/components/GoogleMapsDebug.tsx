@@ -31,23 +31,23 @@ export default function GoogleMapsDebug() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-black bg-opacity-80 text-white p-4 rounded-lg font-mono text-xs max-w-sm">
+    <div className="fixed bottom-4 left-4 bg-black bg-opacity-80 text-white p-3 rounded-lg font-mono text-xs max-w-xs z-[100]">
       <h4 className="font-bold mb-2">🐛 Google Maps Debug</h4>
       <div className="space-y-1">
         <div>
-          <strong>API Key:</strong> 
+          <strong>API Key:</strong>
           <span className={apiKey === 'NO CONFIGURADA' ? 'text-red-400' : 'text-green-400'}>
             {apiKey === 'NO CONFIGURADA' ? apiKey : `${apiKey.substring(0, 10)}...`}
           </span>
         </div>
         <div>
-          <strong>Google Maps:</strong> 
+          <strong>Google Maps:</strong>
           <span className={googleMapsLoaded ? 'text-green-400' : 'text-red-400'}>
             {googleMapsLoaded ? '✅ Cargado' : '❌ No cargado'}
           </span>
         </div>
         <div>
-          <strong>Status:</strong> 
+          <strong>Status:</strong>
           <span className="text-blue-400">Debug activo</span>
         </div>
       </div>

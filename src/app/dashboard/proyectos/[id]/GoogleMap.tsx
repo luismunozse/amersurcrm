@@ -28,6 +28,9 @@ interface GoogleMapProps {
   rotationDeg?: number;
   overlayEditable?: boolean;
   onOverlayBoundsChange?: (bounds: [[number, number], [number, number]]) => void;
+  onMapCenterChange?: (center: [number, number]) => void;
+  onCreateDefaultBounds?: () => void;
+  onGetMapCenter?: () => [number, number] | null;
   projectPolygon?: LatLngLiteral[];
   onProjectPolygonChange?: (vertices: LatLngLiteral[]) => void;
   projectDrawingActive?: boolean;
@@ -69,6 +72,9 @@ export default function GoogleMap({
   rotationDeg = 0,
   overlayEditable = false,
   onOverlayBoundsChange,
+  onMapCenterChange,
+  onCreateDefaultBounds,
+  onGetMapCenter,
   projectPolygon = [],
   onProjectPolygonChange,
   projectDrawingActive = false,
@@ -110,6 +116,23 @@ export default function GoogleMap({
   useEffect(() => {
     setIsDragActive(Boolean(draggingLoteId));
   }, [draggingLoteId]);
+
+  // Exponer función para obtener el centro actual del mapa
+  useEffect(() => {
+    if (!onGetMapCenter) return;
+
+    const getCenter = (): [number, number] | null => {
+      const map = mapInstanceRef.current;
+      if (!map) return null;
+      const center = map.getCenter();
+      if (!center) return null;
+      return [center.lat(), center.lng()];
+    };
+
+    // Esta es una forma de "exponer" la función al componente padre
+    // No es la más elegante pero funciona con el patrón actual
+    (onGetMapCenter as unknown as { current?: () => [number, number] | null }).current = getCenter;
+  }, [onGetMapCenter]);
 
   useEffect(() => () => {
     // Cleanup de polígonos al desmontar
@@ -164,10 +187,16 @@ export default function GoogleMap({
       mapTypeId: google.maps.MapTypeId.SATELLITE,
       mapTypeControl: true,
       mapTypeControlOptions: {
-        position: google.maps.ControlPosition.TOP_RIGHT,
+        position: google.maps.ControlPosition.LEFT_TOP,
       },
       streetViewControl: true,
+      streetViewControlOptions: {
+        position: google.maps.ControlPosition.LEFT_TOP,
+      },
       zoomControl: true,
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.LEFT_BOTTOM,
+      },
       fullscreenControl: false,
       gestureHandling: 'greedy',
     });
@@ -189,12 +218,21 @@ export default function GoogleMap({
     drawingManager.setMap(map);
     drawingManagerRef.current = drawingManager;
 
+    // Listener para informar cambios de centro del mapa
+    const centerChangedListener = map.addListener('center_changed', () => {
+      const center = map.getCenter();
+      if (center && onMapCenterChange) {
+        onMapCenterChange([center.lat(), center.lng()]);
+      }
+    });
+
     return () => {
+      centerChangedListener.remove();
       drawingManager.setMap(null);
       google.maps.event.clearInstanceListeners(map);
       mapInstanceRef.current = null;
     };
-  }, [isLoaded, defaultCenter, defaultZoom]);
+  }, [isLoaded, defaultCenter, defaultZoom, onMapCenterChange]);
 
   useEffect(() => {
     if (!isLoaded || !mapInstanceRef.current) return;
@@ -551,7 +589,10 @@ export default function GoogleMap({
     const map = mapInstanceRef.current;
     if (!map) return;
 
+    console.log('🗺️ GoogleMap - overlayEditable:', overlayEditable, 'overlayBounds:', overlayBounds);
+
     if (!overlayEditable || !overlayBounds) {
+      console.log('🗺️ No crear rectángulo - editable:', overlayEditable, 'bounds:', !!overlayBounds);
       overlayListenersRef.current.forEach((listener) => listener.remove());
       overlayListenersRef.current = [];
       if (overlayRectangleRef.current) {
@@ -568,17 +609,24 @@ export default function GoogleMap({
     );
 
     if (!overlayRectangleRef.current) {
+      console.log('🟦 Creando rectángulo en mapa:', bounds.toString());
       const rectangle = new google.maps.Rectangle({
         bounds,
         map,
         editable: true,
         draggable: true,
-        fillOpacity: 0,
+        fillColor: '#2563EB',
+        fillOpacity: 0.15,
         strokeColor: '#2563EB',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
+        strokeOpacity: 0.9,
+        strokeWeight: 3,
       });
       overlayRectangleRef.current = rectangle;
+      console.log('🟦 Rectángulo creado:', rectangle);
+
+      // Centrar el mapa en el rectángulo cuando se crea
+      map.fitBounds(bounds);
+      console.log('🟦 Mapa centrado en el rectángulo');
 
       const notifyBounds = () => {
         if (overlaySilentRef.current) return;
@@ -840,8 +888,8 @@ export default function GoogleMap({
         )}
       </div>
 
-      {/* Barra de búsqueda */}
-      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 flex flex-col gap-2 w-72 z-[1000]">
+      {/* Barra de búsqueda - Movida arriba a la derecha para no chocar con controles */}
+      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 flex flex-col gap-2 w-72 z-[1000]">
         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Buscar ubicación</div>
         <input
           ref={searchInputRef}
@@ -859,8 +907,8 @@ export default function GoogleMap({
         )}
       </div>
 
-      {/* Leyenda */}
-      <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow flex flex-col gap-2 px-4 py-3 text-xs text-gray-700">
+      {/* Leyenda - Movida abajo a la derecha, debajo del buscador */}
+      <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow flex flex-col gap-2 px-4 py-3 text-xs text-gray-700 z-[1000]">
         <span className="font-semibold text-gray-900 text-sm">Estados de lotes</span>
         <div className="flex flex-col gap-1">
           {legendItems.map((estado) => (

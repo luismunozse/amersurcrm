@@ -17,6 +17,7 @@ export default function ProjectTabs({ lotesSection, mapeoSection }: ProjectTabsP
       <div className="crm-card p-1">
         <div className="flex gap-1">
           <button
+            key="tab-lotes"
             onClick={() => setActiveTab('lotes')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'lotes'
@@ -28,6 +29,7 @@ export default function ProjectTabs({ lotesSection, mapeoSection }: ProjectTabsP
             <span>Gestión de Lotes</span>
           </button>
           <button
+            key="tab-mapeo"
             onClick={() => setActiveTab('mapeo')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'mapeo'

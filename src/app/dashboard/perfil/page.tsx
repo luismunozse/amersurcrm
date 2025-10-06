@@ -1,303 +1,152 @@
-"use client";
+import { createServerOnlyClient } from "@/lib/supabase.server";
+import { redirect } from "next/navigation";
+import EditarPerfilForm from "./_EditarPerfilForm";
+import { User, Mail, Briefcase } from "lucide-react";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
-import { cambiarPasswordPerfil } from "../admin/usuarios/_actions";
+export default async function MiPerfilPage() {
+  const supabase = await createServerOnlyClient();
 
-interface PerfilUsuario {
-  id: string;
-  email: string;
-  nombre_completo?: string;
-  dni?: string;
-  telefono?: string;
-  rol?: {
-    nombre: string;
-    descripcion: string;
-  };
-  requiere_cambio_password?: boolean;
-  activo: boolean;
-  created_at: string;
-}
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
 
-export default function PerfilPage() {
-  const router = useRouter();
-  const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [cambiandoPassword, setCambiandoPassword] = useState(false);
-
-  // Form state
-  const [passwordActual, setPasswordActual] = useState("");
-  const [passwordNueva, setPasswordNueva] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-
-  useEffect(() => {
-    cargarPerfil();
-  }, []);
-
-  const cargarPerfil = async () => {
-    try {
-      setCargando(true);
-      const response = await fetch("/api/auth/perfil");
-      const data = await response.json();
-
-      if (data.success && data.perfil) {
-        setPerfil(data.perfil);
-      } else {
-        toast.error("Error cargando perfil");
-      }
-    } catch (error) {
-      console.error("Error cargando perfil:", error);
-      toast.error("Error cargando perfil");
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  const handleCambiarPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (passwordNueva !== passwordConfirm) {
-      toast.error("Las contraseñas no coinciden");
-      return;
-    }
-
-    if (passwordNueva.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
-
-    setCambiandoPassword(true);
-
-    try {
-      const result = await cambiarPasswordPerfil(passwordActual, passwordNueva);
-
-      if (result.success) {
-        toast.success(result.message);
-        setPasswordActual("");
-        setPasswordNueva("");
-        setPasswordConfirm("");
-        // Recargar perfil para actualizar requiere_cambio_password
-        cargarPerfil();
-      } else {
-        toast.error(result.error || "Error cambiando contraseña");
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error inesperado");
-    } finally {
-      setCambiandoPassword(false);
-    }
-  };
-
-  if (cargando) {
-    return (
-      <div className="min-h-screen bg-crm-bg-primary flex items-center justify-center">
-        <div className="animate-pulse text-crm-text-secondary">
-          Cargando perfil...
-        </div>
-      </div>
-    );
-  }
+  // Obtener perfil completo del usuario
+  const { data: perfil } = await supabase
+    .from('usuario_perfil')
+    .select('*, rol:rol!usuario_perfil_rol_fk(id, nombre, descripcion)')
+    .eq('id', user.id)
+    .single();
 
   if (!perfil) {
-    return (
-      <div className="min-h-screen bg-crm-bg-primary flex items-center justify-center">
-        <div className="crm-card p-6 text-center">
-          <p className="text-crm-text-secondary mb-4">
-            No se pudo cargar el perfil
-          </p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="crm-button-primary px-4 py-2 rounded-lg"
-          >
-            Volver al Dashboard
-          </button>
-        </div>
-      </div>
-    );
+    redirect("/dashboard");
   }
 
   return (
-    <div className="min-h-screen bg-crm-bg-primary">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-crm-text-primary">
-            Mi Perfil
-          </h1>
-          <p className="text-crm-text-secondary mt-2">
-            Gestiona tu información personal y contraseña
-          </p>
-        </div>
-
-        {/* Alerta si requiere cambio de contraseña */}
-        {perfil.requiere_cambio_password && (
-          <div className="crm-card p-4 mb-6 border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
-            <div className="flex items-start gap-3">
-              <svg
-                className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <div>
-                <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">
-                  Cambio de Contraseña Requerido
-                </h3>
-                <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-                  Por seguridad, debes cambiar tu contraseña temporal antes de
-                  continuar usando el sistema.
-                </p>
-              </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="bg-crm-card border border-crm-border rounded-xl p-6 shadow-sm">
+        <div className="flex items-start gap-6">
+          {/* Avatar grande */}
+          <div className="flex-shrink-0">
+            <div className="w-24 h-24 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-lg ring-4 ring-crm-border">
+              <span className="text-white text-3xl font-bold">
+                {perfil.nombre_completo?.charAt(0).toUpperCase() || 'U'}
+              </span>
             </div>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Información del Perfil */}
-          <div className="crm-card p-6">
-            <h2 className="text-xl font-semibold text-crm-text-primary mb-4">
-              Información Personal
-            </h2>
+          {/* Info básica */}
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-crm-text-primary mb-2">
+              {perfil.nombre_completo || 'Sin nombre'}
+            </h1>
+            <p className="text-lg text-crm-text-muted mb-4">
+              {perfil.username}
+            </p>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-crm-text-secondary mb-1">
-                  Nombre Completo
-                </label>
-                <p className="text-crm-text-primary">
-                  {perfil.nombre_completo || "No registrado"}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-crm-text-secondary mb-1">
-                  DNI
-                </label>
-                <p className="text-crm-text-primary">
-                  {perfil.dni || "No registrado"}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-crm-text-secondary mb-1">
-                  Email
-                </label>
-                <p className="text-crm-text-primary">{perfil.email}</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-crm-text-secondary mb-1">
-                  Teléfono
-                </label>
-                <p className="text-crm-text-primary">
-                  {perfil.telefono || "No registrado"}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-crm-text-secondary mb-1">
-                  Rol
-                </label>
-                <p className="text-crm-text-primary">
-                  {perfil.rol?.nombre?.replace("ROL_", "").replace("_", " ") ||
-                    "No asignado"}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-crm-text-secondary mb-1">
-                  Estado
-                </label>
-                <span
-                  className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
-                    perfil.activo
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                  }`}
-                >
-                  {perfil.activo ? "Activo" : "Inactivo"}
+            <div className="flex flex-wrap gap-3">
+              {perfil.rol && (
+                <span className="px-3 py-1 text-sm font-medium rounded-full bg-crm-primary/10 text-crm-primary border border-crm-primary/20">
+                  {perfil.rol.nombre === 'ROL_ADMIN' ? 'Administrador' :
+                   perfil.rol.nombre === 'ROL_COORDINADOR_VENTAS' ? 'Coordinador' :
+                   'Vendedor'}
                 </span>
-              </div>
+              )}
+              {perfil.activo ? (
+                <span className="px-3 py-1 text-sm font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                  Activo
+                </span>
+              ) : (
+                <span className="px-3 py-1 text-sm font-medium rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
+                  Inactivo
+                </span>
+              )}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Cambiar Contraseña */}
-          <div className="crm-card p-6">
-            <h2 className="text-xl font-semibold text-crm-text-primary mb-4">
-              Cambiar Contraseña
-            </h2>
-
-            <form onSubmit={handleCambiarPassword} className="space-y-4">
+      {/* Grid de información */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Información de contacto */}
+        <div className="bg-crm-card border border-crm-border rounded-xl p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center gap-2">
+            <Mail className="h-5 w-5 text-crm-primary" />
+            Información de Contacto
+          </h2>
+          <div className="space-y-3">
+            {user.email && (
               <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Contraseña Actual *
-                </label>
-                <input
-                  type="password"
-                  value={passwordActual}
-                  onChange={(e) => setPasswordActual(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="Tu contraseña actual"
-                />
+                <p className="text-xs text-crm-text-muted mb-1">Email</p>
+                <p className="text-sm text-crm-text-primary font-medium">{user.email}</p>
               </div>
-
+            )}
+            {perfil.dni && (
               <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Nueva Contraseña *
-                </label>
-                <input
-                  type="password"
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  required
-                  minLength={6}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="Nueva contraseña (mín. 6 caracteres)"
-                />
+                <p className="text-xs text-crm-text-muted mb-1">DNI</p>
+                <p className="text-sm text-crm-text-primary font-medium">{perfil.dni}</p>
               </div>
-
+            )}
+            {perfil.telefono && (
               <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Confirmar Nueva Contraseña *
-                </label>
-                <input
-                  type="password"
-                  value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
-                  required
-                  minLength={6}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="Confirma tu nueva contraseña"
-                />
+                <p className="text-xs text-crm-text-muted mb-1">Teléfono</p>
+                <p className="text-sm text-crm-text-primary font-medium">{perfil.telefono}</p>
               </div>
-
-              {passwordNueva && passwordConfirm && passwordNueva !== passwordConfirm && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  Las contraseñas no coinciden
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={cambiandoPassword}
-                className="w-full crm-button-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {cambiandoPassword
-                  ? "Cambiando contraseña..."
-                  : "Cambiar Contraseña"}
-              </button>
-            </form>
+            )}
+            {!user.email && !perfil.dni && !perfil.telefono && (
+              <p className="text-sm text-crm-text-muted">No hay información de contacto</p>
+            )}
           </div>
         </div>
+
+        {/* Información profesional */}
+        <div className="bg-crm-card border border-crm-border rounded-xl p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-crm-primary" />
+            Información Profesional
+          </h2>
+          <div className="space-y-3">
+            {perfil.meta_mensual && (
+              <div>
+                <p className="text-xs text-crm-text-muted mb-1">Meta Mensual</p>
+                <p className="text-sm text-crm-text-primary font-medium">
+                  S/ {perfil.meta_mensual.toLocaleString()}
+                </p>
+              </div>
+            )}
+            {perfil.comision_porcentaje && (
+              <div>
+                <p className="text-xs text-crm-text-muted mb-1">Comisión</p>
+                <p className="text-sm text-crm-text-primary font-medium">
+                  {perfil.comision_porcentaje}%
+                </p>
+              </div>
+            )}
+            {perfil.created_at && (
+              <div>
+                <p className="text-xs text-crm-text-muted mb-1">Fecha de Alta</p>
+                <p className="text-sm text-crm-text-primary font-medium">
+                  {new Date(perfil.created_at).toLocaleDateString('es-PE', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
+              </div>
+            )}
+            {!perfil.meta_mensual && !perfil.comision_porcentaje && (
+              <p className="text-sm text-crm-text-muted">No hay información profesional</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Formulario de edición */}
+      <div className="bg-crm-card border border-crm-border rounded-xl p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-crm-text-primary mb-6 flex items-center gap-2">
+          <User className="h-6 w-6 text-crm-primary" />
+          Editar Información Personal
+        </h2>
+        <EditarPerfilForm perfil={perfil} userEmail={user.email || ''} />
       </div>
     </div>
   );

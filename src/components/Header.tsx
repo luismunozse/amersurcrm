@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import ThemeToggle from "./ThemeToggle";
-import LogoutButton from "./LogoutButton";
 import NotificationsDropdown from "./NotificationsDropdown";
+import UserAvatarMenu from "./UserAvatarMenu";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
 import CurrencyConverter from "./CurrencyConverter";
@@ -112,30 +112,11 @@ export default function Header({
             <NotificationsDropdown notificaciones={notifications} count={notificationsCount} />
 
             {/* Avatar y menú del usuario */}
-            {(userEmail || userName) && (
-              <>
-                <div className="hidden lg:block text-right">
-                  <p className="text-sm font-medium text-crm-text-primary">
-                    {userName || userEmail?.split('@')[0]}
-                  </p>
-                  <p className="text-xs text-crm-text-muted">
-                    {userUsername || userEmail}
-                  </p>
-                </div>
-                <div className="relative flex-shrink-0">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md ring-2 ring-crm-border hover:ring-crm-primary transition-all cursor-pointer">
-                    <span className="text-white text-sm font-bold">
-                      {userName?.charAt(0).toUpperCase() || userEmail?.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 border-2 border-crm-card rounded-full" />
-                </div>
-              </>
-            )}
-
-            <div className="flex-shrink-0">
-              <LogoutButton />
-            </div>
+            <UserAvatarMenu
+              userName={userName}
+              userUsername={userUsername}
+              userEmail={userEmail}
+            />
           </div>
         </div>
       </div>

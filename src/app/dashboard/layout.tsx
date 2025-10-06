@@ -15,12 +15,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const { data: { user } } = await s.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // Obtener el perfil del usuario para nombre y username
+  // Obtener el perfil del usuario para nombre, username y verificar si requiere cambio de password
   const { data: perfil } = await s
     .from('usuario_perfil')
-    .select('nombre_completo, username')
+    .select('nombre_completo, username, requiere_cambio_password')
     .eq('id', user.id)
     .single();
+
+  // Si el usuario requiere cambio de contraseña, redirigir a la página de cambio
+  if (perfil?.requiere_cambio_password) {
+    redirect("/auth/cambiar-password");
+  }
 
   const [notifications, notificationsCount, exchangeRates] = await Promise.all([
     getCachedNotificacionesNoLeidas(),

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
-import MapeoLotes from "./_MapeoLotes";
+import MapeoLotesMejorado from "./_MapeoLotesMejorado";
+import MapeoLotesVisualizacion from "./_MapeoLotesVisualizacion";
 import DeleteProjectButton from "./_DeleteProjectButton";
 import GoogleMapsDebug from "@/components/GoogleMapsDebug";
 import { PaginationClient } from "./_PaginationClient";
@@ -40,6 +41,16 @@ export default async function ProyLotesPage({
   const to = from + perPage - 1;
 
   const supabase = await createServerOnlyClient();
+
+  // Obtener usuario y perfil para verificar rol
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: perfil } = user ? await supabase
+    .from('usuario_perfil')
+    .select('rol:rol!usuario_perfil_rol_fk(nombre)')
+    .eq('id', user.id)
+    .single() : { data: null };
+
+  const isAdmin = perfil?.rol?.nombre === 'ROL_ADMIN';
 
   // Proyecto (para título/404)
   const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,created_at";
@@ -303,7 +314,7 @@ export default async function ProyLotesPage({
         lotesSection={
           <>
             {/* Filtros compactos */}
-            <div className="crm-card p-4 md:p-5">
+            <div key="filtros-lotes" className="crm-card p-4 md:p-5">
               <form action={`/dashboard/proyectos/${proyecto.id}`} className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="relative">
@@ -341,15 +352,17 @@ export default async function ProyLotesPage({
             </div>
 
             <NewLoteForm
+              key="new-lote-form"
               proyectoId={proyecto.id}
               proyectos={todosLosProyectos || []}
             />
 
-            <LotesList proyectoId={proyecto.id} lotes={lotesConProyecto} />
+            <LotesList key="lotes-list" proyectoId={proyecto.id} lotes={lotesConProyecto} />
 
             {/* Paginación mejorada */}
             {total > perPage && (
               <PaginationClient
+                key="pagination-lotes"
                 currentPage={page}
                 totalPages={lastPage}
                 proyectoId={proyecto.id}
@@ -360,16 +373,26 @@ export default async function ProyLotesPage({
           </>
         }
         mapeoSection={
-          <MapeoLotes
-            proyectoId={proyecto.id}
-            planosUrl={proyecto.planos_url}
-            proyectoNombre={proyecto.nombre}
-            initialBounds={overlayBoundsValue}
-            initialRotation={overlayRotationValue}
-            lotes={lotesForMapeo}
-            ubigeo={undefined}
-            initialPolygon={proyectoPolygon}
-          />
+          isAdmin ? (
+            <MapeoLotesMejorado
+              key="mapeo-mejorado"
+              proyectoId={proyecto.id}
+              planosUrl={proyecto.planos_url}
+              proyectoNombre={proyecto.nombre}
+              initialBounds={overlayBoundsValue}
+              initialRotation={overlayRotationValue}
+              lotes={lotesForMapeo}
+            />
+          ) : (
+            <MapeoLotesVisualizacion
+              key="mapeo-visualizacion"
+              proyectoNombre={proyecto.nombre}
+              planosUrl={proyecto.planos_url}
+              overlayBounds={overlayBoundsValue}
+              overlayRotation={overlayRotationValue}
+              lotes={lotesForMapeo}
+            />
+          )
         }
       />
       
