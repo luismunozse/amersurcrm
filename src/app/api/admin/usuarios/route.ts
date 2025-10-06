@@ -286,6 +286,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const {
       id, // requerido
+      username,
       nombre_completo,
       dni,
       telefono,
@@ -299,8 +300,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
     }
 
+    // Validar username si se proporciona
+    if (typeof username === 'string' && username.trim()) {
+      const isValidUsername = await validarUsername(username.trim(), id);
+      if (!isValidUsername) {
+        return NextResponse.json({ error: "El username ya existe o no es válido" }, { status: 400 });
+      }
+    }
+
     // Construir payload de update solo con campos presentes
     const updatePayload: Record<string, unknown> = {};
+    if (typeof username === 'string' && username.trim()) updatePayload.username = username.trim();
     if (typeof nombre_completo === 'string') updatePayload.nombre_completo = nombre_completo;
     if (typeof dni === 'string') updatePayload.dni = dni;
     if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;
@@ -326,6 +336,83 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error en PATCH /api/admin/usuarios:', error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+  }
+}
+
+// DELETE - Eliminar usuario
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('id');
+
+    if (!userId) {
+      return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
+    }
+
+    // Verificar que no se está eliminando a sí mismo
+    if (userId === user.id) {
+      return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
+    }
+
+    // Verificar que el usuario existe
+    const { data: usuarioExistente, error: fetchError } = await supabase
+      .from('usuario_perfil')
+      .select('id, username, nombre_completo')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !usuarioExistente) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    }
+
+    // Verificar si el usuario tiene clientes asignados
+    const { data: clientesAsignados, error: clientesError } = await supabase
+      .from('cliente')
+      .select('id')
+      .eq('vendedor_asignado', usuarioExistente.username)
+      .limit(1);
+
+    if (clientesError) {
+      console.error('Error verificando clientes asignados:', clientesError);
+      return NextResponse.json({ error: "Error verificando dependencias" }, { status: 500 });
+    }
+
+    if (clientesAsignados && clientesAsignados.length > 0) {
+      return NextResponse.json({ 
+        error: `No se puede eliminar el usuario porque tiene ${clientesAsignados.length} cliente(s) asignado(s). Primero debe reasignar o desactivar estos clientes.` 
+      }, { status: 400 });
+    }
+
+    // Eliminar el usuario del perfil (esto también eliminará el usuario de auth.users por cascada)
+    const { error: deleteError } = await supabase
+      .from('usuario_perfil')
+      .delete()
+      .eq('id', userId);
+
+    if (deleteError) {
+      console.error('Error eliminando usuario:', deleteError);
+      return NextResponse.json({ error: "Error eliminando usuario" }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      message: `Usuario ${usuarioExistente.nombre_completo} (@${usuarioExistente.username}) eliminado exitosamente` 
+    });
+
+  } catch (error) {
+    console.error('Error eliminando usuario:', error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

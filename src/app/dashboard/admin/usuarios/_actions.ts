@@ -1,3 +1,4 @@
+
 "use server";
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
@@ -166,6 +167,42 @@ export async function cambiarPasswordPerfil(
     };
   } catch (error) {
     console.error('Error cambiando contraseña:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
+}
+
+/**
+ * Elimina un usuario del sistema
+ */
+export async function eliminarUsuario(userId: string) {
+  try {
+    const response = await fetch(`/api/admin/usuarios?id=${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: result.error || 'Error eliminando usuario'
+      };
+    }
+
+    revalidatePath('/dashboard/admin/usuarios');
+
+    return {
+      success: true,
+      message: result.message || 'Usuario eliminado exitosamente'
+    };
+  } catch (error) {
+    console.error('Error eliminando usuario:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Error desconocido'

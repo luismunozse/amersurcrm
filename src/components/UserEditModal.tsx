@@ -10,6 +10,7 @@ type Rol = {
 
 type UsuarioEditable = {
   id: string;
+  username?: string;
   nombre_completo?: string;
   dni?: string;
   telefono?: string | null;
@@ -26,6 +27,7 @@ interface UserEditModalProps {
   roles: Rol[];
   onSave: (payload: {
     id: string;
+    username?: string;
     nombre_completo?: string;
     dni?: string;
     telefono?: string | null;
@@ -37,6 +39,7 @@ interface UserEditModalProps {
 }
 
 export default function UserEditModal({ open, onClose, user, roles, onSave }: UserEditModalProps) {
+  const [username, setUsername] = useState<string>("");
   const [nombre, setNombre] = useState<string>("");
   const [dni, setDni] = useState<string>("");
   const [telefono, setTelefono] = useState<string>("");
@@ -47,6 +50,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
 
   // Valores iniciales para detectar cambios
   const initial = useMemo(() => ({
+    username: user?.username || "",
     nombre: user?.nombre_completo || "",
     dni: user?.dni || "",
     telefono: user?.telefono || "",
@@ -58,6 +62,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
 
   useEffect(() => {
     if (open && user) {
+      setUsername(initial.username);
       setNombre(initial.nombre);
       setDni(initial.dni);
       setTelefono(initial.telefono);
@@ -74,6 +79,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
     e.preventDefault();
     const payload: any = { id: user.id };
 
+    if (username !== initial.username) payload.username = username;
     if (nombre !== initial.nombre) payload.nombre_completo = nombre;
     if (dni !== initial.dni) payload.dni = dni;
     if (telefono !== initial.telefono) payload.telefono = telefono === "" ? null : telefono;
@@ -106,6 +112,20 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
 
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">Username</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-crm-text-muted">@</span>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                  className="w-full pl-8 pr-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                  placeholder="jperez"
+                  maxLength={50}
+                />
+              </div>
+              <p className="text-xs text-crm-text-muted mt-1">Solo letras minúsculas y números</p>
+            </div>
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">Nombre Completo</label>
               <input
