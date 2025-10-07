@@ -89,6 +89,7 @@ export default function MapeoLotesMejorado({
   const [lotesState, setLotesState] = useState<LoteState[]>(lotes);
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [draggingLoteId, setDraggingLoteId] = useState<string | null>(null);
+  const [drawingLoteId, setDrawingLoteId] = useState<string | null>(null);
   const [savingLotePolygon, setSavingLotePolygon] = useState(false);
 
   useEffect(() => {
@@ -370,6 +371,42 @@ export default function MapeoLotesMejorado({
     setDraggingLoteId(null);
   }, []);
 
+  const handleStartDrawingLote = useCallback((loteId: string) => {
+    setDrawingLoteId(loteId);
+    setSelectedLoteId(loteId);
+  }, []);
+
+  const handleLotePolygonComplete = useCallback(async (vertices: [number, number][]) => {
+    if (!drawingLoteId) return;
+
+    setSavingLotePolygon(true);
+    try {
+      await guardarPoligonoLote(drawingLoteId, proyectoId, vertices);
+
+      setLotesState((prev) =>
+        prev.map((lote) =>
+          lote.id === drawingLoteId
+            ? {
+                ...lote,
+                plano_poligono: vertices,
+                ubicacion: vertices.length > 0 ? {
+                  lat: vertices[0][0],
+                  lng: vertices[0][1],
+                } : null,
+              }
+            : lote
+        )
+      );
+
+      toast.success(`✅ Lote ${lotesState.find(l => l.id === drawingLoteId)?.codigo} ubicado correctamente`);
+      setDrawingLoteId(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el polígono del lote');
+    } finally {
+      setSavingLotePolygon(false);
+    }
+  }, [drawingLoteId, proyectoId, lotesState]);
+
   const handleRemoveLotePin = async (loteId: string) => {
     if (!confirm('¿Quitar la ubicación de este lote?')) return;
     setSavingLotePolygon(true);
@@ -614,7 +651,7 @@ export default function MapeoLotesMejorado({
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
                     <p className="font-medium mb-1">Cómo ubicar lotes:</p>
-                    <p className="text-xs">Arrastra cada lote de la lista y suéltalo en su ubicación dentro del plano</p>
+                    <p className="text-xs">Haz clic en "✏️ Dibujar" y traza el área de la parcela directamente sobre el plano del mapa</p>
                   </div>
 
                   <div>
@@ -629,18 +666,12 @@ export default function MapeoLotesMejorado({
                         </div>
                       ) : (
                         lotesSinUbicar.map((lote) => (
-                          <button
+                          <div
                             key={lote.id}
-                            draggable
-                            onClick={() => setSelectedLoteId(lote.id)}
-                            onDragStart={(e) => handleLoteDragStart(e, lote.id)}
-                            onDragEnd={handleLoteDragEnd}
-                            className={`w-full text-left p-3 border-2 rounded-lg transition-all cursor-grab active:cursor-grabbing ${
-                              draggingLoteId === lote.id
-                                ? 'opacity-50 scale-95 border-crm-primary bg-crm-primary/10'
-                                : selectedLoteId === lote.id
+                            className={`w-full p-3 border-2 rounded-lg transition-all ${
+                              selectedLoteId === lote.id
                                 ? 'border-crm-primary bg-crm-primary/5 shadow-md'
-                                : 'border-crm-border hover:border-crm-primary/50 hover:bg-crm-primary/5'
+                                : 'border-crm-border'
                             }`}
                           >
                             <div className="flex items-center justify-between">
@@ -661,11 +692,14 @@ export default function MapeoLotesMejorado({
                                   </div>
                                 </div>
                               </div>
-                              <svg className="w-5 h-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                              </svg>
+                              <button
+                                onClick={() => handleStartDrawingLote(lote.id)}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+                              >
+                                ✏️ Dibujar
+                              </button>
                             </div>
-                          </button>
+                          </div>
                         ))
                       )}
                     </div>
@@ -740,7 +774,9 @@ export default function MapeoLotesMejorado({
                   onProjectDrawingFinished={handleProjectDrawingFinished}
                   lotes={lotesState}
                   highlightLoteId={selectedLoteId}
-                  loteDrawingActive={false}
+                  loteDrawingActive={Boolean(drawingLoteId)}
+                  onLoteDrawingFinished={() => setDrawingLoteId(null)}
+                  onLotePolygonComplete={handleLotePolygonComplete}
                   draggingLoteId={draggingLoteId}
                   onPinDrop={handlePinDrop}
                   onMarkerDragEnd={handleMarkerDragEnd}
