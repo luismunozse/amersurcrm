@@ -53,7 +53,7 @@ export default async function ProyLotesPage({
   const isAdmin = perfil?.rol?.nombre === 'ROL_ADMIN';
 
   // Proyecto (para título/404)
-  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,created_at";
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at";
   const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
     .select(`${proyectoSelectBase},poligono`)
@@ -205,6 +205,13 @@ export default async function ProyLotesPage({
     : typeof overlayRotationRaw === 'string'
       ? Number(overlayRotationRaw)
       : undefined;
+
+  const overlayOpacityRaw = (proyecto as { overlay_opacity?: unknown } | null)?.overlay_opacity;
+  const overlayOpacityValue = typeof overlayOpacityRaw === 'number'
+    ? overlayOpacityRaw
+    : typeof overlayOpacityRaw === 'string'
+      ? Number(overlayOpacityRaw)
+      : null;
 
   const lotesForMapeo = (lotesConProyecto || []).map((lote) => {
     const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
@@ -381,6 +388,7 @@ export default async function ProyLotesPage({
               proyectoNombre={proyecto.nombre}
               initialBounds={overlayBoundsValue}
               initialRotation={overlayRotationValue}
+              initialOpacity={overlayOpacityValue}
               lotes={lotesForMapeo}
             />
           ) : (

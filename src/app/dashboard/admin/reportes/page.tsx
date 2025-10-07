@@ -1,50 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Download, Filter, TrendingUp, Users, Building, DollarSign, BarChart3, UserCheck, UserCog } from "lucide-react";
+import { Calendar, Download, Filter, TrendingUp, Users, Building, DollarSign, BarChart3, UserCheck, UserCog, RefreshCw } from "lucide-react";
+import { useReportes } from "@/hooks/useReportes";
+import { exportarReportePDF } from "./_actions";
+import GraficosTendencias from "@/components/reportes/GraficosTendencias";
+import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
+import toast from "react-hot-toast";
 
 export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("30");
   const [activeTab, setActiveTab] = useState("ventas");
 
-  const reportCards = [
-    {
-      title: "Ventas Totales",
-      value: "S/ 2,450,000",
-      change: "+12.5%",
-      changeType: "positive" as const,
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-    },
-    {
-      title: "Clientes Activos",
-      value: "1,247",
-      change: "+8.2%",
-      changeType: "positive" as const,
-      icon: UserCheck,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-    },
-    {
-      title: "Propiedades Vendidas",
-      value: "89",
-      change: "+15.3%",
-      changeType: "positive" as const,
-      icon: Building,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-    },
-    {
-      title: "Conversión",
-      value: "24.8%",
-      change: "+3.1%",
-      changeType: "positive" as const,
-      icon: TrendingUp,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
-    },
-  ];
+  const { data, loading, error, cardsData, recargar } = useReportes({
+    periodo: selectedPeriod,
+    autoLoad: true
+  });
+
+  const handlePeriodoChange = (nuevoPeriodo: string) => {
+    setSelectedPeriod(nuevoPeriodo);
+  };
+
+  const handleExportar = async () => {
+    if (!data) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+
+    try {
+      toast.loading('Generando reporte...', { id: 'export' });
+      
+      const result = await exportarReportePDF('general', selectedPeriod, data);
+      
+      if (result.success && result.url) {
+        // Abrir el reporte en una nueva ventana
+        const newWindow = window.open(result.url, '_blank');
+        if (newWindow) {
+          newWindow.document.title = `Reporte AMERSUR - ${new Date().toLocaleDateString('es-PE')}`;
+        }
+        toast.success('Reporte generado exitosamente', { id: 'export' });
+      } else {
+        toast.error(result.error || 'Error generando reporte', { id: 'export' });
+      }
+    } catch (error) {
+      toast.error('Error exportando reporte', { id: 'export' });
+    }
+  };
 
   const reportTypes = [
     {
@@ -81,6 +82,11 @@ export default function ReportesPage() {
           <h1 className="text-3xl font-bold text-crm-text-primary font-display">Reportes</h1>
           <p className="text-crm-text-secondary mt-1">
             Análisis detallado y métricas del sistema
+            {data && (
+              <span className="ml-2 text-xs bg-crm-primary/10 text-crm-primary px-2 py-1 rounded-full">
+                {data.periodo.dias} días • {new Date(data.periodo.inicio).toLocaleDateString('es-PE')} - {new Date(data.periodo.fin).toLocaleDateString('es-PE')}
+              </span>
+            )}
           </p>
         </div>
         
@@ -89,7 +95,7 @@ export default function ReportesPage() {
             <Calendar className="w-4 h-4 text-crm-text-muted" />
             <select
               value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
+              onChange={(e) => handlePeriodoChange(e.target.value)}
               className="px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
             >
               <option value="7">Últimos 7 días</option>
@@ -99,7 +105,11 @@ export default function ReportesPage() {
             </select>
           </div>
           
-          <button className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors">
+          <button 
+            onClick={handleExportar}
+            disabled={loading || !data}
+            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Download className="w-4 h-4" />
             Exportar
           </button>
@@ -108,25 +118,88 @@ export default function ReportesPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {reportCards.map((card, index) => (
-          <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-crm-text-secondary">
-                {card.title}
-              </h3>
-              <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                <card.icon className={`w-4 h-4 ${card.color}`} />
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6">
+              <div className="animate-pulse">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-4 bg-crm-border rounded w-24"></div>
+                  <div className="w-8 h-8 bg-crm-border rounded-lg"></div>
+                </div>
+                <div className="h-8 bg-crm-border rounded w-20 mb-2"></div>
+                <div className="h-3 bg-crm-border rounded w-16"></div>
               </div>
             </div>
-            <div className="text-2xl font-bold text-crm-text-primary mb-1">{card.value}</div>
-            <p className={`text-xs ${
-              card.changeType === "positive" ? "text-green-600" : "text-red-600"
-            }`}>
-              {card.change} vs período anterior
+          ))
+        ) : error ? (
+          // Error state
+          <div className="col-span-full bg-red-50 border border-red-200 rounded-xl p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <span className="text-red-600 text-sm">⚠️</span>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Error cargando datos</h3>
+                <p className="text-xs text-red-600">{error}</p>
+              </div>
+              <button
+                onClick={recargar}
+                className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reintentar
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Real data cards
+          cardsData.map((card, index) => (
+            <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6 hover:shadow-lg transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-crm-text-secondary">
+                  {card.title}
+                </h3>
+                <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                  <span className={`text-lg ${card.color}`}>{card.icon}</span>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-crm-text-primary mb-1">{card.value}</div>
+              <p className={`text-xs ${
+                card.changeType === "positive" ? "text-green-600" : "text-red-600"
+              }`}>
+                {card.change} vs período anterior
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Gráficos de Tendencias */}
+      {data && !loading && !error && (
+        <div className="bg-crm-card border border-crm-border rounded-xl p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-2 mb-2">
+              <BarChart3 className="w-5 h-5" />
+              Análisis Visual
+            </h2>
+            <p className="text-crm-text-secondary">
+              Gráficos interactivos y tendencias de los últimos 6 meses
             </p>
           </div>
-        ))}
-      </div>
+          <GraficosTendencias 
+            tendencias={data.tendencias} 
+            metricas={data.metricas}
+          />
+        </div>
+      )}
+
+      {/* Comparación de Períodos */}
+      {data && !loading && !error && (
+        <ComparacionPeriodos 
+          periodoActual={selectedPeriod}
+        />
+      )}
 
       {/* Reports Tabs */}
       <div className="bg-crm-card border border-crm-border rounded-xl p-6">

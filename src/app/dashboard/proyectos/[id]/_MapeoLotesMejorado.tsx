@@ -37,6 +37,7 @@ interface MapeoLotesMejoradoProps {
   proyectoNombre: string;
   initialBounds?: [[number, number], [number, number]] | null;
   initialRotation?: number | null;
+  initialOpacity?: number | null;
   lotes?: LoteState[];
 }
 
@@ -51,6 +52,7 @@ export default function MapeoLotesMejorado({
   proyectoNombre,
   initialBounds,
   initialRotation,
+  initialOpacity,
   lotes = [],
 }: MapeoLotesMejoradoProps) {
   // Estados principales
@@ -73,10 +75,11 @@ export default function MapeoLotesMejorado({
   );
   const [areaPolygon, setAreaPolygon] = useState<{ lat: number; lng: number }[]>([]);
   const [overlayRotation, setOverlayRotation] = useState<number>(initialRotation ?? 0);
-  const [overlayOpacity, setOverlayOpacity] = useState(0.7);
+  const [overlayOpacity, setOverlayOpacity] = useState(initialOpacity ?? 0.7);
   const [isDrawingArea, setIsDrawingArea] = useState(false);
   const [overlayDirty, setOverlayDirty] = useState(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<[number, number] | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Debug: Log cuando cambia el centro del mapa
   useEffect(() => {
@@ -269,7 +272,7 @@ export default function MapeoLotesMejorado({
   const handleSaveAdjustments = async () => {
     if (!overlayBounds) return;
     try {
-      await guardarOverlayBounds(proyectoId, overlayBounds, Math.round(overlayRotation));
+      await guardarOverlayBounds(proyectoId, overlayBounds, Math.round(overlayRotation), overlayOpacity);
       toast.success('Ajustes guardados');
       setOverlayDirty(false);
     } catch (error) {
@@ -480,9 +483,9 @@ export default function MapeoLotesMejorado({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
         {/* Panel Lateral */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="xl:col-span-1 space-y-6">
           {/* PASO 1: Ubicar Área del Proyecto */}
           {currentStep === 1 && (
             <Card>
@@ -582,7 +585,10 @@ export default function MapeoLotesMejorado({
                           max={1}
                           step={0.05}
                           value={overlayOpacity}
-                          onChange={(e) => setOverlayOpacity(parseFloat(e.target.value))}
+                          onChange={(e) => {
+                            setOverlayOpacity(parseFloat(e.target.value));
+                            setOverlayDirty(true);
+                          }}
                           className="w-full"
                         />
                         <div className="text-xs text-crm-text-muted mt-1">{Math.round(overlayOpacity * 100)}%</div>
@@ -751,10 +757,10 @@ export default function MapeoLotesMejorado({
         </div>
 
         {/* Mapa */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardContent className="p-0">
-              <div className="h-[700px]">
+        <div className={`xl:col-span-4 ${isFullScreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
+          <Card className={isFullScreen ? 'h-full rounded-none' : ''}>
+            <CardContent className="p-0 h-full">
+              <div className={isFullScreen ? 'h-screen' : 'h-[85vh] min-h-[600px]'}>
                 <GoogleMap
                   defaultCenter={mapCenter}
                   defaultZoom={mapZoom}
@@ -780,6 +786,8 @@ export default function MapeoLotesMejorado({
                   draggingLoteId={draggingLoteId}
                   onPinDrop={handlePinDrop}
                   onMarkerDragEnd={handleMarkerDragEnd}
+                  fullScreenActive={isFullScreen}
+                  onToggleFull={() => setIsFullScreen(!isFullScreen)}
                 />
               </div>
             </CardContent>

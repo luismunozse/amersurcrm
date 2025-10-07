@@ -29,6 +29,7 @@ export async function obtenerPerfilUsuario(): Promise<UsuarioPerfil | null> {
 
         // Obtener perfil del usuario
         const { data: perfil, error: perfilError } = await supabase
+          .schema('crm')
           .from('usuario_perfil')
           .select('*, dni')
           .eq('id', user.id)
@@ -43,6 +44,7 @@ export async function obtenerPerfilUsuario(): Promise<UsuarioPerfil | null> {
     let rol = null;
     if (perfil.rol_id) {
       const { data: rolData } = await supabase
+        .schema('crm')
         .from('rol')
         .select('id, nombre, descripcion, permisos')
         .eq('id', perfil.rol_id)

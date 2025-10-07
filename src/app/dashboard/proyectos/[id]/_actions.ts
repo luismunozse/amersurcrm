@@ -531,7 +531,7 @@ export async function guardarCoordenadasMultiples(proyectoId: string, coordenada
 }
 
 // Guardar bounds de overlay del plano
-export async function guardarOverlayBounds(proyectoId: string, bounds: [[number, number], [number, number]], rotationDeg?: number) {
+export async function guardarOverlayBounds(proyectoId: string, bounds: [[number, number], [number, number]], rotationDeg?: number, opacity?: number) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -548,6 +548,7 @@ export async function guardarOverlayBounds(proyectoId: string, bounds: [[number,
 
   const payload: any = { overlay_bounds: bounds as any };
   if (typeof rotationDeg === 'number') payload.overlay_rotation = rotationDeg;
+  if (typeof opacity === 'number') payload.overlay_opacity = opacity;
   const { error } = await supabase
     .from('proyecto')
     .update(payload)
