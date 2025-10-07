@@ -63,6 +63,101 @@ const ESTADO_TEXTOS: Record<string, string> = {
   desconocido: 'Sin estado',
 };
 
+// Función factory para crear la clase de overlay (se ejecuta cuando google está disponible)
+function createGroundOverlayClass() {
+  return class GroundOverlayWithRotation extends google.maps.OverlayView {
+    private url: string;
+    private bounds: google.maps.LatLngBounds;
+    private rotation: number;
+    private opacity: number;
+    private container?: HTMLDivElement;
+    private image?: HTMLImageElement;
+
+    constructor(url: string, bounds: google.maps.LatLngBounds, rotation = 0, opacity = 0.7) {
+      super();
+      this.url = url;
+      this.bounds = bounds;
+      this.rotation = rotation;
+      this.opacity = opacity;
+    }
+
+    onAdd() {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.overflow = 'visible';
+      div.style.pointerEvents = 'none'; // Permitir clicks a través del contenedor
+
+      const img = document.createElement('img');
+      img.src = this.url;
+      img.style.position = 'absolute';
+      img.style.top = '50%';
+      img.style.left = '50%';
+      img.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
+      img.style.transformOrigin = 'center center';
+      img.style.opacity = `${this.opacity}`;
+      img.style.pointerEvents = 'none';
+
+      div.appendChild(img);
+      this.container = div;
+      this.image = img;
+
+      const panes = this.getPanes();
+      if (!panes || !panes.overlayLayer) {
+        console.warn('No se pudo obtener el overlayLayer para el plano');
+        return;
+      }
+      panes.overlayLayer.appendChild(div);
+    }
+
+    draw() {
+      if (!this.container) return;
+      const projection = this.getProjection();
+      if (!projection) return;
+
+      const sw = projection.fromLatLngToDivPixel(this.bounds.getSouthWest());
+      const ne = projection.fromLatLngToDivPixel(this.bounds.getNorthEast());
+      if (!sw || !ne) return;
+
+      const width = ne.x - sw.x;
+      const height = sw.y - ne.y;
+
+      this.container.style.left = `${sw.x}px`;
+      this.container.style.top = `${ne.y}px`;
+      this.container.style.width = `${width}px`;
+      this.container.style.height = `${height}px`;
+
+      if (this.image) {
+        this.image.style.width = `${width}px`;
+        this.image.style.height = `${height}px`;
+        this.image.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
+        this.image.style.opacity = `${this.opacity}`;
+      }
+    }
+
+    updateRotation(rotation: number) {
+      this.rotation = rotation;
+      if (this.image) {
+        this.image.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
+      }
+    }
+
+    updateOpacity(opacity: number) {
+      this.opacity = opacity;
+      if (this.image) {
+        this.image.style.opacity = `${this.opacity}`;
+      }
+    }
+
+    onRemove() {
+      if (this.container?.parentNode) {
+        this.container.parentNode.removeChild(this.container);
+      }
+      this.container = undefined;
+      this.image = undefined;
+    }
+  };
+}
+
 export default function GoogleMap({
   defaultCenter,
   defaultZoom,
@@ -110,12 +205,58 @@ export default function GoogleMap({
   const polygonFitRef = useRef(false);
   const dropOverlayRef = useRef<HTMLDivElement | null>(null);
   const projectionOverlayRef = useRef<google.maps.OverlayView | null>(null);
+  const dropZoneRectangleRef = useRef<google.maps.Rectangle | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
 
   useEffect(() => {
     setIsDragActive(Boolean(draggingLoteId));
   }, [draggingLoteId]);
+
+  // Mostrar zona de drop cuando se está arrastrando un lote
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !isLoaded) return;
+
+    if (isDragActive && overlayBounds) {
+      // Crear rectángulo visible del área del plano
+      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+      const bounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(swLat, swLng),
+        new google.maps.LatLng(neLat, neLng)
+      );
+
+      if (!dropZoneRectangleRef.current) {
+        const dropZone = new google.maps.Rectangle({
+          bounds,
+          map,
+          editable: false,
+          draggable: false,
+          fillColor: '#10B981',
+          fillOpacity: 0.25,
+          strokeColor: '#10B981',
+          strokeOpacity: 1,
+          strokeWeight: 4,
+          zIndex: 999,
+        });
+        dropZoneRectangleRef.current = dropZone;
+      } else {
+        dropZoneRectangleRef.current.setBounds(bounds);
+        dropZoneRectangleRef.current.setMap(map);
+      }
+    } else {
+      // Ocultar zona de drop
+      if (dropZoneRectangleRef.current) {
+        dropZoneRectangleRef.current.setMap(null);
+      }
+    }
+
+    return () => {
+      if (dropZoneRectangleRef.current) {
+        dropZoneRectangleRef.current.setMap(null);
+      }
+    };
+  }, [isDragActive, overlayBounds, isLoaded]);
 
   // Exponer función para obtener el centro actual del mapa
   useEffect(() => {
@@ -184,10 +325,16 @@ export default function GoogleMap({
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: defaultCenter[0], lng: defaultCenter[1] },
       zoom: defaultZoom,
-      mapTypeId: google.maps.MapTypeId.SATELLITE,
+      mapTypeId: google.maps.MapTypeId.TERRAIN,
       mapTypeControl: true,
       mapTypeControlOptions: {
         position: google.maps.ControlPosition.LEFT_TOP,
+        mapTypeIds: [
+          google.maps.MapTypeId.TERRAIN,
+          google.maps.MapTypeId.ROADMAP,
+          google.maps.MapTypeId.SATELLITE,
+          google.maps.MapTypeId.HYBRID,
+        ],
       },
       streetViewControl: true,
       streetViewControlOptions: {
@@ -199,6 +346,10 @@ export default function GoogleMap({
       },
       fullscreenControl: false,
       gestureHandling: 'greedy',
+      scrollwheel: true,
+      disableDoubleClickZoom: false,
+      // No establecer restricciones de zoom - dejar que el mapa use los límites naturales
+      // Esto permite zoom completo según la disponibilidad de tiles del tipo de mapa
     });
 
     mapInstanceRef.current = map;
@@ -373,7 +524,10 @@ export default function GoogleMap({
     const map = mapInstanceRef.current;
     if (!map) return;
 
+    console.log('🗺️ GoogleMap - projectPolygon:', projectPolygon?.length || 0, 'vértices');
+
     if (!projectPolygon || projectPolygon.length < 3) {
+      console.log('🗺️ Eliminando polígono (< 3 vértices)');
       cleanupProjectPolygonListeners();
       if (projectPolygonRef.current) {
         projectPolygonRef.current.setMap(null);
@@ -388,33 +542,34 @@ export default function GoogleMap({
     path.forEach((latLng) => bounds.extend(latLng));
 
     if (!projectPolygonRef.current) {
+      console.log('🟦 Creando nuevo polígono en el mapa');
       const polygon = new google.maps.Polygon({
         map,
         paths: path,
         fillColor: '#2563EB',
-        fillOpacity: 0.1,
+        fillOpacity: 0.2,
         strokeColor: '#1D4ED8',
         strokeOpacity: 0.9,
-        strokeWeight: 2,
+        strokeWeight: 3,
         editable: true,
         draggable: true,
       });
       projectPolygonRef.current = polygon;
       attachProjectPolygonListeners(polygon);
-      if (!polygonFitRef.current) {
+      if (!polygonFitRef.current && !planosUrl) {
+        // Solo hacer fitBounds si no hay plano cargado (primera vez dibujando el polígono)
+        console.log('🟦 Ajustando vista del mapa al polígono (primera vez)');
         map.fitBounds(bounds);
         polygonFitRef.current = true;
       }
     } else {
+      console.log('🟦 Actualizando polígono existente');
       projectPolygonSilentUpdateRef.current = true;
       projectPolygonRef.current.setPath(path);
       projectPolygonSilentUpdateRef.current = false;
-      if (!polygonFitRef.current) {
-        map.fitBounds(bounds);
-        polygonFitRef.current = true;
-      }
+      // No hacer fitBounds al actualizar - respetar el zoom del usuario
     }
-  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners, isLoaded]);
+  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners, isLoaded, planosUrl]);
 
   // Dibujo manual de lotes
   useEffect(() => {
@@ -475,100 +630,25 @@ export default function GoogleMap({
       return;
     }
 
-    if (typeof window === 'undefined') return;
-    const googleNamespace = (window as typeof window & { google?: typeof google }).google;
-    if (!googleNamespace?.maps?.OverlayView) return;
-
     const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-    const bounds = new googleNamespace.maps.LatLngBounds(
-      new googleNamespace.maps.LatLng(swLat, swLng),
-      new googleNamespace.maps.LatLng(neLat, neLng)
+    const bounds = new google.maps.LatLngBounds(
+      new google.maps.LatLng(swLat, swLng),
+      new google.maps.LatLng(neLat, neLng)
     );
 
-    class GroundOverlayWithRotation extends googleNamespace.maps.OverlayView {
-      private url: string;
-      private bounds: google.maps.LatLngBounds;
-      private rotation: number;
-      private opacity: number;
-      private container?: HTMLDivElement;
-      private image?: HTMLImageElement;
-
-      constructor(url: string, bounds: google.maps.LatLngBounds, rotation = 0, opacity = 0.7) {
-        super();
-        this.url = url;
-        this.bounds = bounds;
-        this.rotation = rotation;
-        this.opacity = opacity;
-      }
-
-      onAdd() {
-        const div = document.createElement('div');
-        div.style.position = 'absolute';
-        div.style.overflow = 'visible';
-
-        const img = document.createElement('img');
-        img.src = this.url;
-        img.style.position = 'absolute';
-        img.style.top = '50%';
-        img.style.left = '50%';
-        img.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
-        img.style.transformOrigin = 'center center';
-        img.style.opacity = `${this.opacity}`;
-        img.style.pointerEvents = 'none';
-
-        div.appendChild(img);
-        this.container = div;
-        this.image = img;
-
-        const panes = this.getPanes();
-        if (!panes || !panes.overlayLayer) {
-          console.warn('No se pudo obtener el overlayLayer para el plano');
-          return;
-        }
-        panes.overlayLayer.appendChild(div);
-      }
-
-      draw() {
-        if (!this.container) return;
-        const projection = this.getProjection();
-        if (!projection) return;
-
-        const sw = projection.fromLatLngToDivPixel(this.bounds.getSouthWest());
-        const ne = projection.fromLatLngToDivPixel(this.bounds.getNorthEast());
-        if (!sw || !ne) return;
-
-        const width = ne.x - sw.x;
-        const height = sw.y - ne.y;
-
-        this.container.style.left = `${sw.x}px`;
-        this.container.style.top = `${ne.y}px`;
-        this.container.style.width = `${width}px`;
-        this.container.style.height = `${height}px`;
-
-        if (this.image) {
-          this.image.style.width = `${width}px`;
-          this.image.style.height = `${height}px`;
-          this.image.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
-          this.image.style.opacity = `${this.opacity}`;
-        }
-      }
-
-      onRemove() {
-        if (this.container?.parentNode) {
-          this.container.parentNode.removeChild(this.container);
-        }
-        this.container = undefined;
-        this.image = undefined;
-      }
+    // Eliminar overlay anterior si existe
+    if (overlayRef.current) {
+      overlayRef.current.setMap(null);
     }
 
+    // Crear la clase cuando google esté disponible
+    const GroundOverlayWithRotation = createGroundOverlayClass();
     const overlay = new GroundOverlayWithRotation(planosUrl, bounds, rotationDeg, overlayOpacity);
     overlay.setMap(map);
     overlayRef.current = overlay;
-    if (!overlayFitRef.current) {
-      map.fitBounds(bounds);
-      overlayFitRef.current = true;
-    }
+
+    // NO usar fitBounds - dejar que el usuario controle el zoom
+    // Si quieres centrar en el plano, el usuario puede hacerlo manualmente
 
     return () => {
       overlay.setMap(null);
@@ -576,13 +656,24 @@ export default function GoogleMap({
         overlayRef.current = null;
       }
     };
-  }, [planosUrl, overlayBounds, rotationDeg, overlayOpacity, isLoaded]);
+  }, [planosUrl, overlayBounds, isLoaded]);
 
+  // Actualizar rotación sin recrear el overlay
   useEffect(() => {
-    if (!overlayBounds) {
-      overlayFitRef.current = false;
+    const overlay = overlayRef.current as any;
+    if (overlay && typeof overlay.updateRotation === 'function') {
+      overlay.updateRotation(rotationDeg);
     }
-  }, [overlayBounds]);
+  }, [rotationDeg]);
+
+  // Actualizar opacidad sin recrear el overlay
+  useEffect(() => {
+    const overlay = overlayRef.current as any;
+    if (overlay && typeof overlay.updateOpacity === 'function') {
+      overlay.updateOpacity(overlayOpacity);
+    }
+  }, [overlayOpacity]);
+
 
   // Permitir edición del rectángulo del overlay
   useEffect(() => {
@@ -624,9 +715,9 @@ export default function GoogleMap({
       overlayRectangleRef.current = rectangle;
       console.log('🟦 Rectángulo creado:', rectangle);
 
-      // Centrar el mapa en el rectángulo cuando se crea
-      map.fitBounds(bounds);
-      console.log('🟦 Mapa centrado en el rectángulo');
+      // NO usar fitBounds - permitir que el usuario mantenga su nivel de zoom actual
+      // map.fitBounds(bounds);
+      console.log('🟦 Rectángulo listo para edición');
 
       const notifyBounds = () => {
         if (overlaySilentRef.current) return;
@@ -685,8 +776,8 @@ export default function GoogleMap({
     lotes.forEach((lote) => {
       seen.add(lote.id);
 
-      // Solo renderizar lotes que tienen polígono
-      if (!lote.plano_poligono || lote.plano_poligono.length < 3) {
+      // Si no tiene ubicación, remover cualquier renderizado previo
+      if (!lote.plano_poligono || lote.plano_poligono.length === 0) {
         removeLote(lote.id);
         return;
       }
@@ -694,94 +785,238 @@ export default function GoogleMap({
       const color = ESTADO_COLORES[lote.estado || 'desconocido'] || ESTADO_COLORES.desconocido;
       const isHighlighted = highlightLoteId === lote.id;
 
-      // Convertir coordenadas a formato Google Maps
-      const path = lote.plano_poligono.map(([lat, lng]) => ({ lat, lng }));
+      // Si tiene solo 1 punto, renderizar como marcador (pin)
+      if (lote.plano_poligono.length === 1) {
+        // Remover polígono si existe
+        const existingPolygon = lotesPolygonsRef.current.get(lote.id);
+        if (existingPolygon) {
+          existingPolygon.setMap(null);
+          lotesPolygonsRef.current.delete(lote.id);
+        }
 
-      // Crear o actualizar polígono
-      if (!lotesPolygonsRef.current.has(lote.id)) {
-        const polygon = new google.maps.Polygon({
-          paths: path,
-          strokeColor: color,
-          strokeOpacity: isHighlighted ? 1 : 0.8,
-          strokeWeight: isHighlighted ? 3 : 2,
-          fillColor: color,
-          fillOpacity: isHighlighted ? 0.5 : 0.35,
-          map,
-          draggable: false,
-          editable: false,
-          clickable: true,
-        });
-        lotesPolygonsRef.current.set(lote.id, polygon);
-      } else {
-        const polygon = lotesPolygonsRef.current.get(lote.id)!;
-        polygon.setOptions({
-          paths: path,
-          strokeColor: color,
-          strokeOpacity: isHighlighted ? 1 : 0.8,
-          strokeWeight: isHighlighted ? 3 : 2,
-          fillColor: color,
-          fillOpacity: isHighlighted ? 0.5 : 0.35,
-        });
+        // Desnormalizar coordenadas: convertir de [0-1] a coordenadas geográficas reales
+        const [normalizedY, normalizedX] = lote.plano_poligono[0];
+
+        let position: { lat: number; lng: number };
+
+        if (overlayBounds) {
+          // Si hay bounds del plano, desnormalizar las coordenadas
+          const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+          const lat = swLat + normalizedY * (neLat - swLat);
+          const lng = swLng + normalizedX * (neLng - swLng);
+          position = { lat, lng };
+          console.log('🔄 Desnormalizando lote', lote.codigo, ':', { normalizedY, normalizedX }, '→', position);
+        } else {
+          // Fallback: usar directamente (retrocompatibilidad con lotes antiguos)
+          position = { lat: normalizedY, lng: normalizedX };
+        }
+
+        // Crear o actualizar marcador
+        if (!lotesLabelsRef.current.has(lote.id)) {
+          const marker = new google.maps.Marker({
+            position,
+            map,
+            draggable: true,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: color,
+              fillOpacity: 0.9,
+              strokeColor: '#ffffff',
+              strokeWeight: 3,
+              scale: 12,
+            },
+            label: {
+              text: lote.codigo,
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 'bold',
+            },
+            zIndex: isHighlighted ? 1001 : 1000,
+            title: `${lote.codigo} - Arrastra para reposicionar`,
+            animation: google.maps.Animation.DROP,
+          });
+
+          // Agregar listener para cuando empieza a arrastrar
+          const dragStartListener = marker.addListener('dragstart', () => {
+            marker.setOptions({
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: color,
+                fillOpacity: 0.6,
+                strokeColor: '#ffffff',
+                strokeWeight: 4,
+                scale: 16,
+              },
+            });
+          });
+
+          // Agregar listener para arrastrar el marcador
+          const dragEndListener = marker.addListener('dragend', () => {
+            const pos = marker.getPosition();
+            // Volver al tamaño normal
+            marker.setOptions({
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: color,
+                fillOpacity: 0.9,
+                strokeColor: '#ffffff',
+                strokeWeight: 3,
+                scale: 12,
+              },
+            });
+            if (pos && onMarkerDragEnd) {
+              onMarkerDragEnd(lote.id, pos.lat(), pos.lng());
+            }
+          });
+
+          // Agregar listener para hover
+          const mouseoverListener = marker.addListener('mouseover', () => {
+            marker.setOptions({
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: color,
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 4,
+                scale: 14,
+              },
+            });
+          });
+
+          const mouseoutListener = marker.addListener('mouseout', () => {
+            if (highlightLoteId !== lote.id) {
+              marker.setOptions({
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  fillColor: color,
+                  fillOpacity: 0.9,
+                  strokeColor: '#ffffff',
+                  strokeWeight: 3,
+                  scale: 12,
+                },
+              });
+            }
+          });
+
+          lotesLabelsRef.current.set(lote.id, marker);
+          lotesPolygonListenersRef.current.set(lote.id, [dragStartListener, dragEndListener, mouseoverListener, mouseoutListener]);
+        } else {
+          const marker = lotesLabelsRef.current.get(lote.id)!;
+          marker.setOptions({
+            position,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: color,
+              fillOpacity: isHighlighted ? 1 : 0.9,
+              strokeColor: '#ffffff',
+              strokeWeight: isHighlighted ? 4 : 3,
+              scale: isHighlighted ? 14 : 12,
+            },
+            label: {
+              text: lote.codigo,
+              color: '#ffffff',
+              fontSize: isHighlighted ? '12px' : '11px',
+              fontWeight: 'bold',
+            },
+            zIndex: isHighlighted ? 1001 : 1000,
+          });
+        }
+        return;
       }
 
-      // Calcular centro del polígono para la etiqueta
-      const [latSum, lngSum] = lote.plano_poligono.reduce(
-        (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
-        [0, 0]
-      );
-      const center = {
-        lat: latSum / lote.plano_poligono.length,
-        lng: lngSum / lote.plano_poligono.length,
-      };
+      // Si tiene 3+ puntos, renderizar como polígono
+      if (lote.plano_poligono.length >= 3) {
+        // Convertir coordenadas a formato Google Maps
+        const path = lote.plano_poligono.map(([lat, lng]) => ({ lat, lng }));
 
-      // Crear o actualizar label
-      if (!lotesLabelsRef.current.has(lote.id)) {
-        const label = new google.maps.Marker({
-          position: center,
-          map,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 0,
-          },
-          label: {
-            text: lote.codigo,
-            color: '#ffffff',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            className: 'lote-label',
-          },
-          clickable: false,
-          zIndex: 1000,
-        });
-        lotesLabelsRef.current.set(lote.id, label);
-      } else {
-        const label = lotesLabelsRef.current.get(lote.id)!;
-        label.setOptions({
-          position: center,
-          label: {
-            text: lote.codigo,
-            color: '#ffffff',
-            fontSize: isHighlighted ? '12px' : '11px',
-            fontWeight: 'bold',
-          },
-        });
+        // Crear o actualizar polígono
+        if (!lotesPolygonsRef.current.has(lote.id)) {
+          const polygon = new google.maps.Polygon({
+            paths: path,
+            strokeColor: color,
+            strokeOpacity: isHighlighted ? 1 : 0.8,
+            strokeWeight: isHighlighted ? 3 : 2,
+            fillColor: color,
+            fillOpacity: isHighlighted ? 0.5 : 0.35,
+            map,
+            draggable: false,
+            editable: false,
+            clickable: true,
+          });
+          lotesPolygonsRef.current.set(lote.id, polygon);
+        } else {
+          const polygon = lotesPolygonsRef.current.get(lote.id)!;
+          polygon.setOptions({
+            paths: path,
+            strokeColor: color,
+            strokeOpacity: isHighlighted ? 1 : 0.8,
+            strokeWeight: isHighlighted ? 3 : 2,
+            fillColor: color,
+            fillOpacity: isHighlighted ? 0.5 : 0.35,
+          });
+        }
+
+        // Calcular centro del polígono para la etiqueta
+        const [latSum, lngSum] = lote.plano_poligono.reduce(
+          (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
+          [0, 0]
+        );
+        const center = {
+          lat: latSum / lote.plano_poligono.length,
+          lng: lngSum / lote.plano_poligono.length,
+        };
+
+        // Crear o actualizar label
+        if (!lotesLabelsRef.current.has(lote.id)) {
+          const label = new google.maps.Marker({
+            position: center,
+            map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 0,
+            },
+            label: {
+              text: lote.codigo,
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              className: 'lote-label',
+            },
+            clickable: false,
+            zIndex: 1000,
+          });
+          lotesLabelsRef.current.set(lote.id, label);
+        } else {
+          const label = lotesLabelsRef.current.get(lote.id)!;
+          label.setOptions({
+            position: center,
+            label: {
+              text: lote.codigo,
+              color: '#ffffff',
+              fontSize: isHighlighted ? '12px' : '11px',
+              fontWeight: 'bold',
+            },
+          });
+        }
       }
 
-      // Agregar event listeners al polígono
-      const polygon = lotesPolygonsRef.current.get(lote.id)!;
-      const existingListeners = lotesPolygonListenersRef.current.get(lote.id);
-      if (existingListeners) {
-        existingListeners.forEach((listener) => listener.remove());
-      }
+      // Agregar event listeners al polígono (solo si es polígono, no marcador)
+      const polygon = lotesPolygonsRef.current.get(lote.id);
+      if (polygon) {
+        const existingListeners = lotesPolygonListenersRef.current.get(lote.id);
+        if (existingListeners) {
+          existingListeners.forEach((listener) => listener.remove());
+        }
 
-      const listeners: google.maps.MapsEventListener[] = [];
-      listeners.push(
-        polygon.addListener('click', () => {
-          // Aquí se puede agregar lógica para seleccionar el lote
-          console.log('Lote clickeado:', lote.codigo);
-        })
-      );
-      lotesPolygonListenersRef.current.set(lote.id, listeners);
+        const listeners: google.maps.MapsEventListener[] = [];
+        listeners.push(
+          polygon.addListener('click', () => {
+            // Aquí se puede agregar lógica para seleccionar el lote
+            console.log('Lote clickeado:', lote.codigo);
+          })
+        );
+        lotesPolygonListenersRef.current.set(lote.id, listeners);
+      }
     });
 
     // Remover polígonos que ya no existen
@@ -878,11 +1113,14 @@ export default function GoogleMap({
       <div
         ref={dropOverlayRef}
         className="pointer-events-none absolute inset-0 z-[1100]"
+        style={{
+          cursor: isDragActive ? 'crosshair' : 'default',
+        }}
       >
         {isDragActive && (
-          <div className="flex h-full w-full items-center justify-center bg-blue-500/10">
-            <div className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-blue-700 shadow">
-              Suelta aquí para ubicar el lote
+          <div className="flex h-full w-full items-center justify-center bg-blue-500/20 backdrop-blur-[1px]">
+            <div className="rounded-lg bg-white/95 px-6 py-3 text-base font-semibold text-blue-700 shadow-lg border-2 border-blue-500">
+              📍 Suelta aquí para ubicar el lote en el plano
             </div>
           </div>
         )}

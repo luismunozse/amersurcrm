@@ -173,6 +173,7 @@ export default function MapeoLotesMejorado({
   }, []);
 
   const handlePolygonChange = useCallback((vertices: { lat: number; lng: number }[]) => {
+    console.log('🔵 Polígono cambiado:', vertices.length, 'vértices');
     setAreaPolygon(vertices);
     setOverlayDirty(true);
 
@@ -184,9 +185,15 @@ export default function MapeoLotesMejorado({
         [Math.min(...lats), Math.min(...lngs)],
         [Math.max(...lats), Math.max(...lngs)]
       ];
+      console.log('🔵 Bounds calculados:', bounds);
       setOverlayBounds(bounds);
     }
   }, []);
+
+  // Debug: Ver cuando cambia areaPolygon
+  useEffect(() => {
+    console.log('📐 areaPolygon actualizado:', areaPolygon.length, 'vértices', areaPolygon);
+  }, [areaPolygon]);
 
   const handleSaveArea = async () => {
     if (areaPolygon.length < 3) {
@@ -270,29 +277,68 @@ export default function MapeoLotesMejorado({
   };
 
   const upsertLotePin = useCallback(async (loteId: string, lat: number, lng: number, showToast = true) => {
+    // Verificar que haya bounds del plano
+    if (!overlayBounds) {
+      toast.error('Primero debes definir el área del plano');
+      return;
+    }
+
+    // Verificar que haya un plano subido
+    if (!planUrl) {
+      toast.error('Primero debes subir el plano del proyecto');
+      return;
+    }
+
     setSavingLotePolygon(true);
     try {
-      const poligonoNuevo: [number, number][] = [[lat, lng]];
-      await guardarPoligonoLote(loteId, proyectoId, poligonoNuevo);
+      // Convertir coordenadas geográficas a coordenadas normalizadas dentro del plano (0-1)
+      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+
+      // Normalizar: 0 = esquina SW, 1 = esquina NE
+      const normalizedX = (lng - swLng) / (neLng - swLng);
+      const normalizedY = (lat - swLat) / (neLat - swLat);
+
+      console.log('🎯 Pin drop:', { lat, lng });
+      console.log('📐 Bounds:', overlayBounds);
+      console.log('✨ Normalizado:', { x: normalizedX, y: normalizedY });
+
+      // Verificar que las coordenadas estén dentro del plano (con margen de 10% para tolerar pequeños errores)
+      const margin = 0.1;
+      if (normalizedX < -margin || normalizedX > 1 + margin ||
+          normalizedY < -margin || normalizedY > 1 + margin) {
+        toast.error('⚠️ El lote debe ubicarse DENTRO del plano. Intenta hacer zoom y soltar dentro del área del plano.');
+        console.warn('❌ Coordenadas fuera del plano:', { normalizedX, normalizedY });
+        setSavingLotePolygon(false);
+        return;
+      }
+
+      // Clampear valores al rango 0-1 (por si hay pequeñas desviaciones)
+      const clampedX = Math.max(0, Math.min(1, normalizedX));
+      const clampedY = Math.max(0, Math.min(1, normalizedY));
+
+      // Guardar coordenadas normalizadas como polígono de 1 punto
+      // Formato: [normalizedY, normalizedX] para mantener consistencia con [lat, lng]
+      const poligonoNormalizado: [number, number][] = [[clampedY, clampedX]];
+      await guardarPoligonoLote(loteId, proyectoId, poligonoNormalizado);
 
       setLotesState((prev) =>
         prev.map((lote) =>
           lote.id === loteId
             ? {
                 ...lote,
-                plano_poligono: poligonoNuevo,
-                ubicacion: { lat, lng },
+                plano_poligono: poligonoNormalizado,
+                ubicacion: { lat: clampedY, lng: clampedX }, // Guardar normalizadas
               }
             : lote
         )
       );
-      if (showToast) toast.success('Ubicación del lote actualizada');
+      if (showToast) toast.success('✅ Lote ubicado en el plano');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar la ubicación del lote');
     } finally {
       setSavingLotePolygon(false);
     }
-  }, [proyectoId]);
+  }, [proyectoId, overlayBounds, planUrl]);
 
   const handlePinDrop = useCallback(async (loteId: string, lat: number, lng: number) => {
     setSelectedLoteId(loteId);
