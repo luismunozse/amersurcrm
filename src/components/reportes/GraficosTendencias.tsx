@@ -224,3 +224,4 @@ export default function GraficosTendencias({ tendencias, metricas }: GraficosTen
     </div>
   );
 }
+

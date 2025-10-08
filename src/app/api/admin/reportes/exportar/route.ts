@@ -427,3 +427,4 @@ function calcularCumplimiento(ventas: number, meta: number): string {
   if (!meta || meta === 0) return '0';
   return ((ventas / meta) * 100).toFixed(1);
 }
+

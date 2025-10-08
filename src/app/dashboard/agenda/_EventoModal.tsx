@@ -132,6 +132,9 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
     }
 
     if (evento) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eventoAny = evento as any;
+
       setFormData({
         titulo: evento.titulo,
         descripcion: evento.descripcion || "",
@@ -142,23 +145,23 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
         duracion_minutos: evento.duracion_minutos,
         todo_el_dia: evento.todo_el_dia,
         cliente_id: evento.cliente_id || "",
-        oportunidad_id: evento.oportunidad_id || "",
+        oportunidad_id: eventoAny.oportunidad_id || "",
         propiedad_id: evento.propiedad_id || "",
         ubicacion: evento.ubicacion || "",
         direccion: evento.direccion || "",
         recordar_antes_minutos: evento.recordar_antes_minutos,
         notificar_email: evento.notificar_email,
         notificar_push: evento.notificar_push,
-        objetivo: evento.objetivo || "",
-        resultado_id: evento.resultado_id || "",
-        resultado_notas: evento.resultado_notas || "",
-        proximo_paso_objetivo: evento.proximo_paso_objetivo || "",
-        proximo_paso_fecha: evento.proximo_paso_fecha ? evento.proximo_paso_fecha.slice(0, 16) : "",
-        sla_tipo: evento.sla_tipo || "",
-        sla_vencimiento: evento.sla_vencimiento ? evento.sla_vencimiento.slice(0, 16) : "",
-        recordatorio_canal: evento.recordatorio_canal || "push",
-        snooze_motivo_id: evento.snooze_motivo_id || "",
-        snooze_hasta: evento.snooze_hasta ? evento.snooze_hasta.slice(0, 16) : "",
+        objetivo: eventoAny.objetivo || "",
+        resultado_id: eventoAny.resultado_id || "",
+        resultado_notas: eventoAny.resultado_notas || "",
+        proximo_paso_objetivo: eventoAny.proximo_paso_objetivo || "",
+        proximo_paso_fecha: eventoAny.proximo_paso_fecha ? eventoAny.proximo_paso_fecha.slice(0, 16) : "",
+        sla_tipo: eventoAny.sla_tipo || "",
+        sla_vencimiento: eventoAny.sla_vencimiento ? eventoAny.sla_vencimiento.slice(0, 16) : "",
+        recordatorio_canal: eventoAny.recordatorio_canal || "push",
+        snooze_motivo_id: eventoAny.snooze_motivo_id || "",
+        snooze_hasta: eventoAny.snooze_hasta ? eventoAny.snooze_hasta.slice(0, 16) : "",
         color: evento.color,
         notas: evento.notas || "",
         etiquetas: evento.etiquetas || [],

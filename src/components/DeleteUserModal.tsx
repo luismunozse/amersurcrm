@@ -147,3 +147,4 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
     </div>
   );
 }
+

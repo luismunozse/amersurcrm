@@ -346,9 +346,21 @@ export async function PATCH(request: NextRequest) {
 
     // Validar username si se proporciona
     if (typeof username === 'string' && username.trim()) {
-      const isValidUsername = await validarUsername(username.trim(), id);
-      if (!isValidUsername) {
-        return NextResponse.json({ error: "El username ya existe o no es válido" }, { status: 400 });
+      const validacion = validarUsername(username.trim());
+      if (!validacion.valido) {
+        return NextResponse.json({ error: validacion.error || "El username no es válido" }, { status: 400 });
+      }
+
+      // Verificar que el username no esté en uso por otro usuario
+      const { data: existente } = await supabase
+        .from('usuario_perfil')
+        .select('id')
+        .eq('username', username.trim())
+        .neq('id', id)
+        .single();
+
+      if (existente) {
+        return NextResponse.json({ error: "El username ya está en uso" }, { status: 400 });
       }
     }
 

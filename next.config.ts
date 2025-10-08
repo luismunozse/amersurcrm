@@ -4,11 +4,9 @@ const nextConfig: NextConfig = {
   // Optimizaciones de rendimiento
   experimental: {
     optimizePackageImports: ['@supabase/supabase-js', 'react-hot-toast'],
-  },
-  
-  // Configuración de Server Actions
-  serverActions: {
-    bodySizeLimit: '10mb', // Aumentar límite para subida de imágenes
+    serverActions: {
+      bodySizeLimit: '10mb', // Aumentar límite para subida de imágenes
+    },
   },
   
   // Configuración de Turbopack (nueva sintaxis)

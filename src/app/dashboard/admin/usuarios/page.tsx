@@ -144,7 +144,7 @@ function GestionUsuarios() {
     );
 
     if (result.success) {
-      toast.success(result.message);
+      toast.success(result.message || 'Estado cambiado correctamente');
       cargarUsuarios();
       setEstadoModalOpen(false);
       setUserCambiandoEstado(null);

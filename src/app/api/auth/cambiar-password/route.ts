@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { createServerOnlyClient } from "@/lib/supabase.server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerActionClient();
+    const supabase = await createServerOnlyClient();
 
     // Obtener el usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser();

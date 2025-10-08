@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { createServerOnlyClient } from "@/lib/supabase.server";
 import { z } from "zod";
 
 const ClienteImportSchema = z.object({
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Data must be an array" }, { status: 400 });
     }
 
-    const supabase = await createServerActionClient();
+    const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {

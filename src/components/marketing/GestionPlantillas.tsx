@@ -1,0 +1,227 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Plus, Edit, Trash2, Eye, CheckCircle, XCircle, Clock } from "lucide-react";
+import { obtenerPlantillas, eliminarPlantilla } from "@/app/dashboard/admin/marketing/_actions";
+import type { MarketingTemplate } from "@/types/whatsapp-marketing";
+import toast from "react-hot-toast";
+
+export default function GestionPlantillas() {
+  const [plantillas, setPlantillas] = useState<MarketingTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalCrear, setModalCrear] = useState(false);
+
+  useEffect(() => {
+    cargarPlantillas();
+  }, []);
+
+  const cargarPlantillas = async () => {
+    setLoading(true);
+    const result = await obtenerPlantillas();
+    
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.data) {
+      setPlantillas(result.data);
+    }
+    
+    setLoading(false);
+  };
+
+  const handleEliminar = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta plantilla?')) return;
+
+    const result = await eliminarPlantilla(id);
+    
+    if (result.success) {
+      toast.success('Plantilla eliminada');
+      cargarPlantillas();
+    } else {
+      toast.error(result.error || 'Error eliminando plantilla');
+    }
+  };
+
+  const getEstadoIcon = (estado: string) => {
+    switch (estado) {
+      case 'APPROVED':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'REJECTED':
+        return <XCircle className="w-4 h-4 text-red-600" />;
+      case 'PENDING':
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+      default:
+        return <Clock className="w-4 h-4 text-gray-400" />;
+    }
+  };
+
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case 'APPROVED':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'REJECTED':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'DRAFT':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getCategoriaColor = (categoria: string) => {
+    switch (categoria) {
+      case 'MARKETING':
+        return 'bg-purple-100 text-purple-800';
+      case 'UTILITY':
+        return 'bg-blue-100 text-blue-800';
+      case 'AUTHENTICATION':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6">
+            <div className="animate-pulse">
+              <div className="h-6 bg-crm-border rounded w-48 mb-4"></div>
+              <div className="h-4 bg-crm-border rounded w-full mb-2"></div>
+              <div className="h-4 bg-crm-border rounded w-3/4"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-crm-text-primary">Plantillas de WhatsApp</h2>
+          <p className="text-sm text-crm-text-secondary mt-1">
+            Gestiona tus plantillas aprobadas por WhatsApp
+          </p>
+        </div>
+        <button
+          onClick={() => setModalCrear(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nueva Plantilla
+        </button>
+      </div>
+
+      {/* Lista de plantillas */}
+      {plantillas.length === 0 ? (
+        <div className="bg-crm-card border border-crm-border rounded-xl p-12 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MessageSquare className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-crm-text-primary mb-2">
+            No hay plantillas creadas
+          </h3>
+          <p className="text-sm text-crm-text-secondary mb-6">
+            Crea tu primera plantilla de WhatsApp para comenzar a enviar mensajes
+          </p>
+          <button
+            onClick={() => setModalCrear(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Crear Primera Plantilla
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {plantillas.map((plantilla) => (
+            <div key={plantilla.id} className="bg-crm-card border border-crm-border rounded-xl p-6 hover:shadow-lg transition-shadow duration-200">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-crm-text-primary">
+                      {plantilla.nombre}
+                    </h3>
+                    {getEstadoIcon(plantilla.estado_aprobacion)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCategoriaColor(plantilla.categoria)}`}>
+                      {plantilla.categoria}
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getEstadoColor(plantilla.estado_aprobacion)}`}>
+                      {plantilla.estado_aprobacion}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenido */}
+              <div className="mb-4">
+                <p className="text-sm text-crm-text-secondary line-clamp-3">
+                  {plantilla.body_texto}
+                </p>
+              </div>
+
+              {/* Variables */}
+              {plantilla.variables && plantilla.variables.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-crm-text-muted mb-2">Variables:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {plantilla.variables.map((variable, index) => (
+                      <span key={index} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">
+                        {`{{${variable}}}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Botones */}
+              {plantilla.botones && plantilla.botones.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-crm-text-muted mb-2">Botones:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {plantilla.botones.map((boton, index) => (
+                      <span key={index} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-300">
+                        {boton.texto}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div className="flex items-center gap-2 pt-4 border-t border-crm-border">
+                <button
+                  className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Ver detalles"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  className="inline-flex items-center justify-center w-8 h-8 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
+                  title="Editar"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleEliminar(plantilla.id)}
+                  className="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Eliminar"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

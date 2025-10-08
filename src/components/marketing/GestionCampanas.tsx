@@ -1,0 +1,224 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Plus, Play, Pause, Eye, BarChart3, Calendar, Users, MessageSquare } from "lucide-react";
+import { obtenerCampanas, actualizarEstadoCampana } from "@/app/dashboard/admin/marketing/_actions";
+import type { MarketingCampana } from "@/types/whatsapp-marketing";
+import toast from "react-hot-toast";
+
+export default function GestionCampanas() {
+  const [campanas, setCampanas] = useState<MarketingCampana[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    cargarCampanas();
+  }, []);
+
+  const cargarCampanas = async () => {
+    setLoading(true);
+    const result = await obtenerCampanas();
+    
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.data) {
+      setCampanas(result.data);
+    }
+    
+    setLoading(false);
+  };
+
+  const handleCambiarEstado = async (id: string, nuevoEstado: 'RUNNING' | 'PAUSED') => {
+    const result = await actualizarEstadoCampana(id, nuevoEstado);
+    
+    if (result.success) {
+      toast.success(`Campaña ${nuevoEstado === 'RUNNING' ? 'iniciada' : 'pausada'}`);
+      cargarCampanas();
+    } else {
+      toast.error(result.error || 'Error actualizando campaña');
+    }
+  };
+
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case 'RUNNING':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'SCHEDULED':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'PAUSED':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'COMPLETED':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'DRAFT':
+        return 'bg-gray-100 text-gray-600 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const calcularTasaEntrega = (campana: MarketingCampana) => {
+    if (campana.total_enviados === 0) return 0;
+    return ((campana.total_entregados / campana.total_enviados) * 100).toFixed(1);
+  };
+
+  const calcularTasaLectura = (campana: MarketingCampana) => {
+    if (campana.total_entregados === 0) return 0;
+    return ((campana.total_leidos / campana.total_entregados) * 100).toFixed(1);
+  };
+
+  const calcularTasaRespuesta = (campana: MarketingCampana) => {
+    if (campana.total_leidos === 0) return 0;
+    return ((campana.total_respondidos / campana.total_leidos) * 100).toFixed(1);
+  };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6">
+            <div className="animate-pulse">
+              <div className="h-6 bg-crm-border rounded w-48 mb-4"></div>
+              <div className="h-4 bg-crm-border rounded w-full mb-2"></div>
+              <div className="h-4 bg-crm-border rounded w-3/4"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-crm-text-primary">Campañas de WhatsApp</h2>
+          <p className="text-sm text-crm-text-secondary mt-1">
+            Gestiona tus campañas masivas de marketing
+          </p>
+        </div>
+        <button
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Nueva Campaña
+        </button>
+      </div>
+
+      {/* Lista de campañas */}
+      {campanas.length === 0 ? (
+        <div className="bg-crm-card border border-crm-border rounded-xl p-12 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <BarChart3 className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-crm-text-primary mb-2">
+            No hay campañas creadas
+          </h3>
+          <p className="text-sm text-crm-text-secondary mb-6">
+            Crea tu primera campaña para comenzar a enviar mensajes masivos
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {campanas.map((campana) => (
+            <div key={campana.id} className="bg-crm-card border border-crm-border rounded-xl p-6">
+              {/* Header de campaña */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-crm-text-primary mb-2">
+                    {campana.nombre}
+                  </h3>
+                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getEstadoColor(campana.estado)}`}>
+                    {campana.estado}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {campana.estado === 'RUNNING' ? (
+                    <button
+                      onClick={() => handleCambiarEstado(campana.id, 'PAUSED')}
+                      className="inline-flex items-center justify-center w-8 h-8 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 rounded-lg transition-colors"
+                      title="Pausar campaña"
+                    >
+                      <Pause className="w-4 h-4" />
+                    </button>
+                  ) : campana.estado === 'PAUSED' || campana.estado === 'DRAFT' ? (
+                    <button
+                      onClick={() => handleCambiarEstado(campana.id, 'RUNNING')}
+                      className="inline-flex items-center justify-center w-8 h-8 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
+                      title="Iniciar campaña"
+                    >
+                      <Play className="w-4 h-4" />
+                    </button>
+                  ) : null}
+                  <button
+                    className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Ver detalles"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Información */}
+              <div className="space-y-2 mb-4">
+                {campana.template && (
+                  <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Plantilla: {campana.template.nombre}</span>
+                  </div>
+                )}
+                {campana.audiencia && (
+                  <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
+                    <Users className="w-4 h-4" />
+                    <span>Audiencia: {campana.audiencia.nombre} ({campana.audiencia.contactos_count} contactos)</span>
+                  </div>
+                )}
+                {campana.fecha_inicio && (
+                  <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
+                    <Calendar className="w-4 h-4" />
+                    <span>Inicio: {new Date(campana.fecha_inicio).toLocaleDateString('es-PE')}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Métricas */}
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-crm-border">
+                <div>
+                  <p className="text-xs text-crm-text-muted mb-1">Enviados</p>
+                  <p className="text-lg font-semibold text-crm-text-primary">{campana.total_enviados}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-crm-text-muted mb-1">Entregados</p>
+                  <p className="text-lg font-semibold text-green-600">
+                    {campana.total_entregados} ({calcularTasaEntrega(campana)}%)
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-crm-text-muted mb-1">Leídos</p>
+                  <p className="text-lg font-semibold text-blue-600">
+                    {campana.total_leidos} ({calcularTasaLectura(campana)}%)
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-crm-text-muted mb-1">Respondidos</p>
+                  <p className="text-lg font-semibold text-purple-600">
+                    {campana.total_respondidos} ({calcularTasaRespuesta(campana)}%)
+                  </p>
+                </div>
+              </div>
+
+              {/* Conversiones */}
+              {campana.total_conversiones > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-green-800">Conversiones</span>
+                    <span className="text-lg font-bold text-green-600">{campana.total_conversiones}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

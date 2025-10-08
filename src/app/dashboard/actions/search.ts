@@ -32,6 +32,11 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
 
     if (!propError && propiedades) {
       propiedades.forEach(prop => {
+        // Manejar proyecto que puede ser array u objeto
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const proyecto = prop.proyecto as any;
+        const proyectoNombre = Array.isArray(proyecto) ? proyecto[0]?.nombre : proyecto?.nombre;
+
         const result: PropiedadSearchResult = {
           id: prop.id,
           type: 'propiedad',
@@ -45,7 +50,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
           precio: prop.precio_venta || prop.precio_alquiler,
           moneda: prop.moneda,
           estado: prop.estado_comercial,
-          proyecto_nombre: prop.proyecto?.nombre,
+          proyecto_nombre: proyectoNombre,
           metadata: {
             precio_venta: prop.precio_venta,
             precio_alquiler: prop.precio_alquiler,
@@ -108,6 +113,17 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
 
     if (!eventError && eventos) {
       eventos.forEach(event => {
+        // Manejar cliente y propiedad que pueden ser array u objeto
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cliente = event.cliente as any;
+        const clienteNombre = Array.isArray(cliente) ? cliente[0]?.nombre : cliente?.nombre;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const propiedad = event.propiedad as any;
+        const propiedadCodigo = Array.isArray(propiedad)
+          ? (propiedad[0]?.codigo || propiedad[0]?.identificacion_interna)
+          : (propiedad?.codigo || propiedad?.identificacion_interna);
+
         const result: EventoSearchResult = {
           id: event.id,
           type: 'evento',
@@ -120,12 +136,12 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
           tipo: event.tipo,
           fecha_inicio: event.fecha_inicio,
           estado: event.estado,
-          cliente_nombre: event.cliente?.nombre,
-          propiedad_codigo: event.propiedad?.codigo || event.propiedad?.identificacion_interna,
+          cliente_nombre: clienteNombre,
+          propiedad_codigo: propiedadCodigo,
           metadata: {
             descripcion: event.descripcion,
-            cliente_id: event.cliente?.id,
-            propiedad_id: event.propiedad?.id
+            cliente_id: Array.isArray(cliente) ? cliente[0]?.id : cliente?.id,
+            propiedad_id: Array.isArray(propiedad) ? propiedad[0]?.id : propiedad?.id
           }
         };
         results.push(result);

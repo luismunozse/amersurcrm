@@ -28,8 +28,8 @@ export default function ListaRecordatorios({
   const [filtro, setFiltro] = useState<'todos' | 'pendientes' | 'completados'>('pendientes');
 
   const recordatoriosFiltrados = recordatorios.filter(recordatorio => {
-    if (filtro === 'pendientes') return !recordatorio.completado;
-    if (filtro === 'completados') return recordatorio.completado;
+    if (filtro === 'pendientes') return recordatorio.estado === 'pendiente';
+    if (filtro === 'completados') return recordatorio.estado === 'completado';
     return true;
   });
 
@@ -37,10 +37,10 @@ export default function ListaRecordatorios({
     try {
       const result = await marcarRecordatorioCompletado(recordatorioId);
       if (result.success) {
-        setRecordatorios(prev => 
-          prev.map(r => 
-            r.id === recordatorioId 
-              ? { ...r, completado: true, fecha_completado: new Date().toISOString() }
+        setRecordatorios(prev =>
+          prev.map(r =>
+            r.id === recordatorioId
+              ? { ...r, estado: 'completado' as const, updated_at: new Date().toISOString() }
               : r
           )
         );
@@ -58,10 +58,10 @@ export default function ListaRecordatorios({
     try {
       const result = await marcarRecordatorioLeido(recordatorioId);
       if (result.success) {
-        setRecordatorios(prev => 
-          prev.map(r => 
-            r.id === recordatorioId 
-              ? { ...r, leido: true }
+        setRecordatorios(prev =>
+          prev.map(r =>
+            r.id === recordatorioId
+              ? { ...r, estado: 'leido' as const, updated_at: new Date().toISOString() }
               : r
           )
         );
@@ -138,7 +138,7 @@ export default function ListaRecordatorios({
               : 'bg-crm-border text-crm-text-secondary hover:bg-crm-border-hover'
           }`}
         >
-          Pendientes ({recordatorios.filter(r => !r.completado).length})
+          Pendientes ({recordatorios.filter(r => r.estado !== 'completado').length})
         </button>
         <button
           onClick={() => setFiltro('completados')}
@@ -148,7 +148,7 @@ export default function ListaRecordatorios({
               : 'bg-crm-border text-crm-text-secondary hover:bg-crm-border-hover'
           }`}
         >
-          Completados ({recordatorios.filter(r => r.completado).length})
+          Completados ({recordatorios.filter(r => r.estado === 'completado').length})
         </button>
         <button
           onClick={() => setFiltro('todos')}
@@ -174,7 +174,7 @@ export default function ListaRecordatorios({
             <div
               key={recordatorio.id}
               className={`p-4 rounded-lg border-2 transition-all ${
-                recordatorio.completado 
+                recordatorio.estado === 'completado' 
                   ? 'bg-gray-50 border-gray-200 opacity-75' 
                   : 'bg-white border-crm-border hover:border-crm-primary/30'
               }`}
@@ -183,7 +183,7 @@ export default function ListaRecordatorios({
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="text-lg">{getTipoIcon(recordatorio.tipo)}</span>
-                    <h4 className={`font-medium ${recordatorio.completado ? 'line-through text-gray-500' : 'text-crm-text-primary'}`}>
+                    <h4 className={`font-medium ${recordatorio.estado === 'completado' ? 'line-through text-gray-500' : 'text-crm-text-primary'}`}>
                       {recordatorio.titulo}
                     </h4>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPrioridadColor(recordatorio.prioridad)}`}>
@@ -192,7 +192,7 @@ export default function ListaRecordatorios({
                   </div>
                   
                   {recordatorio.descripcion && (
-                    <p className={`text-sm mb-2 ${recordatorio.completado ? 'text-gray-400' : 'text-crm-text-secondary'}`}>
+                    <p className={`text-sm mb-2 ${recordatorio.estado === 'completado' ? 'text-gray-400' : 'text-crm-text-secondary'}`}>
                       {recordatorio.descripcion}
                     </p>
                   )}
@@ -202,16 +202,16 @@ export default function ListaRecordatorios({
                       <CalendarIcon className="w-4 h-4" />
                       <span>{new Date(recordatorio.fecha_recordatorio).toLocaleString()}</span>
                     </div>
-                    {recordatorio.cliente && (
+                    {recordatorio.cliente_id && (
                       <div className="flex items-center space-x-1">
                         <span>👤</span>
-                        <span>{recordatorio.cliente.nombre}</span>
+                        <span>Cliente asignado</span>
                       </div>
                     )}
-                    {recordatorio.propiedad && (
+                    {recordatorio.propiedad_id && (
                       <div className="flex items-center space-x-1">
                         <span>🏠</span>
-                        <span>{recordatorio.propiedad.identificacion_interna}</span>
+                        <span>Propiedad asignada</span>
                       </div>
                     )}
                   </div>
@@ -231,7 +231,7 @@ export default function ListaRecordatorios({
                 </div>
 
                 <div className="flex items-center space-x-2 ml-4">
-                  {!recordatorio.completado && (
+                  {recordatorio.estado !== 'completado' && (
                     <button
                       onClick={() => handleMarcarCompletado(recordatorio.id)}
                       className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
@@ -241,7 +241,7 @@ export default function ListaRecordatorios({
                     </button>
                   )}
                   
-                  {!recordatorio.leido && !recordatorio.completado && (
+                  {recordatorio.estado !== 'leido' && recordatorio.estado !== 'completado' && (
                     <button
                       onClick={() => handleMarcarLeido(recordatorio.id)}
                       className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"

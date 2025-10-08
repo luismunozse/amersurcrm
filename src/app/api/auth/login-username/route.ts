@@ -46,11 +46,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Obtener el nombre del rol (manejar como any debido a la inferencia compleja de tipos)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rol = usuario.rol as any;
+    const rolNombre = Array.isArray(rol) ? rol[0]?.nombre : rol?.nombre;
+
     // Retornar el email para que el cliente pueda hacer signInWithPassword
     return NextResponse.json({
       success: true,
       email: usuario.email,
-      rol: usuario.rol?.nombre
+      rol: rolNombre
     });
 
   } catch (error) {
