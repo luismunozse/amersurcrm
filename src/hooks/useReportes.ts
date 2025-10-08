@@ -28,8 +28,8 @@ export function useReportes(options: UseReportesOptions = {}) {
 
     try {
       const result = await obtenerMetricasReportes(periodo, fechaInicio, fechaFin);
-      
-      if (result.success && result.data) {
+
+      if (result.data) {
         setData(result.data);
       } else {
         setError(result.error || 'Error cargando datos');

@@ -442,18 +442,54 @@ export default function MapeoLotesMejorado({
           </div>
 
           {/* Indicadores de paso */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${currentStep >= 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-              {currentStep > 1 ? <Check className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-              <span className="text-sm font-medium">1. Ubicar Área</span>
+          <div className="flex items-center gap-2 mb-6">
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+              currentStep >= 1 ? 'bg-green-100 text-green-700 border-2 border-green-300' : 'bg-gray-50 text-gray-400 border-2 border-gray-200'
+            }`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                currentStep > 1 ? 'bg-green-600' : currentStep === 1 ? 'bg-green-500' : 'bg-gray-300'
+              }`}>
+                {currentStep > 1 ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : (
+                  <span className="text-xs font-bold text-white">1</span>
+                )}
+              </div>
+              <span className="text-sm font-medium">Área</span>
             </div>
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${currentStep >= 2 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-              {currentStep > 2 ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
-              <span className="text-sm font-medium">2. Subir Plano</span>
+
+            <div className={`h-0.5 w-8 ${currentStep >= 2 ? 'bg-green-400' : 'bg-gray-200'}`} />
+
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+              currentStep >= 2 ? 'bg-green-100 text-green-700 border-2 border-green-300' : 'bg-gray-50 text-gray-400 border-2 border-gray-200'
+            }`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                currentStep > 2 ? 'bg-green-600' : currentStep === 2 ? 'bg-green-500' : 'bg-gray-300'
+              }`}>
+                {currentStep > 2 ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : (
+                  <span className="text-xs font-bold text-white">2</span>
+                )}
+              </div>
+              <span className="text-sm font-medium">Plano</span>
             </div>
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${currentStep >= 3 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-              {currentStep === 3 && stats.pendientes === 0 ? <Check className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
-              <span className="text-sm font-medium">3. Ubicar Lotes</span>
+
+            <div className={`h-0.5 w-8 ${currentStep >= 3 ? 'bg-green-400' : 'bg-gray-200'}`} />
+
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+              currentStep >= 3 ? 'bg-green-100 text-green-700 border-2 border-green-300' : 'bg-gray-50 text-gray-400 border-2 border-gray-200'
+            }`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                currentStep === 3 && stats.pendientes === 0 ? 'bg-green-600' : currentStep === 3 ? 'bg-green-500' : 'bg-gray-300'
+              }`}>
+                {currentStep === 3 && stats.pendientes === 0 ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : (
+                  <span className="text-xs font-bold text-white">3</span>
+                )}
+              </div>
+              <span className="text-sm font-medium">Lotes</span>
             </div>
           </div>
 
@@ -713,28 +749,25 @@ export default function MapeoLotesMejorado({
 
                   {lotesUbicados.length > 0 && (
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold text-crm-text-primary">Lotes ubicados ({lotesUbicados.length})</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-crm-text-primary">Ubicados ({lotesUbicados.length})</h4>
                       </div>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
                         {lotesUbicados.map((lote) => (
                           <div
                             key={lote.id}
-                            className="flex items-center justify-between p-3 border border-crm-border rounded-lg bg-green-50"
+                            className="flex items-center justify-between p-2 border border-green-200 rounded-lg bg-green-50/50 hover:bg-green-50 transition-colors"
                           >
                             <div className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-green-600" />
-                              <div>
-                                <div className="text-sm font-semibold text-crm-text-primary">Lote {lote.codigo}</div>
-                                <div className="text-xs text-crm-text-muted">Ubicado</div>
-                              </div>
+                              <Check className="w-3.5 h-3.5 text-green-600" />
+                              <span className="text-sm font-medium text-crm-text-primary">{lote.codigo}</span>
                             </div>
                             <button
                               onClick={() => handleRemoveLotePin(lote.id)}
-                              className="text-xs text-red-600 hover:text-red-700 font-medium"
+                              className="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-0.5"
                               disabled={savingLotePolygon}
                             >
-                              Quitar
+                              ✕
                             </button>
                           </div>
                         ))}

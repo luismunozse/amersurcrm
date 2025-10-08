@@ -24,23 +24,46 @@ export default function LoginForm() {
       if (loginType === 'admin') {
         // Login para administradores con username/contraseña
         console.log("Intentando login admin con:", username);
-        
-        const { data, error } = await s.auth.signInWithPassword({ 
-          email: username.trim(), 
-          password: pass 
+
+        // Primero convertir el username a email
+        const response = await fetch('/api/auth/login-username', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: username.trim(),
+            password: pass
+          })
         });
-        
-        if (error) {
-          console.error("Error de autenticación admin:", error);
-          toast.error(`Error: ${error.message}`);
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          toast.error(result.error || 'Usuario no encontrado');
           setPending(false);
           return;
         }
-        
-        if (data.user) {
-          console.log("Login admin exitoso, redirigiendo...");
-          toast.success("¡Login exitoso!");
-          router.replace("/dashboard");
+
+        if (result.success && result.email) {
+          // Realizar el sign-in real con el email obtenido
+          const { data, error } = await s.auth.signInWithPassword({
+            email: result.email,
+            password: pass
+          });
+
+          if (error) {
+            console.error("Error de autenticación admin:", error);
+            toast.error("Contraseña incorrecta");
+            setPending(false);
+            return;
+          }
+
+          if (data.user) {
+            console.log("Login admin exitoso, redirigiendo...");
+            toast.success("¡Login exitoso!");
+            router.replace("/dashboard");
+          }
         }
       } else {
         // Login para vendedores con DNI/contraseña

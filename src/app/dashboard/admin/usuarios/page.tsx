@@ -39,6 +39,7 @@ function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [roles, setRoles] = useState<Rol[]>([]);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [rolSeleccionado, setRolSeleccionado] = useState<string>("");
   const [cargando, setCargando] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [userEditing, setUserEditing] = useState<Usuario | null>(null);
@@ -86,12 +87,13 @@ function GestionUsuarios() {
         method: 'POST',
         body: formData,
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success('Usuario creado exitosamente');
         setMostrarFormulario(false);
+        setRolSeleccionado("");
         cargarUsuarios();
       } else {
         toast.error(data.message || 'Error creando usuario');
@@ -100,6 +102,11 @@ function GestionUsuarios() {
       console.error('Error creando usuario:', error);
       toast.error('Error creando usuario');
     }
+  };
+
+  const esRolAdmin = () => {
+    const rol = roles.find(r => r.id === rolSeleccionado);
+    return rol?.nombre === 'ROL_ADMIN';
   };
 
   // PATCH helper
@@ -212,8 +219,11 @@ function GestionUsuarios() {
         <div className="crm-card p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-crm-text-primary">Crear Nuevo Usuario</h3>
-            <button 
-              onClick={() => setMostrarFormulario(false)}
+            <button
+              onClick={() => {
+                setMostrarFormulario(false);
+                setRolSeleccionado("");
+              }}
               className="text-crm-text-muted hover:text-crm-text-primary"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,135 +233,183 @@ function GestionUsuarios() {
           </div>
 
           <form action={crearUsuario} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Nombre Completo *
-                </label>
-                <input
-                  type="text"
-                  name="nombre_completo"
-                  required
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="Juan Pérez García"
-                />
-                <p className="text-xs text-crm-text-muted mt-1">
-                  Se generará automáticamente el username (ej: jperez)
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  DNI * (usado para login)
-                </label>
-                <input
-                  type="text"
-                  name="dni"
-                  required
-                  pattern="[0-9]{8}"
-                  maxLength={8}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="12345678"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Teléfono
-                </label>
-                <input
-                  type="tel"
-                  name="telefono"
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="987654321"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Email (Opcional)
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="usuario@amersur.com (opcional)"
-                />
-                <p className="text-xs text-crm-text-muted mt-1">
-                  Si no se proporciona, se generará automáticamente usando el DNI
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Rol *
-                </label>
-                <select
-                  name="rol_id"
-                  required
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                >
-                  <option value="">Seleccionar rol</option>
-                  {roles.map((rol) => (
-                    <option key={rol.id} value={rol.id}>
-                      {rol.nombre.replace('ROL_', '').replace('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Contraseña Temporal *
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  required
-                  minLength="6"
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="Contraseña temporal"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Meta Mensual (S/.)
-                </label>
-                <input
-                  type="number"
-                  name="meta_mensual"
-                  min="0"
-                  step="100"
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="50000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Comisión (%)
-                </label>
-                <input
-                  type="number"
-                  name="comision_porcentaje"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  placeholder="2.5"
-                />
-              </div>
+            {/* Primer paso: Seleccionar rol */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Rol *
+              </label>
+              <select
+                name="rol_id"
+                required
+                value={rolSeleccionado}
+                onChange={(e) => setRolSeleccionado(e.target.value)}
+                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+              >
+                <option value="">Seleccionar rol</option>
+                {roles.map((rol) => (
+                  <option key={rol.id} value={rol.id}>
+                    {rol.nombre.replace('ROL_', '').replace('_', ' ')}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setMostrarFormulario(false)}
-                className="px-4 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
-              >
-                Crear Usuario
-              </button>
-            </div>
+            {/* Campos según el rol seleccionado */}
+            {rolSeleccionado && (
+              <>
+                {esRolAdmin() ? (
+                  /* Formulario para ADMIN: solo username y contraseña */
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Username *
+                      </label>
+                      <input
+                        type="text"
+                        name="username"
+                        required
+                        pattern="[a-z0-9_]{3,20}"
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="admin123"
+                      />
+                      <p className="text-xs text-crm-text-muted mt-1">
+                        Solo letras minúsculas, números y guión bajo (3-20 caracteres)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Contraseña *
+                      </label>
+                      <input
+                        type="password"
+                        name="password"
+                        required
+                        minLength={6}
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="Contraseña"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Formulario para VENDEDOR/COORDINADOR: todos los campos */
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Nombre Completo *
+                      </label>
+                      <input
+                        type="text"
+                        name="nombre_completo"
+                        required
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="Juan Pérez García"
+                      />
+                      <p className="text-xs text-crm-text-muted mt-1">
+                        Se generará automáticamente el username (ej: jperez)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        DNI * (usado para login)
+                      </label>
+                      <input
+                        type="text"
+                        name="dni"
+                        required
+                        pattern="[0-9]{8}"
+                        maxLength={8}
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="12345678"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Teléfono
+                      </label>
+                      <input
+                        type="tel"
+                        name="telefono"
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="987654321"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Email (Opcional)
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="usuario@amersur.com (opcional)"
+                      />
+                      <p className="text-xs text-crm-text-muted mt-1">
+                        Si no se proporciona, se generará automáticamente usando el DNI
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Contraseña Temporal *
+                      </label>
+                      <input
+                        type="password"
+                        name="password"
+                        required
+                        minLength={6}
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="Contraseña temporal"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Meta Mensual (S/.)
+                      </label>
+                      <input
+                        type="number"
+                        name="meta_mensual"
+                        min="0"
+                        step="100"
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="50000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                        Comisión (%)
+                      </label>
+                      <input
+                        type="number"
+                        name="comision_porcentaje"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                        placeholder="2.5"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMostrarFormulario(false);
+                      setRolSeleccionado("");
+                    }}
+                    className="px-4 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
+                  >
+                    Crear Usuario
+                  </button>
+                </div>
+              </>
+            )}
           </form>
         </div>
       )}

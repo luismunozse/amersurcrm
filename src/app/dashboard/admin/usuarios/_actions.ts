@@ -2,6 +2,7 @@
 "use server";
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -178,28 +179,69 @@ export async function cambiarPasswordPerfil(
  * Elimina un usuario del sistema
  */
 export async function eliminarUsuario(userId: string) {
+  const supabase = await createServerActionClient();
+  const serviceRole = createServiceRoleClient();
+
   try {
-    const response = await fetch(`/api/admin/usuarios?id=${userId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
+    // Verificar que no se está eliminando a sí mismo
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id === userId) {
       return {
         success: false,
-        error: result.error || 'Error eliminando usuario'
+        error: 'No puedes eliminarte a ti mismo'
       };
+    }
+
+    // Verificar que el usuario existe
+    const { data: usuarioExistente, error: fetchError } = await supabase
+      .from('usuario_perfil')
+      .select('id, username, nombre_completo')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !usuarioExistente) {
+      return {
+        success: false,
+        error: 'Usuario no encontrado'
+      };
+    }
+
+    // Verificar si el usuario tiene clientes asignados
+    const { data: clientesAsignados } = await supabase
+      .from('cliente')
+      .select('id')
+      .eq('vendedor_asignado', usuarioExistente.username)
+      .limit(1);
+
+    if (clientesAsignados && clientesAsignados.length > 0) {
+      return {
+        success: false,
+        error: 'No se puede eliminar el usuario porque tiene clientes asignados. Primero debe reasignar o desactivar estos clientes.'
+      };
+    }
+
+    // Primero eliminar el perfil del usuario
+    const { error: profileError } = await supabase
+      .from('usuario_perfil')
+      .delete()
+      .eq('id', userId);
+
+    if (profileError) {
+      throw new Error(`Error eliminando perfil: ${profileError.message}`);
+    }
+
+    // Luego eliminar el usuario de Supabase Auth usando service role
+    const { error: authError } = await serviceRole.auth.admin.deleteUser(userId);
+
+    if (authError) {
+      throw new Error(`Error eliminando usuario: ${authError.message}`);
     }
 
     revalidatePath('/dashboard/admin/usuarios');
 
     return {
       success: true,
-      message: result.message || 'Usuario eliminado exitosamente'
+      message: `Usuario ${usuarioExistente.nombre_completo} (@${usuarioExistente.username}) eliminado exitosamente`
     };
   } catch (error) {
     console.error('Error eliminando usuario:', error);

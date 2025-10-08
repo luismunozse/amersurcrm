@@ -142,74 +142,8 @@ export async function POST(request: NextRequest) {
     const comision_porcentaje = formData.get("comision_porcentaje") as string;
     let username = formData.get("username") as string;
 
-    if (!nombre_completo || !dni || !password || !rol_id) {
-      return NextResponse.json({ error: "Faltan campos requeridos: nombre, DNI, contraseña y rol son obligatorios" }, { status: 400 });
-    }
-
-    // Generar username si no se proporcionó
-    if (!username) {
-      username = generarUsername(nombre_completo);
-    }
-
-    // Validar formato de username
-    const validacion = validarUsername(username);
-    if (!validacion.valido) {
-      return NextResponse.json({ error: validacion.error }, { status: 400 });
-    }
-
-    // Verificar que el username no exista
-    const { data: existingUser, error: checkError } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('username', username)
-      .single();
-
-    if (existingUser) {
-      // Username ya existe, intentar con número incremental
-      let numero = 2;
-      let usernameDisponible = false;
-      let usernameConNumero = username;
-
-      while (!usernameDisponible && numero <= 99) {
-        usernameConNumero = generarUsernameConNumero(username, numero);
-        const { data } = await supabase
-          .from('usuario_perfil')
-          .select('username')
-          .eq('username', usernameConNumero)
-          .single();
-
-        if (!data) {
-          usernameDisponible = true;
-          username = usernameConNumero;
-        }
-        numero++;
-      }
-
-      if (!usernameDisponible) {
-        return NextResponse.json({
-          error: `El username "${username}" y sus variantes ya están en uso. Por favor, elige otro.`
-        }, { status: 400 });
-      }
-    }
-
-    // Generar email temporal si no se proporciona (para vendedores con DNI)
-    const emailFinal = email || `${dni}@amersur.temp`;
-    
-    // Crear usuario en auth con client de service role (requiere key SRV)
-    const srv = createServiceRoleClient();
-    const { data: authData, error: authError } = await srv.auth.admin.createUser({
-      email: emailFinal,
-      password,
-      email_confirm: true
-    });
-
-    if (authError) {
-      console.error('Error creando usuario en auth:', authError);
-      return NextResponse.json({ error: "Error creando usuario: " + authError.message }, { status: 400 });
-    }
-
-    if (!authData.user) {
-      return NextResponse.json({ error: "No se pudo crear el usuario" }, { status: 500 });
+    if (!password || !rol_id) {
+      return NextResponse.json({ error: "Faltan campos requeridos: contraseña y rol son obligatorios" }, { status: 400 });
     }
 
     // Verificar que el rol existe
@@ -225,6 +159,116 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Rol no válido" }, { status: 400 });
     }
 
+    const esRolAdmin = rol.nombre === 'ROL_ADMIN';
+
+    // Validar campos según el tipo de rol
+    if (esRolAdmin) {
+      // Para admin: solo username es requerido
+      if (!username) {
+        return NextResponse.json({ error: "Username es requerido para administradores" }, { status: 400 });
+      }
+    } else {
+      // Para vendedores/coordinadores: nombre y DNI son requeridos
+      if (!nombre_completo || !dni) {
+        return NextResponse.json({ error: "Nombre completo y DNI son requeridos para vendedores" }, { status: 400 });
+      }
+      // Generar username si no se proporcionó
+      if (!username) {
+        username = generarUsername(nombre_completo);
+      }
+    }
+
+    // Validar formato de username
+    const validacion = validarUsername(username);
+    if (!validacion.valido) {
+      return NextResponse.json({ error: validacion.error }, { status: 400 });
+    }
+
+    // Verificar que el username no exista
+    const { data: existingUser } = await supabase
+      .from('usuario_perfil')
+      .select('username')
+      .eq('username', username)
+      .single();
+
+    if (existingUser) {
+      if (esRolAdmin) {
+        // Para admin, rechazar si el username ya existe
+        return NextResponse.json({
+          error: `El username "${username}" ya está en uso. Por favor, elige otro.`
+        }, { status: 400 });
+      } else {
+        // Para vendedores, intentar con número incremental
+        let numero = 2;
+        let usernameDisponible = false;
+        let usernameConNumero = username;
+
+        while (!usernameDisponible && numero <= 99) {
+          usernameConNumero = generarUsernameConNumero(username, numero);
+          const { data } = await supabase
+            .from('usuario_perfil')
+            .select('username')
+            .eq('username', usernameConNumero)
+            .single();
+
+          if (!data) {
+            usernameDisponible = true;
+            username = usernameConNumero;
+          }
+          numero++;
+        }
+
+        if (!usernameDisponible) {
+          return NextResponse.json({
+            error: `El username "${username}" y sus variantes ya están en uso. Por favor, elige otro.`
+          }, { status: 400 });
+        }
+      }
+    }
+
+    // Generar email según el tipo de usuario
+    let emailFinal: string;
+    if (esRolAdmin) {
+      // Para admin: usar username@amersur.admin si no se proporciona email
+      emailFinal = email || `${username}@amersur.admin`;
+    } else {
+      // Para vendedores: usar email proporcionado o generar con DNI
+      emailFinal = email || `${dni}@amersur.temp`;
+    }
+    
+    // Verificar si el email ya existe
+    const { data: existingEmail } = await supabase
+      .from('usuario_perfil')
+      .select('email')
+      .eq('email', emailFinal)
+      .single();
+
+    if (existingEmail) {
+      return NextResponse.json({
+        error: `El email "${emailFinal}" ya está en uso.`
+      }, { status: 400 });
+    }
+
+    // Crear usuario en auth con client de service role (requiere key SRV)
+    const srv = createServiceRoleClient();
+    const { data: authData, error: authError } = await srv.auth.admin.createUser({
+      email: emailFinal,
+      password,
+      email_confirm: true
+    });
+
+    if (authError) {
+      console.error('Error creando usuario en auth:', authError);
+      return NextResponse.json({
+        error: "Error creando usuario: " + (authError.message || 'Error desconocido'),
+        details: authError
+      }, { status: 400 });
+    }
+
+    if (!authData.user) {
+      return NextResponse.json({ error: "No se pudo crear el usuario" }, { status: 500 });
+    }
+
     // Crear perfil de usuario con username y requiere_cambio_password = true
     const { error: perfilError } = await supabase
       .from('usuario_perfil')
@@ -232,8 +276,8 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         username: username,
         email: emailFinal,
-        nombre_completo: nombre_completo,
-        dni: dni,
+        nombre_completo: nombre_completo || username, // Para admin, usar username como nombre si no hay nombre
+        dni: dni || null, // DNI es null para admin
         telefono: telefono || null,
         rol_id: rol.id,
         meta_mensual_ventas: meta_mensual ? parseInt(meta_mensual, 10) : null,
