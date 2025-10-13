@@ -24,20 +24,20 @@ export default function DashboardMetricas() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+      <div className="bg-crm-danger/10 border border-crm-danger/30 rounded-xl p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-              <span className="text-red-600 text-sm">⚠️</span>
+            <div className="w-8 h-8 bg-crm-danger/20 rounded-lg flex items-center justify-center">
+              <span className="text-crm-danger text-sm">⚠️</span>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-red-800">Error cargando métricas</h3>
-              <p className="text-xs text-red-600">{error}</p>
+              <h3 className="text-sm font-medium text-crm-danger">Error cargando métricas</h3>
+              <p className="text-xs text-crm-text-secondary">{error}</p>
             </div>
           </div>
           <button
             onClick={recargar}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-crm-danger border border-crm-danger/30 rounded-lg hover:bg-crm-danger/10 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Reintentar
@@ -53,48 +53,48 @@ export default function DashboardMetricas() {
       value: data?.campanas_activas || 0,
       subtitle: "En ejecución",
       icon: Play,
-      color: "text-green-600",
-      bgColor: "bg-green-50"
+      color: "text-crm-primary",
+      bgColor: "bg-crm-primary/10"
     },
     {
       title: "Mensajes Hoy",
       value: data?.mensajes_enviados_hoy || 0,
       subtitle: "Enviados",
       icon: MessageSquare,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50"
+      color: "text-crm-secondary",
+      bgColor: "bg-crm-secondary/10"
     },
     {
       title: "Conversaciones",
       value: data?.conversaciones_abiertas || 0,
       subtitle: "Abiertas",
       icon: Users,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50"
+      color: "text-crm-accent",
+      bgColor: "bg-crm-accent/10"
     },
     {
       title: "Tasa Respuesta",
       value: `${data?.tasa_respuesta_promedio.toFixed(1) || 0}%`,
       subtitle: "Promedio",
       icon: TrendingUp,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50"
+      color: "text-crm-success",
+      bgColor: "bg-crm-success/10"
     },
     {
       title: "Tiempo Respuesta",
       value: data ? formatearTiempo(data.tiempo_respuesta_promedio_segundos) : '0s',
       subtitle: "Promedio",
       icon: Clock,
-      color: "text-cyan-600",
-      bgColor: "bg-cyan-50"
+      color: "text-crm-info",
+      bgColor: "bg-crm-info/10"
     },
     {
       title: "Conversiones",
       value: data?.conversiones_mes || 0,
       subtitle: "Este mes",
       icon: Target,
-      color: "text-pink-600",
-      bgColor: "bg-pink-50"
+      color: "text-crm-warning",
+      bgColor: "bg-crm-warning/10"
     }
   ];
 

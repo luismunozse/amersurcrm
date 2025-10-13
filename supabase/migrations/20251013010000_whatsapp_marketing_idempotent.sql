@@ -1,11 +1,61 @@
 -- =====================================================
--- WHATSAPP MARKETING SYSTEM
+-- WHATSAPP MARKETING SYSTEM - MIGRACIÓN IDEMPOTENTE
 -- Sistema completo de WhatsApp Cloud API integrado con CRM
+-- Esta migración puede ejecutarse múltiples veces sin errores
+-- =====================================================
+
+-- =====================================================
+-- PASO 1: ELIMINAR TODO LO EXISTENTE (si existe)
+-- =====================================================
+
+-- Deshabilitar RLS temporalmente
+ALTER TABLE IF EXISTS crm.marketing_channel_credential DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_template DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_audiencia DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_campana DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_conversacion DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_mensaje DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_automatizacion DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_automatizacion_ejecucion DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS crm.marketing_event_log DISABLE ROW LEVEL SECURITY;
+
+-- Eliminar políticas RLS existentes
+DROP POLICY IF EXISTS marketing_admin_all ON crm.marketing_channel_credential;
+DROP POLICY IF EXISTS marketing_template_admin_all ON crm.marketing_template;
+DROP POLICY IF EXISTS marketing_audiencia_admin_all ON crm.marketing_audiencia;
+DROP POLICY IF EXISTS marketing_campana_admin_all ON crm.marketing_campana;
+DROP POLICY IF EXISTS marketing_automatizacion_admin_all ON crm.marketing_automatizacion;
+DROP POLICY IF EXISTS marketing_conversacion_vendedor_select ON crm.marketing_conversacion;
+DROP POLICY IF EXISTS marketing_conversacion_vendedor_update ON crm.marketing_conversacion;
+DROP POLICY IF EXISTS marketing_mensaje_vendedor_select ON crm.marketing_mensaje;
+DROP POLICY IF EXISTS marketing_event_log_admin_select ON crm.marketing_event_log;
+
+-- Eliminar triggers
+DROP TRIGGER IF EXISTS trigger_actualizar_sesion_whatsapp ON crm.marketing_mensaje;
+
+-- Eliminar funciones
+DROP FUNCTION IF EXISTS crm.actualizar_sesion_whatsapp() CASCADE;
+DROP FUNCTION IF EXISTS crm.cerrar_sesiones_expiradas() CASCADE;
+DROP FUNCTION IF EXISTS crm.normalizar_telefono_e164(TEXT, TEXT) CASCADE;
+
+-- Eliminar tablas en orden inverso de dependencias
+DROP TABLE IF EXISTS crm.marketing_event_log CASCADE;
+DROP TABLE IF EXISTS crm.marketing_automatizacion_ejecucion CASCADE;
+DROP TABLE IF EXISTS crm.marketing_automatizacion CASCADE;
+DROP TABLE IF EXISTS crm.marketing_mensaje CASCADE;
+DROP TABLE IF EXISTS crm.marketing_conversacion CASCADE;
+DROP TABLE IF EXISTS crm.marketing_campana CASCADE;
+DROP TABLE IF EXISTS crm.marketing_audiencia CASCADE;
+DROP TABLE IF EXISTS crm.marketing_template CASCADE;
+DROP TABLE IF EXISTS crm.marketing_channel_credential CASCADE;
+
+-- =====================================================
+-- PASO 2: CREAR TABLAS NUEVAS
 -- =====================================================
 
 -- 1. CREDENCIALES DE CANAL (WhatsApp Cloud API)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_channel_credential (
+CREATE TABLE crm.marketing_channel_credential (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   canal_tipo VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
   nombre VARCHAR(100) NOT NULL,
@@ -36,7 +86,7 @@ CREATE INDEX idx_marketing_channel_credential_activo ON crm.marketing_channel_cr
 
 -- 2. PLANTILLAS DE MENSAJES (Message Templates)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_template (
+CREATE TABLE crm.marketing_template (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre VARCHAR(100) NOT NULL UNIQUE,
   categoria VARCHAR(50) NOT NULL CHECK (categoria IN ('MARKETING', 'UTILITY', 'AUTHENTICATION')),
@@ -77,7 +127,7 @@ CREATE INDEX idx_marketing_template_activo ON crm.marketing_template(activo);
 
 -- 3. AUDIENCIAS (Segmentos dinámicos)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_audiencia (
+CREATE TABLE crm.marketing_audiencia (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre VARCHAR(100) NOT NULL,
   descripcion TEXT,
@@ -87,16 +137,6 @@ CREATE TABLE IF NOT EXISTS crm.marketing_audiencia (
 
   -- Filtros (JSON con reglas de segmentación)
   filtros JSONB DEFAULT '{}'::jsonb,
-  /*
-  Ejemplo de filtros:
-  {
-    "proyecto_id": "uuid",
-    "estado_cliente": ["lead", "interesado"],
-    "ultima_interaccion_dias": {"operator": "<=", "value": 30},
-    "tags": ["hot-lead", "utm_source:facebook"],
-    "tiene_whatsapp_consentimiento": true
-  }
-  */
 
   -- Si es estática, lista de contactos
   contactos_ids UUID[],
@@ -118,7 +158,7 @@ CREATE INDEX idx_marketing_audiencia_activo ON crm.marketing_audiencia(activo);
 
 -- 4. CAMPAÑAS
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_campana (
+CREATE TABLE crm.marketing_campana (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre VARCHAR(100) NOT NULL,
   descripcion TEXT,
@@ -147,7 +187,7 @@ CREATE TABLE IF NOT EXISTS crm.marketing_campana (
 
   -- A/B Testing
   es_ab_test BOOLEAN DEFAULT false,
-  ab_porcentaje_muestra INTEGER, -- 10-20%
+  ab_porcentaje_muestra INTEGER,
   ab_variante_ganadora UUID,
 
   -- Estado
@@ -173,7 +213,7 @@ CREATE INDEX idx_marketing_campana_fecha_inicio ON crm.marketing_campana(fecha_i
 
 -- 5. CONVERSACIONES
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_conversacion (
+CREATE TABLE crm.marketing_conversacion (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Contacto
@@ -221,7 +261,7 @@ CREATE INDEX idx_marketing_conversacion_session ON crm.marketing_conversacion(is
 
 -- 6. MENSAJES
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_mensaje (
+CREATE TABLE crm.marketing_mensaje (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversacion_id UUID REFERENCES crm.marketing_conversacion(id) ON DELETE CASCADE,
 
@@ -273,38 +313,19 @@ CREATE INDEX idx_marketing_mensaje_created ON crm.marketing_mensaje(created_at D
 
 -- 7. AUTOMATIZACIONES (Journeys)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_automatizacion (
+CREATE TABLE crm.marketing_automatizacion (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre VARCHAR(100) NOT NULL,
   descripcion TEXT,
 
   -- Trigger
   trigger_evento VARCHAR(100) NOT NULL,
-  /*
-  Eventos:
-  - lead.created
-  - lead.no_respuesta_24h
-  - visita.agendada
-  - visita.completada
-  - pago.vencido
-  - cliente.inactivo_30d
-  */
 
   -- Condiciones (JSON)
   condiciones JSONB DEFAULT '{}'::jsonb,
 
   -- Acciones (JSON array de pasos)
   acciones JSONB DEFAULT '[]'::jsonb,
-  /*
-  Ejemplo:
-  [
-    {"tipo": "enviar_template", "template_id": "uuid", "delay_minutos": 0},
-    {"tipo": "esperar", "minutos": 1440},
-    {"tipo": "enviar_template", "template_id": "uuid2", "solo_si_no_respondio": true},
-    {"tipo": "asignar_vendedor", "vendedor_username": "jperez"},
-    {"tipo": "actualizar_etapa", "nueva_etapa": "nurturing"}
-  ]
-  */
 
   -- Estado
   activo BOOLEAN DEFAULT true,
@@ -324,7 +345,7 @@ CREATE INDEX idx_marketing_automatizacion_trigger ON crm.marketing_automatizacio
 
 -- 8. EJECUCIONES DE AUTOMATIZACIÓN
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_automatizacion_ejecucion (
+CREATE TABLE crm.marketing_automatizacion_ejecucion (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   automatizacion_id UUID REFERENCES crm.marketing_automatizacion(id) ON DELETE CASCADE,
 
@@ -351,7 +372,7 @@ CREATE INDEX idx_marketing_auto_ejecucion_next_action ON crm.marketing_automatiz
 
 -- 9. EVENT LOG (Auditoría y debugging)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS crm.marketing_event_log (
+CREATE TABLE crm.marketing_event_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   evento_tipo VARCHAR(100) NOT NULL,
 
@@ -374,20 +395,68 @@ CREATE TABLE IF NOT EXISTS crm.marketing_event_log (
 CREATE INDEX idx_marketing_event_log_tipo ON crm.marketing_event_log(evento_tipo);
 CREATE INDEX idx_marketing_event_log_created ON crm.marketing_event_log(created_at DESC);
 
--- 10. CONSENTIMIENTO Y OPT-IN/OUT
 -- =====================================================
--- Agregar columnas a tabla cliente existente
-ALTER TABLE crm.cliente
-  ADD COLUMN IF NOT EXISTS whatsapp_consentimiento BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS whatsapp_consentimiento_fecha TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS whatsapp_opt_out BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS whatsapp_opt_out_fecha TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS whatsapp_opt_out_motivo TEXT,
-  ADD COLUMN IF NOT EXISTS telefono_e164 VARCHAR(20);
+-- PASO 3: COLUMNAS DE WHATSAPP EN TABLA CLIENTE
+-- =====================================================
 
+-- Agregar columnas a tabla cliente (solo si no existen)
+DO $$
+BEGIN
+  -- whatsapp_consentimiento
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'crm' AND table_name = 'cliente' AND column_name = 'whatsapp_consentimiento'
+  ) THEN
+    ALTER TABLE crm.cliente ADD COLUMN whatsapp_consentimiento BOOLEAN DEFAULT false;
+  END IF;
+
+  -- whatsapp_consentimiento_fecha
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'crm' AND table_name = 'cliente' AND column_name = 'whatsapp_consentimiento_fecha'
+  ) THEN
+    ALTER TABLE crm.cliente ADD COLUMN whatsapp_consentimiento_fecha TIMESTAMPTZ;
+  END IF;
+
+  -- whatsapp_opt_out
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'crm' AND table_name = 'cliente' AND column_name = 'whatsapp_opt_out'
+  ) THEN
+    ALTER TABLE crm.cliente ADD COLUMN whatsapp_opt_out BOOLEAN DEFAULT false;
+  END IF;
+
+  -- whatsapp_opt_out_fecha
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'crm' AND table_name = 'cliente' AND column_name = 'whatsapp_opt_out_fecha'
+  ) THEN
+    ALTER TABLE crm.cliente ADD COLUMN whatsapp_opt_out_fecha TIMESTAMPTZ;
+  END IF;
+
+  -- whatsapp_opt_out_motivo
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'crm' AND table_name = 'cliente' AND column_name = 'whatsapp_opt_out_motivo'
+  ) THEN
+    ALTER TABLE crm.cliente ADD COLUMN whatsapp_opt_out_motivo TEXT;
+  END IF;
+
+  -- telefono_e164
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'crm' AND table_name = 'cliente' AND column_name = 'telefono_e164'
+  ) THEN
+    ALTER TABLE crm.cliente ADD COLUMN telefono_e164 VARCHAR(20);
+  END IF;
+END $$;
+
+-- Crear índice (eliminando primero si existe)
+DROP INDEX IF EXISTS crm.idx_cliente_whatsapp_consentimiento;
 CREATE INDEX idx_cliente_whatsapp_consentimiento ON crm.cliente(whatsapp_consentimiento) WHERE whatsapp_consentimiento = true;
 
--- 11. FUNCIONES DE UTILIDAD
+-- =====================================================
+-- PASO 4: FUNCIONES DE UTILIDAD
 -- =====================================================
 
 -- Función para actualizar sesión de WhatsApp (24h)
@@ -461,7 +530,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- 12. POLÍTICAS RLS (Row Level Security)
+-- =====================================================
+-- PASO 5: POLÍTICAS RLS (Row Level Security)
 -- =====================================================
 
 -- Habilitar RLS en todas las tablas
@@ -587,7 +657,7 @@ CREATE POLICY marketing_event_log_admin_select ON crm.marketing_event_log FOR SE
 );
 
 -- =====================================================
--- COMENTARIOS Y DOCUMENTACIÓN
+-- PASO 6: COMENTARIOS Y DOCUMENTACIÓN
 -- =====================================================
 
 COMMENT ON TABLE crm.marketing_channel_credential IS 'Credenciales de WhatsApp Cloud API para envío de mensajes';

@@ -3,13 +3,15 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 import { revalidatePath } from "next/cache";
-import type { 
-  MarketingTemplate, 
-  MarketingCampana, 
+import type {
+  MarketingTemplate,
+  MarketingCampana,
   MarketingConversacion,
   MarketingAudiencia,
   MarketingChannelCredential,
-  EstadisticasMarketing
+  EstadisticasMarketing,
+  EstadoCampana,
+  EstadoConversacion
 } from "@/types/whatsapp-marketing";
 
 // =====================================================

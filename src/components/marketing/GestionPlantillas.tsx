@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Eye, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, MessageSquare } from "lucide-react";
 import { obtenerPlantillas, eliminarPlantilla } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingTemplate } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
@@ -44,41 +44,41 @@ export default function GestionPlantillas() {
   const getEstadoIcon = (estado: string) => {
     switch (estado) {
       case 'APPROVED':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="w-4 h-4 text-crm-success" />;
       case 'REJECTED':
-        return <XCircle className="w-4 h-4 text-red-600" />;
+        return <XCircle className="w-4 h-4 text-crm-danger" />;
       case 'PENDING':
-        return <Clock className="w-4 h-4 text-yellow-600" />;
+        return <Clock className="w-4 h-4 text-crm-warning" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-400" />;
+        return <Clock className="w-4 h-4 text-crm-text-muted" />;
     }
   };
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'APPROVED':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-crm-success/10 text-crm-success border-crm-success/30';
       case 'REJECTED':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-crm-danger/10 text-crm-danger border-crm-danger/30';
       case 'PENDING':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-crm-warning/10 text-crm-warning border-crm-warning/30';
       case 'DRAFT':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-crm-text-muted/10 text-crm-text-secondary border-crm-border';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-crm-text-muted/10 text-crm-text-secondary border-crm-border';
     }
   };
 
   const getCategoriaColor = (categoria: string) => {
     switch (categoria) {
       case 'MARKETING':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-crm-primary/10 text-crm-primary';
       case 'UTILITY':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-crm-secondary/10 text-crm-secondary';
       case 'AUTHENTICATION':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-crm-accent/10 text-crm-accent';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-crm-text-muted/10 text-crm-text-secondary';
     }
   };
 
@@ -110,7 +110,7 @@ export default function GestionPlantillas() {
         </div>
         <button
           onClick={() => setModalCrear(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
         >
           <Plus className="w-4 h-4" />
           Nueva Plantilla
@@ -131,7 +131,7 @@ export default function GestionPlantillas() {
           </p>
           <button
             onClick={() => setModalCrear(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
           >
             <Plus className="w-4 h-4" />
             Crear Primera Plantilla
@@ -174,7 +174,7 @@ export default function GestionPlantillas() {
                   <p className="text-xs text-crm-text-muted mb-2">Variables:</p>
                   <div className="flex flex-wrap gap-1">
                     {plantilla.variables.map((variable, index) => (
-                      <span key={index} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">
+                      <span key={index} className="px-2 py-1 text-xs bg-crm-info/10 text-crm-info rounded">
                         {`{{${variable}}}`}
                       </span>
                     ))}
@@ -199,20 +199,20 @@ export default function GestionPlantillas() {
               {/* Acciones */}
               <div className="flex items-center gap-2 pt-4 border-t border-crm-border">
                 <button
-                  className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="inline-flex items-center justify-center w-8 h-8 text-crm-info hover:text-crm-info hover:bg-crm-info/10 rounded-lg transition-colors"
                   title="Ver detalles"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
                 <button
-                  className="inline-flex items-center justify-center w-8 h-8 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
+                  className="inline-flex items-center justify-center w-8 h-8 text-crm-secondary hover:text-crm-secondary hover:bg-crm-secondary/10 rounded-lg transition-colors"
                   title="Editar"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleEliminar(plantilla.id)}
-                  className="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                  className="inline-flex items-center justify-center w-8 h-8 text-crm-danger hover:text-crm-danger hover:bg-crm-danger/10 rounded-lg transition-colors"
                   title="Eliminar"
                 >
                   <Trash2 className="w-4 h-4" />
