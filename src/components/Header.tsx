@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import UserAvatarMenu from "./UserAvatarMenu";
@@ -14,6 +15,9 @@ type HeaderProps = {
   userEmail?: string;
   userName?: string;
   userUsername?: string;
+  userRole?: string;
+  userAvatarUrl?: string;
+  lastSignInAt?: string;
   sidebarCollapsed?: boolean;
   notifications?: NotificacionNoLeida[];
   notificationsCount?: number;
@@ -25,6 +29,9 @@ export default function Header({
   userEmail,
   userName,
   userUsername,
+  userRole,
+  userAvatarUrl,
+  lastSignInAt,
   sidebarCollapsed = false,
   notifications = [],
   notificationsCount = 0,
@@ -48,8 +55,12 @@ export default function Header({
             </button>
 
             {/* Logo - Visible en mobile o cuando sidebar está colapsado */}
-            <div className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} flex items-center space-x-3`}>
-              <div className="relative">
+            <Link
+              href="/"
+              className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} flex items-center space-x-3 rounded-lg px-1 py-1 transition-colors hover:bg-crm-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40`}
+              aria-label="Ir al inicio"
+            >
+              <span className="relative flex">
                 <Image
                   src="/logo-amersur.png"
                   alt="AMERSUR"
@@ -59,12 +70,12 @@ export default function Header({
                   priority
                 />
                 {/* Efecto de resplandor sutil */}
-                <div className="absolute inset-0 bg-crm-primary/15 rounded-full blur-md -z-10"></div>
-              </div>
-              <div className="hidden sm:block">
-                <span className="text-xl font-bold text-crm-text-primary">AMERSUR CRM</span>
-              </div>
-            </div>
+                <span className="absolute inset-0 bg-crm-primary/15 rounded-full blur-md -z-10"></span>
+              </span>
+              <span className="hidden sm:block text-xl font-bold text-crm-text-primary">
+                AMERSUR CRM
+              </span>
+            </Link>
           </div>
 
           {/* Right: búsqueda + acciones */}
@@ -106,6 +117,10 @@ export default function Header({
               userName={userName}
               userUsername={userUsername}
               userEmail={userEmail}
+              userRole={userRole}
+              userAvatarUrl={userAvatarUrl}
+              notificationsCount={notificationsCount}
+              lastSignInAt={lastSignInAt}
             />
           </div>
         </div>

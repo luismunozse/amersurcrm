@@ -15,10 +15,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const { data: { user } } = await s.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // Obtener el perfil del usuario para nombre, username y verificar si requiere cambio de password
+  // Obtener el perfil del usuario para nombre, username, rol, avatar y verificar si requiere cambio de password
   const { data: perfil } = await s
     .from('usuario_perfil')
-    .select('nombre_completo, username, requiere_cambio_password')
+    .select('nombre_completo, username, rol, avatar_url, requiere_cambio_password')
     .eq('id', user.id)
     .single();
 
@@ -38,6 +38,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       userEmail={user.email}
       userName={perfil?.nombre_completo}
       userUsername={perfil?.username}
+      userRole={perfil?.rol}
+      userAvatarUrl={perfil?.avatar_url}
+      lastSignInAt={user.last_sign_in_at}
       notifications={notifications}
       notificationsCount={notificationsCount}
       exchangeRates={exchangeRates}

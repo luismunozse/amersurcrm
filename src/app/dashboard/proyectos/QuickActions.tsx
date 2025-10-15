@@ -60,7 +60,9 @@ export default function QuickActions({
     window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank");
   };
 
-  const upcoming = () => toast("Próximamente", { icon: "🚧" });
+  const handleReports = () => {
+    router.push(`/dashboard/proyectos/${id}/reportes`);
+  };
 
   const handleDelete = async () => {
     if (!showDeleteConfirm) {
@@ -156,7 +158,7 @@ export default function QuickActions({
             <MapPinIcon className="w-4 h-4" />
           </button>
           <button
-            onClick={upcoming}
+            onClick={handleReports}
             className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
             title="Reportes del proyecto"
             aria-label="Reportes del proyecto"

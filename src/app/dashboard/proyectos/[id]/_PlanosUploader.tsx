@@ -20,9 +20,9 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
     if (!file) return;
 
     // Validar tipo de archivo
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Formato no válido. Use JPG, PNG, WEBP o PDF');
+      toast.error('Formato no válido. Use JPG, PNG, WEBP, SVG o PDF');
       return;
     }
 
@@ -121,17 +121,17 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
 
       {planosUrl ? (
         <div className="space-y-4">
-          <div className="relative rounded-lg overflow-hidden border border-crm-border">
+          <div className="relative rounded-lg overflow-hidden border border-crm-border bg-gray-50">
             {planosUrl.endsWith('.pdf') ? (
-              <div className="w-full h-96 bg-gray-100 flex items-center justify-center">
+              <div className="w-full h-96 flex items-center justify-center">
                 <div className="text-center">
                   <svg className="w-16 h-16 text-crm-text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                   </svg>
                   <p className="text-sm text-crm-text-muted">Documento PDF</p>
-                  <a 
-                    href={planosUrl} 
-                    target="_blank" 
+                  <a
+                    href={planosUrl}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-crm-primary hover:text-crm-primary-hover text-sm font-medium"
                   >
@@ -139,16 +139,35 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
                   </a>
                 </div>
               </div>
+            ) : planosUrl.endsWith('.svg') ? (
+              <div className="w-full h-96 flex items-center justify-center p-4">
+                <object
+                  data={planosUrl}
+                  type="image/svg+xml"
+                  className="w-full h-full"
+                  aria-label={`Planos SVG de ${proyectoNombre}`}
+                >
+                  <img
+                    src={planosUrl}
+                    alt={`Planos de ${proyectoNombre}`}
+                    className="w-full h-full object-contain"
+                  />
+                </object>
+              </div>
             ) : (
-              <img 
-                src={planosUrl} 
+              <img
+                src={planosUrl}
                 alt={`Planos de ${proyectoNombre}`}
-                className="w-full h-96 object-contain bg-gray-50"
+                className="w-full h-96 object-contain"
               />
             )}
           </div>
           <div className="text-center">
-            <p className="text-xs text-crm-text-muted">Planos actuales del proyecto</p>
+            <p className="text-xs text-crm-text-muted">
+              Planos actuales del proyecto
+              {planosUrl.endsWith('.svg') && ' (SVG)'}
+              {planosUrl.endsWith('.pdf') && ' (PDF)'}
+            </p>
           </div>
         </div>
       ) : (
@@ -165,7 +184,7 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
         >
           <input
             type="file"
-            accept="image/*,application/pdf"
+            accept="image/*,.svg,application/pdf"
             onChange={handleChange}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             disabled={pending}
@@ -186,7 +205,7 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
                 Arrastra y suelta o haz clic para seleccionar
               </p>
               <p className="text-xs text-crm-text-muted mt-2">
-                Formatos: JPG, PNG, WEBP, PDF • Máx: 10MB
+                Formatos: JPG, PNG, WEBP, SVG, PDF • Máx: 10MB
               </p>
             </div>
           </div>

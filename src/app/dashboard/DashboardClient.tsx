@@ -11,6 +11,9 @@ export default function DashboardClient({
   userEmail,
   userName,
   userUsername,
+  userRole,
+  userAvatarUrl,
+  lastSignInAt,
   notifications = [],
   notificationsCount = 0,
   exchangeRates = [],
@@ -19,6 +22,9 @@ export default function DashboardClient({
   userEmail?: string;
   userName?: string;
   userUsername?: string;
+  userRole?: string;
+  userAvatarUrl?: string;
+  lastSignInAt?: string;
   notifications?: NotificacionNoLeida[];
   notificationsCount?: number;
   exchangeRates?: ExchangeRate[];
@@ -44,6 +50,9 @@ export default function DashboardClient({
           userEmail={userEmail}
           userName={userName}
           userUsername={userUsername}
+          userRole={userRole}
+          userAvatarUrl={userAvatarUrl}
+          lastSignInAt={lastSignInAt}
           sidebarCollapsed={collapsed}
           notifications={notifications}
           notificationsCount={notificationsCount}

@@ -1,22 +1,59 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import toast from "react-hot-toast";
 import ThemeToggle from "./ThemeToggle";
+import { ChevronDown, User, Key, Settings, Moon, LogOut, HelpCircle, AlertCircle, Info } from "lucide-react";
+import Image from "next/image";
 
 interface Props {
   userName?: string;
   userUsername?: string;
   userEmail?: string;
+  userRole?: string;
+  userAvatarUrl?: string; // Nuevo: URL de la foto de perfil
+  notificationsCount?: number; // Nuevo: contador de notificaciones
+  lastSignInAt?: string; // Nuevo: último acceso
 }
 
-export default function UserAvatarMenu({ userName, userUsername, userEmail }: Props) {
+// Función para formatear el último acceso de forma relativa
+function formatLastSignIn(dateString?: string): string {
+  if (!dateString) return '';
+
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Justo ahora';
+  if (diffMins < 60) return `Hace ${diffMins} min`;
+  if (diffHours < 24) return `Hace ${diffHours}h`;
+  if (diffDays === 1) return 'Ayer';
+  if (diffDays < 7) return `Hace ${diffDays} días`;
+  return date.toLocaleDateString('es-PE');
+}
+
+export default function UserAvatarMenu({ userName, userUsername, userEmail, userRole, userAvatarUrl, notificationsCount = 0, lastSignInAt }: Props) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detectar si es mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640); // sm breakpoint
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -34,6 +71,7 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
 
   const displayName = userName || userEmail?.split('@')[0] || 'Usuario';
   const displayUsername = userUsername || userEmail || '';
+  const displayRole = userRole || 'Usuario';
   const avatarInitial = userName?.charAt(0).toUpperCase() || userEmail?.charAt(0).toUpperCase() || 'U';
 
   return (
@@ -52,43 +90,74 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
 
         {/* Avatar */}
         <div className="relative flex-shrink-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md ring-2 ring-crm-border hover:ring-crm-primary transition-all cursor-pointer">
-            <span className="text-white text-sm font-bold">
-              {avatarInitial}
-            </span>
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md ring-2 ring-crm-border hover:ring-crm-primary transition-all cursor-pointer overflow-hidden">
+            {userAvatarUrl ? (
+              <Image
+                src={userAvatarUrl}
+                alt={displayName}
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-white text-sm font-bold">
+                {avatarInitial}
+              </span>
+            )}
           </div>
-          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 border-2 border-crm-card rounded-full" />
+          {/* Badge de notificaciones */}
+          {notificationsCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-crm-danger rounded-full flex items-center justify-center shadow-lg animate-bounce">
+              <span className="text-[10px] font-bold text-white">
+                {notificationsCount > 9 ? '9+' : notificationsCount}
+              </span>
+            </div>
+          )}
+          {/* Indicador online con animación pulse */}
+          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-crm-success border-2 border-crm-card rounded-full animate-pulse" />
         </div>
 
         {/* Dropdown icon */}
-        <svg
-          className="hidden sm:block w-4 h-4 text-crm-text-muted"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown className="hidden sm:block w-4 h-4 text-crm-text-muted" />
       </Menu.Button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu con animaciones mejoradas */}
       <Transition
         as={Fragment}
-        enter="transition ease-out duration-100"
-        enterFrom="transform opacity-0 scale-95"
-        enterTo="transform opacity-100 scale-100"
-        leave="transition ease-in duration-75"
-        leaveFrom="transform opacity-100 scale-100"
-        leaveTo="transform opacity-0 scale-95"
+        enter="transition ease-out duration-200"
+        enterFrom={isMobile ? "transform opacity-0 translate-y-full" : "transform opacity-0 scale-95 translate-y-[-10px]"}
+        enterTo={isMobile ? "transform opacity-100 translate-y-0" : "transform opacity-100 scale-100 translate-y-0"}
+        leave="transition ease-in duration-150"
+        leaveFrom={isMobile ? "transform opacity-100 translate-y-0" : "transform opacity-100 scale-100 translate-y-0"}
+        leaveTo={isMobile ? "transform opacity-0 translate-y-full" : "transform opacity-0 scale-95 translate-y-[-10px]"}
       >
-        <Menu.Items className="absolute right-0 mt-2 w-72 origin-top-right rounded-xl bg-crm-card border border-crm-border shadow-2xl focus:outline-none z-50">
+        <Menu.Items className={isMobile
+          ? "fixed bottom-0 left-0 right-0 w-full rounded-t-3xl bg-crm-card border-t border-crm-border shadow-2xl focus:outline-none z-50 max-h-[85vh] overflow-y-auto pb-safe"
+          : "absolute right-0 mt-2 w-72 origin-top-right rounded-xl bg-crm-card border border-crm-border shadow-2xl focus:outline-none z-50 backdrop-blur-sm"}>
+          {/* Handle para mobile drawer */}
+          {isMobile && (
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-12 h-1 bg-crm-border rounded-full"></div>
+            </div>
+          )}
+
           {/* Header del menú */}
           <div className="px-4 py-3 border-b border-crm-border">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md">
-                <span className="text-white text-lg font-bold">
-                  {avatarInitial}
-                </span>
+              <div className="w-12 h-12 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
+                {userAvatarUrl ? (
+                  <Image
+                    src={userAvatarUrl}
+                    alt={displayName}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white text-lg font-bold">
+                    {avatarInitial}
+                  </span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-crm-text-primary truncate">
@@ -97,6 +166,18 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
                 <p className="text-xs text-crm-text-muted truncate">
                   {displayUsername}
                 </p>
+                {/* Rol del usuario */}
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-crm-primary/10 text-crm-primary border border-crm-primary/20">
+                    {displayRole}
+                  </span>
+                </div>
+                {/* Último acceso */}
+                {lastSignInAt && (
+                  <p className="text-[10px] text-crm-text-muted mt-1">
+                    Último acceso: {formatLastSignIn(lastSignInAt)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -114,9 +195,7 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
                       : 'text-crm-text-primary'
                   }`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                  <User className="w-5 h-5" />
                   <span>Mi Perfil</span>
                 </Link>
               )}
@@ -133,9 +212,7 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
                       : 'text-crm-text-primary'
                   }`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
+                  <Key className="w-5 h-5" />
                   <span>Cambiar Contraseña</span>
                 </Link>
               )}
@@ -152,23 +229,60 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
                       : 'text-crm-text-primary'
                   }`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
+                  <Settings className="w-5 h-5" />
                   <span>Configuración</span>
                 </Link>
               )}
             </Menu.Item>
+
+            {/* Ayuda y Soporte */}
+            <Menu.Item>
+              {({ active }) => (
+                <Link
+                  href="/dashboard/ayuda"
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                    active
+                      ? 'bg-crm-card-hover text-crm-primary'
+                      : 'text-crm-text-primary'
+                  }`}
+                >
+                  <HelpCircle className="w-5 h-5" />
+                  <span>Ayuda y Soporte</span>
+                </Link>
+              )}
+            </Menu.Item>
+
+            {/* Reportar Problema */}
+            <Menu.Item>
+              {({ active }) => (
+                <Link
+                  href="/dashboard/reportar-problema"
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                    active
+                      ? 'bg-crm-card-hover text-crm-primary'
+                      : 'text-crm-text-primary'
+                  }`}
+                >
+                  <AlertCircle className="w-5 h-5" />
+                  <span>Reportar Problema</span>
+                </Link>
+              )}
+            </Menu.Item>
+          </div>
+
+          {/* Versión del Sistema */}
+          <div className="px-4 py-2 border-t border-crm-border">
+            <div className="flex items-center gap-2 text-xs text-crm-text-muted">
+              <Info className="w-4 h-4" />
+              <span>Versión 1.0.0</span>
+            </div>
           </div>
 
           {/* Tema */}
           <div className="px-4 py-2.5 border-t border-crm-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm text-crm-text-primary">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
+                <Moon className="w-5 h-5" />
                 <span>Modo Oscuro</span>
               </div>
               <ThemeToggle compact />
@@ -188,9 +302,7 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail }: Pr
                       : 'text-red-600 dark:text-red-400'
                   } ${loggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
+                  <LogOut className="w-5 h-5" />
                   <span>{loggingOut ? 'Cerrando sesión...' : 'Cerrar Sesión'}</span>
                 </button>
               )}

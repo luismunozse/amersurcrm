@@ -1,6 +1,7 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
 import EditarPerfilForm from "./_EditarPerfilForm";
+import AvatarUpload from "./_AvatarUpload";
 import { User, Mail, Briefcase } from "lucide-react";
 
 export default async function MiPerfilPage() {
@@ -9,7 +10,7 @@ export default async function MiPerfilPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // Obtener perfil completo del usuario
+  // Obtener perfil completo del usuario (incluyendo avatar_url)
   const { data: perfil } = await supabase
     .from('usuario_perfil')
     .select('*, rol:rol!usuario_perfil_rol_fk(id, nombre, descripcion)')
@@ -25,13 +26,13 @@ export default async function MiPerfilPage() {
       {/* Header */}
       <div className="bg-crm-card border border-crm-border rounded-xl p-6 shadow-sm">
         <div className="flex items-start gap-6">
-          {/* Avatar grande */}
+          {/* Avatar grande con upload */}
           <div className="flex-shrink-0">
-            <div className="w-24 h-24 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-lg ring-4 ring-crm-border">
-              <span className="text-white text-3xl font-bold">
-                {perfil.nombre_completo?.charAt(0).toUpperCase() || 'U'}
-              </span>
-            </div>
+            <AvatarUpload
+              currentAvatarUrl={perfil.avatar_url}
+              userName={perfil.nombre_completo || 'Usuario'}
+              userId={user.id}
+            />
           </div>
 
           {/* Info básica */}
