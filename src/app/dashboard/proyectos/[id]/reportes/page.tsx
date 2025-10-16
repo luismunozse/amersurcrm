@@ -1,6 +1,6 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
-import { ArrowLeftIcon, ChartBarIcon, TrendingUpIcon, UsersIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, ChartBarIcon, ArrowTrendingUpIcon, UsersIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import VentasMensualesChart from "./_VentasMensualesChart";
 import EstadoLotesChart from "./_EstadoLotesChart";
@@ -139,7 +139,7 @@ export default async function ReportesProyectoPage({ params }: { params: { id: s
         <div className="crm-card p-6 rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUpIcon className="w-6 h-6 text-green-600" />
+              <ArrowTrendingUpIcon className="w-6 h-6 text-green-600" />
             </div>
           </div>
           <p className="text-3xl font-bold text-green-600">{lotesVendidos}</p>

@@ -116,6 +116,9 @@ export interface RecordatorioFormState {
   etiquetas: string[];
 }
 
+// Backwards-compatible alias for components expecting this name
+export type RecordatorioFormData = RecordatorioFormState;
+
 export interface EventoCalendario {
   id: string;
   titulo: string;
@@ -144,3 +147,24 @@ export interface EstadisticasAgenda {
   recordatoriosPendientes: number;
   recordatoriosEnviados: number;
 }
+
+// Shared UI option helpers
+export const PRIORIDADES_OPTIONS: Array<{ value: Prioridad; label: string }> = [
+  { value: 'baja', label: 'Baja' },
+  { value: 'media', label: 'Media' },
+  { value: 'alta', label: 'Alta' },
+  { value: 'urgente', label: 'Urgente' },
+];
+
+export const TIPOS_RECORDATORIO_OPTIONS: Array<{
+  value: TipoRecordatorio;
+  label: string;
+  icon?: string;
+}> = [
+  { value: 'seguimiento_cliente', label: 'Seguimiento a cliente', icon: '👤' },
+  { value: 'llamada_prospecto', label: 'Llamada a prospecto', icon: '📞' },
+  { value: 'envio_documentos', label: 'Envío de documentos', icon: '📄' },
+  { value: 'visita_propiedad', label: 'Visita a propiedad', icon: '🏠' },
+  { value: 'reunion_equipo', label: 'Reunión de equipo', icon: '👥' },
+  { value: 'personalizado', label: 'Personalizado', icon: '✏️' },
+];

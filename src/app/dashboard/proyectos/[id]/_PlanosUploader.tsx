@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { subirPlanos, eliminarPlanos } from "./_actions";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import toast from "react-hot-toast";
+import PlanosViewer from "./_PlanosViewer";
 
 interface PlanosUploaderProps {
   proyectoId: string;
@@ -121,52 +122,21 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
 
       {planosUrl ? (
         <div className="space-y-4">
-          <div className="relative rounded-lg overflow-hidden border border-crm-border bg-gray-50">
-            {planosUrl.endsWith('.pdf') ? (
-              <div className="w-full h-96 flex items-center justify-center">
-                <div className="text-center">
-                  <svg className="w-16 h-16 text-crm-text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                  </svg>
-                  <p className="text-sm text-crm-text-muted">Documento PDF</p>
-                  <a
-                    href={planosUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-crm-primary hover:text-crm-primary-hover text-sm font-medium"
-                  >
-                    Ver PDF
-                  </a>
-                </div>
-              </div>
-            ) : planosUrl.endsWith('.svg') ? (
-              <div className="w-full h-96 flex items-center justify-center p-4">
-                <object
-                  data={planosUrl}
-                  type="image/svg+xml"
-                  className="w-full h-full"
-                  aria-label={`Planos SVG de ${proyectoNombre}`}
-                >
-                  <img
-                    src={planosUrl}
-                    alt={`Planos de ${proyectoNombre}`}
-                    className="w-full h-full object-contain"
-                  />
-                </object>
-              </div>
-            ) : (
-              <img
-                src={planosUrl}
-                alt={`Planos de ${proyectoNombre}`}
-                className="w-full h-96 object-contain"
-              />
-            )}
-          </div>
+          <PlanosViewer
+            planosUrl={planosUrl}
+            proyectoNombre={proyectoNombre}
+            fileType={
+              planosUrl.endsWith('.pdf') ? 'pdf' :
+              planosUrl.endsWith('.svg') ? 'svg' :
+              'image'
+            }
+          />
           <div className="text-center">
             <p className="text-xs text-crm-text-muted">
               Planos actuales del proyecto
               {planosUrl.endsWith('.svg') && ' (SVG)'}
               {planosUrl.endsWith('.pdf') && ' (PDF)'}
+              {!planosUrl.endsWith('.svg') && !planosUrl.endsWith('.pdf') && ' (Imagen)'}
             </p>
           </div>
         </div>

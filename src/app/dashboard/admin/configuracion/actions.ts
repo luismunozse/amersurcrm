@@ -14,9 +14,9 @@ export type ConfiguracionFormState = {
 const configuracionSchema = z
   .object({
     empresaNombre: z.string().trim().min(2, "Ingresa el nombre de la empresa").max(150),
-    monedaPrincipal: z.enum(["PEN", "USD"], { errorMap: () => ({ message: "Selecciona una moneda válida" }) }),
+    monedaPrincipal: z.enum(["PEN", "USD"], { message: "Selecciona una moneda válida" }),
     zonaHoraria: z.string().trim().min(3, "Selecciona una zona horaria").max(120),
-    idioma: z.enum(["es", "en"], { errorMap: () => ({ message: "Selecciona un idioma válido" }) }),
+    idioma: z.enum(["es", "en"], { message: "Selecciona un idioma válido" }),
     comisionLote: z.coerce.number({ message: "Ingresa un porcentaje válido" }).min(0).max(100),
     comisionCasa: z.coerce.number({ message: "Ingresa un porcentaje válido" }).min(0).max(100),
     comisionAlquiler: z.coerce.number({ message: "Ingresa un porcentaje válido" }).min(0).max(100),
@@ -176,4 +176,3 @@ export async function actualizarConfiguracion(
     };
   }
 }
-
