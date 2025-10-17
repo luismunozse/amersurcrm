@@ -129,6 +129,35 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
         toast.error(result.error);
       } else {
         toast.success("Campaña creada exitosamente");
+
+        // Si se debe enviar inmediatamente, ejecutar la campaña
+        if (formData.enviar_inmediatamente && result.data?.id) {
+          try {
+            const ejecutarResponse = await fetch('/api/whatsapp/campanas/ejecutar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                campana_id: result.data.id,
+                destinatarios_config: destinatarios
+              })
+            });
+
+            const ejecutarResult = await ejecutarResponse.json();
+
+            if (ejecutarResult.success) {
+              toast.success(
+                `Mensajes enviados: ${ejecutarResult.enviados}/${ejecutarResult.total}`,
+                { duration: 5000 }
+              );
+            } else {
+              toast.error(`Error ejecutando campaña: ${ejecutarResult.error}`);
+            }
+          } catch (execError) {
+            console.error('Error ejecutando campaña:', execError);
+            toast.error('Error al enviar los mensajes');
+          }
+        }
+
         onSuccess();
         onClose();
         resetForm();
