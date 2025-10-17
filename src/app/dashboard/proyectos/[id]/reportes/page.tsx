@@ -6,14 +6,15 @@ import VentasMensualesChart from "./_VentasMensualesChart";
 import EstadoLotesChart from "./_EstadoLotesChart";
 import TopVendedoresTable from "./_TopVendedoresTable";
 
-export default async function ReportesProyectoPage({ params }: { params: { id: string } }) {
+export default async function ReportesProyectoPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = await createServerOnlyClient();
 
   // Obtener datos del proyecto
   const { data: proyecto, error: proyectoError } = await supabase
     .from('proyecto')
     .select('id, nombre, ubicacion, estado, created_at')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (proyectoError || !proyecto) {
@@ -24,7 +25,7 @@ export default async function ReportesProyectoPage({ params }: { params: { id: s
   const { data: lotes } = await supabase
     .from('lote')
     .select('id, estado, precio, moneda, created_at, vendedor_asignado')
-    .eq('proyecto_id', params.id);
+    .eq('proyecto_id', id);
 
   const totalLotes = lotes?.length || 0;
   const lotesVendidos = lotes?.filter(l => l.estado === 'vendido').length || 0;
@@ -95,7 +96,7 @@ export default async function ReportesProyectoPage({ params }: { params: { id: s
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            href={`/dashboard/proyectos/${params.id}`}
+            href={`/dashboard/proyectos/${id}`}
             className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
           >
             <ArrowLeftIcon className="w-5 h-5" />
