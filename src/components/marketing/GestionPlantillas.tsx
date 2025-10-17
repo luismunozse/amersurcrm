@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, MessageSquare } f
 import { obtenerPlantillas, eliminarPlantilla } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingTemplate } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
+import ModalCrearPlantilla from "./ModalCrearPlantilla";
 
 export default function GestionPlantillas() {
   const [plantillas, setPlantillas] = useState<MarketingTemplate[]>([]);
@@ -99,23 +100,24 @@ export default function GestionPlantillas() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-crm-text-primary">Plantillas de WhatsApp</h2>
-          <p className="text-sm text-crm-text-secondary mt-1">
-            Gestiona tus plantillas aprobadas por WhatsApp
-          </p>
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-crm-text-primary">Plantillas de WhatsApp</h2>
+            <p className="text-sm text-crm-text-secondary mt-1">
+              Gestiona tus plantillas aprobadas por WhatsApp
+            </p>
+          </div>
+          <button
+            onClick={() => setModalCrear(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Plantilla
+          </button>
         </div>
-        <button
-          onClick={() => setModalCrear(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Plantilla
-        </button>
-      </div>
 
       {/* Lista de plantillas */}
       {plantillas.length === 0 ? (
@@ -222,6 +224,14 @@ export default function GestionPlantillas() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Modal */}
+      <ModalCrearPlantilla
+        open={modalCrear}
+        onClose={() => setModalCrear(false)}
+        onSuccess={cargarPlantillas}
+      />
+    </>
   );
 }
