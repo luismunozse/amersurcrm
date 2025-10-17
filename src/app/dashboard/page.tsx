@@ -72,14 +72,15 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
-  const [clientesData, proyectosData, notificacionesData] = await Promise.all([
+  const [clientesResult, proyectosData, notificacionesData] = await Promise.all([
     getCachedClientes(),
     getCachedProyectos(),
     getCachedNotificacionesNoLeidas(),
   ]);
 
   // Ensure we have arrays, default to empty arrays if null/undefined
-  const clientes = Array.isArray(clientesData) ? clientesData : [];
+  // getCachedClientes devuelve { data: [], total: number }
+  const clientes = Array.isArray(clientesResult?.data) ? clientesResult.data : [];
   const proyectos = Array.isArray(proyectosData) ? proyectosData : [];
   const notificaciones = Array.isArray(notificacionesData) ? notificacionesData : [];
 
