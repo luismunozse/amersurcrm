@@ -239,11 +239,40 @@ export async function crearCampana(campana: Partial<MarketingCampana>) {
       return { data: null, error: "No tienes permisos de administrador" };
     }
 
+    // Si no tiene audiencia_id, crear una audiencia temporal
+    let audienciaId = campana.audiencia_id;
+
+    if (!audienciaId) {
+      const { data: audiencia, error: audienciaError } = await supabase
+        .schema('crm')
+        .from('marketing_audiencia')
+        .insert({
+          nombre: `Audiencia - ${campana.nombre}`,
+          descripcion: 'Audiencia creada automáticamente',
+          tipo: 'ESTATICO',
+          filtros: {},
+          contactos_ids: [],
+          contactos_count: 0,
+          activo: true,
+          created_by: user.id
+        })
+        .select('id')
+        .single();
+
+      if (audienciaError) {
+        console.error('Error creando audiencia:', audienciaError);
+        return { data: null, error: `Error creando audiencia: ${audienciaError.message}` };
+      }
+
+      audienciaId = audiencia.id;
+    }
+
     const { data, error } = await supabase
       .schema('crm')
       .from('marketing_campana')
       .insert({
         ...campana,
+        audiencia_id: audienciaId,
         created_by: user.id
       })
       .select()

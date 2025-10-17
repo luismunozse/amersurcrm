@@ -96,16 +96,31 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
       }
     }
 
+    // Validar destinatarios según tipo
+    if (destinatarios.tipo === "manual") {
+      const numeros = destinatarios.numeros.trim();
+      if (!numeros) {
+        toast.error("Ingresa al menos un número de WhatsApp");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      // Crear campaña con datos básicos
+      // Crear campaña sin audiencia_tipo (ese campo no existe en la tabla)
       const campanaData = {
-        ...formData,
+        nombre: formData.nombre,
+        descripcion: formData.descripcion,
+        template_id: formData.template_id,
         credential_id: credentialId,
         variables_valores: variables,
-        audiencia_tipo: destinatarios.tipo,
+        enviar_inmediatamente: formData.enviar_inmediatamente,
+        fecha_inicio: formData.fecha_inicio || null,
+        max_envios_por_segundo: formData.max_envios_por_segundo,
         estado: formData.enviar_inmediatamente ? 'RUNNING' : 'DRAFT',
+        // Guardar config de destinatarios temporalmente (lo procesaremos en el backend)
+        objetivo: `Destinatarios: ${destinatarios.tipo}${destinatarios.tipo === 'manual' ? ` - ${destinatarios.numeros.split('\n').length} números` : ''}`,
       };
 
       const result = await crearCampana(campanaData);
