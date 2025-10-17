@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Play, Pause, Eye, BarChart3, Calendar, Users, MessageSquare } from "lucide-react";
-import { obtenerCampanas, actualizarEstadoCampana } from "@/app/dashboard/admin/marketing/_actions";
+import { Plus, Play, Pause, Eye, BarChart3, Calendar, Users, MessageSquare, Trash2 } from "lucide-react";
+import { obtenerCampanas, actualizarEstadoCampana, eliminarCampana } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingCampana } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
 import ModalCrearCampana from "./ModalCrearCampana";
@@ -31,12 +31,27 @@ export default function GestionCampanas() {
 
   const handleCambiarEstado = async (id: string, nuevoEstado: 'RUNNING' | 'PAUSED') => {
     const result = await actualizarEstadoCampana(id, nuevoEstado);
-    
+
     if (result.success) {
       toast.success(`Campaña ${nuevoEstado === 'RUNNING' ? 'iniciada' : 'pausada'}`);
       cargarCampanas();
     } else {
       toast.error(result.error || 'Error actualizando campaña');
+    }
+  };
+
+  const handleEliminar = async (id: string, nombre: string) => {
+    if (!confirm(`¿Estás seguro de eliminar la campaña "${nombre}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    const result = await eliminarCampana(id);
+
+    if (result.success) {
+      toast.success('Campaña eliminada exitosamente');
+      cargarCampanas();
+    } else {
+      toast.error(result.error || 'Error eliminando campaña');
     }
   };
 
@@ -157,6 +172,13 @@ export default function GestionCampanas() {
                     title="Ver detalles"
                   >
                     <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleEliminar(campana.id, campana.nombre)}
+                    className="inline-flex items-center justify-center w-8 h-8 text-crm-error hover:text-crm-error hover:bg-crm-error/10 rounded-lg transition-colors"
+                    title="Eliminar campaña"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>

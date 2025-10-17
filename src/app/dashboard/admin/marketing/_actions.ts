@@ -329,6 +329,39 @@ export async function actualizarEstadoCampana(id: string, estado: EstadoCampana)
   }
 }
 
+export async function eliminarCampana(id: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { success: false, error: "No tienes permisos de administrador" };
+    }
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_campana')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error eliminando campaña:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error eliminando campaña:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
 // =====================================================
 // CONVERSACIONES
 // =====================================================
