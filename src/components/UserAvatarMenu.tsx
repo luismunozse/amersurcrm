@@ -42,18 +42,6 @@ function formatLastSignIn(dateString?: string): string {
 export default function UserAvatarMenu({ userName, userUsername, userEmail, userRole, userAvatarUrl, notificationsCount = 0, lastSignInAt }: Props) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detectar si es mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640); // sm breakpoint
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -125,21 +113,17 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail, user
       <Transition
         as={Fragment}
         enter="transition ease-out duration-200"
-        enterFrom={isMobile ? "transform opacity-0 translate-y-full" : "transform opacity-0 scale-95 translate-y-[-10px]"}
-        enterTo={isMobile ? "transform opacity-100 translate-y-0" : "transform opacity-100 scale-100 translate-y-0"}
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
         leave="transition ease-in duration-150"
-        leaveFrom={isMobile ? "transform opacity-100 translate-y-0" : "transform opacity-100 scale-100 translate-y-0"}
-        leaveTo={isMobile ? "transform opacity-0 translate-y-full" : "transform opacity-0 scale-95 translate-y-[-10px]"}
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className={isMobile
-          ? "fixed bottom-0 left-0 right-0 w-full rounded-t-3xl bg-crm-card border-t border-crm-border shadow-2xl focus:outline-none z-50 max-h-[85vh] overflow-y-auto pb-safe"
-          : "absolute right-0 mt-2 w-72 origin-top-right rounded-xl bg-crm-card border border-crm-border shadow-2xl focus:outline-none z-50 backdrop-blur-sm"}>
+        <Menu.Items className="fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-auto right-0 sm:right-0 w-full sm:w-72 sm:mt-2 rounded-t-3xl sm:rounded-xl bg-crm-card border-t sm:border border-crm-border shadow-2xl focus:outline-none z-50 max-h-[85vh] sm:max-h-none overflow-y-auto sm:overflow-visible pb-safe sm:pb-0 sm:origin-top-right sm:backdrop-blur-sm">
           {/* Handle para mobile drawer */}
-          {isMobile && (
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1 bg-crm-border rounded-full"></div>
-            </div>
-          )}
+          <div className="flex sm:hidden justify-center pt-3 pb-2">
+            <div className="w-12 h-1 bg-crm-border rounded-full"></div>
+          </div>
 
           {/* Header del menú */}
           <div className="px-4 py-3 border-b border-crm-border">
