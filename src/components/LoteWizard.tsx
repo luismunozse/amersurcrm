@@ -66,7 +66,7 @@ export default function LoteWizard({ proyectoId, proyectoNombre, proyectoUbicaci
   const isWithinProject = !!proyectoId;
   
   // Validar datos requeridos
-  const hasRequiredData = data.nombre?.trim() && data.superficie && data.superficie > 0 && data.precio && data.precio > 0;
+  const hasRequiredData = !!(data.nombre?.trim() && data.superficie && data.superficie > 0 && data.precio && data.precio > 0);
 
   const updateData = (updates: Partial<LoteData>) => {
     setData(prev => ({ ...prev, ...updates }));
@@ -119,7 +119,7 @@ export default function LoteWizard({ proyectoId, proyectoNombre, proyectoUbicaci
 
         // Crear FormData con los datos del lote
         const formData = new FormData();
-        formData.append("proyecto_id", proyectoSeleccionado);
+        formData.append("proyecto_id", proyectoSeleccionado || "");
         formData.append("codigo", codigoLote);
         formData.append("sup_m2", data.superficie?.toString() || "");
         formData.append("precio", data.precio?.toString() || "");

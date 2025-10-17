@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { actualizarPropiedad, eliminarPropiedad, cambiarEstadoPropiedad } from "@/app/dashboard/propiedades/_actions";
+import { eliminarPropiedad, cambiarEstadoPropiedad } from "@/app/dashboard/propiedades/_actions";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import ConfirmDialog from "./ConfirmDialog";
@@ -279,14 +279,14 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
 
       {/* Dialog de confirmación de eliminación */}
       <ConfirmDialog
-        isOpen={showDeleteDialog}
+        open={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleEliminar}
         title="Eliminar Propiedad"
-        message={`¿Estás seguro de que deseas eliminar la propiedad "${propiedad.identificacion_interna}"? Esta acción no se puede deshacer.`}
+        description={`¿Estás seguro de que deseas eliminar la propiedad "${propiedad.identificacion_interna}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         cancelText="Cancelar"
-        isLoading={isPending}
+        disabled={isPending}
       />
     </>
   );

@@ -46,14 +46,14 @@ export default async function ProyLotesPage({
   const { data: { user } } = await supabase.auth.getUser();
   const { data: perfil } = user ? await supabase
     .from('usuario_perfil')
-    .select('rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('rol(nombre)')
     .eq('id', user.id)
     .single() : { data: null };
 
-  const isAdmin = perfil?.rol?.nombre === 'ROL_ADMIN';
+  const isAdmin = perfil?.rol?.[0]?.nombre === 'ROL_ADMIN' || false;
 
   // Proyecto (para título/404)
-  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at";
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";
   const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
     .select(`${proyectoSelectBase},poligono`)

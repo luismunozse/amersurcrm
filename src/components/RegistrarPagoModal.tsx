@@ -5,7 +5,7 @@ import { Dialog, Transition } from "@headlessui/react";
 import { createPortal } from "react-dom";
 import { X, CreditCard, DollarSign, Calendar, FileText } from "lucide-react";
 import { registrarPago } from "@/app/dashboard/clientes/_actions_crm";
-import { MONEDAS, METODOS_PAGO_OPTIONS, formatearMoneda, type Moneda } from "@/lib/types/crm-flujo";
+import { MONEDAS, METODOS_PAGO, formatearMoneda, type Moneda } from "@/lib/types/crm-flujo";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -274,7 +274,7 @@ export default function RegistrarPagoModal({
                       required
                       disabled={isPending}
                     >
-                      {METODOS_PAGO_OPTIONS.map((metodo) => (
+                      {METODOS_PAGO.map((metodo) => (
                         <option key={metodo.value} value={metodo.value}>
                           {metodo.label}
                         </option>

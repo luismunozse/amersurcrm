@@ -28,7 +28,7 @@ export async function crearProyecto(formData: FormData) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para crear proyectos. Solo los administradores pueden realizar esta acción.");
     }
@@ -150,7 +150,7 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para actualizar proyectos. Solo los administradores pueden realizar esta acción.");
     }
@@ -285,7 +285,7 @@ export async function eliminarProyecto(proyectoId: string) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
     }

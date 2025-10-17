@@ -11,7 +11,7 @@ export type PerfilActual = {
 };
 
 export async function getPerfilActual(): Promise<PerfilActual | null> {
-  const s = createOptimizedServerClient();
+  const s = await createOptimizedServerClient();
   const { data: { user } } = await s.auth.getUser();
   if (!user) return null;
 

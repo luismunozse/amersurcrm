@@ -13,7 +13,7 @@ export async function subirPlanos(proyectoId: string, fd: FormData) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para subir planos. Solo los administradores pueden realizar esta acción.");
     }
@@ -66,7 +66,7 @@ export async function eliminarPlanos(proyectoId: string) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para eliminar planos. Solo los administradores pueden realizar esta acción.");
     }
@@ -139,7 +139,7 @@ export async function crearLote(fd: FormData) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para crear lotes. Solo los administradores pueden realizar esta acción.");
     }
@@ -184,7 +184,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos y ruta según rol
-  const perfil = await obtenerPerfilUsuario(user.id);
+  const perfil = await obtenerPerfilUsuario();
   if (!perfil) {
     throw new Error("Perfil no encontrado");
   }
@@ -274,7 +274,7 @@ export async function guardarPoligonoProyecto(
   if (!user) throw new Error("No autenticado");
 
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
       throw new Error("No tienes permisos para actualizar el perímetro del proyecto");
     }
@@ -306,7 +306,7 @@ export async function eliminarPoligonoProyecto(proyectoId: string) {
   if (!user) throw new Error("No autenticado");
 
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
       throw new Error("No tienes permisos para eliminar el perímetro del proyecto");
     }
@@ -337,7 +337,7 @@ export async function guardarPoligonoLote(
   if (!user) throw new Error("No autenticado");
 
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
       throw new Error("No tienes permisos para actualizar lotes");
     }
@@ -371,7 +371,7 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para eliminar lotes. Solo los administradores pueden realizar esta acción.");
     }
@@ -397,7 +397,7 @@ export async function duplicarLote(loteId: string, proyectoId: string) {
 
   // Solo admin
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para duplicar lotes");
     }
@@ -469,7 +469,7 @@ export async function guardarCoordenadasLote(loteId: string, lat: number, lng: n
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
     }
@@ -499,7 +499,7 @@ export async function guardarCoordenadasMultiples(proyectoId: string, coordenada
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
     }
@@ -538,7 +538,7 @@ export async function guardarOverlayBounds(proyectoId: string, bounds: [[number,
 
   // Solo admin
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para calibrar el plano");
     }
@@ -590,7 +590,7 @@ export async function eliminarProyecto(proyectoId: string) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
     }

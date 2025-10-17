@@ -395,10 +395,10 @@ function getNivelCliente(capacidad: number | null): { nivel: string; className: 
   };
 }
 
-type Cliente = { 
-  id: string; 
+type Cliente = {
+  id: string;
   codigo_cliente: string;
-  nombre: string; 
+  nombre: string;
   tipo_cliente: string;
   email: string | null;
   telefono: string | null;
@@ -419,6 +419,17 @@ type Cliente = {
   saldo_pendiente: number;
   notas: string | null;
   direccion: any;
+  propiedades?: Array<{
+    direccion?: string;
+    distrito?: string;
+    provincia?: string;
+    partida_sunarp?: string;
+    lote_manzana?: string;
+    area_terreno?: number;
+    area_techada?: number;
+    estado?: string;
+    precio?: number;
+  }>;
 };
 
 interface ClientesTableProps {
@@ -648,7 +659,7 @@ export default function ClientesTable({
     
     return (
       <ClienteForm
-        cliente={cliente}
+        cliente={cliente as any}
         isEditing={true}
         onSuccess={handleAfterSave}
         onCancel={handleCancelEdit}

@@ -169,7 +169,7 @@ class INEIUbigeoService {
     const departamentos = Array.from(departamentosMap.values()).map(dept => ({
       codigo: dept.codigo,
       nombre: dept.nombre,
-      provincias: Array.from(dept.provincias.values()).map(prov => ({
+      provincias: Array.from(dept.provincias.values()).map((prov: any) => ({
         codigo: prov.codigo,
         nombre: prov.nombre,
         distritos: prov.distritos

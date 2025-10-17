@@ -124,36 +124,95 @@ export default async function PropiedadesPage({
   if (eProyectos) throw eProyectos;
 
   // Combinar propiedades y lotes en un solo array
-  const todasLasPropiedades = [
+  type ProyectoRef = { id: any; nombre: any; ubicacion: any; estado: any };
+  type PropiedadListItem = {
+    id: string;
+    codigo: string;
+    tipo: string;
+    identificacion_interna: string;
+    ubicacion: { ciudad?: string; direccion?: string } | null;
+    superficie: { total?: number; construida?: number } | null;
+    estado_comercial: string;
+    precio: number | null;
+    moneda: string;
+    marketing: { fotos?: string[]; renders?: string[]; links3D?: string[]; etiquetas?: string[] } | null;
+    data: Record<string, unknown> | null;
+    created_at: string;
+    proyecto_id: string | null;
+    proyecto: { id: string; nombre: string; ubicacion: string | null; estado: string } | null;
+    es_lote?: boolean;
+  };
+  type LoteWithProyecto = {
+    id: any;
+    codigo: any;
+    sup_m2: any;
+    precio: any;
+    moneda: any;
+    estado: any;
+    data: any;
+    created_at: any;
+    proyecto_id: any;
+    proyecto: ProyectoRef | ProyectoRef[] | null;
+  };
+  const todasLasPropiedades: PropiedadListItem[] = [
     // Propiedades de la tabla propiedad
-    ...(propiedades || []).map(prop => ({
-      ...prop,
-      tipo: prop.tipo,
-      identificacion_interna: prop.identificacion_interna,
-      ubicacion: prop.ubicacion,
-      superficie: prop.superficie,
-      estado_comercial: prop.estado_comercial,
-      marketing: prop.marketing,
-      es_lote: false
-    })),
+    ...(propiedades || []).map((propRaw) => {
+      const prop: any = propRaw as any;
+      const proyectoObj = Array.isArray(prop.proyecto) ? prop.proyecto[0] : prop.proyecto;
+      return {
+        id: String(prop.id),
+        codigo: String(prop.codigo),
+        tipo: String(prop.tipo),
+        identificacion_interna: String(prop.identificacion_interna),
+        ubicacion: (prop.ubicacion as any) ?? null,
+        superficie: (prop.superficie as any) ?? null,
+        estado_comercial: String(prop.estado_comercial),
+        precio: prop.precio === null || prop.precio === undefined ? null : Number(prop.precio),
+        moneda: String(prop.moneda),
+        marketing: (prop.marketing as any) ?? null,
+        data: (prop.data as any) ?? null,
+        created_at: String(prop.created_at),
+        proyecto_id: prop.proyecto_id ? String(prop.proyecto_id) : null,
+        proyecto: proyectoObj
+          ? {
+              id: String(proyectoObj.id),
+              nombre: String(proyectoObj.nombre),
+              ubicacion: proyectoObj.ubicacion !== undefined && proyectoObj.ubicacion !== null ? String(proyectoObj.ubicacion) : null,
+              estado: String(proyectoObj.estado),
+            }
+          : null,
+        es_lote: false,
+      } as PropiedadListItem;
+    }),
     // Lotes de la tabla lote
-    ...(lotes || []).map(lote => ({
-      id: lote.id,
-      codigo: lote.codigo,
-      tipo: "lote",
-      identificacion_interna: lote.codigo,
-      ubicacion: lote.proyecto?.ubicacion ? { ciudad: lote.proyecto.ubicacion } : null,
-      superficie: { total: lote.sup_m2, construida: null },
-      estado_comercial: lote.estado,
-      precio: lote.precio,
-      moneda: lote.moneda,
-      marketing: { etiquetas: [] },
-      data: lote.data,
-      created_at: lote.created_at,
-      proyecto_id: lote.proyecto_id,
-      proyecto: lote.proyecto,
-      es_lote: true
-    }))
+    ...(lotes || []).map((loteRaw) => {
+      const lote = loteRaw as LoteWithProyecto;
+      const proyectoObj = Array.isArray(lote.proyecto) ? lote.proyecto[0] : lote.proyecto;
+      return {
+        id: String(lote.id),
+        codigo: String(lote.codigo),
+        tipo: "lote",
+        identificacion_interna: String(lote.codigo),
+        ubicacion: proyectoObj?.ubicacion ? { ciudad: String(proyectoObj.ubicacion) } : null,
+        superficie: lote.sup_m2 !== null && lote.sup_m2 !== undefined ? { total: Number(lote.sup_m2) } : null,
+        estado_comercial: String(lote.estado),
+        precio: lote.precio === null || lote.precio === undefined ? null : Number(lote.precio),
+        moneda: String(lote.moneda),
+        marketing: { etiquetas: [] },
+        data: (lote.data as any) ?? null,
+        created_at: String(lote.created_at),
+        proyecto_id: lote.proyecto_id ? String(lote.proyecto_id) : null,
+        proyecto: proyectoObj
+          ? {
+              id: String(proyectoObj.id),
+              nombre: String(proyectoObj.nombre),
+              ubicacion: proyectoObj.ubicacion !== undefined && proyectoObj.ubicacion !== null ? String(proyectoObj.ubicacion) : null,
+              estado: String(proyectoObj.estado),
+            }
+          : null,
+        es_lote: true,
+      } as PropiedadListItem;
+    })
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Calcular paginación

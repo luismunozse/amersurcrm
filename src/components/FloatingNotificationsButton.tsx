@@ -147,7 +147,7 @@ export default function FloatingNotificationsButton({
                   onClick={() => handleMarkAsRead(notif.id)}
                   className={cn(
                     "flex items-start space-x-3 p-3 border-b border-crm-border cursor-pointer hover:bg-crm-card-hover transition-colors",
-                    !notif.leida && "bg-crm-card-hover/50"
+                    "bg-crm-card-hover/50"
                   )}
                 >
                   <div className={cn("text-xl", getColorClass(notif.tipo))}>

@@ -27,7 +27,7 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
     descripcion: proyecto.descripcion || '',
   });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
-  const [imagenPreview, setImagenPreview] = useState<string | null>(proyecto.imagen_url);
+  const [imagenPreview, setImagenPreview] = useState<string | null>(proyecto.imagen_url || null);
   const [eliminarImagen, setEliminarImagen] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -103,7 +103,7 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
         descripcion: proyecto.descripcion || '',
       });
       setImagenFile(null);
-      setImagenPreview(proyecto.imagen_url);
+      setImagenPreview(proyecto.imagen_url || null);
       setEliminarImagen(false);
       onClose();
     }

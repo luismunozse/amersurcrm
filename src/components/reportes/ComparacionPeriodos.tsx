@@ -24,8 +24,8 @@ export default function ComparacionPeriodos({
 
     try {
       const result = await obtenerMetricasReportes(periodoComparacion);
-      
-      if (result.success && result.data) {
+
+      if (result.data) {
         setDatosComparacion(result.data);
         onPeriodoComparacionChange?.(periodoComparacion);
       } else {

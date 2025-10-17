@@ -36,6 +36,7 @@ export type ClienteCached = {
     imagen_url: string | null;
     planos_url: string | null;
     created_at: string;
+    tipo?: string | null;
   };
   
   export type LoteCached = {

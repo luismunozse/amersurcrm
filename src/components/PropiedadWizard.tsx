@@ -31,7 +31,7 @@ const initialData: PropiedadWizardData = {
   // Paso 1: Tipo de operación y propiedad
   tipo: "lote",
   tipo_operacion: "venta",
-  
+
   // Paso 2: Datos generales
   proyecto: "",
   identificador: "",
@@ -44,23 +44,26 @@ const initialData: PropiedadWizardData = {
   antiguedad_anos: 0,
   disponibilidad_inmediata: true,
   disponibilidad_desde: "",
-  
+
   // Datos de ubigeo
   departamento: "",
   provincia: "",
   distrito: "",
-  
-  // Paso 3: Precios y condiciones comerciales
+
+  // Paso 3: Características específicas
+  caracteristicas: {},
+
+  // Paso 4: Precios y condiciones comerciales
   precio_venta: 0,
   precio_alquiler: 0,
   condiciones_venta: {},
   condiciones_alquiler: {},
-  
+
   // Paso 5: Marketing (sin multimedia)
   etiquetas: [],
   destacado: false,
   premium: false,
-  
+
   // Paso 6: Confirmación
   confirmado: false
 };
@@ -111,7 +114,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
         }
         
         formData.append("superficie_total", data.superficie_total.toString());
-        formData.append("superficie_construida", data.superficie_construida?.toString() || "");
+        formData.append("superficie_construida", (data.caracteristicas?.superficie_construida as number | undefined)?.toString() || "");
         formData.append("precio", data.precio_venta.toString());
         formData.append("moneda", "PEN");
         formData.append("estado_comercial", "disponible");
@@ -480,29 +483,27 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
           Información de la Propiedad
         </h4>
     <div className="space-y-6">
-          {/* Ubicación - Solo para propiedades que no sean lotes - Ocupa todo el ancho */}
-          {data.tipo !== 'lote' && (
-            <div className="w-full">
-              <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Ubicación (Ubigeo)
-              </label>
-              <UbicacionSelector
-                key={`ubigeo-${data.tipo}`}
-                departamento={data.departamento}
-                provincia={data.provincia}
-                distrito={data.distrito}
-                onUbigeoChange={(departamento, provincia, distrito) => {
-                  updateData({ 
-                    departamento, 
-                    provincia, 
-                    distrito,
-                    ubicacion: [distrito, provincia, departamento].filter(Boolean).join(', ')
-                  });
-                }}
-                className="w-full"
-              />
-            </div>
-          )}
+          {/* Ubicación - En este flujo ya no es lote, siempre mostrar */}
+          <div className="w-full">
+            <label className="block text-sm font-medium text-crm-text-primary mb-2">
+              Ubicación (Ubigeo)
+            </label>
+            <UbicacionSelector
+              key={`ubigeo-${data.tipo}`}
+              departamento={data.departamento}
+              provincia={data.provincia}
+              distrito={data.distrito}
+              onUbigeoChange={(departamento, provincia, distrito) => {
+                updateData({ 
+                  departamento, 
+                  provincia, 
+                  distrito,
+                  ubicacion: [distrito, provincia, departamento].filter(Boolean).join(', ')
+                });
+              }}
+              className="w-full"
+            />
+          </div>
 
           {/* Grid de 2 columnas para el resto de campos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -539,21 +540,7 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
           />
         </div>
 
-          {/* Para lotes, mantener el campo simple */}
-          {data.tipo === 'lote' && (
-            <div>
-              <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Ciudad/Ubicación
-              </label>
-              <input
-                type="text"
-                value={data.ubicacion}
-                onChange={(e) => updateData({ ubicacion: e.target.value })}
-                className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-                placeholder="Ej: Lima, Arequipa"
-              />
-            </div>
-          )}
+          {/* Campo de ubicación simple solo aplica en flujo de lotes (se maneja en el paso correspondiente) */}
 
           {/* Calle */}
           <div>
@@ -605,8 +592,15 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
             </label>
         <input
           type="number"
-              value={data.superficie_construida || ''}
-              onChange={(e) => updateData({ superficie_construida: Number(e.target.value) || 0 })}
+              value={(data.caracteristicas as any)?.superficie_construida ?? ''}
+              onChange={(e) =>
+                updateData({
+                  caracteristicas: {
+                    ...data.caracteristicas,
+                    superficie_construida: Number(e.target.value) || 0,
+                  } as any,
+                })
+              }
               className="w-full px-4 py-3 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
               placeholder="120"
         />
@@ -710,10 +704,10 @@ function Paso4Precios({ data, updateData, proyectos }: {
               <span className="text-sm font-medium text-crm-text-muted">Superficie Total:</span>
               <p className="text-crm-text-primary">{data.superficie_total} m²</p>
             </div>
-            {data.superficie_construida && (
+            {data.caracteristicas?.superficie_construida && (
             <div>
                 <span className="text-sm font-medium text-crm-text-muted">Superficie Construida:</span>
-                <p className="text-crm-text-primary">{data.superficie_construida} m²</p>
+                <p className="text-crm-text-primary">{data.caracteristicas.superficie_construida} m²</p>
             </div>
             )}
             <div>
@@ -732,4 +726,3 @@ function Paso4Precios({ data, updateData, proyectos }: {
     </div>
   );
 }
-

@@ -109,7 +109,7 @@ export default function RecordatoriosPanel() {
 
       if (error) throw error;
 
-      const normalizados: Recordatorio[] = ((data ?? []) as RecordatorioQuery[]).map((item) => {
+      const normalizados: Recordatorio[] = ((data ?? []) as any[]).map((item: any) => {
         const prioridad = (item.prioridad ?? "media") as Prioridad;
         const tipoNormalizado = (Object.keys(TIPOS_RECORDATORIO).includes(item.tipo)
           ? item.tipo
@@ -122,8 +122,8 @@ export default function RecordatoriosPanel() {
           tipo: tipoNormalizado,
           prioridad,
           fecha_recordatorio: item.fecha_recordatorio,
-          cliente_nombre: item.cliente?.nombre ?? undefined,
-          propiedad_nombre: item.propiedad?.identificacion_interna ?? undefined,
+          cliente_nombre: item.cliente?.[0]?.nombre ?? undefined,
+          propiedad_nombre: item.propiedad?.[0]?.identificacion_interna ?? undefined,
           completado: Boolean(item.completado),
           leido: Boolean(item.leido),
           notificar_email: Boolean(item.notificar_email ?? true),

@@ -12,7 +12,7 @@ export async function crearPropiedad(formData: FormData) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para crear propiedades. Solo los administradores pueden realizar esta acción.");
     }
@@ -103,7 +103,7 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para cambiar el estado de propiedades. Solo los administradores pueden realizar esta acción.");
     }
@@ -140,7 +140,7 @@ export async function eliminarPropiedad(propiedadId: string) {
 
   // Verificar permisos de administrador
   try {
-    const perfil = await obtenerPerfilUsuario(user.id);
+    const perfil = await obtenerPerfilUsuario();
     if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
       throw new Error("No tienes permisos para eliminar propiedades. Solo los administradores pueden realizar esta acción.");
     }
@@ -185,8 +185,15 @@ export async function eliminarPropiedad(propiedadId: string) {
     // 3. Eliminar archivos del storage si existen
     if (propiedad.marketing?.fotos) {
       try {
-        const fotos = Array.isArray(propiedad.marketing.fotos) ? propiedad.marketing.fotos : [];
-        const filePaths = fotos.map(foto => `propiedades/${propiedadId}/${foto.split('/').pop()}`);
+        const fotos: string[] = Array.isArray(propiedad.marketing.fotos)
+          ? (propiedad.marketing.fotos as string[])
+          : [];
+        const filePaths = fotos
+          .map((foto: string) => {
+            const name = foto.split('/').pop() || '';
+            return name ? `propiedades/${propiedadId}/${name}` : null;
+          })
+          .filter((p): p is string => Boolean(p));
         
         if (filePaths.length > 0) {
           const { error: deleteError } = await supabase.storage
@@ -204,8 +211,15 @@ export async function eliminarPropiedad(propiedadId: string) {
 
     if (propiedad.marketing?.renders) {
       try {
-        const renders = Array.isArray(propiedad.marketing.renders) ? propiedad.marketing.renders : [];
-        const filePaths = renders.map(render => `propiedades/${propiedadId}/${render.split('/').pop()}`);
+        const renders: string[] = Array.isArray(propiedad.marketing.renders)
+          ? (propiedad.marketing.renders as string[])
+          : [];
+        const filePaths = renders
+          .map((renderPath: string) => {
+            const name = renderPath.split('/').pop() || '';
+            return name ? `propiedades/${propiedadId}/${name}` : null;
+          })
+          .filter((p): p is string => Boolean(p));
         
         if (filePaths.length > 0) {
           const { error: deleteError } = await supabase.storage

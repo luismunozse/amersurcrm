@@ -16,6 +16,7 @@ import {
   guardarPoligonoProyecto,
   eliminarPoligonoProyecto,
   guardarPoligonoLote,
+  actualizarLote,
 } from './_actions';
 import { obtenerCoordenadasUbicacion } from '@/lib/geocoding';
 

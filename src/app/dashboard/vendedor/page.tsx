@@ -88,7 +88,7 @@ export default async function VendedorDashboardPage() {
   // Obtener perfil del vendedor
   const { data: perfil } = await supabase
     .from('usuario_perfil')
-    .select('username, nombre_completo, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('username, nombre_completo, rol(nombre)')
     .eq('id', user.id)
     .single();
 
@@ -114,7 +114,7 @@ export default async function VendedorDashboardPage() {
       proxima_accion,
       fecha_proxima_accion,
       notas,
-      cliente:cliente!cliente_id(nombre, codigo_cliente)
+      cliente(nombre, codigo_cliente)
     `)
     .eq('vendedor_username', perfil.username)
     .not('proxima_accion', 'is', null)
@@ -133,8 +133,8 @@ export default async function VendedorDashboardPage() {
       moneda,
       fecha_vencimiento,
       estado,
-      cliente:cliente!cliente_id(nombre, codigo_cliente),
-      lote:lote!lote_id(numero_lote, proyecto:proyecto!proyecto_id(nombre))
+      cliente(nombre, codigo_cliente),
+      lote(numero_lote, proyecto(nombre))
     `)
     .eq('vendedor_username', perfil.username)
     .eq('estado', 'activa')
@@ -152,8 +152,8 @@ export default async function VendedorDashboardPage() {
       moneda,
       forma_pago,
       estado,
-      cliente:cliente!cliente_id(nombre, codigo_cliente),
-      lote:lote!lote_id(numero_lote, proyecto:proyecto!proyecto_id(nombre))
+      cliente(nombre, codigo_cliente),
+      lote(numero_lote, proyecto(nombre))
     `)
     .eq('vendedor_username', perfil.username)
     .eq('estado', 'en_proceso')
@@ -185,7 +185,7 @@ export default async function VendedorDashboardPage() {
           Bienvenido, {perfil.nombre_completo}
         </h1>
         <p className="text-crm-primary-light opacity-90">
-          {perfil.username} · {perfil.rol?.nombre || 'Vendedor'}
+          {perfil.username} · {perfil.rol?.[0]?.nombre || 'Vendedor'}
         </p>
       </div>
 
@@ -292,10 +292,10 @@ export default async function VendedorDashboardPage() {
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <p className="font-medium text-crm-text">
-                          {accion.cliente?.nombre}
+                          {accion.cliente?.[0]?.nombre}
                         </p>
                         <p className="text-xs text-crm-text-muted">
-                          {accion.cliente?.codigo_cliente}
+                          {accion.cliente?.[0]?.codigo_cliente}
                         </p>
                       </div>
                       <span className="px-2 py-1 text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">
@@ -413,16 +413,16 @@ export default async function VendedorDashboardPage() {
                           {reserva.codigo_reserva}
                         </p>
                         <p className="text-sm text-crm-text-muted">
-                          {reserva.cliente?.nombre}
+                          {reserva.cliente?.[0]?.nombre}
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-crm-text">
                         {formatearMoneda(reserva.monto_reserva, reserva.moneda as any)}
                       </span>
                     </div>
-                    {reserva.lote && (
+                    {reserva.lote?.[0] && (
                       <p className="text-sm text-crm-text-muted">
-                        Lote {reserva.lote.numero_lote} - {reserva.lote.proyecto?.nombre}
+                        Lote {reserva.lote[0].numero_lote} - {reserva.lote[0].proyecto?.[0]?.nombre}
                       </p>
                     )}
                     <div className="mt-2 flex items-center gap-2 text-xs text-crm-text-muted">
@@ -465,7 +465,7 @@ export default async function VendedorDashboardPage() {
                           {venta.codigo_venta}
                         </p>
                         <p className="text-sm text-crm-text-muted">
-                          {venta.cliente?.nombre}
+                          {venta.cliente?.[0]?.nombre}
                         </p>
                       </div>
                       <div className="text-right">
@@ -477,9 +477,9 @@ export default async function VendedorDashboardPage() {
                         </p>
                       </div>
                     </div>
-                    {venta.lote && (
+                    {venta.lote?.[0] && (
                       <p className="text-sm text-crm-text-muted">
-                        Lote {venta.lote.numero_lote} - {venta.lote.proyecto?.nombre}
+                        Lote {venta.lote[0].numero_lote} - {venta.lote[0].proyecto?.[0]?.nombre}
                       </p>
                     )}
                     <span className="inline-block mt-2 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
