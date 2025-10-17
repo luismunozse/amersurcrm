@@ -81,6 +81,7 @@ async function DashboardContent() {
   // Ensure we have arrays, default to empty arrays if null/undefined
   // getCachedClientes devuelve { data: [], total: number }
   const clientes = Array.isArray(clientesResult?.data) ? clientesResult.data : [];
+  const totalClientes = clientesResult?.total ?? 0; // Total real de clientes
   const proyectos = Array.isArray(proyectosData) ? proyectosData : [];
   const notificaciones = Array.isArray(notificacionesData) ? notificacionesData : [];
 
@@ -102,7 +103,7 @@ async function DashboardContent() {
   const heroHighlights = [
     {
       label: "Clientes activos",
-      description: `${clientes.length} totales • ${clientesSinSeguimiento} sin seguimiento`,
+      description: `${totalClientes.toLocaleString()} totales • ${clientesSinSeguimiento} sin seguimiento`,
       href: "/dashboard/clientes",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
