@@ -38,7 +38,6 @@ export default function DashboardClient({
       <Sidebar
         isOpen={open}
         onClose={() => setOpen(false)}
-        userEmail={userEmail}
         collapsed={collapsed}
         onCollapseChange={setCollapsed}
       />

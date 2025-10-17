@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -11,7 +11,6 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  userEmail?: string;
   collapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
 }
@@ -158,21 +157,21 @@ function NavLink({
   return content;
 }
 
-export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollapsed = false, onCollapseChange }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false, onCollapseChange }: SidebarProps) {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   
   const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
-  
-  const handleCollapseChange = (newCollapsed: boolean) => {
+
+  const handleCollapseChange = useCallback((newCollapsed: boolean) => {
     if (onCollapseChange) {
       onCollapseChange(newCollapsed);
     } else {
       setInternalCollapsed(newCollapsed);
     }
-  };
+  }, [onCollapseChange]);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -191,7 +190,7 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("sidebarCollapsed") : null;
     if (saved === "1") handleCollapseChange(true);
-  }, []);
+  }, [handleCollapseChange]);
   useEffect(() => {
     try { localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "0"); } catch {}
     // togglear clase en <html> para cambiar --sidebar-w
