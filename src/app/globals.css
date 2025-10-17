@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /* Animaciones para Radix UI Tooltip */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes zoomIn {
+    from { transform: scale(0.95); }
+    to { transform: scale(1); }
+  }
+
+  @keyframes zoomOut {
+    from { transform: scale(1); }
+    to { transform: scale(0.95); }
+  }
+}
+
 @layer components{
   .input{@apply w-full border rounded-xl px-3 py-2 bg-bg focus:outline-none focus:ring-2 focus:ring-brand-400;}
   .btn{@apply inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-medium border hover:bg-neutral-50;}

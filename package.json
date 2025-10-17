@@ -23,6 +23,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.8",
     "@heroicons/react": "^2.2.0",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@types/papaparse": "^5.3.16",

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
+import * as Tooltip from "@radix-ui/react-tooltip";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -81,38 +82,80 @@ const adminNavigation = [
 ];
 
 function NavLink({
-  href, active, children, onClick, collapsed = false,
+  href, active, children, onClick, collapsed = false, label = "",
 }: {
-  href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean;
+  href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean; label?: string;
 }) {
-  return (
+  const content = (
     <Link
       href={href}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden px-4 py-3",
-        collapsed ? "lg:justify-center lg:px-0" : "lg:justify-start lg:px-4",
+        "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+        collapsed ? "lg:justify-center lg:px-3 lg:py-3 lg:mx-2" : "px-4 py-3",
         active
-          ? "bg-gradient-to-r from-crm-primary to-crm-primary-hover text-white shadow-lg shadow-crm-primary/25"
-          : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white hover:shadow-md hover:scale-[1.02]"
+          ? "bg-gradient-to-r from-crm-primary to-crm-primary-hover text-white shadow-lg shadow-crm-primary/30 scale-[1.02]"
+          : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white hover:shadow-lg hover:shadow-crm-primary/10 hover:scale-[1.03]"
       )}
-      title={collapsed ? href.split("/").pop() ?? "" : undefined}
     >
+      {/* Efecto de brillo en hover */}
       {!active && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
       )}
+
+      {/* Indicador activo más visible */}
       {active && (
-        <div className={cn(
-          "absolute top-2 bottom-2 w-1 bg-crm-primary rounded-r-full",
-          collapsed ? "left-1" : "left-0"
-        )} />
+        <>
+          <div className={cn(
+            "absolute top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-full",
+            collapsed ? "left-0 h-8" : "left-0 h-10"
+          )} />
+          {collapsed && (
+            <div className="absolute inset-0 bg-white/5 rounded-xl animate-pulse" />
+          )}
+        </>
       )}
-      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0" : "lg:gap-3")}>
+
+      {/* Glow effect en hover cuando está colapsado */}
+      {collapsed && !active && (
+        <div className="absolute inset-0 bg-crm-primary/0 group-hover:bg-crm-primary/10 rounded-xl transition-colors duration-300" />
+      )}
+
+      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3")}>
         {children}
       </div>
     </Link>
   );
+
+  // Si está colapsado en desktop, envolver en Tooltip
+  if (collapsed && label) {
+    return (
+      <Tooltip.Provider delayDuration={200}>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild className="hidden lg:block">
+            {content}
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content
+              side="right"
+              sideOffset={12}
+              className="z-50 px-4 py-2.5 bg-crm-card border border-crm-border rounded-xl shadow-2xl text-sm font-medium text-crm-text-primary animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+            >
+              {label}
+              <Tooltip.Arrow className="fill-crm-border" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+        {/* Para móvil, mostrar sin tooltip */}
+        <div className="lg:hidden">
+          {content}
+        </div>
+      </Tooltip.Provider>
+    );
+  }
+
+  return content;
 }
 
 export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollapsed = false, onCollapseChange }: SidebarProps) {
@@ -193,15 +236,32 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
             <div className={cn("flex items-center", collapsed ? "lg:space-x-0" : "space-x-4 w-full")}>
               {/* Logo o botón hamburguesa */}
               {collapsed ? (
-                <button
-                  type="button"
-                  onClick={() => handleCollapseChange(false)}
-                  className="hidden lg:flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 backdrop-blur-sm border border-crm-primary/30 text-white hover:border-crm-primary/50 hover:bg-gradient-to-br hover:from-crm-primary/30 hover:to-crm-accent/30 transition-all duration-300 shadow-lg shadow-crm-primary/10 hover:shadow-crm-primary/25"
-                  aria-label="Expandir sidebar"
-                  title="Expandir menú"
-                >
-                  <Bars3Icon className="w-7 h-7 transition-transform hover:scale-110" />
-                </button>
+                <Tooltip.Provider delayDuration={200}>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => handleCollapseChange(false)}
+                        className="hidden lg:flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-crm-primary/30 to-crm-accent/30 backdrop-blur-sm border-2 border-crm-primary/40 text-white hover:border-crm-primary/60 hover:from-crm-primary/40 hover:to-crm-accent/40 transition-all duration-300 shadow-xl shadow-crm-primary/20 hover:shadow-2xl hover:shadow-crm-primary/30 hover:scale-105 active:scale-95 group relative overflow-hidden"
+                        aria-label="Expandir sidebar"
+                      >
+                        {/* Efecto de brillo animado */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                        <Bars3Icon className="w-7 h-7 relative z-10 transition-transform group-hover:scale-110" />
+                      </button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content
+                        side="right"
+                        sideOffset={12}
+                        className="z-50 px-4 py-2.5 bg-crm-card border border-crm-border rounded-xl shadow-2xl text-sm font-medium text-crm-text-primary animate-in fade-in-0 zoom-in-95"
+                      >
+                        Expandir menú
+                        <Tooltip.Arrow className="fill-crm-border" />
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                </Tooltip.Provider>
               ) : (
                 <div className="relative flex-shrink-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 rounded-2xl blur-sm" />
@@ -245,9 +305,16 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 sm:px-6 py-6 space-y-1">
+          <nav className="flex-1 px-4 sm:px-6 py-6 space-y-1.5">
             {navigation.map((item) => (
-              <NavLink key={item.name} href={item.href} active={isActive(item.href)} onClick={onClose} collapsed={collapsed}>
+              <NavLink
+                key={item.name}
+                href={item.href}
+                active={isActive(item.href)}
+                onClick={onClose}
+                collapsed={collapsed}
+                label={item.name}
+              >
                 <span className="shrink-0 grid place-items-center w-8 h-8">{item.icon}</span>
                 <span className={collapsed ? "hidden lg:hidden" : "truncate"}>{item.name}</span>
               </NavLink>
@@ -255,22 +322,41 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
 
             {!loading && isAdmin && (
               <>
-                <div className={collapsed ? "mx-3 my-4 border-t border-white/10" : "border-t border-crm-sidebar-hover/50 my-6"} />
-                <div className={collapsed ? "px-2 py-2 flex items-center justify-center" : "px-4 py-3"}>
-                  {collapsed ? (
-                    <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  ) : (
-                    <h3 className="text-xs font-bold text-crm-primary uppercase tracking-widest flex items-center">
-                      <div className="w-2 h-2 bg-crm-primary rounded-full mr-2" />
-                      Administración
-                    </h3>
+                {/* Separador mejorado */}
+                <div className={cn(
+                  "relative my-6",
+                  collapsed ? "mx-auto w-8" : "w-full"
+                )}>
+                  <div className={cn(
+                    "border-t transition-all duration-300",
+                    collapsed
+                      ? "border-crm-primary/30 shadow-[0_0_8px_rgba(var(--crm-primary-rgb),0.2)]"
+                      : "border-crm-sidebar-hover/50"
+                  )} />
+                  {collapsed && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-crm-primary rounded-full shadow-[0_0_8px_rgba(var(--crm-primary-rgb),0.5)]" />
                   )}
                 </div>
+
+                {/* Título de sección admin */}
+                {!collapsed && (
+                  <div className="px-4 py-2 mb-2">
+                    <h3 className="text-xs font-bold text-crm-primary uppercase tracking-widest flex items-center">
+                      <div className="w-2 h-2 bg-crm-primary rounded-full mr-2 animate-pulse" />
+                      Administración
+                    </h3>
+                  </div>
+                )}
+
                 {adminNavigation.map((item) => (
-                  <NavLink key={item.name} href={item.href} active={isActive(item.href)} onClick={onClose} collapsed={collapsed}>
+                  <NavLink
+                    key={item.name}
+                    href={item.href}
+                    active={isActive(item.href)}
+                    onClick={onClose}
+                    collapsed={collapsed}
+                    label={item.name}
+                  >
                     <span className="shrink-0 grid place-items-center w-8 h-8">{item.icon}</span>
                     <span className={collapsed ? "hidden lg:hidden" : "truncate"}>{item.name}</span>
                   </NavLink>
