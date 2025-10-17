@@ -245,7 +245,7 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                   placeholder="Hola {{1}}, bienvenido a AMERSUR Inmobiliaria..."
                 />
                 <p className="text-xs text-crm-text-muted mt-1">
-                  Usa {{"{{"}}1{{"}}"}}, {{"{{"}}2{{"}}"}} para variables
+                  Usa {`{{1}}`}, {`{{2}}`} para variables
                 </p>
               </div>
 
