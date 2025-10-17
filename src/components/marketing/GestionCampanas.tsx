@@ -5,10 +5,12 @@ import { Plus, Play, Pause, Eye, BarChart3, Calendar, Users, MessageSquare } fro
 import { obtenerCampanas, actualizarEstadoCampana } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingCampana } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
+import ModalCrearCampana from "./ModalCrearCampana";
 
 export default function GestionCampanas() {
   const [campanas, setCampanas] = useState<MarketingCampana[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalCrear, setModalCrear] = useState(false);
 
   useEffect(() => {
     cargarCampanas();
@@ -97,6 +99,7 @@ export default function GestionCampanas() {
           </p>
         </div>
         <button
+          onClick={() => setModalCrear(true)}
           className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -219,6 +222,13 @@ export default function GestionCampanas() {
           ))}
         </div>
       )}
+
+      {/* Modal */}
+      <ModalCrearCampana
+        open={modalCrear}
+        onClose={() => setModalCrear(false)}
+        onSuccess={cargarCampanas}
+      />
     </div>
   );
 }
