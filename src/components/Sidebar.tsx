@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -190,18 +191,16 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
             collapsed ? "lg:justify-center lg:px-3" : "justify-between"
           )}>
             <div className={cn("flex items-center", collapsed ? "lg:space-x-0" : "space-x-4 w-full")}>
-              {/* Logo o botón de expandir */}
+              {/* Logo o botón hamburguesa */}
               {collapsed ? (
                 <button
                   type="button"
                   onClick={() => handleCollapseChange(false)}
-                  className="hidden lg:flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                  className="hidden lg:flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 backdrop-blur-sm border border-crm-primary/30 text-white hover:border-crm-primary/50 hover:bg-gradient-to-br hover:from-crm-primary/30 hover:to-crm-accent/30 transition-all duration-300 shadow-lg shadow-crm-primary/10 hover:shadow-crm-primary/25"
                   aria-label="Expandir sidebar"
-                  title="Expandir"
+                  title="Expandir menú"
                 >
-                  <svg className="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <Bars3Icon className="w-7 h-7 transition-transform hover:scale-110" />
                 </button>
               ) : (
                 <div className="relative flex-shrink-0">
@@ -221,26 +220,26 @@ export function Sidebar({ isOpen, onClose, userEmail, collapsed: externalCollaps
               </div>
             </div>
 
-            {/* Toggle collapse (desktop) - Solo visible cuando no está colapsado */}
+            {/* Botón hamburguesa para colapsar (desktop) - Solo visible cuando no está colapsado */}
             {!collapsed && (
               <button
                 type="button"
                 onClick={() => handleCollapseChange(true)}
-                className="hidden lg:flex items-center justify-center ml-3 w-9 h-9 rounded-lg border border-white/20 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                className="hidden lg:flex items-center justify-center ml-3 w-10 h-10 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
                 aria-label="Colapsar sidebar"
-                title="Colapsar"
+                title="Colapsar menú"
               >
-                <svg className="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+                <Bars3Icon className="w-6 h-6 transition-transform group-hover:scale-110" />
               </button>
             )}
 
             {/* Close (mobile) */}
-            <button onClick={onClose} className="lg:hidden text-crm-text-muted hover:text-white flex-shrink-0" aria-label="Cerrar menú">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button
+              onClick={onClose}
+              className="lg:hidden text-crm-text-muted hover:text-white flex-shrink-0 transition-colors"
+              aria-label="Cerrar menú"
+            >
+              <XMarkIcon className="w-6 h-6" />
             </button>
 
           </div>

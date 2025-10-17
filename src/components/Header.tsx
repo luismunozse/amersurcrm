@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Bars3Icon } from "@heroicons/react/24/outline";
 import ThemeToggle from "./ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import UserAvatarMenu from "./UserAvatarMenu";
@@ -46,12 +47,10 @@ export default function Header({
             <button
               type="button"
               onClick={onSidebarToggle}
-              className="lg:hidden inline-flex items-center justify-center p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+              className="lg:hidden inline-flex items-center justify-center p-2.5 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-all duration-200 hover:scale-105 active:scale-95"
               aria-label="Abrir menú"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
-              </svg>
+              <Bars3Icon className="h-6 w-6" />
             </button>
 
             {/* Logo - Visible en mobile o cuando sidebar está colapsado */}
