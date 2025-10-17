@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  MessageSquare, 
-  Users, 
+import { useState, useEffect } from "react";
+import {
+  MessageSquare,
+  Users,
   Zap,
   BarChart3,
   Send
@@ -13,9 +13,22 @@ import GestionPlantillas from "@/components/marketing/GestionPlantillas";
 import GestionCampanas from "@/components/marketing/GestionCampanas";
 import BandejaConversaciones from "@/components/marketing/BandejaConversaciones";
 import GestionAutomatizaciones from "@/components/marketing/GestionAutomatizaciones";
+import { verificarCredencialesWhatsApp } from "@/app/dashboard/admin/marketing/_actions";
 
 export default function MarketingPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [tieneCredenciales, setTieneCredenciales] = useState(true);
+  const [verificandoCredenciales, setVerificandoCredenciales] = useState(true);
+
+  useEffect(() => {
+    verificarConfiguracion();
+  }, []);
+
+  const verificarConfiguracion = async () => {
+    const result = await verificarCredencialesWhatsApp();
+    setTieneCredenciales(result.tieneCredenciales);
+    setVerificandoCredenciales(false);
+  };
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -124,21 +137,40 @@ export default function MarketingPage() {
         {activeTab === "automatizaciones" && <GestionAutomatizaciones />}
       </div>
 
-      {/* Info importante */}
-      <div className="bg-crm-warning/10 border border-crm-warning/30 rounded-xl p-6">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-crm-warning/20 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-crm-warning text-sm">⚠️</span>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-crm-warning mb-1">Configuración Requerida</h4>
-            <p className="text-xs text-crm-text-secondary">
-              Para usar WhatsApp Business API, necesitas configurar tus credenciales en la sección de Configuración.
-              Requieres: App ID, Phone Number ID, Access Token y Webhook Verify Token de Meta Business.
-            </p>
+      {/* Info importante - Solo mostrar si NO tiene credenciales */}
+      {!verificandoCredenciales && !tieneCredenciales && (
+        <div className="bg-crm-warning/10 border border-crm-warning/30 rounded-xl p-6">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-crm-warning/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="text-crm-warning text-sm">⚠️</span>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-crm-warning mb-1">Configuración Requerida</h4>
+              <p className="text-xs text-crm-text-secondary">
+                Para usar WhatsApp Business API, necesitas configurar tus credenciales en la sección de Configuración.
+                Requieres: App ID, Phone Number ID, Access Token y Webhook Verify Token de Meta Business.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Mensaje de éxito si tiene credenciales */}
+      {!verificandoCredenciales && tieneCredenciales && (
+        <div className="bg-crm-success/10 border border-crm-success/30 rounded-xl p-6">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-crm-success/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="text-crm-success text-sm">✓</span>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-crm-success mb-1">WhatsApp Configurado</h4>
+              <p className="text-xs text-crm-text-secondary">
+                Las credenciales de WhatsApp Business API están configuradas correctamente. Ya puedes enviar mensajes y crear campañas.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

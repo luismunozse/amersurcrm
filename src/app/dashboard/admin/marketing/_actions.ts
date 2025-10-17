@@ -15,6 +15,46 @@ import type {
 } from "@/types/whatsapp-marketing";
 
 // =====================================================
+// CREDENCIALES
+// =====================================================
+
+export async function verificarCredencialesWhatsApp() {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { tieneCredenciales: false, error: "No autorizado" };
+    }
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_channel_credential')
+      .select('id, phone_number_id, access_token, activo')
+      .eq('canal_tipo', 'whatsapp')
+      .eq('activo', true)
+      .single();
+
+    if (error || !data) {
+      return { tieneCredenciales: false };
+    }
+
+    // Verificar que tenga los campos requeridos
+    const tieneCredenciales = !!(
+      data.phone_number_id &&
+      data.access_token &&
+      data.phone_number_id.length > 0 &&
+      data.access_token.length > 10
+    );
+
+    return { tieneCredenciales, credentialId: data.id };
+  } catch (error) {
+    console.error('Error verificando credenciales:', error);
+    return { tieneCredenciales: false, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
 // PLANTILLAS
 // =====================================================
 
