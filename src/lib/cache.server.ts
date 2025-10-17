@@ -46,6 +46,17 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     sortOrder = 'desc'
   } = params || {};
 
+  // Obtener el rol del usuario
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('rol')
+    .eq('id', userId)
+    .single();
+
+  const esAdmin = perfil?.rol === 'ROL_ADMIN';
+  const esGerente = perfil?.rol === 'ROL_GERENTE';
+
   let q = supabase
     .from("cliente")
     .select(`
@@ -74,6 +85,12 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
       direccion,
       created_at
     `, { count: 'exact' });
+
+  // Filtro por rol: vendedores solo ven sus clientes asignados
+  if (!esAdmin && !esGerente && !vendedor) {
+    // Si es vendedor y no se está filtrando por vendedor específico, mostrar solo sus clientes
+    q = q.or(`created_by.eq.${userId},vendedor_asignado.eq.${userId}`);
+  }
 
   // Aplicar filtros
   if (searchTerm) {
@@ -123,9 +140,25 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return 0;
 
-  const { count, error } = await supabase
-    .from('cliente')
-    .select('*', { count: 'exact', head: true });
+  // Obtener el rol del usuario
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('rol')
+    .eq('id', userId)
+    .single();
+
+  const esAdmin = perfil?.rol === 'ROL_ADMIN';
+  const esGerente = perfil?.rol === 'ROL_GERENTE';
+
+  let query = supabase.from('cliente').select('*', { count: 'exact', head: true });
+
+  // Vendedores solo ven sus clientes
+  if (!esAdmin && !esGerente) {
+    query = query.or(`created_by.eq.${userId},vendedor_asignado.eq.${userId}`);
+  }
+
+  const { count, error } = await query;
 
   if (error) throw error;
   return count ?? 0;
@@ -170,12 +203,31 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return { totalClientes: 0, totalProyectos: 0, totalLotes: 0 };
 
+  // Obtener el rol del usuario para determinar qué datos mostrar
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('rol')
+    .eq('id', userId)
+    .single();
+
+  const esAdmin = perfil?.rol === 'ROL_ADMIN';
+  const esGerente = perfil?.rol === 'ROL_GERENTE';
+
+  // Administradores y gerentes ven todos los clientes del sistema
+  // Vendedores solo ven sus clientes asignados
+  let clientesQuery = supabase.from("cliente").select("*", { count: "exact", head: true });
+
+  if (!esAdmin && !esGerente) {
+    // Vendedor: solo sus clientes (donde created_by = userId o vendedor_asignado = userId)
+    clientesQuery = clientesQuery.or(`created_by.eq.${userId},vendedor_asignado.eq.${userId}`);
+  }
+
   const [cRes, pRes, lRes] = await Promise.all([
-    // Clientes: solo los del usuario actual (vendedor gestiona sus propios clientes)
-    supabase.from("cliente").select("*", { count: "exact", head: true }).eq("created_by", userId),
-    // Proyectos: todos los proyectos (vendedores pueden ver todos)
+    clientesQuery,
+    // Proyectos: todos los proyectos (todos pueden ver)
     supabase.from("proyecto").select("*", { count: "exact", head: true }),
-    // Lotes: todos los lotes (vendedores pueden ver todos)
+    // Lotes: todos los lotes (todos pueden ver)
     supabase.from("lote").select("*", { count: "exact", head: true }),
   ]);
 
