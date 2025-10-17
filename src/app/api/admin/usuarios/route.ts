@@ -20,6 +20,7 @@ export async function GET() {
 
     // Obtener usuarios con sus perfiles
     const { data: usuarios, error } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .select(`
         id,
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el rol existe
     const { data: rol, error: rolError } = await supabase
+      .schema('crm')
       .from('rol')
       .select('id, nombre')
       .eq('id', rol_id)
@@ -186,6 +188,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el username no exista
     const { data: existingUser } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .select('username')
       .eq('username', username)
@@ -206,6 +209,7 @@ export async function POST(request: NextRequest) {
         while (!usernameDisponible && numero <= 99) {
           usernameConNumero = generarUsernameConNumero(username, numero);
           const { data } = await supabase
+            .schema('crm')
             .from('usuario_perfil')
             .select('username')
             .eq('username', usernameConNumero)
@@ -238,6 +242,7 @@ export async function POST(request: NextRequest) {
     
     // Verificar si el email ya existe
     const { data: existingEmail } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .select('email')
       .eq('email', emailFinal)
@@ -271,6 +276,7 @@ export async function POST(request: NextRequest) {
 
     // Crear perfil de usuario con username y requiere_cambio_password = true
     const { error: perfilError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .insert({
         id: authData.user.id,
@@ -353,6 +359,7 @@ export async function PATCH(request: NextRequest) {
 
       // Verificar que el username no esté en uso por otro usuario
       const { data: existente } = await supabase
+        .schema('crm')
         .from('usuario_perfil')
         .select('id')
         .eq('username', username.trim())
@@ -380,6 +387,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { error: updError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .update(updatePayload)
       .eq('id', id);
@@ -425,6 +433,7 @@ export async function DELETE(request: NextRequest) {
 
     // Verificar que el usuario existe
     const { data: usuarioExistente, error: fetchError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .select('id, username, nombre_completo')
       .eq('id', userId)
@@ -436,6 +445,7 @@ export async function DELETE(request: NextRequest) {
 
     // Verificar si el usuario tiene clientes asignados
     const { data: clientesAsignados, error: clientesError } = await supabase
+      .schema('crm')
       .from('cliente')
       .select('id')
       .eq('vendedor_asignado', usuarioExistente.username)
@@ -454,6 +464,7 @@ export async function DELETE(request: NextRequest) {
 
     // Eliminar el usuario del perfil (esto también eliminará el usuario de auth.users por cascada)
     const { error: deleteError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .delete()
       .eq('id', userId);

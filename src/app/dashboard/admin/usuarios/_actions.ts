@@ -40,6 +40,7 @@ export async function resetearPasswordUsuario(userId: string) {
 
     // Marcar que requiere cambio de contraseña en el perfil
     const { error: profileError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .update({
         requiere_cambio_password: true,
@@ -86,6 +87,7 @@ export async function cambiarEstadoUsuario(
 
   try {
     const { error } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .update({
         activo,
@@ -148,6 +150,7 @@ export async function cambiarPasswordPerfil(
 
     // Marcar que ya no requiere cambio de contraseña
     const { error: profileError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .update({
         requiere_cambio_password: false,
@@ -194,6 +197,7 @@ export async function eliminarUsuario(userId: string) {
 
     // Verificar que el usuario existe
     const { data: usuarioExistente, error: fetchError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .select('id, username, nombre_completo')
       .eq('id', userId)
@@ -208,6 +212,7 @@ export async function eliminarUsuario(userId: string) {
 
     // Verificar si el usuario tiene clientes asignados
     const { data: clientesAsignados } = await supabase
+      .schema('crm')
       .from('cliente')
       .select('id')
       .eq('vendedor_asignado', usuarioExistente.username)
@@ -222,6 +227,7 @@ export async function eliminarUsuario(userId: string) {
 
     // Primero eliminar el perfil del usuario
     const { error: profileError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
       .delete()
       .eq('id', userId);

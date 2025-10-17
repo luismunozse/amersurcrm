@@ -19,6 +19,7 @@ export async function GET() {
 
     // Obtener roles activos
     const { data: roles, error } = await supabase
+      .schema('crm')
       .from('rol')
       .select('id, nombre, descripcion')
       .eq('activo', true)
