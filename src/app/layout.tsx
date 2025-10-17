@@ -5,13 +5,13 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import AppToaster from "@/components/Toaster";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-export const inter = Inter({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
 });
 
-export const mont = Montserrat({
+const mont = Montserrat({
   subsets: ["latin"],
   variable: "--font-mont",
   display: "swap",
