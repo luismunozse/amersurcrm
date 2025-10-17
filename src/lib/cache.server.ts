@@ -58,6 +58,7 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
   const esGerente = perfil?.rol === 'ROL_GERENTE';
 
   let q = supabase
+    .schema('crm')
     .from("cliente")
     .select(`
       id,
@@ -151,7 +152,7 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
   const esAdmin = perfil?.rol === 'ROL_ADMIN';
   const esGerente = perfil?.rol === 'ROL_GERENTE';
 
-  let query = supabase.from('cliente').select('*', { count: 'exact', head: true });
+  let query = supabase.schema('crm').from('cliente').select('*', { count: 'exact', head: true });
 
   // Vendedores solo ven sus clientes
   if (!esAdmin && !esGerente) {
@@ -172,6 +173,7 @@ export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
 
   // Todos los usuarios pueden ver todos los proyectos (vendedores y admins)
   const { data, error } = await supabase
+    .schema('crm')
     .from("proyecto")
     .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
     .order("created_at", { ascending: false });
@@ -188,6 +190,7 @@ export const getCachedLotes = cache(async (proyectoId: string): Promise<LoteCach
 
   // Todos los usuarios pueden ver todos los lotes de un proyecto
   const { data, error } = await supabase
+    .schema('crm')
     .from("lote")
     .select("id,codigo,sup_m2,precio,moneda,estado")
     .eq("proyecto_id", proyectoId)
@@ -216,7 +219,7 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
 
   // Administradores y gerentes ven todos los clientes del sistema
   // Vendedores solo ven sus clientes asignados
-  let clientesQuery = supabase.from("cliente").select("*", { count: "exact", head: true });
+  let clientesQuery = supabase.schema('crm').from("cliente").select("*", { count: "exact", head: true });
 
   if (!esAdmin && !esGerente) {
     // Vendedor: solo sus clientes (donde created_by = userId o vendedor_asignado = userId)
@@ -226,9 +229,9 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
   const [cRes, pRes, lRes] = await Promise.all([
     clientesQuery,
     // Proyectos: todos los proyectos (todos pueden ver)
-    supabase.from("proyecto").select("*", { count: "exact", head: true }),
+    supabase.schema('crm').from("proyecto").select("*", { count: "exact", head: true }),
     // Lotes: todos los lotes (todos pueden ver)
-    supabase.from("lote").select("*", { count: "exact", head: true }),
+    supabase.schema('crm').from("lote").select("*", { count: "exact", head: true }),
   ]);
 
   return {
@@ -246,6 +249,7 @@ export const getCachedProyecto = cache(async (proyectoId: string): Promise<Proye
 
   // Todos los usuarios pueden ver cualquier proyecto
   const { data, error } = await supabase
+    .schema('crm')
     .from("proyecto")
     .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
     .eq("id", proyectoId)
@@ -262,6 +266,7 @@ export const getCachedNotificacionesNoLeidas = cache(async (): Promise<Notificac
   if (!userId) return [];
 
   const { data, error } = await supabase
+    .schema('crm')
     .from("notificacion")
     .select("id,tipo,titulo,mensaje,data,created_at")
     .eq("usuario_id", userId)
@@ -279,6 +284,7 @@ export const getCachedNotificacionesCount = cache(async (): Promise<number> => {
   if (!userId) return 0;
 
   const { count, error } = await supabase
+    .schema('crm')
     .from("notificacion")
     .select("*", { count: "exact", head: true })
     .eq("usuario_id", userId)
