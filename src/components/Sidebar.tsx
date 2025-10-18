@@ -81,15 +81,16 @@ const adminNavigation = [
 ];
 
 function NavLink({
-  href, active, children, onClick, collapsed = false, label = "",
+  href, active, children, onClick, collapsed = false, label = "", style,
 }: {
-  href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean; label?: string;
+  href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean; label?: string; style?: React.CSSProperties;
 }) {
   const content = (
     <Link
       href={href}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
+      style={style}
       className={cn(
         "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
         collapsed ? "lg:justify-center lg:px-3 lg:py-3 lg:mx-2" : "px-4 py-3",
@@ -121,7 +122,8 @@ function NavLink({
         <div className="absolute inset-0 bg-crm-primary/0 group-hover:bg-crm-primary/10 rounded-xl transition-colors duration-300" />
       )}
 
-      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3")}>
+      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3")}
+      >
         {children}
       </div>
     </Link>
@@ -162,7 +164,8 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
-  
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
   const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
 
   const handleCollapseChange = useCallback((newCollapsed: boolean) => {
@@ -172,6 +175,16 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
       setInternalCollapsed(newCollapsed);
     }
   }, [onCollapseChange]);
+
+  // Detectar preferencia de reduced motion
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -204,11 +217,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
 
   return (
     <>
-      {/* Overlay móvil */}
+      {/* Overlay móvil mejorado con blur */}
       {isOpen && (
         <button
           aria-label="Cerrar menú"
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-gradient-to-r from-black/50 to-black/30 backdrop-blur-md z-40 lg:hidden animate-in fade-in-0 duration-300 cursor-default"
           onClick={onClose}
         />
       )}
@@ -216,13 +229,21 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
       {/* Sidebar */}
       <aside
         aria-label="Barra lateral de navegación"
+        data-collapsed={collapsed}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 bg-crm-sidebar transform transition-transform duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 bg-crm-sidebar",
           "lg:translate-x-0 lg:sticky lg:top-0 lg:h-dvh lg:z-40",
           // ancho desktop controlado por variable
           "lg:w-[var(--sidebar-w)]",
           // ancho móvil (expandido)
           "w-80 sm:w-72",
+          // Transiciones mejoradas con soporte para reduced motion
+          prefersReducedMotion
+            ? "transition-none" // Sin animaciones si el usuario lo prefiere
+            : cn(
+                "transform transition-all duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)]",
+                "lg:transition-[width] lg:duration-300 lg:ease-[cubic-bezier(0.4,0.0,0.2,1)]"
+              ),
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -241,12 +262,12 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                       <button
                         type="button"
                         onClick={() => handleCollapseChange(false)}
-                        className="hidden lg:flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-crm-primary/30 to-crm-accent/30 backdrop-blur-sm border-2 border-crm-primary/40 text-white hover:border-crm-primary/60 hover:from-crm-primary/40 hover:to-crm-accent/40 transition-all duration-300 shadow-xl shadow-crm-primary/20 hover:shadow-2xl hover:shadow-crm-primary/30 hover:scale-105 active:scale-95 group relative overflow-hidden"
+                        className="hidden lg:flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-crm-primary/30 to-crm-accent/30 backdrop-blur-sm border-2 border-crm-primary/40 text-white hover:border-crm-primary/60 hover:from-crm-primary/40 hover:to-crm-accent/40 transition-all duration-300 shadow-xl shadow-crm-primary/20 hover:shadow-2xl hover:shadow-crm-primary/30 hover:scale-110 active:scale-95 group relative overflow-hidden"
                         aria-label="Expandir sidebar"
                       >
                         {/* Efecto de brillo animado */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                        <Bars3Icon className="w-7 h-7 relative z-10 transition-transform group-hover:scale-110" />
+                        <Bars3Icon className="w-7 h-7 relative z-10 transition-transform group-hover:rotate-180 group-hover:scale-110" />
                       </button>
                     </Tooltip.Trigger>
                     <Tooltip.Portal>
@@ -284,11 +305,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
               <button
                 type="button"
                 onClick={() => handleCollapseChange(true)}
-                className="hidden lg:flex items-center justify-center ml-3 w-10 h-10 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
+                className="hidden lg:flex items-center justify-center ml-3 w-10 h-10 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 group"
                 aria-label="Colapsar sidebar"
                 title="Colapsar menú"
               >
-                <Bars3Icon className="w-6 h-6 transition-transform group-hover:scale-110" />
+                <Bars3Icon className="w-6 h-6 transition-transform group-hover:rotate-180" />
               </button>
             )}
 
@@ -305,7 +326,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
 
           {/* Navigation */}
           <nav className="flex-1 px-4 sm:px-6 py-6 space-y-1.5">
-            {navigation.map((item) => (
+            {navigation.map((item, i) => (
               <NavLink
                 key={item.name}
                 href={item.href}
@@ -313,9 +334,19 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                 onClick={onClose}
                 collapsed={collapsed}
                 label={item.name}
+                style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
               >
                 <span className="shrink-0 grid place-items-center w-8 h-8">{item.icon}</span>
-                <span className={collapsed ? "hidden lg:hidden" : "truncate"}>{item.name}</span>
+                <span
+                  className={cn(
+                    "transition-all duration-300 ease-out whitespace-nowrap",
+                    collapsed
+                      ? "max-w-0 opacity-0 translate-x-2 pointer-events-none"
+                      : "max-w-[12rem] opacity-100 translate-x-0 truncate"
+                  )}
+                >
+                  {item.name}
+                </span>
               </NavLink>
             ))}
 
@@ -347,7 +378,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                   </div>
                 )}
 
-                {adminNavigation.map((item) => (
+                {adminNavigation.map((item, i) => (
                   <NavLink
                     key={item.name}
                     href={item.href}
@@ -355,9 +386,19 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                     onClick={onClose}
                     collapsed={collapsed}
                     label={item.name}
+                    style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
                   >
                     <span className="shrink-0 grid place-items-center w-8 h-8">{item.icon}</span>
-                    <span className={collapsed ? "hidden lg:hidden" : "truncate"}>{item.name}</span>
+                    <span
+                      className={cn(
+                        "transition-all duration-300 ease-out whitespace-nowrap",
+                        collapsed
+                          ? "max-w-0 opacity-0 translate-x-2 pointer-events-none"
+                          : "max-w-[12rem] opacity-100 translate-x-0 truncate"
+                      )}
+                    >
+                      {item.name}
+                    </span>
                   </NavLink>
                 ))}
               </>
