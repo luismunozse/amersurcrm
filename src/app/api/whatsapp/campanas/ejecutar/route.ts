@@ -3,6 +3,24 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import { WhatsAppClient } from "@/lib/whatsapp/client";
 
 /**
+ * Normaliza un número de teléfono al formato de WhatsApp
+ * - Remueve espacios, guiones, paréntesis
+ * - Remueve el + del inicio
+ * - Solo deja números
+ */
+function normalizarTelefono(telefono: string): string {
+  // Remover todo excepto números y el + del inicio
+  let normalizado = telefono.replace(/[^\d+]/g, '');
+
+  // Remover el + del inicio si existe
+  if (normalizado.startsWith('+')) {
+    normalizado = normalizado.substring(1);
+  }
+
+  return normalizado;
+}
+
+/**
  * API para ejecutar una campaña de WhatsApp
  * Procesa los destinatarios y envía mensajes según la configuración
  */
@@ -109,6 +127,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No se encontraron destinatarios" }, { status: 400 });
     }
 
+    // Normalizar todos los teléfonos
+    telefonos = telefonos.map(normalizarTelefono);
+
+    console.log(`[CAMPAÑA ${campana_id}] Destinatarios normalizados:`, telefonos);
+    console.log(`[CAMPAÑA ${campana_id}] Plantilla: ${template.nombre} (${template.idioma})`);
+    console.log(`[CAMPAÑA ${campana_id}] Variables:`, variables);
+
     // Crear cliente de WhatsApp
     const whatsappClient = new WhatsAppClient(
       credential.phone_number_id,
@@ -146,6 +171,8 @@ export async function POST(request: NextRequest) {
 
     for (const telefono of telefonos) {
       try {
+        console.log(`[CAMPAÑA ${campana_id}] Enviando mensaje a: ${telefono}`);
+
         // Enviar mensaje
         const waResponse = await whatsappClient.enviarMensajePlantilla(
           telefono,
@@ -153,6 +180,8 @@ export async function POST(request: NextRequest) {
           template.idioma,
           components.length > 0 ? components : undefined
         );
+
+        console.log(`[CAMPAÑA ${campana_id}] ✅ Mensaje enviado exitosamente a ${telefono}`, waResponse);
 
         // Guardar mensaje en la base de datos
         await supabase
@@ -181,7 +210,7 @@ export async function POST(request: NextRequest) {
           .eq('id', campana_id);
 
       } catch (error) {
-        console.error(`Error enviando mensaje a ${telefono}:`, error);
+        console.error(`[CAMPAÑA ${campana_id}] ❌ Error enviando mensaje a ${telefono}:`, error);
         fallidos++;
       }
 
