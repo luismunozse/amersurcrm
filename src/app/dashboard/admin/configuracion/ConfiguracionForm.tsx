@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useMemo, useState, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { actualizarConfiguracion, ConfiguracionFormState } from "./actions";
 
 export type ConfiguracionInicial = {
@@ -64,7 +64,7 @@ function SubmitButton() {
 }
 
 export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) {
-  const [state, formAction] = useFormState(actualizarConfiguracion, initialState);
+  const [state, formAction] = useActionState(actualizarConfiguracion, initialState);
   const [reemplazarWhatsappToken, setReemplazarWhatsappToken] = useState(false);
 
   const camposClienteDefault = useMemo(

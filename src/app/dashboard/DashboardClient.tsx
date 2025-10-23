@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import type { NotificacionNoLeida } from "@/types/crm";
@@ -33,8 +34,8 @@ export default function DashboardClient({
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-dvh flex bg-crm-bg-primary">
-      {/* Sidebar único */}
+    <div className="relative min-h-dvh bg-crm-bg-primary">
+      {/* Sidebar flotante - ahora es fixed en lugar de flex item */}
       <Sidebar
         isOpen={open}
         onClose={() => setOpen(false)}
@@ -42,8 +43,13 @@ export default function DashboardClient({
         onCollapseChange={setCollapsed}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header recibe el estado del sidebar */}
+      {/* Contenido principal con padding dinámico según estado del sidebar */}
+      <div className={cn(
+        "min-h-dvh flex flex-col transition-all duration-300 ease-out",
+        // En desktop, agregar margen izquierdo según el ancho del sidebar
+        "lg:ml-[var(--sidebar-w)]"
+      )}>
+        {/* Header */}
         <Header
           onSidebarToggle={() => setOpen(true)}
           userEmail={userEmail}
@@ -57,7 +63,11 @@ export default function DashboardClient({
           notificationsCount={notificationsCount}
           exchangeRates={exchangeRates}
         />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
+
+        {/* Main content */}
+        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+          {children}
+        </main>
       </div>
     </div>
   );

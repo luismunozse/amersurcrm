@@ -50,12 +50,6 @@ const navigation = [
 ];
 
 const adminNavigation = [
-  { name: "Administración", href: "/dashboard/admin", icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-  )},
   { name: "Usuarios", href: "/dashboard/admin/usuarios", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -93,7 +87,7 @@ function NavLink({
       style={style}
       className={cn(
         "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
-        collapsed ? "lg:justify-center lg:px-3 lg:py-3 lg:mx-2" : "px-4 py-3",
+        collapsed ? "lg:justify-center lg:px-2 lg:py-2 lg:mx-1.5" : "px-4 py-3",
         active
           ? "bg-gradient-to-r from-crm-primary to-crm-primary-hover text-white shadow-lg shadow-crm-primary/30 scale-[1.02]"
           : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white hover:shadow-lg hover:shadow-crm-primary/10 hover:scale-[1.03]"
@@ -232,7 +226,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
         data-collapsed={collapsed}
         className={cn(
           "fixed inset-y-0 left-0 z-50 bg-crm-sidebar",
-          "lg:translate-x-0 lg:sticky lg:top-0 lg:h-dvh lg:z-40",
+          // Sombra profunda para efecto flotante
+          "shadow-2xl shadow-black/30",
+          "lg:border-r lg:border-crm-sidebar-hover/30",
+          // En desktop, sidebar es fixed flotante
+          "lg:fixed lg:top-0 lg:h-screen lg:z-40",
           // ancho desktop controlado por variable
           "lg:w-[var(--sidebar-w)]",
           // ancho móvil (expandido)
@@ -244,7 +242,12 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                 "transform transition-all duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)]",
                 "lg:transition-[width] lg:duration-300 lg:ease-[cubic-bezier(0.4,0.0,0.2,1)]"
               ),
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          // Animación mejorada con scale en móvil
+          isOpen
+            ? "translate-x-0 scale-100 opacity-100"
+            : "-translate-x-full scale-95 opacity-0",
+          // En desktop siempre visible
+          "lg:translate-x-0 lg:scale-100 lg:opacity-100"
         )}
       >
         <div className="flex flex-col h-full">
@@ -325,7 +328,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 sm:px-6 py-6 space-y-1.5">
+          <nav className={cn(
+            "flex-1 overflow-y-auto",
+            collapsed ? "px-2 py-3 space-y-0.5" : "px-4 sm:px-6 py-6 space-y-1.5"
+          )}>
             {navigation.map((item, i) => (
               <NavLink
                 key={item.name}
@@ -336,7 +342,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                 label={item.name}
                 style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
               >
-                <span className="shrink-0 grid place-items-center w-8 h-8">{item.icon}</span>
+                <span className={cn(
+                  "shrink-0 grid place-items-center transition-all",
+                  collapsed ? "w-9 h-9" : "w-8 h-8"
+                )}>{item.icon}</span>
                 <span
                   className={cn(
                     "transition-all duration-300 ease-out whitespace-nowrap",
@@ -354,17 +363,19 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
               <>
                 {/* Separador mejorado */}
                 <div className={cn(
-                  "relative my-6",
-                  collapsed ? "mx-auto w-8" : "w-full"
+                  "relative flex items-center justify-center",
+                  collapsed ? "my-3 px-2" : "my-6"
                 )}>
-                  <div className={cn(
-                    "border-t transition-all duration-300",
-                    collapsed
-                      ? "border-crm-primary/30 shadow-[0_0_8px_rgba(var(--crm-primary-rgb),0.2)]"
-                      : "border-crm-sidebar-hover/50"
-                  )} />
-                  {collapsed && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-crm-primary rounded-full shadow-[0_0_8px_rgba(var(--crm-primary-rgb),0.5)]" />
+                  {collapsed ? (
+                    // Versión colapsada: solo línea vertical sutil
+                    <div className="relative w-8 flex items-center justify-center">
+                      <div className="h-8 w-px bg-gradient-to-b from-transparent via-crm-sidebar-hover/50 to-transparent" />
+                    </div>
+                  ) : (
+                    // Versión expandida: línea horizontal elegante
+                    <div className="relative w-full flex items-center">
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-crm-sidebar-hover to-transparent" />
+                    </div>
                   )}
                 </div>
 
@@ -373,7 +384,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                   <div className="px-4 py-2 mb-2">
                     <h3 className="text-xs font-bold text-crm-primary uppercase tracking-widest flex items-center">
                       <div className="w-2 h-2 bg-crm-primary rounded-full mr-2 animate-pulse" />
-                      Administración
+                      Sistema
                     </h3>
                   </div>
                 )}
@@ -388,7 +399,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                     label={item.name}
                     style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
                   >
-                    <span className="shrink-0 grid place-items-center w-8 h-8">{item.icon}</span>
+                    <span className={cn(
+                  "shrink-0 grid place-items-center transition-all",
+                  collapsed ? "w-9 h-9" : "w-8 h-8"
+                )}>{item.icon}</span>
                     <span
                       className={cn(
                         "transition-all duration-300 ease-out whitespace-nowrap",
