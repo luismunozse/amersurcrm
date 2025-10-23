@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,17 @@ function formatLastSignIn(dateString?: string): string {
 export default function UserAvatarMenu({ userName, userUsername, userEmail, userRole, userAvatarUrl, notificationsCount = 0, lastSignInAt }: Props) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return (
+      <div className="h-10 w-32 rounded-full bg-crm-card animate-pulse" aria-hidden="true" />
+    );
+  }
 
   const handleLogout = async () => {
     setLoggingOut(true);

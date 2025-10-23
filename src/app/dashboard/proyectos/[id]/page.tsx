@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+import { esAdmin } from "@/lib/auth/roles";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
 import MapeoLotesMejorado from "./_MapeoLotesMejorado";
@@ -9,6 +10,9 @@ import DeleteProjectButton from "./_DeleteProjectButton";
 import GoogleMapsDebug from "@/components/GoogleMapsDebug";
 import { PaginationClient } from "./_PaginationClient";
 import ProjectTabs from "./_ProjectTabs";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
@@ -43,14 +47,11 @@ export default async function ProyLotesPage({
   const supabase = await createServerOnlyClient();
 
   // Obtener usuario y perfil para verificar rol
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: perfil } = user ? await supabase
-    .from('usuario_perfil')
-    .select('rol(nombre)')
-    .eq('id', user.id)
-    .single() : { data: null };
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-  const isAdmin = perfil?.rol?.[0]?.nombre === 'ROL_ADMIN' || false;
+  const isAdmin = user ? await esAdmin() : false;
 
   // Proyecto (para título/404)
   const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";

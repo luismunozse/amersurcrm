@@ -45,6 +45,8 @@ interface GoogleMapProps {
   draggingLoteId?: string | null;
   onPinDrop?: (loteId: string, lat: number, lng: number) => void;
   onMarkerDragEnd?: (loteId: string, lat: number, lng: number) => void;
+  focusLoteRequest?: { id: string; ts: number } | null;
+  onFocusHandled?: () => void;
 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -62,6 +64,43 @@ const ESTADO_TEXTOS: Record<string, string> = {
   vendido: 'Vendido',
   desconocido: 'Sin estado',
 };
+
+const NORMALIZED_MIN = -0.0001;
+const NORMALIZED_MAX = 1.0001;
+
+function isNormalizedPair([lat, lng]: [number, number]) {
+  return (
+    lat >= NORMALIZED_MIN && lat <= NORMALIZED_MAX &&
+    lng >= NORMALIZED_MIN && lng <= NORMALIZED_MAX
+  );
+}
+
+function denormalizePair(
+  pair: [number, number],
+  bounds?: [[number, number], [number, number]]
+): [number, number] {
+  if (!bounds || !isNormalizedPair(pair)) {
+    return pair;
+  }
+  const [[swLat, swLng], [neLat, neLng]] = bounds;
+  const lat = swLat + pair[0] * (neLat - swLat);
+  const lng = swLng + pair[1] * (neLng - swLng);
+  return [lat, lng];
+}
+
+function denormalizePolygon(
+  points: [number, number][],
+  bounds?: [[number, number], [number, number]]
+): [number, number][] {
+  if (!points || points.length === 0) return points;
+  if (!bounds) return points;
+  const converted = points.map((point) => denormalizePair(point, bounds));
+  const changed = converted.some((point, index) => {
+    const original = points[index];
+    return point[0] !== original[0] || point[1] !== original[1];
+  });
+  return changed ? converted : points;
+}
 
 // Función factory para crear la clase de overlay (se ejecuta cuando google está disponible)
 function createGroundOverlayClass() {
@@ -184,6 +223,8 @@ export default function GoogleMap({
   draggingLoteId = null,
   onPinDrop,
   onMarkerDragEnd,
+  focusLoteRequest,
+  onFocusHandled,
 }: GoogleMapProps) {
   const [centerLat, centerLng] = defaultCenter;
   const mapRef = useRef<HTMLDivElement>(null);
@@ -794,21 +835,11 @@ export default function GoogleMap({
           lotesPolygonsRef.current.delete(lote.id);
         }
 
-        // Desnormalizar coordenadas: convertir de [0-1] a coordenadas geográficas reales
-        const [normalizedY, normalizedX] = lote.plano_poligono[0];
-
-        let position: { lat: number; lng: number };
-
-        if (overlayBounds) {
-          // Si hay bounds del plano, desnormalizar las coordenadas
-          const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-          const lat = swLat + normalizedY * (neLat - swLat);
-          const lng = swLng + normalizedX * (neLng - swLng);
-          position = { lat, lng };
-          console.log('🔄 Desnormalizando lote', lote.codigo, ':', { normalizedY, normalizedX }, '→', position);
-        } else {
-          // Fallback: usar directamente (retrocompatibilidad con lotes antiguos)
-          position = { lat: normalizedY, lng: normalizedX };
+        const [rawLat, rawLng] = lote.plano_poligono[0];
+        const [lat, lng] = denormalizePair([rawLat, rawLng], overlayBounds);
+        const position = { lat, lng };
+        if (position.lat !== rawLat || position.lng !== rawLng) {
+          console.log('🔄 Desnormalizando lote', lote.codigo, ':', { rawLat, rawLng }, '→', position);
         }
 
         // Crear o actualizar marcador
@@ -926,8 +957,8 @@ export default function GoogleMap({
 
       // Si tiene 3+ puntos, renderizar como polígono
       if (lote.plano_poligono.length >= 3) {
-        // Convertir coordenadas a formato Google Maps
-        const path = lote.plano_poligono.map(([lat, lng]) => ({ lat, lng }));
+        const denormalizedPairs = denormalizePolygon(lote.plano_poligono, overlayBounds);
+        const path = denormalizedPairs.map(([lat, lng]) => ({ lat, lng }));
 
         // Crear o actualizar polígono
         if (!lotesPolygonsRef.current.has(lote.id)) {
@@ -957,7 +988,7 @@ export default function GoogleMap({
         }
 
         // Calcular centro del polígono para la etiqueta
-        const [latSum, lngSum] = lote.plano_poligono.reduce(
+        const [latSum, lngSum] = denormalizedPairs.reduce(
           (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
           [0, 0]
         );
@@ -1095,6 +1126,48 @@ export default function GoogleMap({
     () => ['disponible', 'reservado', 'vendido'] as const,
     []
   );
+
+  useEffect(() => {
+    if (!focusLoteRequest || !isLoaded) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const lote = lotes.find((item) => item.id === focusLoteRequest.id);
+    if (!lote) {
+      onFocusHandled?.();
+      return;
+    }
+
+    let focused = false;
+
+    if (lote.plano_poligono && lote.plano_poligono.length >= 3) {
+      const polygonPoints = denormalizePolygon(lote.plano_poligono, overlayBounds);
+      const bounds = new google.maps.LatLngBounds();
+      polygonPoints.forEach(([lat, lng]) => bounds.extend(new google.maps.LatLng(lat, lng)));
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds);
+        focused = true;
+      }
+    }
+
+    if (!focused) {
+      let point: [number, number] | null = null;
+      if (lote.plano_poligono && lote.plano_poligono.length >= 1) {
+        point = denormalizePair(lote.plano_poligono[0], overlayBounds);
+      } else if (lote.ubicacion) {
+        point = denormalizePair([lote.ubicacion.lat, lote.ubicacion.lng], overlayBounds);
+      }
+
+      if (point) {
+        map.panTo({ lat: point[0], lng: point[1] });
+        const currentZoom = map.getZoom();
+        if (!currentZoom || currentZoom < 18) {
+          map.setZoom(18);
+        }
+      }
+    }
+
+    onFocusHandled?.();
+  }, [focusLoteRequest, isLoaded, lotes, overlayBounds, onFocusHandled]);
 
   if (!isLoaded) {
     return loadingFallback;

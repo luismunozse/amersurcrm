@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Upload, Check, MapPin, Search, Square } from 'lucide-react';
+import { Upload, Check, MapPin, Search, RefreshCcw, Trash2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import BlueprintUploader from '@/components/BlueprintUploader';
 import { toast } from 'sonner';
 import {
@@ -12,6 +12,7 @@ import {
   eliminarPlanos,
   guardarOverlayBounds,
   guardarPoligonoLote,
+  eliminarLote,
 } from './_actions';
 
 interface LatLngLiteral {
@@ -94,16 +95,87 @@ export default function MapeoLotesMejorado({
   const [draggingLoteId, setDraggingLoteId] = useState<string | null>(null);
   const [drawingLoteId, setDrawingLoteId] = useState<string | null>(null);
   const [savingLotePolygon, setSavingLotePolygon] = useState(false);
+  const [deletingLoteId, setDeletingLoteId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [focusRequest, setFocusRequest] = useState<{ id: string; ts: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'located'>('pending');
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const toggleDrawer = useCallback(() => setDrawerOpen((prev) => !prev), []);
 
   useEffect(() => {
-    setLotesState(lotes);
-  }, [lotes]);
+    if (currentStep !== 3) {
+      setDrawerOpen(true);
+    }
+  }, [currentStep]);
+
+  const convertLegacyPoint = useCallback(
+    (point: [number, number]): [number, number] => {
+      if (!overlayBounds) return point;
+      const [lat, lng] = point;
+      const isNormalized =
+        lat >= -0.0001 && lat <= 1.0001 && lng >= -0.0001 && lng <= 1.0001;
+      if (!isNormalized) return point;
+      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+      const actualLat = swLat + lat * (neLat - swLat);
+      const actualLng = swLng + lng * (neLng - swLng);
+      return [actualLat, actualLng];
+    },
+    [overlayBounds]
+  );
+
+  const denormalizeLote = useCallback(
+    (lote: LoteState): LoteState => {
+      if (!overlayBounds) return lote;
+
+      let changed = false;
+      let finalPlano = lote.plano_poligono;
+
+      if (lote.plano_poligono && lote.plano_poligono.length > 0) {
+        const convertedPlano = lote.plano_poligono.map((pair) => convertLegacyPoint(pair));
+        const planoChanged = convertedPlano.some((pair, index) => {
+          const original = lote.plano_poligono![index];
+          return pair[0] !== original[0] || pair[1] !== original[1];
+        });
+        if (planoChanged) {
+          changed = true;
+          finalPlano = convertedPlano;
+        }
+      }
+
+      let finalUbicacion = lote.ubicacion;
+      if (lote.ubicacion) {
+        const converted = convertLegacyPoint([lote.ubicacion.lat, lote.ubicacion.lng]);
+        if (converted[0] !== lote.ubicacion.lat || converted[1] !== lote.ubicacion.lng) {
+          changed = true;
+          finalUbicacion = { lat: converted[0], lng: converted[1] };
+        }
+      }
+
+      if (!changed) return lote;
+
+      return {
+        ...lote,
+        plano_poligono: finalPlano,
+        ubicacion: finalUbicacion,
+      };
+    },
+    [convertLegacyPoint, overlayBounds]
+  );
+
+  useEffect(() => {
+    setLotesState(lotes.map((lote) => denormalizeLote(lote)));
+  }, [lotes, denormalizeLote]);
+
+  useEffect(() => {
+    if (!overlayBounds) return;
+    setLotesState((prev) => prev.map((lote) => denormalizeLote(lote)));
+  }, [denormalizeLote, overlayBounds]);
 
   useEffect(() => {
     setPlanUrl(planosUrl);
   }, [planosUrl]);
 
-  // Estadísticas
+  // Estadísticas globales (sin filtros)
   const stats = useMemo(() => {
     const disponibles = lotesState.filter((l) => l.estado === 'disponible').length;
     const reservados = lotesState.filter((l) => l.estado === 'reservado').length;
@@ -123,23 +195,47 @@ export default function MapeoLotesMejorado({
     };
   }, [lotesState]);
 
+  const normalizedSearch = useMemo(() => searchTerm.trim().toLowerCase(), [searchTerm]);
+  const hasSearch = normalizedSearch.length >= 2;
+  const searchTooShort = searchTerm.trim().length > 0 && !hasSearch;
+
+  const filteredLotes = useMemo(() => {
+    if (!hasSearch) return lotesState;
+    return lotesState.filter((lote) => lote.codigo.toLowerCase().includes(normalizedSearch));
+  }, [hasSearch, lotesState, normalizedSearch]);
+
   const lotesSinUbicar = useMemo(
-    () => lotesState.filter((lote) => {
-      if (lote.ubicacion?.lat && lote.ubicacion?.lng) return false;
-      if (lote.plano_poligono && lote.plano_poligono.length > 0) return false;
-      return true;
-    }),
-    [lotesState]
+    () =>
+      filteredLotes.filter((lote) => {
+        if (lote.ubicacion?.lat && lote.ubicacion?.lng) return false;
+        if (lote.plano_poligono && lote.plano_poligono.length > 0) return false;
+        return true;
+      }),
+    [filteredLotes]
   );
 
   const lotesUbicados = useMemo(
-    () => lotesState.filter((lote) => {
-      if (lote.ubicacion?.lat && lote.ubicacion?.lng) return true;
-      if (lote.plano_poligono && lote.plano_poligono.length > 0) return true;
-      return false;
-    }),
-    [lotesState]
+    () =>
+      filteredLotes.filter((lote) => {
+        if (lote.ubicacion?.lat && lote.ubicacion?.lng) return true;
+        if (lote.plano_poligono && lote.plano_poligono.length > 0) return true;
+        return false;
+      }),
+    [filteredLotes]
   );
+
+  const totalProgress = stats.total > 0 ? Math.round((stats.ubicados / stats.total) * 100) : 0;
+  const visibleLotes = activeTab === 'pending' ? lotesSinUbicar : lotesUbicados;
+  const selectedLote = useMemo(
+    () => lotesState.find((lote) => lote.id === selectedLoteId) ?? null,
+    [lotesState, selectedLoteId]
+  );
+  const selectedLoteUbicado = useMemo(() => {
+    if (!selectedLote) return false;
+    if (selectedLote.ubicacion?.lat && selectedLote.ubicacion?.lng) return true;
+    if (selectedLote.plano_poligono && selectedLote.plano_poligono.length > 0) return true;
+    return false;
+  }, [selectedLote]);
 
   const mapCenter = useMemo(() => {
     if (overlayBounds) {
@@ -281,13 +377,11 @@ export default function MapeoLotesMejorado({
   };
 
   const upsertLotePin = useCallback(async (loteId: string, lat: number, lng: number, showToast = true) => {
-    // Verificar que haya bounds del plano
     if (!overlayBounds) {
       toast.error('Primero debes definir el área del plano');
       return;
     }
 
-    // Verificar que haya un plano subido
     if (!planUrl) {
       toast.error('Primero debes subir el plano del proyecto');
       return;
@@ -295,43 +389,33 @@ export default function MapeoLotesMejorado({
 
     setSavingLotePolygon(true);
     try {
-      // Convertir coordenadas geográficas a coordenadas normalizadas dentro del plano (0-1)
       const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-
-      // Normalizar: 0 = esquina SW, 1 = esquina NE
       const normalizedX = (lng - swLng) / (neLng - swLng);
       const normalizedY = (lat - swLat) / (neLat - swLat);
 
-      console.log('🎯 Pin drop:', { lat, lng });
-      console.log('📐 Bounds:', overlayBounds);
-      console.log('✨ Normalizado:', { x: normalizedX, y: normalizedY });
-
-      // Verificar que las coordenadas estén dentro del plano (con margen de 10% para tolerar pequeños errores)
       const margin = 0.1;
-      if (normalizedX < -margin || normalizedX > 1 + margin ||
-          normalizedY < -margin || normalizedY > 1 + margin) {
-        toast.error('⚠️ El lote debe ubicarse DENTRO del plano. Intenta hacer zoom y soltar dentro del área del plano.');
+      if (
+        normalizedX < -margin ||
+        normalizedX > 1 + margin ||
+        normalizedY < -margin ||
+        normalizedY > 1 + margin
+      ) {
+        toast.error('⚠️ El lote debe ubicarse DENTRO del plano. Intenta soltarlo nuevamente dentro del área.');
         console.warn('❌ Coordenadas fuera del plano:', { normalizedX, normalizedY });
         setSavingLotePolygon(false);
         return;
       }
 
-      // Clampear valores al rango 0-1 (por si hay pequeñas desviaciones)
-      const clampedX = Math.max(0, Math.min(1, normalizedX));
-      const clampedY = Math.max(0, Math.min(1, normalizedY));
-
-      // Guardar coordenadas normalizadas como polígono de 1 punto
-      // Formato: [normalizedY, normalizedX] para mantener consistencia con [lat, lng]
-      const poligonoNormalizado: [number, number][] = [[clampedY, clampedX]];
-      await guardarPoligonoLote(loteId, proyectoId, poligonoNormalizado);
+      const poligonoReal: [number, number][] = [[lat, lng]];
+      await guardarPoligonoLote(loteId, proyectoId, poligonoReal);
 
       setLotesState((prev) =>
         prev.map((lote) =>
           lote.id === loteId
             ? {
                 ...lote,
-                plano_poligono: poligonoNormalizado,
-                ubicacion: { lat: clampedY, lng: clampedX }, // Guardar normalizadas
+                plano_poligono: poligonoReal,
+                ubicacion: { lat, lng },
               }
             : lote
         )
@@ -374,6 +458,12 @@ export default function MapeoLotesMejorado({
     setDraggingLoteId(null);
   }, []);
 
+  const handleFocusLote = useCallback((loteId: string) => {
+    setSelectedLoteId(loteId);
+    setFocusRequest({ id: loteId, ts: Date.now() });
+    setCurrentStep((prev) => (prev === 3 ? prev : 3));
+  }, []);
+
   const handleStartDrawingLote = useCallback((loteId: string) => {
     setDrawingLoteId(loteId);
     setSelectedLoteId(loteId);
@@ -410,24 +500,64 @@ export default function MapeoLotesMejorado({
     }
   }, [drawingLoteId, proyectoId, lotesState]);
 
-  const handleRemoveLotePin = async (loteId: string) => {
-    if (!confirm('¿Quitar la ubicación de este lote?')) return;
-    setSavingLotePolygon(true);
-    try {
+  const handleRemoveLotePin = useCallback(
+    async (
+      loteId: string,
+      options: { skipConfirm?: boolean } = {}
+    ): Promise<boolean> => {
+      if (!options.skipConfirm && !confirm('¿Quitar la ubicación de este lote?')) {
+        return false;
+      }
+      setSavingLotePolygon(true);
+      try {
       await guardarPoligonoLote(loteId, proyectoId, []);
       setLotesState((prev) =>
         prev.map((lote) =>
           lote.id === loteId ? { ...lote, plano_poligono: null, ubicacion: null } : lote
         )
       );
+      setSelectedLoteId((prevSelected) => (prevSelected === loteId ? null : prevSelected));
+      setActiveTab((prev) => (prev === 'located' ? 'pending' : prev));
+      toast.success('Se removió la ubicación del lote');
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo remover la ubicación');
+      return false;
+      } finally {
+        setSavingLotePolygon(false);
+      }
+    },
+    [proyectoId]
+  );
+
+  const handleReubicarLote = useCallback(
+    async (loteId: string) => {
+      const lote = lotesState.find((item) => item.id === loteId);
+      const mensaje = `El lote ${lote?.codigo ?? ''} volverá a la lista de pendientes para que puedas ubicarlo nuevamente. ¿Deseas continuar?`;
+      if (!confirm(mensaje)) return;
+      const removed = await handleRemoveLotePin(loteId, { skipConfirm: true });
+      if (removed) {
+        setActiveTab('pending');
+        handleStartDrawingLote(loteId);
+      }
+    },
+    [handleRemoveLotePin, handleStartDrawingLote, lotesState]
+  );
+
+  const handleDeleteLote = async (loteId: string) => {
+    if (!confirm('¿Eliminar este lote del proyecto? Esta acción no se puede deshacer.')) return;
+    setDeletingLoteId(loteId);
+    try {
+      await eliminarLote(loteId, proyectoId);
+      setLotesState((prev) => prev.filter((lote) => lote.id !== loteId));
       if (selectedLoteId === loteId) {
         setSelectedLoteId(null);
       }
-      toast.success('Se removió la ubicación del lote');
+      toast.success('Lote eliminado correctamente');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo remover la ubicación');
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el lote');
     } finally {
-      setSavingLotePolygon(false);
+      setDeletingLoteId(null);
     }
   };
 
@@ -519,314 +649,570 @@ export default function MapeoLotesMejorado({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        {/* Panel Lateral */}
-        <div className="xl:col-span-1 space-y-6">
-          {/* PASO 1: Ubicar Área del Proyecto */}
-          {currentStep === 1 && (
+      {currentStep === 3 ? (
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-stretch">
+          <div
+            className={`w-full space-y-4 transition-all duration-300 ${
+              drawerOpen
+                ? 'xl:w-[22rem] xl:max-w-[22rem] xl:opacity-100'
+                : 'xl:w-0 xl:max-w-0 xl:opacity-0 xl:pointer-events-none'
+            }`}
+          >
             <Card>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Search className="w-5 h-5 text-blue-600" />
+              <CardContent className="p-6 space-y-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 bg-blue-100 rounded-full flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-crm-text-primary">Paso 3 · Ubicar lotes</h3>
+                      <p className="text-xs text-crm-text-muted">
+                        Arrastra o dibuja cada lote directamente sobre el plano para finalizar el mapeo.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-crm-text-primary">Paso 1: Ubicar Área del Proyecto</h3>
-                    <p className="text-xs text-crm-text-muted">Busca y marca la zona en el mapa</p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
-                  <p className="font-medium mb-2">Instrucciones:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs">
-                    <li>Usa el <strong>buscador del mapa</strong> para encontrar la ubicación (ej: "Huaral, Lima")</li>
-                    <li>Haz clic en <strong>"✏️ Dibujar área del proyecto"</strong></li>
-                    <li>Haz clic en el mapa para marcar cada <strong>vértice del área</strong></li>
-                    <li>Haz clic en el <strong>primer punto</strong> para cerrar el polígono</li>
-                    <li>Arrastra los vértices para ajustar si es necesario</li>
-                    <li>Haz clic en <strong>"Guardar ubicación"</strong> para continuar</li>
-                  </ol>
-                </div>
-
-                {areaPolygon.length === 0 ? (
-                  <button
-                    onClick={handleStartDrawingPolygon}
-                    disabled={isDrawingArea}
-                    className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
-                      isDrawingArea
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-crm-primary text-white hover:bg-crm-primary-dark'
-                    }`}
-                  >
-                    {isDrawingArea ? '✏️ Dibujando... (haz clic en el mapa)' : '✏️ Dibujar área del proyecto'}
-                  </button>
-                ) : (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                    <p className="font-medium">✓ Área dibujada ({areaPolygon.length} vértices)</p>
-                    <p className="text-xs mt-1">Arrastra los vértices para ajustar el área</p>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleSaveArea}
-                  disabled={areaPolygon.length < 3}
-                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  ✓ Guardar ubicación y continuar
-                </button>
-
-                {overlayDirty && areaPolygon.length >= 3 && (
-                  <p className="text-xs text-orange-600 text-center">Área definida • Guarda para continuar</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* PASO 2: Subir Plano */}
-          {currentStep === 2 && (
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-crm-text-primary">Paso 2: Subir Plano</h3>
-                    <p className="text-xs text-crm-text-muted">El plano se ubicará en el área marcada</p>
+                  <div className="sm:w-56">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-crm-text-muted">
+                      <span>Progreso del mapeo</span>
+                      <span className="text-crm-text-primary">{stats.ubicados}/{stats.total}</span>
+                    </div>
+                    <div className="mt-2 h-2 bg-crm-border rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-crm-primary to-crm-primary-hover"
+                        style={{ width: `${totalProgress}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-crm-text-muted">{totalProgress}% completado</p>
                   </div>
                 </div>
 
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm">
-                  <p className="text-green-800">✓ Área del proyecto ubicada correctamente</p>
-                  <p className="text-xs text-green-700 mt-1">El plano aparecerá dentro del área marcada</p>
-                </div>
-
-                <BlueprintUploader
-                  onFileSelect={handleUploadPlano}
-                  isUploading={isUploading}
-                  currentFile={planUrl}
-                  onDelete={handleDeletePlano}
-                  acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
-                  maxSize={10}
-                />
-
-                {planUrl && (
-                  <>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-medium text-crm-text-primary mb-2 block">Opacidad del plano</label>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={overlayOpacity}
-                          onChange={(e) => {
-                            setOverlayOpacity(parseFloat(e.target.value));
-                            setOverlayDirty(true);
-                          }}
-                          className="w-full"
-                        />
-                        <div className="text-xs text-crm-text-muted mt-1">{Math.round(overlayOpacity * 100)}%</div>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-crm-text-primary mb-2 block">Rotación</label>
-                        <input
-                          type="range"
-                          min={-180}
-                          max={180}
-                          step={1}
-                          value={overlayRotation}
-                          onChange={(e) => {
-                            setOverlayRotation(parseFloat(e.target.value));
-                            setOverlayDirty(true);
-                          }}
-                          className="w-full"
-                        />
-                        <div className="text-xs text-crm-text-muted mt-1">{overlayRotation.toFixed(0)}°</div>
-                      </div>
-
-                      {overlayDirty && (
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+                  <div className="flex-1">
+                    <label className="text-xs font-semibold text-crm-text-muted uppercase tracking-wide" htmlFor="buscar-lote">
+                      Buscar lote
+                    </label>
+                    <div className="relative mt-1">
+                      <Search className="w-4 h-4 text-crm-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="buscar-lote"
+                        type="search"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Código, referencia..."
+                        className="w-full pl-10 pr-24 py-2 border border-crm-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                      />
+                      {(hasSearch || searchTooShort) && (
                         <button
-                          onClick={handleSaveAdjustments}
-                          className="w-full px-4 py-2 bg-crm-primary text-white rounded-lg font-medium hover:bg-crm-primary-dark transition-colors text-sm"
+                          type="button"
+                          onClick={() => setSearchTerm("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-crm-text-muted hover:text-crm-primary"
                         >
-                          💾 Guardar ajustes
+                          Limpiar
                         </button>
                       )}
                     </div>
+                    {searchTooShort && (
+                      <p className="text-xs text-crm-text-muted mt-1">Escribe al menos 2 caracteres para buscar.</p>
+                    )}
+                    {hasSearch && !filteredLotes.length && !searchTooShort && (
+                      <p className="text-xs text-crm-text-muted mt-1">No se encontraron lotes con “{searchTerm.trim()}”.</p>
+                    )}
+                    {hasSearch && filteredLotes.length > 0 && (
+                      <p className="text-xs text-crm-text-muted mt-1">{filteredLotes.length} resultado{filteredLotes.length === 1 ? '' : 's'} encontrado{filteredLotes.length === 1 ? '' : 's'}.</p>
+                    )}
+                  </div>
 
+                  <div className="lg:w-48 p-3 border border-blue-200 bg-blue-50 rounded-lg text-xs text-blue-900">
+                    <p className="font-semibold mb-1">¿Cómo ubico un lote?</p>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li>Haz clic en <span className="font-semibold">“Dibujar”</span> para trazar el polígono.</li>
+                      <li>También puedes arrastrar el lote al plano para soltar un pin.</li>
+                      <li>Usa “Reubicar” si necesitas ajustarlo nuevamente.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1 px-1 py-1 rounded-lg bg-crm-card border border-crm-border">
                     <button
-                      onClick={() => setCurrentStep(3)}
-                      className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                      type="button"
+                      onClick={() => setActiveTab('pending')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                        activeTab === 'pending'
+                          ? 'bg-crm-primary text-white shadow'
+                          : 'text-crm-text-secondary hover:bg-crm-card-hover'
+                      }`}
                     >
-                      ✓ Plano listo, continuar
+                      Pendientes ({lotesSinUbicar.length})
                     </button>
-                  </>
-                )}
-
-                <button
-                  onClick={() => setCurrentStep(1)}
-                  className="w-full px-4 py-2 border border-crm-border text-crm-text-secondary rounded-lg font-medium hover:bg-crm-card-hover transition-colors text-sm"
-                >
-                  ← Volver a ubicar área
-                </button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* PASO 3: Ubicar Lotes */}
-          {currentStep === 3 && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-blue-600" />
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('located')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                        activeTab === 'located'
+                          ? 'bg-crm-primary text-white shadow'
+                          : 'text-crm-text-secondary hover:bg-crm-card-hover'
+                      }`}
+                    >
+                      Ubicados ({lotesUbicados.length})
+                    </button>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-crm-text-primary">Paso 3: Ubicar Lotes</h3>
-                    <p className="text-xs text-crm-text-muted">Arrastra cada lote al plano</p>
-                  </div>
+
+                  <span className="text-[11px] text-crm-text-muted">
+                    {activeTab === 'pending'
+                      ? 'Arrastra o dibuja los lotes pendientes sobre el plano.'
+                      : 'Revisa, reubica o quita la ubicación de los lotes ya colocados.'}
+                  </span>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
-                    <p className="font-medium mb-1">Cómo ubicar lotes:</p>
-                    <p className="text-xs">Haz clic en "✏️ Dibujar" y traza el área de la parcela directamente sobre el plano del mapa</p>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-crm-text-primary">Lotes pendientes ({lotesSinUbicar.length})</h4>
-                    </div>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {lotesSinUbicar.length === 0 ? (
-                        <div className="text-center py-8 text-sm text-crm-text-muted border border-dashed rounded-lg">
-                          <Check className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                          <p>¡Todos los lotes están ubicados!</p>
-                        </div>
-                      ) : (
-                        lotesSinUbicar.map((lote) => (
-                          <div
-                            key={lote.id}
-                            className={`w-full p-3 border-2 rounded-lg transition-all ${
-                              selectedLoteId === lote.id
-                                ? 'border-crm-primary bg-crm-primary/5 shadow-md'
-                                : 'border-crm-border'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-crm-primary/10 rounded flex items-center justify-center">
-                                  <span className="text-sm font-bold text-crm-primary">{lote.codigo}</span>
-                                </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-crm-text-primary">Lote {lote.codigo}</div>
-                                  <div className={`text-xs ${
-                                    lote.estado === 'disponible' ? 'text-green-600' :
-                                    lote.estado === 'reservado' ? 'text-yellow-600' :
-                                    lote.estado === 'vendido' ? 'text-red-600' : 'text-gray-600'
-                                  }`}>
-                                    {lote.estado === 'disponible' ? '✅ Disponible' :
-                                     lote.estado === 'reservado' ? '🔒 Reservado' :
-                                     lote.estado === 'vendido' ? '💰 Vendido' : 'Sin estado'}
-                                  </div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleStartDrawingLote(lote.id)}
-                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
-                              >
-                                ✏️ Dibujar
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {lotesUbicados.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-crm-text-primary">Ubicados ({lotesUbicados.length})</h4>
-                      </div>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                        {lotesUbicados.map((lote) => (
-                          <div
-                            key={lote.id}
-                            className="flex items-center justify-between p-2 border border-green-200 rounded-lg bg-green-50/50 hover:bg-green-50 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Check className="w-3.5 h-3.5 text-green-600" />
-                              <span className="text-sm font-medium text-crm-text-primary">{lote.codigo}</span>
-                            </div>
-                            <button
-                              onClick={() => handleRemoveLotePin(lote.id)}
-                              className="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-0.5"
-                              disabled={savingLotePolygon}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pt-4 border-t border-crm-border">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-crm-text-primary">
+                      {activeTab === 'pending'
+                        ? `Lotes pendientes (${lotesSinUbicar.length})`
+                        : `Lotes ubicados (${lotesUbicados.length})`}
+                    </h4>
                     <button
                       onClick={() => setCurrentStep(2)}
-                      className="w-full px-4 py-2 border border-crm-border text-crm-text-secondary rounded-lg font-medium hover:bg-crm-card-hover transition-colors text-sm"
+                      className="text-xs text-crm-text-secondary hover:text-crm-primary"
                     >
-                      ← Volver a ajustar plano
+                      ← Ajustar plano
                     </button>
                   </div>
+
+                  <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
+                    {visibleLotes.length === 0 ? (
+                      <div className="text-center py-10 border border-dashed border-crm-border rounded-xl bg-white">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-crm-primary/10 flex items-center justify-center">
+                          <Check className="w-6 h-6 text-crm-primary" />
+                        </div>
+                        <p className="text-sm font-medium text-crm-text-primary">
+                          {activeTab === 'pending'
+                            ? 'No hay lotes pendientes'
+                            : 'Todos los lotes están ubicados'}
+                        </p>
+                        <p className="text-xs text-crm-text-muted mt-1">
+                          {activeTab === 'pending'
+                            ? '¡Puedes comenzar a ubicar lotes desde el listado principal!'
+                            : 'Puedes reubicar un lote si lo necesitas usando las acciones laterales.'}
+                        </p>
+                      </div>
+                    ) : (
+                      visibleLotes.map((lote) => {
+                        const estadoColor =
+                          lote.estado === 'disponible'
+                            ? 'text-green-600 bg-green-50 border-green-200'
+                            : lote.estado === 'vendido'
+                              ? 'text-red-600 bg-red-50 border-red-200'
+                              : lote.estado === 'reservado'
+                                ? 'text-yellow-600 bg-yellow-50 border-yellow-200'
+                                : 'text-gray-600 bg-gray-50 border-gray-200';
+
+                        return (
+                          <div
+                            key={lote.id}
+                            className={`group rounded-xl border transition-all duration-200 bg-white ${
+                              selectedLoteId === lote.id
+                                ? 'border-crm-primary shadow-md'
+                                : 'border-crm-border hover:border-crm-primary/60 hover:shadow-sm'
+                            }`}
+                          >
+                            <div className="flex flex-col gap-3 p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="text-xs font-semibold text-crm-text-muted uppercase tracking-wider">
+                                    Lote {lote.codigo}
+                                  </div>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${estadoColor}`}>
+                                    {lote.estado === 'disponible'
+                                      ? 'Disponible'
+                                      : lote.estado === 'vendido'
+                                        ? 'Vendido'
+                                        : lote.estado === 'reservado'
+                                          ? 'Reservado'
+                                          : 'Sin estado'}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-2 justify-end text-xs">
+                                  <button
+                                    onClick={() => handleFocusLote(lote.id)}
+                                    className="px-3 py-1 border border-crm-border rounded-md text-crm-text-secondary hover:text-crm-primary hover:border-crm-primary transition-colors"
+                                  >
+                                    Ver
+                                  </button>
+                                  {activeTab === 'pending' ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleStartDrawingLote(lote.id)}
+                                        className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                      >
+                                        Dibujar
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteLote(lote.id)}
+                                        disabled={deletingLoteId === lote.id}
+                                        className="px-3 py-1 border border-transparent rounded-md text-red-600 hover:text-red-700 hover:border-red-300 transition-colors disabled:opacity-60 flex items-center gap-1"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Eliminar
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => handleReubicarLote(lote.id)}
+                                        className="px-3 py-1 border border-crm-border rounded-md text-crm-text-secondary hover:text-crm-primary hover:border-crm-primary transition-colors flex items-center gap-1"
+                                      >
+                                        <RefreshCcw className="w-3.5 h-3.5" />
+                                        Reubicar
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoveLotePin(lote.id)}
+                                        className="px-3 py-1 text-red-600 border border-transparent rounded-md hover:text-red-700 hover:border-red-300 transition-colors"
+                                        disabled={savingLotePolygon}
+                                      >
+                                        Quitar ubicación
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteLote(lote.id)}
+                                        disabled={deletingLoteId === lote.id}
+                                        className="px-3 py-1 border border-transparent rounded-md text-red-600 hover:text-red-700 hover:border-red-300 transition-colors disabled:opacity-60 flex items-center gap-1"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Eliminar
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {selectedLote && (
+                    <div className="p-4 border border-crm-border rounded-xl bg-crm-card space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-crm-text-primary">Lote {selectedLote.codigo}</p>
+                          <p className="text-xs text-crm-text-muted">
+                            Estado: {selectedLote.estado ?? 'Sin estado'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleFocusLote(selectedLote.id)}
+                          className="text-xs text-crm-text-secondary hover:text-crm-primary"
+                        >
+                          Centrar
+                        </button>
+                      </div>
+                      {selectedLoteUbicado ? (
+                        <>
+                          {selectedLote.ubicacion && (
+                            <div>
+                              <p className="text-[11px] text-crm-text-muted uppercase font-semibold mb-1">Ubicación</p>
+                              <p className="font-mono text-xs text-crm-text-primary">
+                                {selectedLote.ubicacion.lat.toFixed(6)}, {selectedLote.ubicacion.lng.toFixed(6)}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <button
+                              onClick={() => handleReubicarLote(selectedLote.id)}
+                              className="px-3 py-1 border border-crm-border rounded-md text-crm-text-secondary hover:text-crm-primary hover:border-crm-primary transition-colors flex items-center gap-1"
+                            >
+                              <RefreshCcw className="w-3.5 h-3.5" />
+                              Reubicar
+                            </button>
+                            <button
+                              onClick={() => handleRemoveLotePin(selectedLote.id)}
+                              className="px-3 py-1 text-red-600 border border-transparent rounded-md hover:text-red-700 hover:border-red-300 transition-colors"
+                              disabled={savingLotePolygon}
+                            >
+                              Quitar ubicación
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[11px] text-crm-text-muted">
+                            Este lote aún no se ha ubicado. Puedes comenzar a dibujarlo ahora mismo.
+                          </p>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <button
+                              onClick={() => handleStartDrawingLote(selectedLote.id)}
+                              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                            >
+                              Dibujar ahora
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLote(selectedLote.id)}
+                              disabled={deletingLoteId === selectedLote.id}
+                              className="px-3 py-1 border border-transparent rounded-md text-red-600 hover:text-red-700 hover:border-red-300 transition-colors disabled:opacity-60 flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Eliminar
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          )}
+          </div>
+          <div className={`flex-1 relative ${isFullScreen ? 'fixed inset-0 z-40 bg-white' : ''}`}>
+            <Card className={isFullScreen ? 'h-full rounded-none' : 'h-full'}>
+              <CardContent className="p-0 h-full">
+                <div className={isFullScreen ? 'h-screen' : 'h-[88vh] min-h-[640px]'}>
+                  <GoogleMap
+                    defaultCenter={mapCenter}
+                    defaultZoom={mapZoom}
+                    planosUrl={planUrl}
+                    overlayBounds={overlayBounds}
+                    overlayOpacity={overlayOpacity}
+                    rotationDeg={overlayRotation}
+                    overlayEditable={false}
+                    onOverlayBoundsChange={handleOverlayBoundsChange}
+                    onMapCenterChange={setCurrentMapCenter}
+                    onCreateDefaultBounds={() => {
+                      setOverlayDirty(true);
+                    }}
+                    projectPolygon={areaPolygon}
+                    onProjectPolygonChange={handlePolygonChange}
+                    projectDrawingActive={isDrawingArea}
+                    onProjectDrawingFinished={handleProjectDrawingFinished}
+                    lotes={lotesState}
+                    highlightLoteId={selectedLoteId}
+                    loteDrawingActive={Boolean(drawingLoteId)}
+                    onLoteDrawingFinished={() => setDrawingLoteId(null)}
+                    onLotePolygonComplete={handleLotePolygonComplete}
+                    draggingLoteId={draggingLoteId}
+                    onPinDrop={handlePinDrop}
+                    onMarkerDragEnd={handleMarkerDragEnd}
+                    focusLoteRequest={focusRequest}
+                    onFocusHandled={() => setFocusRequest(null)}
+                    fullScreenActive={isFullScreen}
+                    onToggleFull={() => setIsFullScreen(!isFullScreen)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+            {!isFullScreen && (
+              <button
+                type="button"
+                onClick={toggleDrawer}
+                className="absolute top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/90 shadow-md border border-crm-border text-xs font-semibold text-crm-text-primary hover:bg-white"
+              >
+                {drawerOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                <span className="hidden sm:inline">{drawerOpen ? 'Ocultar lista' : 'Mostrar lista'}</span>
+              </button>
+            )}
+          </div>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+          {/* Panel Lateral */}
+          <div className="xl:col-span-1 space-y-6">
+            {/* PASO 1: Ubicar Área del Proyecto */}
+            {currentStep === 1 && (
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Search className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-crm-text-primary">Paso 1: Ubicar Área del Proyecto</h3>
+                      <p className="text-xs text-crm-text-muted">Busca y marca la zona en el mapa</p>
+                    </div>
+                  </div>
 
-        {/* Mapa */}
-        <div className={`xl:col-span-4 ${isFullScreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
-          <Card className={isFullScreen ? 'h-full rounded-none' : ''}>
-            <CardContent className="p-0 h-full">
-              <div className={isFullScreen ? 'h-screen' : 'h-[85vh] min-h-[600px]'}>
-                <GoogleMap
-                  defaultCenter={mapCenter}
-                  defaultZoom={mapZoom}
-                  planosUrl={planUrl}
-                  overlayBounds={overlayBounds}
-                  overlayOpacity={overlayOpacity}
-                  rotationDeg={overlayRotation}
-                  overlayEditable={false}
-                  onOverlayBoundsChange={handleOverlayBoundsChange}
-                  onMapCenterChange={setCurrentMapCenter}
-                  onCreateDefaultBounds={() => {
-                    setOverlayDirty(true);
-                  }}
-                  projectPolygon={areaPolygon}
-                  onProjectPolygonChange={handlePolygonChange}
-                  projectDrawingActive={isDrawingArea}
-                  onProjectDrawingFinished={handleProjectDrawingFinished}
-                  lotes={lotesState}
-                  highlightLoteId={selectedLoteId}
-                  loteDrawingActive={Boolean(drawingLoteId)}
-                  onLoteDrawingFinished={() => setDrawingLoteId(null)}
-                  onLotePolygonComplete={handleLotePolygonComplete}
-                  draggingLoteId={draggingLoteId}
-                  onPinDrop={handlePinDrop}
-                  onMarkerDragEnd={handleMarkerDragEnd}
-                  fullScreenActive={isFullScreen}
-                  onToggleFull={() => setIsFullScreen(!isFullScreen)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+                    <p className="font-medium mb-2">Instrucciones:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                      <li>Usa el <strong>buscador del mapa</strong> para encontrar la ubicación (ej: "Huaral, Lima")</li>
+                      <li>Haz clic en <strong>"✏️ Dibujar área del proyecto"</strong></li>
+                      <li>Haz clic en el mapa para marcar cada <strong>vértice del área</strong></li>
+                      <li>Haz clic en el <strong>primer punto</strong> para cerrar el polígono</li>
+                      <li>Arrastra los vértices para ajustar si es necesario</li>
+                      <li>Haz clic en <strong>"Guardar ubicación"</strong> para continuar</li>
+                    </ol>
+                  </div>
+
+                  {areaPolygon.length === 0 ? (
+                    <button
+                      onClick={handleStartDrawingPolygon}
+                      disabled={isDrawingArea}
+                      className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
+                        isDrawingArea
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-crm-primary text-white hover:bg-crm-primary-dark'
+                      }`}
+                    >
+                      {isDrawingArea ? '✏️ Dibujando... (haz clic en el mapa)' : '✏️ Dibujar área del proyecto'}
+                    </button>
+                  ) : (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                      <p className="font-medium">✓ Área dibujada ({areaPolygon.length} vértices)</p>
+                      <p className="text-xs mt-1">Arrastra los vértices para ajustar el área</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSaveArea}
+                    disabled={areaPolygon.length < 3}
+                    className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ✓ Guardar ubicación y continuar
+                  </button>
+
+                  {overlayDirty && areaPolygon.length >= 3 && (
+                    <p className="text-xs text-orange-600 text-center">Área definida • Guarda para continuar</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* PASO 2: Subir Plano */}
+            {currentStep === 2 && (
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Upload className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-crm-text-primary">Paso 2: Subir Plano</h3>
+                      <p className="text-xs text-crm-text-muted">El plano se ubicará en el área marcada</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm">
+                    <p className="text-green-800">✓ Área del proyecto ubicada correctamente</p>
+                    <p className="text-xs text-green-700 mt-1">El plano aparecerá dentro del área marcada</p>
+                  </div>
+
+                  <BlueprintUploader
+                    onFileSelect={handleUploadPlano}
+                    isUploading={isUploading}
+                    currentFile={planUrl}
+                    onDelete={handleDeletePlano}
+                    acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+                    maxSize={10}
+                  />
+
+                  {planUrl && (
+                    <>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-medium text-crm-text-primary mb-2 block">Opacidad del plano</label>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            value={overlayOpacity}
+                            onChange={(e) => {
+                              setOverlayOpacity(parseFloat(e.target.value));
+                              setOverlayDirty(true);
+                            }}
+                            className="w-full"
+                          />
+                          <div className="text-xs text-crm-text-muted mt-1">{Math.round(overlayOpacity * 100)}%</div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-medium text-crm-text-primary mb-2 block">Rotación</label>
+                          <input
+                            type="range"
+                            min={-180}
+                            max={180}
+                            step={1}
+                            value={overlayRotation}
+                            onChange={(e) => {
+                              setOverlayRotation(parseFloat(e.target.value));
+                              setOverlayDirty(true);
+                            }}
+                            className="w-full"
+                          />
+                          <div className="text-xs text-crm-text-muted mt-1">{overlayRotation.toFixed(0)}°</div>
+                        </div>
+
+                        {overlayDirty && (
+                          <button
+                            onClick={handleSaveAdjustments}
+                            className="w-full px-4 py-2 bg-crm-primary text-white rounded-lg font-medium hover:bg-crm-primary-dark transition-colors text-sm"
+                          >
+                            💾 Guardar ajustes
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => setCurrentStep(3)}
+                        className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                      >
+                        ✓ Plano listo, continuar
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => setCurrentStep(1)}
+                    className="w-full px-4 py-2 border border-crm-border text-crm-text-secondary rounded-lg font-medium hover:bg-crm-card-hover transition-colors text-sm"
+                  >
+                    ← Volver a ubicar área
+                  </button>
+                </CardContent>
+              </Card>
+            )}
+
+          </div>
+          <div className={`xl:col-span-4 relative ${isFullScreen ? 'fixed inset-0 z-40 bg-white' : ''}`}>
+            <Card className={isFullScreen ? 'h-full rounded-none' : 'h-full'}>
+              <CardContent className="p-0 h-full">
+                <div className={isFullScreen ? 'h-screen' : 'h-[88vh] min-h-[640px]'}>
+                  <GoogleMap
+                    defaultCenter={mapCenter}
+                    defaultZoom={mapZoom}
+                    planosUrl={planUrl}
+                    overlayBounds={overlayBounds}
+                    overlayOpacity={overlayOpacity}
+                    rotationDeg={overlayRotation}
+                    overlayEditable={false}
+                    onOverlayBoundsChange={handleOverlayBoundsChange}
+                    onMapCenterChange={setCurrentMapCenter}
+                    onCreateDefaultBounds={() => {
+                      setOverlayDirty(true);
+                    }}
+                    projectPolygon={areaPolygon}
+                    onProjectPolygonChange={handlePolygonChange}
+                    projectDrawingActive={isDrawingArea}
+                    onProjectDrawingFinished={handleProjectDrawingFinished}
+                    lotes={lotesState}
+                    highlightLoteId={selectedLoteId}
+                    loteDrawingActive={Boolean(drawingLoteId)}
+                    onLoteDrawingFinished={() => setDrawingLoteId(null)}
+                    onLotePolygonComplete={handleLotePolygonComplete}
+                    draggingLoteId={draggingLoteId}
+                    onPinDrop={handlePinDrop}
+                    onMarkerDragEnd={handleMarkerDragEnd}
+                    focusLoteRequest={focusRequest}
+                    onFocusHandled={() => setFocusRequest(null)}
+                    fullScreenActive={isFullScreen}
+                    onToggleFull={() => setIsFullScreen(!isFullScreen)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
