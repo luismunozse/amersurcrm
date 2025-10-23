@@ -28,6 +28,7 @@ const configuracionSchema = z
     whatsappToken: z.string().trim().optional(),
     replaceWhatsappToken: z.boolean(),
     smtpHost: z.string().trim().max(255, "El host SMTP es demasiado largo").optional(),
+    googleDriveFolderId: z.string().trim().max(255, "El folder ID es demasiado largo").optional(),
   })
   .superRefine((data, ctx) => {
     if (data.replaceWhatsappToken && !data.whatsappToken) {
@@ -98,6 +99,7 @@ export async function actualizarConfiguracion(
       whatsappToken: formData.get("whatsappToken"),
       replaceWhatsappToken: formData.get("replaceWhatsappToken") === "true",
       smtpHost: formData.get("smtpHost"),
+      googleDriveFolderId: formData.get("googleDriveFolderId"),
     };
 
     const parsed = configuracionSchema.safeParse(rawData);
@@ -160,6 +162,29 @@ export async function actualizarConfiguracion(
         status: "error",
         message: "Ocurrió un error al guardar la configuración.",
       };
+    }
+
+    // Actualizar Google Drive Folder ID si se proporcionó
+    if (parsed.data.googleDriveFolderId) {
+      const { data: driveConfig } = await supabase
+        .from("google_drive_sync_config")
+        .select("id")
+        .eq("activo", true)
+        .maybeSingle();
+
+      if (driveConfig) {
+        const { error: driveError } = await supabase
+          .from("google_drive_sync_config")
+          .update({
+            root_folder_id: parsed.data.googleDriveFolderId,
+            updated_at: ahora,
+          })
+          .eq("id", driveConfig.id);
+
+        if (driveError) {
+          console.error("Error actualizando folder ID de Google Drive:", driveError);
+        }
+      }
     }
 
     revalidatePath("/dashboard/admin/configuracion");

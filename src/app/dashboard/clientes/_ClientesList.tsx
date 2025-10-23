@@ -2,6 +2,7 @@
 
 import { useState, useTransition, memo, useMemo, useEffect } from "react";
 import { eliminarCliente, actualizarEstadoCliente } from "./_actions";
+import { registrarInteraccion } from "./_actions_crm";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -47,6 +48,8 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [clientesState, setClientesState] = useState<Cliente[]>(clientes);
+  const [contactoModal, setContactoModal] = useState<{ open: boolean; cliente: Cliente | null }>({ open: false, cliente: null });
+  const [contactoLoading, setContactoLoading] = useState(false);
   const router = useRouter();
 
   // Sincronizar estado cuando cambien los props
@@ -90,8 +93,6 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   };
 
   const handleShowDetail = (cliente: Cliente) => {
-    console.log('Opening detail modal for client:', cliente.nombre);
-    alert(`Abriendo detalles de: ${cliente.nombre}`);
     setSelectedCliente(cliente);
     setShowDetailModal(true);
   };
@@ -99,6 +100,45 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   const handleCloseDetail = () => {
     setShowDetailModal(false);
     setSelectedCliente(null);
+  };
+
+  const handleSolicitarContacto = (cliente: Cliente) => {
+    setContactoModal({ open: true, cliente });
+  };
+
+  const handleCerrarContacto = () => {
+    if (contactoLoading) return;
+    setContactoModal({ open: false, cliente: null });
+  };
+
+  const handleGuardarContacto = async (payload: ContactoFormData) => {
+    if (!contactoModal.cliente) return;
+    setContactoLoading(true);
+    try {
+      const result = await registrarInteraccion({
+        clienteId: contactoModal.cliente.id,
+        tipo: payload.tipo,
+        resultado: payload.resultado,
+        notas: payload.notas,
+        duracionMinutos: payload.duracionMinutos,
+        proximaAccion: payload.proximaAccion,
+        fechaProximaAccion: payload.fechaProximaAccion,
+      });
+
+      if (!result.success) {
+        toast.error(result.error || 'No se pudo registrar la interacción');
+        setContactoLoading(false);
+        return;
+      }
+
+      await handleEstadoChange(contactoModal.cliente.id, 'contactado');
+      toast.success('Contacto registrado');
+      setContactoModal({ open: false, cliente: null });
+    } catch (error) {
+      toast.error(getErrorMessage(error) || 'Error registrando el contacto');
+    } finally {
+      setContactoLoading(false);
+    }
   };
 
   const getEstadoText = (estado: string) => {
@@ -166,6 +206,7 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
                 onDelete={askDelete}
                 onShowDetail={handleShowDetail}
                 onEstadoChange={handleEstadoChange}
+                onSolicitarContacto={handleSolicitarContacto}
               />
             ))}
           </div>
@@ -198,6 +239,14 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
         onClose={handleCloseDetail}
         cliente={selectedCliente ? { nombre: selectedCliente.nombre, email: selectedCliente.email } : null}
       />
+
+      <RegistrarContactoModal
+        open={contactoModal.open}
+        cliente={contactoModal.cliente}
+        loading={contactoLoading}
+        onClose={handleCerrarContacto}
+        onSubmit={handleGuardarContacto}
+      />
       
       {/* Debug info */}
       {process.env.NODE_ENV === 'development' && (
@@ -221,6 +270,7 @@ const ClienteItem = memo(function ClienteItem({
   onDelete,
   onShowDetail,
   onEstadoChange,
+  onSolicitarContacto,
 }: {
   cliente: Cliente;
   isEditing: boolean;
@@ -231,6 +281,7 @@ const ClienteItem = memo(function ClienteItem({
   onDelete: (c: Cliente) => void;
   onShowDetail: (c: Cliente) => void;
   onEstadoChange: (clienteId: string, nuevoEstado: string) => void;
+  onSolicitarContacto: (cliente: Cliente) => void;
 }) {
   if (isEditing) {
     return (
@@ -275,19 +326,6 @@ const ClienteItem = memo(function ClienteItem({
       if (currentEstado === 'por contactar' || currentEstado === 'por_contactar') currentEstado = 'por_contactar';
     }
     
-    console.log('Cliente:', cliente.nombre, 'Estado original:', cliente.estado_cliente, 'Estado normalizado:', currentEstado);
-
-    // Botón de prueba que siempre aparece
-    buttons.push(
-      <button
-        key="test"
-        onClick={() => console.log('Botón de prueba clickeado para:', cliente.nombre)}
-        className="px-2 py-1 text-xs font-medium text-red-600 bg-red-100 border border-red-200 hover:bg-red-200 hover:border-red-300 transition-colors rounded-full"
-      >
-        TEST
-      </button>
-    );
-
     if (currentEstado === 'prospecto' || currentEstado === '') {
       buttons.push(
         <button
@@ -304,7 +342,7 @@ const ClienteItem = memo(function ClienteItem({
       buttons.push(
         <button
           key="contactado"
-          onClick={() => onEstadoChange(cliente.id, 'contactado')}
+          onClick={() => onSolicitarContacto(cliente)}
           className="px-2 py-1 text-xs font-medium text-yellow-600 bg-yellow-100 border border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-colors rounded-full"
         >
           Contactado
@@ -353,10 +391,7 @@ const ClienteItem = memo(function ClienteItem({
         <div className="flex items-start justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors group"
-            onClick={() => {
-              console.log('Header clicked for client:', cliente.nombre);
-              onShowDetail(cliente);
-            }}
+            onClick={() => onShowDetail(cliente)}
           >
             <div className="w-12 h-12 bg-crm-primary/10 rounded-full flex items-center justify-center group-hover:bg-crm-primary/20 transition-colors">
               <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -548,3 +583,198 @@ function EditRow({
   );
 }
 
+type ContactoFormData = {
+  tipo: 'llamada' | 'email' | 'whatsapp' | 'visita' | 'reunion' | 'mensaje';
+  resultado?: 'contesto' | 'no_contesto' | 'reagendo' | 'interesado' | 'no_interesado' | 'cerrado' | 'pendiente';
+  notas: string;
+  duracionMinutos?: number;
+  proximaAccion?: 'llamar' | 'enviar_propuesta' | 'reunion' | 'visita' | 'seguimiento' | 'cierre' | 'ninguna';
+  fechaProximaAccion?: string;
+};
+
+function RegistrarContactoModal({
+  open,
+  cliente,
+  loading,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  cliente: Cliente | null;
+  loading: boolean;
+  onClose: () => void;
+  onSubmit: (data: ContactoFormData) => void;
+}) {
+  const [tipo, setTipo] = useState<ContactoFormData['tipo']>('llamada');
+  const [resultado, setResultado] = useState<ContactoFormData['resultado']>('contesto');
+  const [notas, setNotas] = useState('');
+  const [duracion, setDuracion] = useState('');
+  const [proximaAccion, setProximaAccion] = useState<ContactoFormData['proximaAccion']>('ninguna');
+  const [fechaProxima, setFechaProxima] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setTipo('llamada');
+      setResultado('contesto');
+      setNotas('');
+      setDuracion('');
+      setProximaAccion('ninguna');
+      setFechaProxima('');
+    }
+  }, [open, cliente?.id]);
+
+  if (!open || !cliente) return null;
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!notas.trim()) {
+      toast.error('Describe brevemente lo conversado con el cliente.');
+      return;
+    }
+
+    onSubmit({
+      tipo,
+      resultado,
+      notas: notas.trim(),
+      duracionMinutos: duracion ? Number(duracion) : undefined,
+      proximaAccion: proximaAccion && proximaAccion !== 'ninguna' ? proximaAccion : undefined,
+      fechaProximaAccion:
+        proximaAccion && proximaAccion !== 'ninguna' && fechaProxima ? fechaProxima : undefined,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl border border-crm-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-crm-border flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-crm-text-primary">Registrar contacto</h3>
+            <p className="text-xs text-crm-text-muted mt-1">Cliente: {cliente.nombre}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-crm-text-muted hover:text-crm-text"
+            type="button"
+            disabled={loading}
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Canal</label>
+              <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as ContactoFormData['tipo'])}
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                disabled={loading}
+              >
+                <option value="llamada">Llamada</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Email</option>
+                <option value="visita">Visita</option>
+                <option value="reunion">Reunión</option>
+                <option value="mensaje">Otro mensaje</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Resultado</label>
+              <select
+                value={resultado}
+                onChange={(e) => setResultado(e.target.value as ContactoFormData['resultado'])}
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                disabled={loading}
+              >
+                <option value="contesto">Contestó</option>
+                <option value="no_contesto">No contestó</option>
+                <option value="reagendo">Reagendó</option>
+                <option value="interesado">Mostró interés</option>
+                <option value="no_interesado">No interesado</option>
+                <option value="cerrado">Cerrado</option>
+                <option value="pendiente">Pendiente</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Notas</label>
+            <textarea
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              className="w-full min-h-[120px] border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+              placeholder="Describe brevemente lo conversado, acuerdos o próximos pasos"
+              disabled={loading}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Duración (min)</label>
+              <input
+                type="number"
+                min="0"
+                value={duracion}
+                onChange={(e) => setDuracion(e.target.value)}
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Próxima acción</label>
+              <select
+                value={proximaAccion}
+                onChange={(e) => setProximaAccion(e.target.value as ContactoFormData['proximaAccion'])}
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                disabled={loading}
+              >
+                <option value="ninguna">Ninguna</option>
+                <option value="llamar">Llamar</option>
+                <option value="enviar_propuesta">Enviar propuesta</option>
+                <option value="reunion">Reunión</option>
+                <option value="visita">Visita</option>
+                <option value="seguimiento">Seguimiento</option>
+                <option value="cierre">Cierre</option>
+              </select>
+            </div>
+          </div>
+
+          {proximaAccion && proximaAccion !== 'ninguna' && (
+            <div>
+              <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Fecha próxima acción</label>
+              <input
+                type="datetime-local"
+                value={fechaProxima}
+                onChange={(e) => setFechaProxima(e.target.value)}
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                disabled={loading}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-crm-border">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-crm-text-muted hover:text-crm-text"
+              disabled={loading}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-semibold text-white bg-crm-primary rounded-lg hover:bg-crm-primary-hover disabled:opacity-60"
+              disabled={loading}
+            >
+              {loading ? 'Guardando…' : 'Registrar contacto'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

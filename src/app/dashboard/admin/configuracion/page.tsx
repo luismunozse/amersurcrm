@@ -57,6 +57,15 @@ async function obtenerConfiguracionInicial(supabase: SupabaseServerClient): Prom
     ? (data?.campos_propiedad ?? []).filter((item): item is string => typeof item === "string")
     : [];
 
+  // Obtener configuración de Google Drive
+  const { data: googleDriveData } = await supabase
+    .from("google_drive_sync_config")
+    .select("access_token, refresh_token, token_expires_at, root_folder_id")
+    .eq("activo", true)
+    .maybeSingle();
+
+  const googleDriveConectado = Boolean(googleDriveData?.access_token || googleDriveData?.refresh_token);
+
   return {
     empresaNombre: data?.empresa_nombre ?? "AMERSUR Inmobiliaria",
     monedaPrincipal: (data?.moneda_principal as "PEN" | "USD") ?? "PEN",
@@ -74,6 +83,9 @@ async function obtenerConfiguracionInicial(supabase: SupabaseServerClient): Prom
     whatsappTokenActualizadoEn: data?.whatsapp_token_updated_at ?? null,
     smtpHost: data?.smtp_host ?? "",
     smtpHostActualizadoEn: data?.smtp_host_updated_at ?? null,
+    googleDriveConectado,
+    googleDriveFolderId: googleDriveData?.root_folder_id ?? null,
+    googleDriveTokenExpiresAt: googleDriveData?.token_expires_at ?? null,
   };
 }
 

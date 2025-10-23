@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState, useActionState } from "react";
+import { useMemo, useState, useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import { actualizarConfiguracion, ConfiguracionFormState } from "./actions";
 
 export type ConfiguracionInicial = {
@@ -21,6 +22,9 @@ export type ConfiguracionInicial = {
   whatsappTokenActualizadoEn?: string | null;
   smtpHost?: string | null;
   smtpHostActualizadoEn?: string | null;
+  googleDriveConectado: boolean;
+  googleDriveFolderId?: string | null;
+  googleDriveTokenExpiresAt?: string | null;
 };
 
 const initialState: ConfiguracionFormState = {
@@ -66,6 +70,8 @@ function SubmitButton() {
 export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) {
   const [state, formAction] = useActionState(actualizarConfiguracion, initialState);
   const [reemplazarWhatsappToken, setReemplazarWhatsappToken] = useState(false);
+  const searchParams = useSearchParams();
+  const [urlMessage, setUrlMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const camposClienteDefault = useMemo(
     () => config.camposCliente.join("\n"),
@@ -76,12 +82,60 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
     [config.camposPropiedad]
   );
 
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+
+    if (success === "google_connected") {
+      setUrlMessage({
+        type: "success",
+        text: "Google Drive conectado exitosamente. Ahora puedes ingresar el ID de la carpeta raíz.",
+      });
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        google_auth_cancelled: "Cancelaste la autorización de Google Drive.",
+        google_auth_invalid: "Error al autorizar con Google Drive.",
+        unauthorized: "No estás autorizado para realizar esta acción.",
+        server_config_missing: "Faltan las credenciales de Google Drive en el servidor.",
+        google_token_exchange_failed: "Error al obtener los tokens de Google Drive.",
+        database_update_failed: "Error al actualizar la configuración en la base de datos.",
+        database_insert_failed: "Error al guardar la configuración en la base de datos.",
+        unexpected_error: "Ocurrió un error inesperado.",
+      };
+      setUrlMessage({
+        type: "error",
+        text: errorMessages[error] || "Ocurrió un error desconocido.",
+      });
+    }
+
+    // Limpiar los parámetros de la URL después de mostrar el mensaje
+    if (success || error) {
+      const timer = setTimeout(() => {
+        setUrlMessage(null);
+        window.history.replaceState({}, "", window.location.pathname);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
   return (
     <form
       action={formAction}
       className="space-y-6"
       onReset={() => setReemplazarWhatsappToken(false)}
     >
+      {urlMessage && (
+        <div
+          className={`border rounded-lg px-4 py-3 ${
+            urlMessage.type === "success"
+              ? "border-green-200 bg-green-50 text-green-700"
+              : "border-red-200 bg-red-50 text-red-600"
+          }`}
+        >
+          {urlMessage.text}
+        </div>
+      )}
+
       {state.status !== "idle" && state.message && (
         <div
           className={`border rounded-lg px-4 py-3 ${
@@ -370,6 +424,62 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
               )}
               <FieldError message={state.fieldErrors?.smtpHost} />
             </div>
+          </div>
+        </div>
+
+        {/* Google Drive */}
+        <div className="border-t border-crm-border pt-6">
+          <h3 className="text-lg font-medium text-crm-text-primary mb-4">Google Drive</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-crm-background rounded-lg">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-crm-text-primary">
+                  Estado de conexión
+                </p>
+                {config.googleDriveConectado ? (
+                  <div className="mt-1 space-y-1">
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 bg-green-600 rounded-full"></span>
+                      Conectado
+                    </p>
+                    {config.googleDriveTokenExpiresAt && (
+                      <p className="text-xs text-crm-text-muted">
+                        Token expira: {new Date(config.googleDriveTokenExpiresAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-crm-text-muted mt-1">No conectado</p>
+                )}
+              </div>
+              <a
+                href="/api/google/auth"
+                className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
+              >
+                {config.googleDriveConectado ? "Reconectar" : "Conectar con Google Drive"}
+              </a>
+            </div>
+
+            {config.googleDriveConectado && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-crm-text-primary" htmlFor="googleDriveFolderId">
+                  ID de Carpeta Raíz
+                </label>
+                <input
+                  id="googleDriveFolderId"
+                  name="googleDriveFolderId"
+                  type="text"
+                  defaultValue={config.googleDriveFolderId ?? ""}
+                  placeholder="ABC123XYZ789"
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                />
+                <p className="text-xs text-crm-text-muted">
+                  El ID de la carpeta raíz de Google Drive donde se sincronizarán los documentos.
+                  Lo puedes obtener de la URL: drive.google.com/drive/folders/<strong>ID_AQUI</strong>
+                </p>
+                <FieldError message={state.fieldErrors?.googleDriveFolderId} />
+              </div>
+            )}
           </div>
         </div>
       </div>
