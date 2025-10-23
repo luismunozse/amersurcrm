@@ -130,6 +130,8 @@ export async function POST(request: NextRequest) {
     // Normalizar todos los teléfonos
     telefonos = telefonos.map(normalizarTelefono);
 
+    const variables = campana.variables_valores as Record<string, string>;
+
     console.log(`[CAMPAÑA ${campana_id}] Destinatarios normalizados:`, telefonos);
     console.log(`[CAMPAÑA ${campana_id}] Plantilla: ${template.nombre} (${template.idioma})`);
     console.log(`[CAMPAÑA ${campana_id}] Variables:`, variables);
@@ -142,8 +144,6 @@ export async function POST(request: NextRequest) {
 
     // Construir componentes de la plantilla con variables
     const components = [];
-    const variables = campana.variables_valores as Record<string, string>;
-
     if (variables && Object.keys(variables).length > 0) {
       components.push({
         type: 'body',

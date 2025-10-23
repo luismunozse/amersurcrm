@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Send, Users, Calendar, Zap } from "lucide-react";
 import { crearCampana, obtenerPlantillas, verificarCredencialesWhatsApp } from "@/app/dashboard/admin/marketing/_actions";
-import type { MarketingTemplate } from "@/types/whatsapp-marketing";
+import type { MarketingTemplate, EstadoCampana } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
 
 interface ModalCrearCampanaProps {
@@ -116,9 +116,9 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
         credential_id: credentialId,
         variables_valores: variables,
         enviar_inmediatamente: formData.enviar_inmediatamente,
-        fecha_inicio: formData.fecha_inicio || null,
+        fecha_inicio: formData.fecha_inicio || undefined,
         max_envios_por_segundo: formData.max_envios_por_segundo,
-        estado: formData.enviar_inmediatamente ? 'RUNNING' : 'DRAFT',
+        estado: (formData.enviar_inmediatamente ? 'RUNNING' : 'DRAFT') as EstadoCampana,
         // Guardar config de destinatarios temporalmente (lo procesaremos en el backend)
         objetivo: `Destinatarios: ${destinatarios.tipo}${destinatarios.tipo === 'manual' ? ` - ${destinatarios.numeros.split('\n').length} números` : ''}`,
       };
