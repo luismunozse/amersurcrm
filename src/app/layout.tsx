@@ -18,8 +18,24 @@ const mont = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "AMERSUR CRM",
-  description: "Tu Propiedad, sin fronteras",
+  title: {
+    default: "AMERSUR CRM",
+    template: "%s | AMERSUR CRM",
+  },
+  description: "Tu Propiedad, sin fronteras - Sistema de gestión inmobiliaria",
+  keywords: ["CRM", "Inmobiliaria", "AMERSUR", "Propiedades", "Gestión"],
+  authors: [{ name: "AMERSUR" }],
+  creator: "AMERSUR",
+  publisher: "AMERSUR",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", type: "image/png" },
+    ],
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
