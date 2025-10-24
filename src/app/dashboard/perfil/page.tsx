@@ -21,6 +21,8 @@ export default async function MiPerfilPage() {
     redirect("/dashboard");
   }
 
+  const isAdmin = perfil?.rol?.nombre === 'ROL_ADMIN';
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -31,7 +33,6 @@ export default async function MiPerfilPage() {
             <AvatarUpload
               currentAvatarUrl={perfil.avatar_url}
               userName={perfil.nombre_completo || 'Usuario'}
-              userId={user.id}
             />
           </div>
 
@@ -147,7 +148,11 @@ export default async function MiPerfilPage() {
           <User className="h-6 w-6 text-crm-primary" />
           Editar Información Personal
         </h2>
-        <EditarPerfilForm perfil={perfil} userEmail={user.email || ''} />
+        <EditarPerfilForm
+          perfil={perfil}
+          userEmail={user.email || ''}
+          isAdmin={isAdmin}
+        />
       </div>
     </div>
   );

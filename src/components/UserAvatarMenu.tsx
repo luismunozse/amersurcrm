@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,9 +15,9 @@ interface Props {
   userUsername?: string;
   userEmail?: string;
   userRole?: string;
-  userAvatarUrl?: string; // Nuevo: URL de la foto de perfil
-  notificationsCount?: number; // Nuevo: contador de notificaciones
-  lastSignInAt?: string; // Nuevo: último acceso
+  userAvatarUrl?: string | null;
+  notificationsCount?: number;
+  lastSignInAt?: string;
 }
 
 // Función para formatear el último acceso de forma relativa
@@ -39,7 +39,15 @@ function formatLastSignIn(dateString?: string): string {
   return date.toLocaleDateString('es-PE');
 }
 
-export default function UserAvatarMenu({ userName, userUsername, userEmail, userRole, userAvatarUrl, notificationsCount = 0, lastSignInAt }: Props) {
+export default function UserAvatarMenu({
+  userName,
+  userUsername,
+  userEmail,
+  userRole,
+  userAvatarUrl,
+  notificationsCount = 0,
+  lastSignInAt,
+}: Props) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -47,6 +55,13 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail, user
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  const sanitizedUsername = useMemo(() => {
+    const candidate = userUsername?.trim();
+    if (!candidate) return undefined;
+    if (/^\d+$/.test(candidate)) return undefined;
+    return candidate;
+  }, [userUsername]);
 
   if (!isMounted) {
     return (
@@ -68,10 +83,30 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail, user
     }
   };
 
-  const displayName = userName || userEmail?.split('@')[0] || 'Usuario';
-  const displayUsername = userUsername || userEmail || '';
-  const displayRole = userRole || 'Usuario';
-  const avatarInitial = userName?.charAt(0).toUpperCase() || userEmail?.charAt(0).toUpperCase() || 'U';
+  const roleLabels: Record<string, string> = {
+    ROL_ADMIN: "Administrador",
+    ROL_COORDINADOR_VENTAS: "Coordinador",
+    ROL_VENDEDOR: "Vendedor",
+  };
+
+  const displayName =
+    userName?.trim() ||
+    sanitizedUsername ||
+    userEmail?.split("@")[0] ||
+    "Usuario";
+  const displayRoleLabel = userRole ? roleLabels[userRole] ?? userRole : "";
+  const roleChipLabel = displayRoleLabel || "Usuario";
+  const secondaryDetail =
+    sanitizedUsername && sanitizedUsername !== displayName
+      ? sanitizedUsername
+      : !userName && userEmail
+        ? userEmail
+        : "";
+  const avatarInitial =
+    userName?.charAt(0).toUpperCase() ||
+    sanitizedUsername?.charAt(0).toUpperCase() ||
+    userEmail?.charAt(0).toUpperCase() ||
+    "U";
 
   return (
     <Menu as="div" className="relative">
@@ -82,9 +117,11 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail, user
           <p className="text-sm font-medium text-crm-text-primary">
             {displayName}
           </p>
-          <p className="text-xs text-crm-text-muted">
-            {displayUsername}
-          </p>
+          {displayRoleLabel && (
+            <p className="text-xs text-crm-text-muted">
+              {displayRoleLabel}
+            </p>
+          )}
         </div>
 
         {/* Avatar */}
@@ -158,13 +195,15 @@ export default function UserAvatarMenu({ userName, userUsername, userEmail, user
                 <p className="text-sm font-semibold text-crm-text-primary truncate">
                   {displayName}
                 </p>
-                <p className="text-xs text-crm-text-muted truncate">
-                  {displayUsername}
-                </p>
+                {secondaryDetail && (
+                  <p className="text-xs text-crm-text-muted truncate">
+                    {secondaryDetail}
+                  </p>
+                )}
                 {/* Rol del usuario */}
                 <div className="mt-1 flex items-center gap-2">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-crm-primary/10 text-crm-primary border border-crm-primary/20">
-                    {displayRole}
+                    {roleChipLabel}
                   </span>
                 </div>
                 {/* Último acceso */}

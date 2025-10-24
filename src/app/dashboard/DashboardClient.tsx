@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
+import { UserProfileProvider } from "./UserProfileContext";
 
 export default function DashboardClient({
   children,
@@ -32,43 +33,54 @@ export default function DashboardClient({
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(userAvatarUrl ?? null);
+
+  useEffect(() => {
+    setAvatarUrl(userAvatarUrl ?? null);
+  }, [userAvatarUrl]);
+
+  const handleAvatarUpdate = (url: string | null) => {
+    setAvatarUrl(url);
+  };
 
   return (
-    <div className="relative min-h-dvh bg-crm-bg-primary">
-      {/* Sidebar flotante - ahora es fixed en lugar de flex item */}
-      <Sidebar
-        isOpen={open}
-        onClose={() => setOpen(false)}
-        collapsed={collapsed}
-        onCollapseChange={setCollapsed}
-      />
-
-      {/* Contenido principal con padding dinámico según estado del sidebar */}
-      <div className={cn(
-        "min-h-dvh flex flex-col transition-all duration-300 ease-out",
-        // En desktop, agregar margen izquierdo según el ancho del sidebar
-        "lg:ml-[var(--sidebar-w)]"
-      )}>
-        {/* Header */}
-        <Header
-          onSidebarToggle={() => setOpen(true)}
-          userEmail={userEmail}
-          userName={userName}
-          userUsername={userUsername}
-          userRole={userRole}
-          userAvatarUrl={userAvatarUrl}
-          lastSignInAt={lastSignInAt}
-          sidebarCollapsed={collapsed}
-          notifications={notifications}
-          notificationsCount={notificationsCount}
-          exchangeRates={exchangeRates}
+    <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>
+      <div className="relative min-h-dvh bg-crm-bg-primary">
+        {/* Sidebar flotante - ahora es fixed en lugar de flex item */}
+        <Sidebar
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          collapsed={collapsed}
+          onCollapseChange={setCollapsed}
         />
 
-        {/* Main content */}
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          {children}
-        </main>
+        {/* Contenido principal con padding dinámico según estado del sidebar */}
+        <div
+          className={cn(
+            "min-h-dvh flex flex-col transition-all duration-300 ease-out",
+            // En desktop, agregar margen izquierdo según el ancho del sidebar
+            "lg:ml-[var(--sidebar-w)]"
+          )}
+        >
+          {/* Header */}
+          <Header
+            onSidebarToggle={() => setOpen(true)}
+            userEmail={userEmail}
+            userName={userName}
+            userUsername={userUsername}
+            userRole={userRole}
+            userAvatarUrl={avatarUrl || undefined}
+            lastSignInAt={lastSignInAt}
+            sidebarCollapsed={collapsed}
+            notifications={notifications}
+            notificationsCount={notificationsCount}
+            exchangeRates={exchangeRates}
+          />
+
+          {/* Main content */}
+          <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
+        </div>
       </div>
-    </div>
+    </UserProfileProvider>
   );
 }

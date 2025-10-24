@@ -192,8 +192,8 @@ export default async function ConfiguracionPage() {
             <div className="p-4 bg-crm-background rounded-lg border border-crm-border">
               <p className="text-xs text-crm-text-muted mb-1">Última actualización</p>
               <p className="text-sm font-medium text-crm-text-primary">
-                {perfil?.actualizado_en
-                  ? new Date(perfil.actualizado_en).toLocaleDateString("es-PE", {
+                {perfil?.updated_at
+                  ? new Date(perfil.updated_at).toLocaleDateString("es-PE", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",

@@ -3,27 +3,34 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { Camera, Upload, X, Loader2 } from "lucide-react";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { actualizarAvatarAction, eliminarAvatarAction } from "./_actions";
+import { useUserProfileContext } from "../UserProfileContext";
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
   userName: string;
-  userId: string;
 }
 
-export default function AvatarUpload({ currentAvatarUrl, userName, userId }: AvatarUploadProps) {
+export default function AvatarUpload({ currentAvatarUrl, userName }: AvatarUploadProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { setAvatarUrl } = useUserProfileContext();
 
   const avatarInitial = userName?.charAt(0).toUpperCase() || 'U';
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (uploading) {
+      return;
+    }
 
     // Validar tipo de archivo
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -54,48 +61,18 @@ export default function AvatarUpload({ currentAvatarUrl, userName, userId }: Ava
     setUploading(true);
 
     try {
-      const supabase = supabaseBrowser();
-
-      // Generar nombre único para el archivo
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/avatar.${fileExt}`;
-
-      // Subir a Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, {
-          upsert: true, // Reemplazar si ya existe
-          contentType: file.type,
-        });
-
-      if (uploadError) {
-        console.error('Error al subir imagen:', uploadError);
-        toast.error('Error al subir la imagen');
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const result = await actualizarAvatarAction(formData);
+      if (!result.success) {
+        toast.error(result.error || 'Error al subir la imagen');
         return;
       }
-
-      // Obtener URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      // Actualizar URL en la base de datos
-      const { error: updateError } = await supabase
-        .from('usuario_perfil')
-        .update({ avatar_url: publicUrl })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error('Error al actualizar perfil:', updateError);
-        toast.error('Error al actualizar el perfil');
-        return;
+      if (typeof result.avatarUrl !== 'undefined') {
+        setAvatarUrl(result.avatarUrl);
       }
-
       toast.success('Foto de perfil actualizada');
-
-      // Refrescar la página para mostrar el nuevo avatar
       router.refresh();
-
     } catch (error) {
       console.error('Error inesperado:', error);
       toast.error('Error al subir la imagen');
@@ -105,40 +82,30 @@ export default function AvatarUpload({ currentAvatarUrl, userName, userId }: Ava
     }
   };
 
-  const handleRemoveAvatar = async () => {
-    if (!confirm('¿Estás seguro de eliminar tu foto de perfil?')) return;
+  const handleRemoveAvatar = () => {
+    if (uploading) return;
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmRemoveAvatar = async () => {
     setUploading(true);
 
     try {
-      const supabase = supabaseBrowser();
-
-      // Eliminar de Storage (opcional, puede fallar si no existe)
-      if (currentAvatarUrl) {
-        const fileName = `${userId}/avatar.${currentAvatarUrl.split('.').pop()}`;
-        await supabase.storage.from('avatars').remove([fileName]);
+      const result = await eliminarAvatarAction();
+      if (!result.success) {
+        toast.error(result.error || 'Error al eliminar la foto');
+      } else {
+        setAvatarUrl(null);
+        toast.success('Foto de perfil eliminada');
+        router.refresh();
       }
-
-      // Actualizar BD
-      const { error } = await supabase
-        .from('usuario_perfil')
-        .update({ avatar_url: null })
-        .eq('id', userId);
-
-      if (error) {
-        console.error('Error al eliminar avatar:', error);
-        toast.error('Error al eliminar la foto');
-        return;
-      }
-
-      toast.success('Foto de perfil eliminada');
-      router.refresh();
 
     } catch (error) {
       console.error('Error inesperado:', error);
       toast.error('Error al eliminar la foto');
     } finally {
       setUploading(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -220,6 +187,20 @@ export default function AvatarUpload({ currentAvatarUrl, userName, userId }: Ava
           {currentAvatarUrl ? "Cambiar o eliminar foto" : "Subir foto de perfil"}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Eliminar foto de perfil"
+        description="Tu foto actual será eliminada. Puedes subir una nueva en cualquier momento."
+        confirmText={uploading ? "Eliminando..." : "Eliminar"}
+        cancelText="Cancelar"
+        onConfirm={confirmRemoveAvatar}
+        onClose={() => {
+          if (uploading) return;
+          setShowDeleteConfirm(false);
+        }}
+        disabled={uploading}
+      />
     </div>
   );
 }

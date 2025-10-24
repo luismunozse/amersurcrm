@@ -7,9 +7,10 @@ import toast from "react-hot-toast";
 interface Props {
   perfil: any;
   userEmail: string;
+  isAdmin?: boolean;
 }
 
-export default function EditarPerfilForm({ perfil, userEmail }: Props) {
+export default function EditarPerfilForm({ perfil, userEmail, isAdmin = false }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -66,7 +67,10 @@ export default function EditarPerfilForm({ perfil, userEmail }: Props) {
 
       <div className="p-4 bg-crm-background rounded-lg border border-crm-border">
         <p className="text-sm text-crm-text-muted">
-          <strong>Nota:</strong> Para modificar tu nombre, DNI o email, contacta con el administrador del sistema.
+          <strong>Nota:</strong>{" "}
+          {isAdmin
+            ? "Para modificar tu nombre, DNI o email, utiliza la sección Administración → Usuarios."
+            : "Para modificar tu nombre, DNI o email, contacta con el administrador del sistema."}
         </p>
       </div>
 

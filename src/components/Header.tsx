@@ -9,6 +9,7 @@ import UserAvatarMenu from "./UserAvatarMenu";
 import GlobalSearch from "./GlobalSearch";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
+import { useOptionalUserProfileContext } from "@/app/dashboard/UserProfileContext";
 import CurrencyConverter from "./CurrencyConverter";
 
 type HeaderProps = {
@@ -38,6 +39,10 @@ export default function Header({
   notificationsCount = 0,
   exchangeRates = [],
 }: HeaderProps) {
+  const profileCtx = useOptionalUserProfileContext();
+  const effectiveAvatarUrl =
+    profileCtx?.avatarUrl ?? userAvatarUrl;
+
   return (
     <header className="bg-crm-card shadow-crm-lg border-b border-crm-border sticky top-0 z-30">
       <div className="w-full px-6">
@@ -117,7 +122,7 @@ export default function Header({
               userUsername={userUsername}
               userEmail={userEmail}
               userRole={userRole}
-              userAvatarUrl={userAvatarUrl}
+              userAvatarUrl={effectiveAvatarUrl}
               notificationsCount={notificationsCount}
               lastSignInAt={lastSignInAt}
             />

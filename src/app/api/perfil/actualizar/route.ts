@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       .from("usuario_perfil")
       .update({
         telefono: telefono || null,
-        actualizado_en: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
 
