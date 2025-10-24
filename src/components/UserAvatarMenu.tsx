@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import ThemeToggle from "./ThemeToggle";
 import { ChevronDown, User, Key, Settings, Moon, LogOut, HelpCircle, AlertCircle, Info } from "lucide-react";
 import Image from "next/image";
+import { useOptionalUserProfileContext } from "@/app/dashboard/UserProfileContext";
 
 interface Props {
   userName?: string;
@@ -51,10 +52,43 @@ export default function UserAvatarMenu({
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const profileCtx = useOptionalUserProfileContext();
+  const resolvedAvatarUrl = profileCtx?.avatarUrl ?? userAvatarUrl ?? null;
+  const [avatarUrlState, setAvatarUrlState] = useState<string | null>(resolvedAvatarUrl);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    setAvatarUrlState(resolvedAvatarUrl);
+  }, [resolvedAvatarUrl]);
+
+  useEffect(() => {
+    if (avatarUrlState) return;
+    let canceled = false;
+    (async () => {
+      try {
+        const supabase = supabaseBrowser();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || canceled) return;
+        const { data, error } = await supabase
+          .from("usuario_perfil")
+          .select("avatar_url")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (!canceled && !error && data?.avatar_url) {
+          setAvatarUrlState(data.avatar_url);
+          profileCtx?.setAvatarUrl(data.avatar_url);
+        }
+      } catch (error) {
+        console.error("No se pudo obtener avatar desde Supabase:", error);
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [avatarUrlState, profileCtx]);
 
   const sanitizedUsername = useMemo(() => {
     const candidate = userUsername?.trim();
@@ -127,9 +161,9 @@ export default function UserAvatarMenu({
         {/* Avatar */}
         <div className="relative flex-shrink-0">
           <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md ring-2 ring-crm-border hover:ring-crm-primary transition-all cursor-pointer overflow-hidden">
-            {userAvatarUrl ? (
+            {avatarUrlState ? (
               <Image
-                src={userAvatarUrl}
+                src={avatarUrlState}
                 alt={displayName}
                 width={40}
                 height={40}
@@ -177,9 +211,9 @@ export default function UserAvatarMenu({
           <div className="px-4 py-3 border-b border-crm-border">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-crm-primary to-crm-accent rounded-full flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
-                {userAvatarUrl ? (
+                {avatarUrlState ? (
                   <Image
-                    src={userAvatarUrl}
+                    src={avatarUrlState}
                     alt={displayName}
                     width={48}
                     height={48}
