@@ -8,8 +8,14 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get("state"); // user ID
     const error = searchParams.get("error");
 
+    console.log("[Google Callback] Iniciando proceso de callback");
+    console.log("[Google Callback] Code presente:", Boolean(code));
+    console.log("[Google Callback] State presente:", Boolean(state));
+    console.log("[Google Callback] Error parámetro:", error);
+
     // Si el usuario canceló la autorización
     if (error) {
+      console.log("[Google Callback] Usuario canceló autorización");
       return NextResponse.redirect(
         new URL(
           `/dashboard/admin/configuracion?error=google_auth_cancelled`,
@@ -19,6 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!code || !state) {
+      console.log("[Google Callback] Faltan parámetros code o state");
       return NextResponse.redirect(
         new URL(
           `/dashboard/admin/configuracion?error=google_auth_invalid`,
@@ -70,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
-      console.error("Error al obtener tokens de Google:", errorData);
+      console.error("[Google Callback] Error al obtener tokens de Google:", errorData);
       return NextResponse.redirect(
         new URL(
           `/dashboard/admin/configuracion?error=google_token_exchange_failed`,
@@ -81,6 +88,10 @@ export async function GET(request: NextRequest) {
 
     const tokens = await tokenResponse.json();
     const { access_token, refresh_token, expires_in } = tokens;
+
+    console.log("[Google Callback] Tokens obtenidos exitosamente");
+    console.log("[Google Callback] Access token presente:", Boolean(access_token));
+    console.log("[Google Callback] Refresh token presente:", Boolean(refresh_token));
 
     // Calcular cuando expira el token
     const tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
@@ -106,7 +117,7 @@ export async function GET(request: NextRequest) {
         .eq("id", existingConfig.id);
 
       if (updateError) {
-        console.error("Error al actualizar tokens:", updateError);
+        console.error("[Google Callback] Error al actualizar tokens:", updateError);
         return NextResponse.redirect(
           new URL(
             `/dashboard/admin/configuracion?error=database_update_failed`,
@@ -114,6 +125,7 @@ export async function GET(request: NextRequest) {
           )
         );
       }
+      console.log("[Google Callback] Tokens actualizados en DB exitosamente");
     } else {
       // Crear nueva configuración
       const { error: insertError } = await supabase
@@ -129,7 +141,7 @@ export async function GET(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error("Error al guardar tokens:", insertError);
+        console.error("[Google Callback] Error al guardar tokens:", insertError);
         return NextResponse.redirect(
           new URL(
             `/dashboard/admin/configuracion?error=database_insert_failed`,
@@ -137,14 +149,16 @@ export async function GET(request: NextRequest) {
           )
         );
       }
+      console.log("[Google Callback] Tokens guardados en DB exitosamente");
     }
 
+    console.log("[Google Callback] Proceso completado con éxito, redirigiendo");
     // Redirigir de vuelta a la página de configuración con éxito
     return NextResponse.redirect(
       new URL(`/dashboard/admin/configuracion?success=google_connected`, request.url)
     );
   } catch (error) {
-    console.error("Error en /api/google/callback:", error);
+    console.error("[Google Callback] Error inesperado:", error);
     return NextResponse.redirect(
       new URL(
         `/dashboard/admin/configuracion?error=unexpected_error`,
