@@ -127,7 +127,7 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {documentos.map((doc) => {
-          const Icon = getFileIcon(doc.tipo_mime, doc.extension);
+          const Icon = getFileIcon(doc.tipo_mime);
           const colorClass = getFileColor(doc.tipo_mime);
 
           return (
@@ -211,7 +211,7 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
           </thead>
           <tbody className="divide-y divide-crm-border">
             {documentos.map((doc) => {
-              const Icon = getFileIcon(doc.tipo_mime, doc.extension);
+              const Icon = getFileIcon(doc.tipo_mime);
               const colorClass = getFileColor(doc.tipo_mime);
 
               return (

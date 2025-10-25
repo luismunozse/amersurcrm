@@ -32,7 +32,6 @@ export default async function DocumentosPage() {
 
   return (
     <DocumentosClient
-      documentosIniciales={documentos || []}
       googleDriveConectado={!!googleDriveConfig}
       ultimaSincronizacion={ultimaSincronizacion}
       stats={{
