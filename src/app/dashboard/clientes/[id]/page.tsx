@@ -1,7 +1,7 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect, notFound } from "next/navigation";
 import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
-import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, MapPin } from "lucide-react";
 import Link from "next/link";
 import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/clientes";
 

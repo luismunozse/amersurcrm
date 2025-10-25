@@ -37,6 +37,7 @@
     "next": "15.5.3",
     "node-cron": "^4.2.1",
     "papaparse": "^5.5.3",
+    "pdf-lib": "^1.17.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",

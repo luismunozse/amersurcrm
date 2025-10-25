@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
 import { esAdmin } from "@/lib/auth/roles";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -134,12 +135,12 @@ function AdminDashboard() {
           <p className="text-crm-text-secondary text-sm mb-4">
             Gestiona proyectos inmobiliarios, asigna vendedores y configura precios.
           </p>
-          <a
+          <Link
             href="/dashboard/proyectos"
             className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium inline-block w-full text-center"
           >
             Gestionar Proyectos
-          </a>
+          </Link>
         </div>
 
         {/* Reportes del Sistema */}

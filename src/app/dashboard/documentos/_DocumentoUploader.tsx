@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, X, File, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, X, File, AlertCircle } from "lucide-react";
 
 interface DocumentoUploaderProps {
-  carpetaId: string | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export default function DocumentoUploader({
-  carpetaId,
   onClose,
   onSuccess
 }: DocumentoUploaderProps) {

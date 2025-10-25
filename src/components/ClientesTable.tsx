@@ -98,6 +98,14 @@ export default function ClientesTable({
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const router = useRouter();
+
+  // Estado local para búsqueda
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+
+  // Actualizar búsqueda local cuando cambie el prop
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
   const sortBy = initialSortBy as keyof Cliente;
   const sortOrder = initialSortOrder;
 
@@ -310,14 +318,6 @@ export default function ClientesTable({
       />
     );
   }
-
-  // Estado local para búsqueda
-  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
-
-  // Actualizar búsqueda local cuando cambie el prop
-  useEffect(() => {
-    setLocalSearchQuery(searchQuery);
-  }, [searchQuery]);
 
   // Función para aplicar búsqueda
   const handleSearch = (value: string) => {

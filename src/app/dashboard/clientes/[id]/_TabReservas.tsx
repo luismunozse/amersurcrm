@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Clock, DollarSign, CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import CrearReservaModal from "@/components/CrearReservaModal";

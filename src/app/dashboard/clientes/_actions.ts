@@ -9,11 +9,6 @@ import {
   TipoCliente,
   TipoDocumento,
   EstadoCliente,
-  OrigenLead,
-  FormaPago,
-  InteresPrincipal,
-  ProximaAccion,
-  DireccionCliente,
   EstadoCivil
 } from "@/lib/types/clientes";
 

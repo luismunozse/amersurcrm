@@ -98,7 +98,7 @@ export async function obtenerMetricasReportes(
     }
 
     // Clientes totales (no solo del período)
-    const { data: totalClientes, error: totalClientesError } = await supabase
+    const { data: totalClientes } = await supabase
       .schema('crm')
       .from('cliente')
       .select('id, estado_cliente')
@@ -117,13 +117,13 @@ export async function obtenerMetricasReportes(
     }
 
     // Propiedades totales por estado
-    const { data: propiedadesEstados, error: propiedadesEstadosError } = await supabase
+    const { data: propiedadesEstados } = await supabase
       .schema('crm')
       .from('propiedad')
       .select('id, estado_comercial, precio');
 
     // 3. Métricas de Proyectos
-    const { data: proyectosData, error: proyectosError } = await supabase
+    const { data: proyectosData } = await supabase
       .schema('crm')
       .from('proyecto')
       .select('id, nombre, estado, created_at')
@@ -131,7 +131,7 @@ export async function obtenerMetricasReportes(
       .lte('created_at', endDate);
 
     // 4. Métricas de Usuarios/Vendedores
-    const { data: vendedoresData, error: vendedoresError } = await supabase
+    const { data: vendedoresData } = await supabase
       .schema('crm')
       .from('usuario_perfil')
       .select('id, username, nombre_completo, activo, rol_id, meta_mensual_ventas, comision_porcentaje')
@@ -160,8 +160,8 @@ export async function obtenerMetricasReportes(
     // 6. Datos para gráficos de tendencias (últimos 6 meses)
     const seisMesesAtras = new Date();
     seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
-    
-    const { data: tendenciasData, error: tendenciasError } = await supabase
+
+    const { data: tendenciasData } = await supabase
       .schema('crm')
       .from('propiedad')
       .select('created_at, estado_comercial, precio')
@@ -231,8 +231,7 @@ export async function obtenerMetricasReportes(
  * Obtiene reporte de ventas
  */
 export async function obtenerReporteVentas(
-  periodo: string = '30',
-  vendedorId?: string
+  periodo: string = '30'
 ): Promise<{ data: any | null; error: string | null }> {
   try {
     // Implementación simplificada por ahora
@@ -240,8 +239,8 @@ export async function obtenerReporteVentas(
     return { data: metricas.data, error: metricas.error };
   } catch (error) {
     console.error('Error obteniendo reporte de ventas:', error);
-    return { 
-      data: null, 
+    return {
+      data: null,
       error: error instanceof Error ? error.message : 'Error desconocido'
     };
   }
@@ -307,11 +306,7 @@ export async function obtenerReporteRendimiento(
 /**
  * Exporta reporte a PDF
  */
-export async function exportarReportePDF(
-  tipoReporte: string,
-  periodo: string = '30',
-  datos: any
-): Promise<{ success: boolean; url?: string; error?: string }> {
+export async function exportarReportePDF(): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     // Por ahora retornamos un mock
     return {

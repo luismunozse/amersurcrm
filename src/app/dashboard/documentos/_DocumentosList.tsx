@@ -36,7 +36,7 @@ interface DocumentosListProps {
 export default function DocumentosList({ documentos, vista }: DocumentosListProps) {
 
   // Obtener icono según tipo
-  const getFileIcon = (mimeType: string, extension: string) => {
+  const getFileIcon = (mimeType: string) => {
     if (mimeType?.startsWith('image/')) return Image;
     if (mimeType?.includes('pdf')) return FileText;
     if (mimeType?.includes('zip') || mimeType?.includes('rar')) return FileArchive;

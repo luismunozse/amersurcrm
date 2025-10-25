@@ -163,7 +163,7 @@ export default function AyudaPage() {
               <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
             </summary>
             <div className="p-4 text-sm text-crm-text-muted">
-              Puedes cambiar tu contraseña desde el menú de usuario (esquina superior derecha) → "Cambiar Contraseña".
+              Puedes cambiar tu contraseña desde el menú de usuario (esquina superior derecha) → &apos;Cambiar Contraseña&apos;.
               También puedes hacerlo desde tu perfil.
             </div>
           </details>
@@ -174,7 +174,7 @@ export default function AyudaPage() {
               <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
             </summary>
             <div className="p-4 text-sm text-crm-text-muted">
-              Ve a la sección "Clientes" en el menú lateral y haz clic en el botón "Nuevo Cliente" (+).
+              Ve a la sección &apos;Clientes&apos; en el menú lateral y haz clic en el botón &apos;Nuevo Cliente&apos; (+).
               Completa el formulario con la información requerida y guarda.
             </div>
           </details>
@@ -196,7 +196,7 @@ export default function AyudaPage() {
               <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
             </summary>
             <div className="p-4 text-sm text-crm-text-muted">
-              Ve a tu perfil desde el menú de usuario → "Mi Perfil". Ahí encontrarás un botón para cambiar tu foto de perfil.
+              Ve a tu perfil desde el menú de usuario → &apos;Mi Perfil&apos;. Ahí encontrarás un botón para cambiar tu foto de perfil.
               Las imágenes deben ser JPG, PNG o WebP y no superar los 2MB.
             </div>
           </details>
@@ -207,7 +207,7 @@ export default function AyudaPage() {
               <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
             </summary>
             <div className="p-4 text-sm text-crm-text-muted">
-              Si encuentras un error o bug, por favor repórtalo usando la opción "Reportar Problema" en el menú de usuario.
+              Si encuentras un error o bug, por favor repórtalo usando la opción &apos;Reportar Problema&apos; en el menú de usuario.
               Nuestro equipo técnico lo revisará lo antes posible.
             </div>
           </details>

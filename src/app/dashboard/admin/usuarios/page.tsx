@@ -577,7 +577,7 @@ function GestionUsuarios() {
               ) : usuariosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-crm-text-muted">
-                    No se encontraron usuarios con el criterio de búsqueda "{busqueda}"
+                    No se encontraron usuarios con el criterio de búsqueda &quot;{busqueda}&quot;
                   </td>
                 </tr>
               ) : (

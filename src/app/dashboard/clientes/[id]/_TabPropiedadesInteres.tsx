@@ -1,15 +1,14 @@
 "use client";
 
-import { Heart, MapPin, DollarSign, Tag } from "lucide-react";
+import { Heart, DollarSign, Tag } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 
 interface Props {
-  clienteId: string;
   propiedades: any[];
 }
 
-export default function TabPropiedadesInteres({ clienteId, propiedades }: Props) {
+export default function TabPropiedadesInteres({ propiedades }: Props) {
   const getPrioridadColor = (prioridad: number) => {
     if (prioridad === 1) return 'red';
     if (prioridad === 2) return 'yellow';

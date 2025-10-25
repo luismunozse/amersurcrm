@@ -5,10 +5,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import {
   Evento,
-  TipoEvento,
   EstadoEvento,
-  Prioridad,
-  TipoRecordatorio,
 } from "@/lib/types/agenda";
 import { 
   startOfMonth,

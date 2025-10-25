@@ -1,14 +1,13 @@
 "use client";
 
-import { Eye, MapPin, Clock, Star, FileText } from "lucide-react";
+import { Eye, Clock, Star, FileText } from "lucide-react";
 import Link from "next/link";
 
 interface Props {
-  clienteId: string;
   visitas: any[];
 }
 
-export default function TabVisitas({ clienteId, visitas }: Props) {
+export default function TabVisitas({ visitas }: Props) {
   const renderEstrellas = (nivel: number) => {
     return (
       <div className="flex gap-0.5">

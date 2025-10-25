@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { User, Mail, Phone, MapPin, Calendar, CreditCard, Home, DollarSign, FileText, UserCheck } from "lucide-react";
+import { User, Mail, Phone, MapPin, DollarSign, FileText, UserCheck } from "lucide-react";
 import { TIPOS_DOCUMENTO_OPTIONS, ESTADO_CIVIL_OPTIONS, ORIGENES_LEAD_OPTIONS, INTERESES_PRINCIPALES_OPTIONS, FORMAS_PAGO_OPTIONS } from "@/lib/types/clientes";
 import { formatCapacidadCompra } from "@/lib/types/clientes";
 import toast from "react-hot-toast";

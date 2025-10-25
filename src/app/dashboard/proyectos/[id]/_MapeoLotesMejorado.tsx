@@ -1035,12 +1035,12 @@ export default function MapeoLotesMejorado({
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
                     <p className="font-medium mb-2">Instrucciones:</p>
                     <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Usa el <strong>buscador del mapa</strong> para encontrar la ubicación (ej: "Huaral, Lima")</li>
-                      <li>Haz clic en <strong>"✏️ Dibujar área del proyecto"</strong></li>
+                      <li>Usa el <strong>buscador del mapa</strong> para encontrar la ubicación (ej: &quot;Huaral, Lima&quot;)</li>
+                      <li>Haz clic en <strong>&quot;✏️ Dibujar área del proyecto&quot;</strong></li>
                       <li>Haz clic en el mapa para marcar cada <strong>vértice del área</strong></li>
                       <li>Haz clic en el <strong>primer punto</strong> para cerrar el polígono</li>
                       <li>Arrastra los vértices para ajustar si es necesario</li>
-                      <li>Haz clic en <strong>"Guardar ubicación"</strong> para continuar</li>
+                      <li>Haz clic en <strong>&quot;Guardar ubicación&quot;</strong> para continuar</li>
                     </ol>
                   </div>
 

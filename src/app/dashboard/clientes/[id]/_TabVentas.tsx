@@ -1,16 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { DollarSign, FileText, Calendar, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 
 interface Props {
-  clienteId: string;
   ventas: any[];
 }
 
-export default function TabVentas({ clienteId, ventas }: Props) {
+export default function TabVentas({ ventas }: Props) {
   const getEstadoColor = (estado: string) => {
     const colores = {
       'en_proceso': 'blue',

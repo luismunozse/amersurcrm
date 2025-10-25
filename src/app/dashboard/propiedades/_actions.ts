@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
-import { redirect } from "next/navigation";
 
 export async function crearPropiedad(formData: FormData) {
   const supabase = await createServerActionClient();

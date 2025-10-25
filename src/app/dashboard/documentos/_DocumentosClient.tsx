@@ -17,10 +17,9 @@ import GoogleDriveStatus from "./_GoogleDriveStatus";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { useEffect, useState as useStateEffect } from "react";
+import { useEffect } from "react";
 
 interface DocumentosClientProps {
-  documentosIniciales: any[];
   googleDriveConectado: boolean;
   ultimaSincronizacion: string | null;
   stats: {
@@ -30,7 +29,6 @@ interface DocumentosClientProps {
 }
 
 export default function DocumentosClient({
-  documentosIniciales,
   googleDriveConectado,
   ultimaSincronizacion,
   stats
@@ -40,7 +38,7 @@ export default function DocumentosClient({
   const [busqueda, setBusqueda] = useState('');
   const [sincronizando, setSincronizando] = useState(false);
   const [documentosEnCarpeta, setDocumentosEnCarpeta] = useState<any[]>([]);
-  const [cargandoDocumentos, setCargandoDocumentos] = useState(false);
+  const [, setCargandoDocumentos] = useState(false);
 
   // Cargar documentos de la carpeta actual desde Google Drive
   useEffect(() => {
@@ -96,14 +94,6 @@ export default function DocumentosClient({
     return true;
   });
 
-  // Formatear tamaño
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
 
   // Sincronizar con Google Drive
   const handleSincronizar = async () => {

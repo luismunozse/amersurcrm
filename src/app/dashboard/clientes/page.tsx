@@ -1,9 +1,6 @@
-import Link from "next/link";
-import { getCachedClientes, getCachedClientesTotal } from "@/lib/cache.server";
+import { getCachedClientes } from "@/lib/cache.server";
 import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
-import AdvancedClientSearch from "@/components/AdvancedClientSearch";
-import PhoneNormalizationTool from "@/components/PhoneNormalizationTool";
 
 type SP = Promise<{
   q?: string | string[];

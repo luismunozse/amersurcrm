@@ -108,7 +108,7 @@ export default function QuickActions({
           <ExclamationTriangleIcon className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-red-800">
-              ¿Eliminar "{nombre}"?
+              ¿Eliminar &quot;{nombre}&quot;?
             </p>
             <p className="text-xs text-red-600 mt-1">
               {lotesCount} lote(s) se eliminarán

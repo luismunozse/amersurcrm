@@ -6,11 +6,10 @@ import toast from "react-hot-toast";
 
 interface Props {
   perfil: any;
-  userEmail: string;
   isAdmin?: boolean;
 }
 
-export default function EditarPerfilForm({ perfil, userEmail, isAdmin = false }: Props) {
+export default function EditarPerfilForm({ perfil, isAdmin = false }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 

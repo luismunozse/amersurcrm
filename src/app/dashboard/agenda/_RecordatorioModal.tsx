@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Recordatorio, RecordatorioFormData, TIPOS_RECORDATORIO_OPTIONS, PRIORIDADES_OPTIONS } from "@/lib/types/agenda";
 import { crearRecordatorio } from "./actions";
 import toast from "react-hot-toast";
-import { XMarkIcon, BellIcon, UserIcon, HomeIcon, CalendarIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface RecordatorioModalProps {
   recordatorio?: Recordatorio | null;

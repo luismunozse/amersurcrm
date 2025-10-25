@@ -1,339 +1,440 @@
 "use client";
 
-import { jsPDF } from "jspdf";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { ProformaRecord } from "@/types/proforma";
 
-const PRIMARY_COLOR = { r: 92, g: 140, b: 33 };
-const DARK_COLOR = { r: 27, g: 44, b: 61 };
-const BORDER_COLOR = { r: 210, g: 215, b: 222 };
+const TEMPLATE_PATH = "/proforma/plantilla-proforma.pdf";
+const PAGE_WIDTH = 595.2; // pts
+const PAGE_HEIGHT = 841.92; // pts
+const ORIGINAL_WIDTH = 1240; // px extracted from template raster
+const SCALE = PAGE_WIDTH / ORIGINAL_WIDTH;
+const DEFAULT_FONT_SIZE = 10;
+const CELL_PADDING_PX = 14;
 
-async function loadImageAsDataURL(src: string): Promise<string | null> {
-  try {
-    const response = await fetch(src);
-    const blob = await response.blob();
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.warn("No se pudo cargar la imagen", src, error);
-    return null;
+type BoundsPx = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+type DrawOptions = {
+  fontSize?: number;
+  paddingPx?: number;
+  maxLines?: number;
+  color?: ReturnType<typeof rgb>;
+};
+
+const COLOR_TEXT = rgb(29 / 255, 41 / 255, 59 / 255);
+
+const CELLS = {
+  cliente: {
+    nombre: bounds(103, 358, 411, 396),
+    dni: bounds(103, 396, 411, 434),
+    telefono: bounds(103, 434, 411, 473),
+    email: bounds(103, 473, 411, 512),
+  },
+  asesor: {
+    nombre: bounds(704, 358, 1131, 396),
+    celular: bounds(704, 396, 1131, 434),
+    email: bounds(704, 434, 1131, 473),
+    observacion: bounds(704, 473, 1131, 512),
+  },
+  terreno: {
+    proyecto: bounds(103, 646, 318, 683),
+    lote: bounds(318, 646, 418, 683),
+    etapa: bounds(418, 646, 828, 683),
+    area: bounds(828, 646, 1009, 683),
+    precioLista: bounds(1009, 646, 1131, 683),
+  },
+  precios: {
+    lista: bounds(103, 799, 561, 839),
+    descuento: bounds(103, 839, 561, 878),
+    final: bounds(103, 878, 561, 917),
+  },
+  formaPago: {
+    separacion: bounds(704, 799, 1131, 839),
+    abonoPrincipal: bounds(704, 839, 1131, 878),
+    cuotas: bounds(704, 878, 1131, 917),
+  },
+  mediosPago: {
+    soles: bounds(103, 955, 411, 990),
+    dolares: bounds(704, 955, 1131, 990),
+  },
+  firmas: {
+    cliente: bounds(103, 1338, 320, 1387),
+    asesor: bounds(420, 1338, 820, 1387),
+  },
+  comentarios: bounds(103, 1188, 1131, 1265),
+  numeroProforma: bounds(940, 300, 1131, 335),
+  fechaEmision: bounds(940, 330, 1131, 365),
+};
+
+const DEFAULT_DATOS = {
+  cliente: { nombre: "", dni: "", telefono: "", email: "" },
+  asesor: { nombre: "", celular: "", email: "", observacion: "" },
+  terreno: {
+    proyecto: "",
+    lote: "",
+    etapa: "",
+    area: "",
+    precioLista: null as number | null,
+  },
+  precios: {
+    precioLista: null as number | null,
+    descuento: null as number | null,
+    precioFinal: null as number | null,
+  },
+  formaPago: {
+    separacion: null as number | null,
+    abonoPrincipal: null as number | null,
+    numeroCuotas: null as number | null,
+  },
+  mediosPago: {
+    soles: "",
+    dolares: "",
+  },
+  comentariosAdicionales: "",
+  validezDias: 3,
+};
+
+export async function generarProformaPdf(proforma: ProformaRecord) {
+  const response = await fetch(TEMPLATE_PATH);
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la plantilla de proforma.");
   }
+
+  const templateBytes = await response.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(templateBytes);
+  const page = pdfDoc.getPage(0);
+
+  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const datos = mergeDatos(DEFAULT_DATOS, proforma.datos);
+
+  // Cabecera: número y fecha
+  if (proforma.numero) {
+    drawTextInBounds(page, regularFont, `N° ${proforma.numero}`, CELLS.numeroProforma, {
+      fontSize: 11,
+      paddingPx: 6,
+      maxLines: 1,
+    });
+  }
+  drawTextInBounds(
+    page,
+    regularFont,
+    `Emitida el ${formatFecha(proforma.created_at ?? proforma.updated_at ?? new Date().toISOString())}`,
+    CELLS.fechaEmision,
+    { fontSize: 9, paddingPx: 6, maxLines: 1 },
+  );
+
+  // Datos del cliente
+  drawTextInBounds(page, boldFont, textOrDash(datos.cliente.nombre), CELLS.cliente.nombre);
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.dni), CELLS.cliente.dni);
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.telefono), CELLS.cliente.telefono);
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.email), CELLS.cliente.email);
+
+  // Datos del asesor
+  drawTextInBounds(page, boldFont, textOrDash(datos.asesor.nombre), CELLS.asesor.nombre);
+  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.celular), CELLS.asesor.celular);
+  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.email), CELLS.asesor.email);
+  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.observacion), CELLS.asesor.observacion);
+
+  // Terreno
+  drawTextInBounds(page, boldFont, textOrDash(datos.terreno.proyecto), CELLS.terreno.proyecto);
+  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.lote), CELLS.terreno.lote);
+  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.etapa), CELLS.terreno.etapa);
+  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.area), CELLS.terreno.area);
+  drawTextInBounds(
+    page,
+    boldFont,
+    formatCurrency(datos.terreno.precioLista ?? datos.precios.precioLista, proforma.moneda),
+    CELLS.terreno.precioLista,
+  );
+
+  // Tabla de precios
+  drawTextInBounds(
+    page,
+    regularFont,
+    formatCurrency(datos.precios.precioLista, proforma.moneda),
+    CELLS.precios.lista,
+  );
+  drawTextInBounds(
+    page,
+    regularFont,
+    formatCurrency(datos.precios.descuento, proforma.moneda),
+    CELLS.precios.descuento,
+  );
+  drawTextInBounds(
+    page,
+    boldFont,
+    formatCurrency(datos.precios.precioFinal ?? proforma.total, proforma.moneda),
+    CELLS.precios.final,
+  );
+
+  // Forma de pago
+  drawTextInBounds(
+    page,
+    regularFont,
+    formatCurrency(datos.formaPago.separacion, proforma.moneda),
+    CELLS.formaPago.separacion,
+  );
+  drawTextInBounds(
+    page,
+    regularFont,
+    formatCurrency(datos.formaPago.abonoPrincipal, proforma.moneda),
+    CELLS.formaPago.abonoPrincipal,
+  );
+  drawTextInBounds(
+    page,
+    regularFont,
+    textOrDash(datos.formaPago.numeroCuotas?.toString()),
+    CELLS.formaPago.cuotas,
+  );
+
+  // Medios de pago
+  drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.soles), CELLS.mediosPago.soles);
+  drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.dolares), CELLS.mediosPago.dolares);
+
+  // Comentarios adicionales (opcional)
+  if (datos.comentariosAdicionales) {
+    drawParagraph(page, regularFont, datos.comentariosAdicionales, CELLS.comentarios, {
+      fontSize: 9,
+      paddingPx: 12,
+    });
+  }
+
+  // Firmas sugeridas
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.nombre), CELLS.firmas.cliente, {
+    fontSize: 9,
+    paddingPx: 6,
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.nombre), CELLS.firmas.asesor, {
+    fontSize: 9,
+    paddingPx: 6,
+  });
+
+  // Nota de validez y total
+  const nota = `Oferta válida por ${datos.validezDias ?? 3} día(s) hábil(es) desde la fecha de emisión.`;
+  drawText(page, regularFont, nota, px(103), pxY(1275), { fontSize: 8 });
+
+  const pdfBytes = await pdfDoc.save();
+  downloadPdf(pdfBytes, buildFileName(proforma));
 }
 
-function formatCurrency(value: number | null | undefined, currency: string) {
-  if (value === null || value === undefined) return "—";
+function bounds(left: number, top: number, right: number, bottom: number): BoundsPx {
+  return { left, top, right, bottom };
+}
+
+function px(value: number) {
+  return value * SCALE;
+}
+
+function pxY(pixelY: number) {
+  return PAGE_HEIGHT - pixelY * SCALE;
+}
+
+function boundsToRect(boundsPx: BoundsPx) {
+  const widthPx = boundsPx.right - boundsPx.left;
+  const heightPx = boundsPx.bottom - boundsPx.top;
+  return {
+    x: px(boundsPx.left),
+    y: PAGE_HEIGHT - px(boundsPx.bottom),
+    width: px(widthPx),
+    height: px(heightPx),
+  };
+}
+
+function drawTextInBounds(
+  page: PDFPage,
+  font: PDFFont,
+  rawValue: string,
+  boundsPx: BoundsPx,
+  options: DrawOptions = {},
+) {
+  const value = rawValue || "—";
+  const rect = boundsToRect(boundsPx);
+  const fontSize = options.fontSize ?? DEFAULT_FONT_SIZE;
+  const padding = px(options.paddingPx ?? CELL_PADDING_PX);
+  const maxWidth = rect.width - padding * 2;
+  const lineGap = 2;
+  const maxLines = options.maxLines ?? Math.max(1, Math.floor((rect.height - padding * 2) / (fontSize + lineGap)));
+
+  const lines = wrapText(value, font, fontSize, maxWidth, maxLines);
+  let cursorY = rect.y + rect.height - padding - fontSize;
+
+  lines.forEach((line) => {
+    page.drawText(line, {
+      x: rect.x + padding,
+      y: cursorY,
+      font,
+      size: fontSize,
+      color: options.color ?? COLOR_TEXT,
+    });
+    cursorY -= fontSize + lineGap;
+  });
+}
+
+function drawParagraph(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  boundsPx: BoundsPx,
+  options: DrawOptions = {},
+) {
+  const rect = boundsToRect(boundsPx);
+  const padding = px(options.paddingPx ?? CELL_PADDING_PX);
+  const fontSize = options.fontSize ?? 9;
+  const lineGap = 2;
+  const maxWidth = rect.width - padding * 2;
+  const maxLines = options.maxLines ?? Math.floor((rect.height - padding * 2) / (fontSize + lineGap));
+  const lines = wrapText(text, font, fontSize, maxWidth, maxLines);
+
+  let cursorY = rect.y + rect.height - padding - fontSize;
+  lines.forEach((line) => {
+    page.drawText(line, {
+      x: rect.x + padding,
+      y: cursorY,
+      font,
+      size: fontSize,
+      color: options.color ?? COLOR_TEXT,
+    });
+    cursorY -= fontSize + lineGap;
+  });
+}
+
+function drawText(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  x: number,
+  y: number,
+  options: { fontSize?: number; color?: ReturnType<typeof rgb> } = {},
+) {
+  page.drawText(text, {
+    x,
+    y,
+    font,
+    size: options.fontSize ?? DEFAULT_FONT_SIZE,
+    color: options.color ?? COLOR_TEXT,
+  });
+}
+
+function wrapText(
+  text: string,
+  font: PDFFont,
+  fontSize: number,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
+  const sanitized = text.replace(/\s+/g, " ").trim();
+  if (!sanitized) return ["—"];
+
+  const words = sanitized.split(" ");
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
+      current = candidate;
+      continue;
+    }
+
+    if (current) {
+      lines.push(current);
+      if (lines.length === maxLines) return lines;
+    }
+
+    if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
+      // Split very long word
+      let buffer = "";
+      for (const char of word) {
+        const candidateWord = buffer + char;
+        if (font.widthOfTextAtSize(candidateWord, fontSize) > maxWidth && buffer) {
+          lines.push(buffer);
+          buffer = char;
+          if (lines.length === maxLines) return lines;
+        } else {
+          buffer = candidateWord;
+        }
+      }
+      current = buffer;
+    } else {
+      current = word;
+    }
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines.slice(0, maxLines);
+}
+
+function formatCurrency(value: number | null | undefined, currency?: string) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+  const currencyCode = currency === "USD" ? "USD" : "PEN";
   try {
     return new Intl.NumberFormat("es-PE", {
       style: "currency",
-      currency: currency === "USD" ? "USD" : "PEN",
+      currency: currencyCode,
       minimumFractionDigits: 2,
     }).format(value);
   } catch {
-    return `${currency} ${value.toFixed(2)}`;
+    return `${currencyCode} ${value.toFixed(2)}`;
   }
 }
 
-function textOrDash(value: string | null | undefined) {
-  if (value === null || value === undefined || value === "") return "—";
-  return value;
+function textOrDash(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return "—";
+  const str = typeof value === "number" ? value.toString() : value.trim();
+  return str.length > 0 ? str : "—";
 }
 
-function drawFieldBlock(
-  doc: jsPDF,
-  opts: {
-    x: number;
-    y: number;
-    width: number;
-    label: string;
-    value: string;
-    height?: number;
-  },
-) {
-  const height = opts.height ?? 8;
-  doc.setDrawColor(BORDER_COLOR.r, BORDER_COLOR.g, BORDER_COLOR.b);
-  doc.rect(opts.x, opts.y, opts.width, height);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(100, 116, 139);
-  doc.text(opts.label.toUpperCase(), opts.x + 2, opts.y + 3.2);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(34, 41, 57);
-  const textY = opts.y + height - 2;
-  doc.text(opts.value || "—", opts.x + 2, textY);
-}
-
-function drawSectionTitle(doc: jsPDF, title: string, x: number, y: number) {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(PRIMARY_COLOR.r, PRIMARY_COLOR.g, PRIMARY_COLOR.b);
-  doc.text(title.toUpperCase(), x, y);
-}
-
-function drawList(doc: jsPDF, items: string[], x: number, y: number, width: number) {
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(34, 41, 57);
-  let currentY = y;
-  items.forEach((item) => {
-    const lines = doc.splitTextToSize(`• ${item}`, width);
-    doc.text(lines, x, currentY);
-    currentY += lines.length * 4.2;
-  });
-  return currentY;
-}
-
-export async function generarProformaPdf(proforma: ProformaRecord) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 12;
-
-  // Cabecera
-  doc.setFillColor(DARK_COLOR.r, DARK_COLOR.g, DARK_COLOR.b);
-  doc.rect(0, 0, pageWidth, 28, "F");
-  doc.setFillColor(PRIMARY_COLOR.r, PRIMARY_COLOR.g, PRIMARY_COLOR.b);
-  doc.rect(0, 28, pageWidth, 10, "F");
-
-  const logo = await loadImageAsDataURL("/amersur-logo-b.png");
-  if (logo) {
-    doc.addImage(logo, "PNG", margin, 5, 40, 20);
+function mergeDatos<T>(defaults: T, source: unknown): T {
+  if (!source || typeof source !== "object") {
+    return clone(defaults);
   }
+  const result = clone(defaults);
+  deepAssign(result as Record<string, unknown>, source as Record<string, unknown>);
+  return result;
+}
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255);
-  doc.text("+51 969 306 754", pageWidth - margin, 9, { align: "right" });
-  doc.text("www.amersurac.com", pageWidth - margin, 14, { align: "right" });
-  doc.text("info@amersurac.com", pageWidth - margin, 19, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  doc.text("#TuPropiedadSinFrontera", pageWidth - margin, 24, { align: "right" });
-
-  // Título
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(34, 41, 57);
-  doc.text("PROFORMA DE AMERSUR", pageWidth / 2, 48, { align: "center" });
-
-  let cursorY = 60;
-  const columnWidth = (pageWidth - margin * 2) / 2;
-
-  const datos = proforma.datos ?? {
-    cliente: { nombre: "", dni: "", telefono: "", email: "" },
-    asesor: { nombre: "", celular: "" },
-    terreno: {},
-    precios: {},
-    formaPago: {},
-    condicionesComerciales: [],
-    mediosPago: {},
-    requisitosContrato: [],
-    cuentasEmpresa: [],
-  };
-
-  // Datos del cliente y asesor
-  drawSectionTitle(doc, "Datos del Cliente", margin, cursorY);
-  drawSectionTitle(doc, "Atendido por", margin + columnWidth, cursorY);
-  cursorY += 4;
-
-  const blockHeight = 28;
-  const rowHeight = blockHeight / 4;
-
-  const clienteFields = [
-    { label: "Nombre y Apellido", value: textOrDash(datos?.cliente?.nombre) },
-    { label: "DNI", value: textOrDash(datos?.cliente?.dni) },
-    { label: "Teléfono", value: textOrDash(datos?.cliente?.telefono) },
-    { label: "Correo Electrónico", value: textOrDash(datos?.cliente?.email) },
-  ];
-
-  clienteFields.forEach((field, index) => {
-    drawFieldBlock(doc, {
-      x: margin,
-      y: cursorY + index * rowHeight,
-      width: columnWidth - 3,
-      height: rowHeight,
-      label: field.label,
-      value: field.value,
-    });
+function deepAssign(target: Record<string, unknown>, source: Record<string, unknown>) {
+  Object.entries(source).forEach(([key, value]) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      if (!target[key] || typeof target[key] !== "object") {
+        target[key] = {};
+      }
+      deepAssign(target[key] as Record<string, unknown>, value as Record<string, unknown>);
+    } else {
+      target[key] = value as unknown;
+    }
   });
+}
 
-  const asesorFields = [
-    { label: "Asesor(a) de Ventas", value: textOrDash(datos?.asesor?.nombre) },
-    { label: "Celular", value: textOrDash(datos?.asesor?.celular) },
-  ];
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
-  asesorFields.forEach((field, index) => {
-    drawFieldBlock(doc, {
-      x: margin + columnWidth + 3,
-      y: cursorY + index * rowHeight,
-      width: columnWidth - 3,
-      height: rowHeight,
-      label: field.label,
-      value: field.value,
-    });
-  });
+function downloadPdf(bytes: Uint8Array, filename: string) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
-  cursorY += blockHeight + 12;
-
-  // Terreno
-  drawSectionTitle(doc, "Características del Terreno", margin, cursorY);
-  cursorY += 4;
-
-  const terrenoFields = [
-    { label: "Proyecto", value: textOrDash(datos?.terreno?.proyecto) },
-    { label: "Lote", value: textOrDash(datos?.terreno?.lote) },
-    { label: "Etapa / Sector", value: textOrDash(datos?.terreno?.etapa) },
-    {
-      label: "Área del Terreno",
-      value: textOrDash(datos?.terreno?.area),
-    },
-    {
-      label: "Precio en Lista",
-      value: formatCurrency(datos?.terreno?.precioLista ?? datos?.precios?.precioLista, proforma.moneda),
-    },
-  ];
-
-  const terrenoRowHeight = 8.5;
-  terrenoFields.forEach((field, index) => {
-    drawFieldBlock(doc, {
-      x: margin + (index % 3) * ((pageWidth - margin * 2) / 3),
-      y: cursorY + Math.floor(index / 3) * terrenoRowHeight,
-      width: (pageWidth - margin * 2) / 3 - 2,
-      height: terrenoRowHeight,
-      label: field.label,
-      value: field.value,
-    });
-  });
-
-  cursorY += terrenoRowHeight * Math.ceil(terrenoFields.length / 3) + 12;
-
-  // Descuentos y promociones / Forma de pago
-  drawSectionTitle(doc, "Descuentos y Promociones", margin, cursorY);
-  drawSectionTitle(doc, "Forma de Pago", margin + columnWidth, cursorY);
-  cursorY += 4;
-
-  const preciosFields = [
-    { label: "Precio en Lista", value: formatCurrency(datos?.precios?.precioLista, proforma.moneda) },
-    { label: "Descuento", value: formatCurrency(datos?.precios?.descuento, proforma.moneda) },
-    { label: "Precio Final", value: formatCurrency(datos?.precios?.precioFinal ?? proforma.total, proforma.moneda) },
-  ];
-
-  preciosFields.forEach((field, index) => {
-    drawFieldBlock(doc, {
-      x: margin,
-      y: cursorY + index * rowHeight,
-      width: columnWidth - 3,
-      height: rowHeight,
-      label: field.label,
-      value: field.value,
-    });
-  });
-
-  const formaPagoFields = [
-    { label: "Separación", value: formatCurrency(datos?.formaPago?.separacion, proforma.moneda) },
-    { label: "Abono Principal", value: formatCurrency(datos?.formaPago?.abonoPrincipal, proforma.moneda) },
-    { label: "Número de Cuotas", value: textOrDash(datos?.formaPago?.numeroCuotas?.toString()) },
-  ];
-
-  formaPagoFields.forEach((field, index) => {
-    drawFieldBlock(doc, {
-      x: margin + columnWidth + 3,
-      y: cursorY + index * rowHeight,
-      width: columnWidth - 3,
-      height: rowHeight,
-      label: field.label,
-      value: field.value,
-    });
-  });
-
-  cursorY += rowHeight * preciosFields.length + 12;
-
-  // Condiciones comerciales
-  drawSectionTitle(doc, "Condiciones Comerciales", margin, cursorY);
-  cursorY += 6;
-  const condiciones = datos.condicionesComerciales?.length
-    ? datos.condicionesComerciales
-    : [
-        "Validez de oferta: 3 días hábiles desde su recepción.",
-        "Pagos mediante transferencia o depósito bancario.",
-        "La reserva asegura el lote seleccionado.",
-      ];
-  cursorY = drawList(doc, condiciones, margin, cursorY, pageWidth - margin * 2);
-  cursorY += 6;
-
-  // Medios de pago
-  drawSectionTitle(doc, "Medios de Pago", margin, cursorY);
-  cursorY += 5;
-  drawFieldBlock(doc, {
-    x: margin,
-    y: cursorY,
-    width: columnWidth - 3,
-    height: 10,
-    label: "Soles",
-    value: textOrDash(datos.mediosPago?.soles),
-  });
-  drawFieldBlock(doc, {
-    x: margin + columnWidth + 3,
-    y: cursorY,
-    width: columnWidth - 3,
-    height: 10,
-    label: "Dólares",
-    value: textOrDash(datos.mediosPago?.dolares),
-  });
-  cursorY += 16;
-
-  // Requisitos
-  drawSectionTitle(doc, "Requisitos para Emisión de Contrato", margin, cursorY);
-  cursorY += 6;
-  const requisitos = datos.requisitosContrato?.length
-    ? datos.requisitosContrato
-    : ["DNI (anverso y reverso)", "Recibo de servicios", "Profesión u ocupación", "Número de celular", "Correo electrónico"];
-  cursorY = drawList(doc, requisitos, margin, cursorY, pageWidth - margin * 2);
-  cursorY += 6;
-
-  // Cuentas de la empresa
-  drawSectionTitle(doc, "Cuentas de la Empresa", margin, cursorY);
-  cursorY += 6;
-  const cuentas = datos.cuentasEmpresa?.length ? datos.cuentasEmpresa : ["Inversiones de América del Sur S.A.C."];
-  cursorY = drawList(doc, cuentas, margin, cursorY, pageWidth - margin * 2);
-  cursorY += 8;
-
-  // Comentarios adicionales
-  if (datos.comentariosAdicionales) {
-    drawSectionTitle(doc, "Comentarios", margin, cursorY);
-    cursorY += 6;
-    const lines = doc.splitTextToSize(datos.comentariosAdicionales, pageWidth - margin * 2);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(lines, margin, cursorY);
-    cursorY += lines.length * 4.5 + 6;
-  }
-
-  // Firmas
-  const footerY = doc.internal.pageSize.getHeight() - 45;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("Firma del Cliente", margin + 20, footerY);
-  doc.text("Asesor(a) de Ventas - AMERSUR S.A.C.", pageWidth - margin - 70, footerY);
-  doc.setDrawColor(180, 188, 196);
-  doc.line(margin, footerY + 25, margin + 70, footerY + 25);
-  doc.line(pageWidth - margin - 70, footerY + 25, pageWidth - margin, footerY + 25);
-
-  // Pie
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(120, 130, 140);
-  doc.text(
-    `Generado el ${new Date().toLocaleString("es-PE")} · Validez ${datos.validezDias ?? 3} días`,
-    margin,
-    doc.internal.pageSize.getHeight() - 12,
-  );
-  doc.text("AMERSUR CRM · Sistema de Gestión Comercial", margin, doc.internal.pageSize.getHeight() - 7);
-
-  const fileName = `${proforma.numero ?? "proforma"}_${clienteSlug(
-    proforma.datos?.cliente?.nombre ?? "cliente",
-  )}.pdf`.replace(/\s+/g, "_");
-  doc.save(fileName);
+function buildFileName(proforma: ProformaRecord) {
+  const base = proforma.numero ?? "proforma";
+  const clienteNombre = clienteSlug(proforma.datos?.cliente?.nombre ?? "cliente");
+  return `${base}_${clienteNombre}.pdf`.replace(/\s+/g, "_");
 }
 
 function clienteSlug(text: string) {
@@ -343,4 +444,17 @@ function clienteSlug(text: string) {
     .replace(/[^a-z0-9]+/gi, "-")
     .replace(/^-|-$/g, "")
     .toLowerCase();
+}
+
+function formatFecha(value: string | Date) {
+  try {
+    const date = value instanceof Date ? value : new Date(value);
+    return date.toLocaleDateString("es-PE", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  } catch {
+    return "";
+  }
 }

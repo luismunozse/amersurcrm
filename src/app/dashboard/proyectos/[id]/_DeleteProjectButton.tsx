@@ -70,7 +70,7 @@ export default function DeleteProjectButton({
       <AlertTriangle className="w-5 h-5 text-red-600" />
       <div className="flex-1">
         <p className="text-sm font-medium text-red-800">
-          ¿Eliminar proyecto "{proyectoNombre}"?
+          ¿Eliminar proyecto &quot;{proyectoNombre}&quot;?
         </p>
         <p className="text-xs text-red-600 mt-1">
           Se eliminarán {lotesCount} lote(s) y todos los archivos asociados. Esta acción no se puede deshacer.

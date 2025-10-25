@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Home, TrendingUp, DollarSign, Archive } from "lucide-react";
+import { Home, DollarSign, Archive } from "lucide-react";
 
 interface Propiedad {
   estado_comercial: string;

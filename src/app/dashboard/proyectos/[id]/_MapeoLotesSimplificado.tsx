@@ -406,11 +406,11 @@ export default function MapeoLotesSimplificado({
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
                     <p className="font-medium mb-2">Instrucciones:</p>
                     <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Haz clic en "✏️ Activar modo ajuste"</li>
+                      <li>Haz clic en &quot;✏️ Activar modo ajuste&quot;</li>
                       <li>Verás un <strong>rectángulo azul</strong> sobre el plano</li>
                       <li>Arrastra las <strong>esquinas</strong> del rectángulo azul para ajustar el plano</li>
                       <li>Usa los sliders para <strong>rotar</strong> y ajustar <strong>opacidad</strong></li>
-                      <li>Cuando esté alineado, haz clic en "✓ Plano está listo"</li>
+                      <li>Cuando esté alineado, haz clic en &quot;✓ Plano está listo&quot;</li>
                     </ol>
                   </div>
 
