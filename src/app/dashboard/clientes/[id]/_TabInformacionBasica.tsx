@@ -1,22 +1,81 @@
 "use client";
 
-import { User, Mail, Phone, MapPin, Calendar, CreditCard, Home, DollarSign, FileText } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { User, Mail, Phone, MapPin, Calendar, CreditCard, Home, DollarSign, FileText, UserCheck } from "lucide-react";
 import { TIPOS_DOCUMENTO_OPTIONS, ESTADO_CIVIL_OPTIONS, ORIGENES_LEAD_OPTIONS, INTERESES_PRINCIPALES_OPTIONS, FORMAS_PAGO_OPTIONS } from "@/lib/types/clientes";
 import { formatCapacidadCompra } from "@/lib/types/clientes";
+import toast from "react-hot-toast";
+import { asignarVendedorCliente } from "@/app/dashboard/clientes/_actions";
 
 interface Props {
   cliente: any;
+  vendedores: Array<{ id: string; username: string; nombre_completo?: string | null; telefono?: string | null; email?: string | null }>;
 }
 
-export default function TabInformacionBasica({ cliente }: Props) {
+export default function TabInformacionBasica({ cliente, vendedores }: Props) {
   const tipoDoc = TIPOS_DOCUMENTO_OPTIONS.find(t => t.value === cliente.tipo_documento)?.label;
   const estadoCivil = ESTADO_CIVIL_OPTIONS.find(e => e.value === cliente.estado_civil)?.label;
   const origenLead = ORIGENES_LEAD_OPTIONS.find(o => o.value === cliente.origen_lead)?.label;
   const interesPrincipal = INTERESES_PRINCIPALES_OPTIONS.find(i => i.value === cliente.interes_principal)?.label;
   const formaPago = FORMAS_PAGO_OPTIONS.find(f => f.value === cliente.forma_pago_preferida)?.label;
+  const [isAssigning, startTransition] = useTransition();
+  const [selectedVendedor, setSelectedVendedor] = useState<string>(cliente.vendedor_username || "");
+
+  useEffect(() => {
+    setSelectedVendedor(cliente.vendedor_username || "");
+  }, [cliente.vendedor_username]);
+
+  const handleAsignarVendedor = (value: string) => {
+    setSelectedVendedor(value);
+    startTransition(async () => {
+      try {
+        await asignarVendedorCliente(cliente.id, value || null);
+        toast.success(value ? "Vendedor asignado exitosamente" : "Cliente sin asesor asignado");
+      } catch (error) {
+        console.error(error);
+        toast.error("No se pudo actualizar el vendedor");
+        setSelectedVendedor(cliente.vendedor_username || "");
+      }
+    });
+  };
 
   return (
     <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-crm-text mb-4 flex items-center gap-2">
+          <UserCheck className="h-5 w-5 text-crm-primary" />
+          Asesor Responsable
+        </h3>
+        <div className="p-4 bg-crm-background rounded-lg border border-crm-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-crm-text-muted mb-1">Vendedor asignado</p>
+            <p className="text-sm text-crm-text font-medium">
+              {selectedVendedor
+                ? vendedores.find((v) => v.username === selectedVendedor)?.nombre_completo || selectedVendedor
+                : "Sin asignar"}
+            </p>
+            <p className="text-xs text-crm-text-muted mt-1">
+              Los asesores asignados pueden gestionar proformas y el seguimiento del cliente.
+            </p>
+          </div>
+          <div className="w-full sm:w-64">
+            <select
+              value={selectedVendedor}
+              onChange={(e) => handleAsignarVendedor(e.target.value)}
+              disabled={isAssigning}
+              className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary/40"
+            >
+              <option value="">Sin asignar</option>
+              {vendedores.map((vendedor) => (
+                <option key={vendedor.id} value={vendedor.username || ""}>
+                  {vendedor.nombre_completo || vendedor.username}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Información Personal */}
       <div>
         <h3 className="text-lg font-semibold text-crm-text mb-4 flex items-center gap-2">

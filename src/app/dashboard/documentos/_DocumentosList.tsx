@@ -7,15 +7,11 @@ import {
   File,
   Download,
   Eye,
-  Trash2,
-  Share2,
-  MoreVertical,
-  HardDrive,
-  Cloud,
   ExternalLink
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import toast from "react-hot-toast";
 
 interface Documento {
   id: string;
@@ -24,6 +20,8 @@ interface Documento {
   extension: string;
   tamano_bytes: number;
   storage_tipo: 'supabase' | 'google_drive' | 'externo';
+  google_drive_file_id?: string;
+  google_drive_web_view_link?: string;
   created_at: string;
   carpeta?: { nombre: string; color: string };
   proyecto?: { nombre: string };
@@ -63,11 +61,50 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  // Icono de storage
-  const StorageIcon = ({ tipo }: { tipo: string }) => {
-    if (tipo === 'supabase') return <HardDrive className="w-3 h-3" />;
-    if (tipo === 'google_drive') return <Cloud className="w-3 h-3" />;
-    return <ExternalLink className="w-3 h-3" />;
+  // Ver documento en Google Drive
+  const handleVer = (doc: Documento) => {
+    if (doc.google_drive_web_view_link) {
+      window.open(doc.google_drive_web_view_link, '_blank');
+    } else {
+      toast.error('No hay enlace disponible para este documento');
+    }
+  };
+
+  // Descargar documento
+  const handleDescargar = async (doc: Documento) => {
+    if (!doc.google_drive_file_id) {
+      toast.error('No hay archivo para descargar');
+      return;
+    }
+
+    const toastId = toast.loading('Descargando archivo...');
+
+    try {
+      const response = await fetch(`/api/google-drive/download/${doc.google_drive_file_id}`);
+
+      if (!response.ok) {
+        throw new Error('Error al descargar el archivo');
+      }
+
+      // Crear un blob con la respuesta
+      const blob = await response.blob();
+
+      // Crear un enlace temporal y hacer click para descargar
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.nombre;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Archivo descargado', { id: toastId });
+
+    } catch (error) {
+      console.error('Error descargando archivo:', error);
+      toast.error('Error al descargar el archivo', { id: toastId });
+    }
   };
 
   if (documentos.length === 0) {
@@ -80,7 +117,7 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
           No hay documentos
         </h3>
         <p className="text-sm text-crm-text-secondary">
-          Sube tu primer documento para comenzar
+          Sincroniza con Google Drive para ver tus documentos
         </p>
       </div>
     );
@@ -96,23 +133,19 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
           return (
             <div
               key={doc.id}
-              className="crm-card p-4 rounded-xl hover:shadow-md transition-all cursor-pointer group"
+              className="crm-card p-4 rounded-xl hover:shadow-md transition-all group"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className={`p-3 rounded-lg ${colorClass}`}>
                   <Icon className="w-6 h-6" />
                 </div>
-                <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-crm-card-hover rounded">
-                  <MoreVertical className="w-4 h-4 text-crm-text-secondary" />
-                </button>
               </div>
 
-              <h4 className="font-medium text-crm-text-primary text-sm mb-1 truncate">
+              <h4 className="font-medium text-crm-text-primary text-sm mb-1 truncate" title={doc.nombre}>
                 {doc.nombre}
               </h4>
 
               <div className="flex items-center gap-2 text-xs text-crm-text-muted mb-2">
-                <StorageIcon tipo={doc.storage_tipo} />
                 <span>{formatBytes(doc.tamano_bytes)}</span>
                 <span>•</span>
                 <span>{doc.extension?.toUpperCase()}</span>
@@ -129,11 +162,19 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
                   {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true, locale: es })}
                 </span>
                 <div className="flex items-center gap-1">
-                  <button className="p-1 hover:bg-crm-card-hover rounded">
-                    <Eye className="w-3.5 h-3.5 text-crm-text-secondary" />
+                  <button
+                    onClick={() => handleVer(doc)}
+                    className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                    title="Ver en Google Drive"
+                  >
+                    <Eye className="w-4 h-4 text-crm-text-secondary" />
                   </button>
-                  <button className="p-1 hover:bg-crm-card-hover rounded">
-                    <Download className="w-3.5 h-3.5 text-crm-text-secondary" />
+                  <button
+                    onClick={() => handleDescargar(doc)}
+                    className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                    title="Descargar"
+                  >
+                    <Download className="w-4 h-4 text-crm-text-secondary" />
                   </button>
                 </div>
               </div>
@@ -159,9 +200,6 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-secondary uppercase tracking-wider">
                 Tamaño
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-secondary uppercase tracking-wider">
-                Storage
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-secondary uppercase tracking-wider">
                 Fecha
@@ -203,29 +241,36 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
                   <td className="px-4 py-3 text-sm text-crm-text-secondary">
                     {formatBytes(doc.tamano_bytes)}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-xs text-crm-text-muted">
-                      <StorageIcon tipo={doc.storage_tipo} />
-                      <span className="capitalize">{doc.storage_tipo.replace('_', ' ')}</span>
-                    </div>
-                  </td>
                   <td className="px-4 py-3 text-sm text-crm-text-secondary">
                     {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true, locale: es })}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="p-1.5 hover:bg-crm-card-hover rounded">
+                      <button
+                        onClick={() => handleVer(doc)}
+                        className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                        title="Ver en Google Drive"
+                      >
                         <Eye className="w-4 h-4 text-crm-text-secondary" />
                       </button>
-                      <button className="p-1.5 hover:bg-crm-card-hover rounded">
+                      <button
+                        onClick={() => handleDescargar(doc)}
+                        className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                        title="Descargar"
+                      >
                         <Download className="w-4 h-4 text-crm-text-secondary" />
                       </button>
-                      <button className="p-1.5 hover:bg-crm-card-hover rounded">
-                        <Share2 className="w-4 h-4 text-crm-text-secondary" />
-                      </button>
-                      <button className="p-1.5 hover:bg-crm-card-hover rounded">
-                        <MoreVertical className="w-4 h-4 text-crm-text-secondary" />
-                      </button>
+                      {doc.google_drive_web_view_link && (
+                        <a
+                          href={doc.google_drive_web_view_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                          title="Abrir en Google Drive"
+                        >
+                          <ExternalLink className="w-4 h-4 text-crm-text-secondary" />
+                        </a>
+                      )}
                     </div>
                   </td>
                 </tr>

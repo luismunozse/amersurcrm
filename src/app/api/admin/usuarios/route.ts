@@ -93,18 +93,23 @@ export async function GET() {
     }
 
     // Retornar perfiles directamente sin combinar con auth.users
-    // Mapear para compatibilidad con el frontend: meta_mensual = meta_mensual_ventas
+    // IMPORTANTE: Mapeo de campos para compatibilidad con el frontend
+    // La base de datos usa 'meta_mensual_ventas' pero el frontend espera 'meta_mensual'
     type Usuario = {
       [key: string]: unknown;
       meta_mensual_ventas?: number | string;
     };
 
-    const usuariosCompat = (usuarios || []).map((u: Usuario) => ({
-      ...u,
-      meta_mensual: typeof u.meta_mensual_ventas === 'number'
-        ? u.meta_mensual_ventas
-        : (u.meta_mensual_ventas ? Number(u.meta_mensual_ventas) : undefined),
-    }));
+    const usuariosCompat = (usuarios || []).map((u: Usuario) => {
+      const { meta_mensual_ventas, ...resto } = u;
+      return {
+        ...resto,
+        // Mapear meta_mensual_ventas -> meta_mensual para el frontend
+        meta_mensual: typeof meta_mensual_ventas === 'number'
+          ? meta_mensual_ventas
+          : (meta_mensual_ventas ? Number(meta_mensual_ventas) : undefined),
+      };
+    });
 
     return NextResponse.json({ 
       success: true, 
@@ -230,14 +235,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generar email según el tipo de usuario
+    // Validar y generar email según el tipo de usuario
     let emailFinal: string;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (esRolAdmin) {
       // Para admin: usar username@amersur.admin si no se proporciona email
       emailFinal = email || `${username}@amersur.admin`;
     } else {
-      // Para vendedores: usar email proporcionado o generar con DNI
-      emailFinal = email || `${dni}@amersur.temp`;
+      // Para vendedores/coordinadores: el email es OPCIONAL
+      if (email && email.trim()) {
+        // Si se proporciona, validar formato
+        if (!emailRegex.test(email.trim())) {
+          return NextResponse.json({
+            error: "El formato del email no es válido"
+          }, { status: 400 });
+        }
+        emailFinal = email.trim().toLowerCase();
+      } else {
+        // Si NO se proporciona, generar un email válido usando el DNI
+        // Usamos @amersur.local como dominio interno (válido pero no público)
+        emailFinal = `${dni}@amersur.local`;
+      }
     }
     
     // Verificar si el email ya existe
@@ -252,6 +271,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: `El email "${emailFinal}" ya está en uso.`
       }, { status: 400 });
+    }
+
+    // Verificar si el DNI ya existe (solo para no-admin)
+    if (dni && !esRolAdmin) {
+      const { data: existingDni } = await supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('dni')
+        .eq('dni', dni)
+        .single();
+
+      if (existingDni) {
+        return NextResponse.json({
+          error: `El DNI "${dni}" ya está registrado.`
+        }, { status: 400 });
+      }
     }
 
     // Crear usuario en auth con client de service role (requiere key SRV)
@@ -372,12 +407,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Construir payload de update solo con campos presentes
+    // IMPORTANTE: Mapeo de campos desde el frontend a la base de datos
+    // El frontend envía 'meta_mensual' pero la BD espera 'meta_mensual_ventas'
     const updatePayload: Record<string, unknown> = {};
     if (typeof username === 'string' && username.trim()) updatePayload.username = username.trim();
     if (typeof nombre_completo === 'string') updatePayload.nombre_completo = nombre_completo;
     if (typeof dni === 'string') updatePayload.dni = dni;
     if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;
     if (typeof rol_id === 'string') updatePayload.rol_id = rol_id;
+    // Mapear meta_mensual (frontend) -> meta_mensual_ventas (BD)
     if (typeof meta_mensual !== 'undefined') updatePayload.meta_mensual_ventas = meta_mensual === null ? null : parseInt(String(meta_mensual), 10);
     if (typeof comision_porcentaje !== 'undefined') updatePayload.comision_porcentaje = comision_porcentaje === null ? null : Number(comision_porcentaje);
     if (typeof activo === 'boolean') updatePayload.activo = activo;

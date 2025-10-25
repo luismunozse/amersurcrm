@@ -207,6 +207,34 @@ export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: st
   revalidatePath("/dashboard/clientes");
 }
 
+export async function asignarVendedorCliente(clienteId: string, vendedorUsername: string | null) {
+  const supabase = await createServerActionClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("No autenticado");
+  }
+
+  const payload = {
+    vendedor_username: vendedorUsername || null,
+    vendedor_asignado: vendedorUsername || null,
+  };
+
+  const { error } = await supabase
+    .from("cliente")
+    .update(payload)
+    .eq("id", clienteId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/dashboard/clientes/${clienteId}`);
+  revalidatePath("/dashboard/clientes");
+}
+
 export async function eliminarCliente(id: string) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();

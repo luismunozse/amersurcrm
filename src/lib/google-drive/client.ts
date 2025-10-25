@@ -277,8 +277,7 @@ export class GoogleOAuthClient {
    * Genera URL de autorización
    */
   getAuthUrl(scopes: string[] = [
-    'https://www.googleapis.com/auth/drive.file',
-    'https://www.googleapis.com/auth/drive.metadata.readonly'
+    'https://www.googleapis.com/auth/drive.readonly'
   ]): string {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',

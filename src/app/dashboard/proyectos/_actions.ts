@@ -5,20 +5,40 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
 
-function buildStoragePathFromUrl(url: string | null, proyectoId: string) {
+function buildStoragePathFromUrl(url: string | null, proyectoId: string): string | null {
   if (!url) return null;
 
-  const marker = "/storage/v1/object/public/imagenes/";
-  const markerIndex = url.indexOf(marker);
+  try {
+    // Intentar extraer el path de diferentes formatos de URL de Supabase Storage
+    const marker = "/storage/v1/object/public/imagenes/";
+    const markerIndex = url.indexOf(marker);
 
-  if (markerIndex !== -1) {
-    return decodeURIComponent(url.slice(markerIndex + marker.length));
+    if (markerIndex !== -1) {
+      // Formato estándar: https://xxx.supabase.co/storage/v1/object/public/imagenes/path/to/file.jpg
+      return decodeURIComponent(url.slice(markerIndex + marker.length));
+    }
+
+    // Intentar parsear como URL completa
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    const imagenesIndex = pathParts.indexOf('imagenes');
+
+    if (imagenesIndex !== -1 && imagenesIndex < pathParts.length - 1) {
+      // Extraer el path después de 'imagenes/'
+      return decodeURIComponent(pathParts.slice(imagenesIndex + 1).join('/'));
+    }
+
+    // Fallback: intentar extraer el nombre de archivo y construir path
+    const fileName = url.split("/").pop();
+    if (fileName && fileName.length > 0) {
+      return `proyectos/${proyectoId}/${fileName}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn(`Error parseando URL de storage: ${url}`, error);
+    return null;
   }
-
-  const fileName = url.split("/").pop();
-  if (!fileName) return null;
-
-  return `proyectos/${proyectoId}/${fileName}`;
 }
 
 export async function crearProyecto(formData: FormData) {
@@ -38,6 +58,7 @@ export async function crearProyecto(formData: FormData) {
 
   try {
     const nombre = String(formData.get("nombre") || "").trim();
+    const tipo = String(formData.get("tipo") || "propio"); // Tipo: propio o corretaje
     const estado = String(formData.get("estado") || "activo");
     const descripcion = String(formData.get("descripcion") || "").trim();
     const imagenFile = formData.get("imagen") as File | null;
@@ -76,6 +97,7 @@ export async function crearProyecto(formData: FormData) {
       .from("proyecto")
       .insert({
         nombre,
+        tipo: tipo as "propio" | "corretaje",
         estado: estado as "activo" | "pausado" | "cerrado",
         ubicacion: ubicacionFinal,
         descripcion: descripcion || null,
@@ -297,7 +319,7 @@ export async function eliminarProyecto(proyectoId: string) {
     // 1. Obtener información del proyecto para eliminar archivos relacionados
     const { data: proyecto, error: proyectoError } = await supabase
       .from("proyecto")
-      .select("id, nombre, planos_url")
+      .select("id, nombre, planos_url, imagen_url")
       .eq("id", proyectoId)
       .single();
 
@@ -310,20 +332,38 @@ export async function eliminarProyecto(proyectoId: string) {
     }
 
     // 2. Eliminar archivos del storage si existen
-    if (proyecto.planos_url) {
-      try {
-        const storagePath = buildStoragePathFromUrl(proyecto.planos_url, proyectoId);
-        if (storagePath) {
-          const { error: deleteError } = await supabase.storage
-            .from('imagenes')
-            .remove([storagePath]);
+    const archivosAEliminar: string[] = [];
 
-          if (deleteError) {
-            console.warn(`Error eliminando archivo del storage: ${deleteError.message}`);
-          }
+    // Agregar planos_url si existe
+    if (proyecto.planos_url) {
+      const storagePath = buildStoragePathFromUrl(proyecto.planos_url, proyectoId);
+      if (storagePath) {
+        archivosAEliminar.push(storagePath);
+      }
+    }
+
+    // Agregar imagen_url si existe
+    if (proyecto.imagen_url) {
+      const storagePath = buildStoragePathFromUrl(proyecto.imagen_url, proyectoId);
+      if (storagePath) {
+        archivosAEliminar.push(storagePath);
+      }
+    }
+
+    // Eliminar todos los archivos en un solo batch
+    if (archivosAEliminar.length > 0) {
+      try {
+        const { error: deleteError } = await supabase.storage
+          .from('imagenes')
+          .remove(archivosAEliminar);
+
+        if (deleteError) {
+          console.warn(`Error eliminando archivos del storage: ${deleteError.message}`);
+        } else {
+          console.log(`Eliminados ${archivosAEliminar.length} archivos del storage`);
         }
       } catch (storageError) {
-        console.warn(`Error procesando archivo del storage: ${storageError}`);
+        console.warn(`Error procesando archivos del storage: ${storageError}`);
       }
     }
 

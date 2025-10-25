@@ -1,16 +1,43 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect, notFound } from "next/navigation";
-import ClienteDetailTabs from "./_ClienteDetailTabs";
+import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
 import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, Tag } from "lucide-react";
 import Link from "next/link";
 import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/clientes";
 
+type SearchParams = {
+  tab?: string | string[];
+  action?: string | string[];
+};
+
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<SearchParams>;
 }
 
-export default async function ClienteDetailPage({ params }: Props) {
+function normalizeParam(value?: string | string[]): string | undefined {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function resolveDefaultTab(tabRaw: string | undefined): ClienteTabType {
+  const allowed: ClienteTabType[] = [
+    "info",
+    "timeline",
+    "interacciones",
+    "propiedades",
+    "visitas",
+    "reservas",
+    "ventas",
+    "proformas",
+  ];
+  return allowed.includes(tabRaw as ClienteTabType) ? (tabRaw as ClienteTabType) : "info";
+}
+
+export default async function ClienteDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const defaultTab = resolveDefaultTab(normalizeParam(sp.tab));
   const supabase = await createServerOnlyClient();
 
   // Verificar autenticación
@@ -67,7 +94,11 @@ export default async function ClienteDetailPage({ params }: Props) {
     .select(`
       *,
       lote:lote!lote_id(
+        id,
         numero_lote,
+        sup_m2,
+        precio,
+        moneda,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
@@ -81,7 +112,11 @@ export default async function ClienteDetailPage({ params }: Props) {
     .select(`
       *,
       lote:lote!lote_id(
+        id,
         numero_lote,
+        sup_m2,
+        precio,
+        moneda,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
@@ -95,7 +130,11 @@ export default async function ClienteDetailPage({ params }: Props) {
     .select(`
       *,
       lote:lote!lote_id(
+        id,
         numero_lote,
+        sup_m2,
+        precio,
+        moneda,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo),
@@ -103,6 +142,30 @@ export default async function ClienteDetailPage({ params }: Props) {
     `)
     .eq('cliente_id', id)
     .order('created_at', { ascending: false });
+
+  const { data: proformas } = await supabase
+    .from('proforma')
+    .select('*')
+    .eq('cliente_id', id)
+    .order('created_at', { ascending: false });
+
+  const { data: asesorActual } = await supabase
+    .from('usuario_perfil')
+    .select('id, nombre_completo, username, telefono, email')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const { data: vendedoresRaw } = await supabase
+    .from('usuario_perfil')
+    .select('id, username, nombre_completo, telefono, email, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .eq('activo', true)
+    .order('nombre_completo', { ascending: true });
+
+  const vendedores = (vendedoresRaw || []).filter((v) =>
+    v.rol?.nombre && ['ROL_VENDEDOR', 'ROL_COORDINADOR_VENTAS', 'ROL_GERENTE'].includes(v.rol.nombre)
+  );
+
+  const vendedorAsignado = vendedores?.find((v) => v.username === cliente.vendedor_username);
 
   const estadoColor = getEstadoClienteColor(cliente.estado_cliente);
 
@@ -159,11 +222,11 @@ export default async function ClienteDetailPage({ params }: Props) {
                 <span className="text-crm-text-muted truncate">{cliente.direccion.ciudad}</span>
               </div>
             )}
-            {cliente.vendedor && (
+            {vendedorAsignado && (
               <div className="flex items-center gap-2 text-sm">
                 <User className="h-4 w-4 text-crm-text-muted" />
                 <span className="text-crm-text-muted truncate">
-                  Vendedor: {cliente.vendedor.username}
+                  Vendedor: {vendedorAsignado.nombre_completo || vendedorAsignado.username}
                 </span>
               </div>
             )}
@@ -180,6 +243,10 @@ export default async function ClienteDetailPage({ params }: Props) {
           visitas={visitas || []}
           reservas={reservas || []}
           ventas={ventas || []}
+          proformas={proformas || []}
+          asesorActual={asesorActual || null}
+          vendedores={vendedores || []}
+          defaultTab={defaultTab}
         />
       </div>
     </div>

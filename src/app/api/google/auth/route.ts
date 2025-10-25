@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Construir URL de autorización de Google OAuth
+    // drive.readonly: permite leer todos los archivos del Drive (no solo los creados por la app)
     const scopes = [
-      "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.readonly",
     ];
 
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");

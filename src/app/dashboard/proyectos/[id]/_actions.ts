@@ -129,7 +129,7 @@ export async function crearLote(fd: FormData) {
   const codigo = String(fd.get("codigo") || "");
   const sup_m2 = fd.get("sup_m2") ? Number(fd.get("sup_m2")) : null;
   const precio = fd.get("precio") ? Number(fd.get("precio")) : null;
-  const moneda = String(fd.get("moneda") || "ARS");
+  const moneda = String(fd.get("moneda") || "PEN"); // Moneda por defecto: Soles Peruanos
   const estado = String(fd.get("estado") || "disponible");
 
 
@@ -145,6 +145,24 @@ export async function crearLote(fd: FormData) {
     }
   } catch (error) {
     throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  // Validar que el código sea único dentro del proyecto
+  if (codigo) {
+    const { data: existingLote, error: checkError } = await supabase
+      .from("lote")
+      .select("id, codigo")
+      .eq("proyecto_id", proyectoId)
+      .eq("codigo", codigo)
+      .maybeSingle();
+
+    if (checkError) {
+      throw new Error(`Error verificando código de lote: ${checkError.message}`);
+    }
+
+    if (existingLote) {
+      throw new Error(`Ya existe un lote con código "${codigo}" en este proyecto`);
+    }
   }
 
   const { data: lote, error } = await supabase
@@ -174,7 +192,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   const codigo = String(fd.get("codigo") || "");
   const sup_m2 = fd.get("sup_m2") ? Number(fd.get("sup_m2")) : null;
   const precio = fd.get("precio") ? Number(fd.get("precio")) : null;
-  const moneda = String(fd.get("moneda") || "ARS");
+  const moneda = String(fd.get("moneda") || "PEN"); // Moneda por defecto: Soles Peruanos
   const estado = String(fd.get("estado") || "disponible");
   const data = fd.get("data") ? String(fd.get("data")) : null;
   const planoPoligonoRaw = fd.has("plano_poligono") ? fd.get("plano_poligono") : null;
@@ -196,7 +214,6 @@ export async function actualizarLote(loteId: string, fd: FormData) {
       (codigo && codigo.trim() !== "") ||
       sup_m2 !== null ||
       precio !== null ||
-      (moneda && moneda !== "ARS") ||
       (data && data.trim() !== "") ||
       planoPoligonoRaw !== null
     );
@@ -224,6 +241,32 @@ export async function actualizarLote(loteId: string, fd: FormData) {
     return { success: true };
   }
 
+  // Validar que el código sea único dentro del proyecto (si se está cambiando)
+  if (codigo && codigo.trim() !== "") {
+    const { data: currentLote } = await supabase
+      .from("lote")
+      .select("codigo, proyecto_id")
+      .eq("id", loteId)
+      .single();
+
+    if (currentLote && codigo !== currentLote.codigo) {
+      const { data: existingLote, error: checkError } = await supabase
+        .from("lote")
+        .select("id, codigo")
+        .eq("proyecto_id", currentLote.proyecto_id)
+        .eq("codigo", codigo)
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error(`Error verificando código de lote: ${checkError.message}`);
+      }
+
+      if (existingLote) {
+        throw new Error(`Ya existe un lote con código "${codigo}" en este proyecto`);
+      }
+    }
+  }
+
   // Construir objeto de actualización dinámicamente
   const updateData: any = {
     estado: estado as "disponible" | "reservado" | "vendido",
@@ -233,7 +276,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   if (codigo) updateData.codigo = codigo;
   if (sup_m2 !== null) updateData.sup_m2 = sup_m2;
   if (precio !== null) updateData.precio = precio;
-  if (moneda && moneda !== "ARS") updateData.moneda = moneda;
+  if (moneda) updateData.moneda = moneda;
   if (data) {
     try {
       updateData.data = JSON.parse(data);

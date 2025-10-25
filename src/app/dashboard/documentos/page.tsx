@@ -10,47 +10,33 @@ export default async function DocumentosPage() {
     redirect('/login');
   }
 
-  // Obtener carpetas
-  const { data: carpetas } = await supabase
-    .from('carpeta_documento')
-    .select('*')
-    .order('posicion', { ascending: true });
-
-  // Obtener documentos del usuario
+  // Obtener documentos sincronizados de Google Drive (solo para estadísticas iniciales)
+  // Los archivos se cargarán dinámicamente desde Google Drive API según la carpeta
   const { data: documentos } = await supabase
     .from('documento')
-    .select(`
-      *,
-      carpeta:carpeta_documento(id, nombre, color, icono),
-      proyecto:proyecto(id, nombre),
-      lote:lote(id, codigo),
-      cliente:cliente(id, nombre_completo)
-    `)
-    .order('created_at', { ascending: false })
-    .limit(50);
+    .select('id, tamano_bytes, created_at')
+    .eq('storage_tipo', 'google_drive')
+    .order('created_at', { ascending: false });
 
   // Obtener configuración de Google Drive (si existe)
   const { data: googleDriveConfig } = await supabase
     .from('google_drive_sync_config')
     .select('*')
     .eq('activo', true)
-    .single();
+    .maybeSingle();
 
   // Calcular estadísticas
   const totalDocumentos = documentos?.length || 0;
-  const documentosSupabase = documentos?.filter(d => d.storage_tipo === 'supabase').length || 0;
-  const documentosGoogleDrive = documentos?.filter(d => d.storage_tipo === 'google_drive').length || 0;
   const tamanoTotal = documentos?.reduce((sum, d) => sum + (d.tamano_bytes || 0), 0) || 0;
+  const ultimaSincronizacion = googleDriveConfig?.ultima_sincronizacion_at || null;
 
   return (
     <DocumentosClient
-      carpetas={carpetas || []}
       documentosIniciales={documentos || []}
       googleDriveConectado={!!googleDriveConfig}
+      ultimaSincronizacion={ultimaSincronizacion}
       stats={{
         total: totalDocumentos,
-        supabase: documentosSupabase,
-        googleDrive: documentosGoogleDrive,
         tamanoTotal
       }}
     />

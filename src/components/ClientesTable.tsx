@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, memo, useMemo, useEffect } from "react";
+import Link from "next/link";
 import {
   actualizarCliente,
   eliminarCliente,
@@ -25,354 +26,6 @@ import {
   formatCapacidadCompra,
   formatSaldoPendiente,
 } from "@/lib/types/clientes";
-
-// Función para generar proforma PDF profesional
-function generarProformaPDF(cliente: Cliente) {
-  const { jsPDF } = require('jspdf');
-  const doc = new jsPDF();
-  
-  // Configuración de colores usando la paleta del proyecto
-  const primaryColor = '#86901F'; // Verde corporativo AMERSUR
-  const secondaryColor = '#6B7319'; // Verde oscuro
-  const accentColor = '#9EA64C'; // Verde claro
-  const textColor = '#0f172a'; // Texto principal
-  const mutedColor = '#64748b'; // Texto secundario
-  const lightGray = '#f8fafc'; // Fondo claro
-  
-  let yPosition = 20;
-  
-  // ===== ENCABEZADO CORPORATIVO =====
-  // Fondo del header con gradiente simulado
-  doc.setFillColor(primaryColor);
-  doc.rect(0, 0, 210, 45, 'F');
-  
-  // Logo AMERSUR con estilo corporativo
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.text('AMERSUR', 20, 18);
-  
-  // Subtítulo corporativo
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('SISTEMA DE GESTIÓN INMOBILIARIA', 20, 25);
-  
-  // Datos de la empresa en el header
-  doc.setFontSize(8);
-  doc.text('RUC: 20123456789', 20, 32);
-  doc.text('Av. Principal 123, Lima, Perú', 20, 37);
-  doc.text('Tel: +51 1 234-5678 | Email: info@amersur.com', 20, 42);
-  
-  // Número de proforma y fecha (lado derecho)
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`PROFORMA N°: ${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`, 150, 18);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-PE')}`, 150, 25);
-  doc.text(`Vigencia: 10 días calendario`, 150, 30);
-  doc.text(`Válida hasta: ${new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('es-PE')}`, 150, 35);
-  
-  yPosition = 55;
-  
-  // ===== TÍTULO PRINCIPAL =====
-  doc.setTextColor(textColor);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text('PROFORMA DE COMPRA/VENTA DE INMUEBLE', 20, yPosition);
-  
-  // Línea decorativa debajo del título
-  doc.setDrawColor(primaryColor);
-  doc.setLineWidth(2);
-  doc.line(20, yPosition + 3, 190, yPosition + 3);
-  
-  yPosition += 20;
-  
-  // ===== DATOS DEL CLIENTE =====
-  // Fondo de sección con color corporativo
-  doc.setFillColor(lightGray);
-  doc.rect(15, yPosition, 180, 10, 'F');
-  
-  // Borde superior con color corporativo
-  doc.setDrawColor(primaryColor);
-  doc.setLineWidth(1);
-  doc.line(15, yPosition, 195, yPosition);
-  
-  doc.setTextColor(textColor);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('DATOS DEL CLIENTE', 20, yPosition + 7);
-  yPosition += 18;
-  
-  // Tabla de datos del cliente
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  
-  // Fila 1: Nombre y Tipo
-  doc.setFillColor(lightGray);
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setTextColor(textColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Nombre/Razón Social:', 20, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.nombre, 80, yPosition + 6);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Tipo:', 120, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.tipo_cliente === 'persona' ? 'Persona' : 'Empresa', 140, yPosition + 6);
-  yPosition += 10;
-  
-  // Fila 2: Documento y Email
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.text('Documento:', 20, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.documento_identidad || 'No especificado', 80, yPosition + 6);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Email:', 120, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.email || 'No especificado', 140, yPosition + 6);
-  yPosition += 10;
-  
-  // Fila 3: Teléfonos
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.text('Teléfono:', 20, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.telefono || 'No especificado', 80, yPosition + 6);
-  doc.setFont('helvetica', 'bold');
-  doc.text('WhatsApp:', 120, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.telefono_whatsapp || 'No especificado', 140, yPosition + 6);
-  yPosition += 10;
-  
-  // Fila 4: Estado y Capacidad
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.text('Estado:', 20, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(getEstadoClienteLabel(cliente.estado_cliente as any), 80, yPosition + 6);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Capacidad:', 120, yPosition + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(cliente.capacidad_compra_estimada ? `S/ ${cliente.capacidad_compra_estimada.toLocaleString()}` : 'No especificada', 140, yPosition + 6);
-  yPosition += 20;
-  
-  // ===== DATOS DEL INMUEBLE =====
-  // Fondo de sección
-  doc.setFillColor(lightGray);
-  doc.rect(15, yPosition, 180, 10, 'F');
-  
-  // Borde superior con color corporativo
-  doc.setDrawColor(primaryColor);
-  doc.setLineWidth(1);
-  doc.line(15, yPosition, 195, yPosition);
-  
-  doc.setTextColor(textColor);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('DATOS DEL INMUEBLE', 20, yPosition + 7);
-  yPosition += 18;
-  
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  
-  if (cliente.propiedades && cliente.propiedades.length > 0) {
-    cliente.propiedades.forEach((propiedad, index) => {
-      if (index > 0) yPosition += 10; // Espacio entre propiedades
-      
-      // Encabezado de propiedad
-      doc.setFillColor(primaryColor);
-      doc.rect(15, yPosition, 180, 8, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`PROPIEDAD ${index + 1}`, 20, yPosition + 6);
-      yPosition += 12;
-      
-      // Datos de la propiedad en tabla
-      const propiedadesData = [
-        ['Dirección:', propiedad.direccion || 'Por especificar'],
-        ['Distrito:', propiedad.distrito || 'Por especificar'],
-        ['Provincia:', propiedad.provincia || 'Por especificar'],
-        ['Partida SUNARP:', propiedad.partida_sunarp || 'Por especificar'],
-        ['Lote/Manzana:', propiedad.lote_manzana || 'Por especificar'],
-        ['Área terreno:', `${propiedad.area_terreno || 'Por especificar'} m²`],
-        ['Área techada:', `${propiedad.area_techada || 'Por especificar'} m²`],
-        ['Estado:', propiedad.estado || 'Primera venta de constructor'],
-        ['Precio:', propiedad.precio ? `S/ ${propiedad.precio.toLocaleString()}` : 'Por especificar']
-      ];
-      
-      propiedadesData.forEach(([label, value], i) => {
-        doc.setFillColor(i % 2 === 0 ? lightGray : '#ffffff');
-        doc.rect(15, yPosition, 180, 8, 'F');
-        doc.setTextColor(textColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text(label, 20, yPosition + 6);
-        doc.setFont('helvetica', 'normal');
-        doc.text(value, 80, yPosition + 6);
-        yPosition += 10;
-      });
-    });
-  } else {
-    // Sin propiedades específicas
-    doc.setFillColor(lightGray);
-    doc.rect(15, yPosition, 180, 8, 'F');
-    doc.setTextColor(textColor);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Estado:', 20, yPosition + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text('No hay propiedades específicas asociadas', 80, yPosition + 6);
-    yPosition += 10;
-    
-    doc.rect(15, yPosition, 180, 8, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.text('Observación:', 20, yPosition + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Se evaluarán opciones según capacidad de compra', 80, yPosition + 6);
-    yPosition += 10;
-  }
-  yPosition += 15;
-  
-  // ===== PRECIO Y FORMA DE PAGO =====
-  // Fondo de sección
-  doc.setFillColor(lightGray);
-  doc.rect(15, yPosition, 180, 10, 'F');
-  
-  // Borde superior con color corporativo
-  doc.setDrawColor(primaryColor);
-  doc.setLineWidth(1);
-  doc.line(15, yPosition, 195, yPosition);
-  
-  doc.setTextColor(textColor);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('PRECIO Y FORMA DE PAGO', 20, yPosition + 7);
-  yPosition += 18;
-  
-  // Tabla de precios y pagos
-  const preciosData = [
-    ['Precio de lista:', 'A consultar según propiedad seleccionada'],
-    ['Descuentos:', 'Según promociones vigentes'],
-    ['Medios de pago:', 'Transferencia bancaria'],
-    ['ITF:', '0.005% por cada movimiento bancario']
-  ];
-  
-  preciosData.forEach(([label, value], i) => {
-    doc.setFillColor(i % 2 === 0 ? lightGray : '#ffffff');
-    doc.rect(15, yPosition, 180, 8, 'F');
-    doc.setTextColor(textColor);
-    doc.setFont('helvetica', 'bold');
-    doc.text(label, 20, yPosition + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text(value, 80, yPosition + 6);
-    yPosition += 10;
-  });
-  
-  // Cronograma de pago
-  yPosition += 5;
-  doc.setFillColor(primaryColor);
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text('CRONOGRAMA DE PAGO', 20, yPosition + 6);
-  yPosition += 12;
-  
-  const cronogramaData = [
-    ['Reserva/Arras:', '5% del valor de la propiedad'],
-    ['Cuota inicial:', '20% del valor de la propiedad'],
-    ['Desembolso:', '75% (contado o crédito hipotecario)']
-  ];
-  
-  cronogramaData.forEach(([label, value], i) => {
-    doc.setFillColor(i % 2 === 0 ? lightGray : '#ffffff');
-    doc.rect(15, yPosition, 180, 8, 'F');
-    doc.setTextColor(textColor);
-    doc.setFont('helvetica', 'bold');
-    doc.text(label, 20, yPosition + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text(value, 80, yPosition + 6);
-    yPosition += 10;
-  });
-  
-  yPosition += 15;
-  
-  // ===== IMPUESTOS Y GASTOS =====
-  doc.setFillColor(240, 240, 240);
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('IMPUESTOS Y GASTOS (ESTIMADOS)', 20, yPosition + 6);
-  yPosition += 15;
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('IGV: 18% (16% IGV + 2% IPM) - Aplica según tipo de operación', 20, yPosition);
-  yPosition += 8;
-  doc.text('Alcabala: 3% sobre la base después de restar 10 UIT (paga el comprador)', 20, yPosition);
-  yPosition += 8;
-  doc.text('Gastos notariales y registrales (SUNARP): Se liquidarán con tarifa vigente', 20, yPosition);
-  yPosition += 8;
-  doc.text('Otros gastos: Tasación, certificaciones municipales, courier, etc.', 20, yPosition);
-  yPosition += 15;
-  
-  // ===== CLÁUSULAS Y CONDICIONES =====
-  doc.setFillColor(240, 240, 240);
-  doc.rect(15, yPosition, 180, 8, 'F');
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('CLÁUSULAS Y CONDICIONES', 20, yPosition + 6);
-  yPosition += 15;
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('1. Condiciones suspensivas:', 20, yPosition);
-  yPosition += 6;
-  doc.text('   • Aprobación de crédito hipotecario (si aplica)', 25, yPosition);
-  yPosition += 6;
-  doc.text('   • Verificación de no tener cargas o gravámenes', 25, yPosition);
-  yPosition += 8;
-  doc.text('2. Penalidad/Arras: 5% del valor de la propiedad', 20, yPosition);
-  yPosition += 8;
-  doc.text('3. Fecha tentativa de firma de escritura: A coordinar', 20, yPosition);
-  yPosition += 8;
-  doc.text('4. Declaración de no tener cargas: Por verificar', 20, yPosition);
-  yPosition += 15;
-  
-  // ===== FIRMAS =====
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FIRMAS:', 20, yPosition);
-  yPosition += 15;
-  
-  // Vendedor
-  doc.setFont('helvetica', 'normal');
-  doc.text('VENDEDOR:', 20, yPosition);
-  doc.text('AMERSUR', 20, yPosition + 15);
-  doc.text('RUC: 20123456789', 20, yPosition + 20);
-  doc.text('_________________________', 20, yPosition + 30);
-  doc.text('Firma y sello', 20, yPosition + 35);
-  
-  // Comprador
-  doc.text('COMPRADOR:', 120, yPosition);
-  doc.text(cliente.nombre, 120, yPosition + 15);
-  doc.text(cliente.tipo_cliente === 'persona' ? 'Persona' : 'Empresa', 120, yPosition + 20);
-  doc.text('_________________________', 120, yPosition + 30);
-  doc.text('Firma', 120, yPosition + 35);
-  
-  // ===== PIE DE PÁGINA =====
-  const pageHeight = doc.internal.pageSize.height;
-  doc.setFontSize(8);
-  doc.setTextColor(secondaryColor);
-  doc.text('Generado el: ' + new Date().toLocaleString('es-PE'), 20, pageHeight - 15);
-  doc.text('AMERSUR CRM - Sistema de Gestión Inmobiliaria', 20, pageHeight - 10);
-  doc.text('Esta proforma es válida por 10 días calendario', 20, pageHeight - 5);
-  
-  // Guardar PDF
-  const fileName = `proforma_${cliente.nombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(fileName);
-}
 
 // Función para determinar el nivel del cliente basado en capacidad de compra
 function getNivelCliente(capacidad: number | null): { nivel: string; className: string } {
@@ -597,7 +250,6 @@ export default function ClientesTable({
   };
 
   const handleShowDetail = (cliente: Cliente) => {
-    console.log('Opening detail modal for client:', cliente.nombre);
     setSelectedCliente(cliente);
     setShowDetailModal(true);
   };
@@ -605,6 +257,13 @@ export default function ClientesTable({
   const handleCloseDetail = () => {
     setShowDetailModal(false);
     setSelectedCliente(null);
+  };
+
+  const handleQuickProforma = (cliente: Cliente) => {
+    const params = new URLSearchParams();
+    params.set("tab", "proformas");
+    params.set("action", "new");
+    router.push(`/dashboard/clientes/${cliente.id}?${params.toString()}`);
   };
 
   const handleSort = (column: keyof Cliente) => {
@@ -807,6 +466,7 @@ export default function ClientesTable({
                   onEdit={handleEdit}
                   onDelete={askDelete}
                   onShowDetail={handleShowDetail}
+                  onQuickProforma={handleQuickProforma}
                   isPending={isPending}
                   isSelected={selectedIds.has(cliente.id)}
                   onToggleSelect={toggleSelectOne}
@@ -888,6 +548,7 @@ const ClienteRow = memo(function ClienteRow({
   onEdit,
   onDelete,
   onShowDetail,
+  onQuickProforma,
   isPending,
   isSelected,
   onToggleSelect,
@@ -896,6 +557,7 @@ const ClienteRow = memo(function ClienteRow({
   onEdit: (id: string) => void;
   onDelete: (c: Cliente) => void;
   onShowDetail: (c: Cliente) => void;
+  onQuickProforma: (c: Cliente) => void;
   isPending: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
@@ -1004,20 +666,23 @@ const ClienteRow = memo(function ClienteRow({
       </td>
       {/* Cliente */}
       <td className="px-4 py-4">
-        <div className="flex items-center">
-          <div className="w-10 h-10 bg-crm-primary/10 rounded-full flex items-center justify-center mr-3">
-            <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <Link
+          href={`/dashboard/clientes/${cliente.id}`}
+          className="flex items-center group gap-3 text-crm-text-primary hover:text-crm-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40 rounded-md"
+        >
+          <div className="w-10 h-10 bg-crm-primary/10 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-crm-primary group-hover:scale-105 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
             </svg>
           </div>
           <div>
-            <div className="text-sm font-medium text-crm-text-primary">{cliente.nombre}</div>
+            <div className="text-sm font-medium group-hover:text-crm-primary transition-colors">{cliente.nombre}</div>
             <div className="text-xs text-crm-text-muted capitalize">
-              {cliente.tipo_cliente === 'persona' ? 'Persona' : 
+              {cliente.tipo_cliente === 'persona' ? 'Persona' :
                cliente.tipo_cliente === 'empresa' ? 'Empresa' : 'No especificado'}
             </div>
           </div>
-        </div>
+        </Link>
       </td>
 
       {/* Estado */}
@@ -1112,12 +777,12 @@ const ClienteRow = memo(function ClienteRow({
             </svg>
           </a>
           <button
-            onClick={() => generarProformaPDF(cliente)}
+            onClick={() => onQuickProforma(cliente)}
             className="text-crm-info hover:text-crm-info/80 transition-colors"
-            title="Exportar Proforma PDF"
+            title="Generar proforma"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m8 4a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h7l5 5v9z" />
             </svg>
           </button>
           <button

@@ -50,6 +50,10 @@ function GestionUsuarios() {
   const [userResetPassword, setUserResetPassword] = useState<Usuario | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null);
+  const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [paginaActual, setPaginaActual] = useState(1);
+  const USUARIOS_POR_PAGINA = 10;
 
   useEffect(() => {
     cargarUsuarios();
@@ -83,6 +87,13 @@ function GestionUsuarios() {
 
   const crearUsuario = async (formData: FormData) => {
     try {
+      // Validar que el rol seleccionado existe
+      const rol = getRolSeleccionado();
+      if (!rol) {
+        toast.error('Debe seleccionar un rol válido');
+        return;
+      }
+
       const response = await fetch('/api/admin/usuarios', {
         method: 'POST',
         body: formData,
@@ -94,6 +105,7 @@ function GestionUsuarios() {
         toast.success('Usuario creado exitosamente');
         setMostrarFormulario(false);
         setRolSeleccionado("");
+        setMostrarPassword(false);
         cargarUsuarios();
       } else {
         toast.error(data.message || 'Error creando usuario');
@@ -105,8 +117,15 @@ function GestionUsuarios() {
   };
 
   const esRolAdmin = () => {
+    if (!rolSeleccionado) return false;
     const rol = roles.find(r => r.id === rolSeleccionado);
-    return rol?.nombre === 'ROL_ADMIN';
+    // Validar que el rol existe y es ROL_ADMIN
+    return rol ? rol.nombre === 'ROL_ADMIN' : false;
+  };
+
+  const getRolSeleccionado = () => {
+    if (!rolSeleccionado) return null;
+    return roles.find(r => r.id === rolSeleccionado) || null;
   };
 
   // PATCH helper
@@ -178,7 +197,7 @@ function GestionUsuarios() {
 
   const confirmDeleteUser = async (userId: string) => {
     const result = await eliminarUsuario(userId);
-    
+
     if (result.success) {
       toast.success(result.message || 'Usuario eliminado exitosamente');
       cargarUsuarios();
@@ -191,6 +210,32 @@ function GestionUsuarios() {
     }
   };
 
+  // Filtrar usuarios según búsqueda
+  const usuariosFiltrados = usuarios.filter((usuario) => {
+    if (!busqueda.trim()) return true;
+
+    const searchTerm = busqueda.toLowerCase();
+    return (
+      usuario.nombre_completo?.toLowerCase().includes(searchTerm) ||
+      usuario.username?.toLowerCase().includes(searchTerm) ||
+      usuario.dni?.toLowerCase().includes(searchTerm) ||
+      usuario.email?.toLowerCase().includes(searchTerm) ||
+      usuario.telefono?.toLowerCase().includes(searchTerm) ||
+      usuario.rol?.nombre?.toLowerCase().includes(searchTerm)
+    );
+  });
+
+  // Calcular paginación
+  const totalPaginas = Math.ceil(usuariosFiltrados.length / USUARIOS_POR_PAGINA);
+  const indiceInicio = (paginaActual - 1) * USUARIOS_POR_PAGINA;
+  const indiceFin = indiceInicio + USUARIOS_POR_PAGINA;
+  const usuariosPaginados = usuariosFiltrados.slice(indiceInicio, indiceFin);
+
+  // Resetear a página 1 cuando cambia la búsqueda
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [busqueda]);
+
   return (
     <div className="space-y-6">
       {/* Header con botón para crear usuario */}
@@ -202,8 +247,11 @@ function GestionUsuarios() {
               Crea y administra usuarios del sistema (Vendedores, Coordinadores, etc.)
             </p>
           </div>
-          <button 
-            onClick={() => setMostrarFormulario(true)}
+          <button
+            onClick={() => {
+              setMostrarFormulario(true);
+              setMostrarPassword(false);
+            }}
             className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,6 +271,7 @@ function GestionUsuarios() {
               onClick={() => {
                 setMostrarFormulario(false);
                 setRolSeleccionado("");
+                setMostrarPassword(false);
               }}
               className="text-crm-text-muted hover:text-crm-text-primary"
             >
@@ -280,14 +329,33 @@ function GestionUsuarios() {
                       <label className="block text-sm font-medium text-crm-text-primary mb-2">
                         Contraseña *
                       </label>
-                      <input
-                        type="password"
-                        name="password"
-                        required
-                        minLength={6}
-                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                        placeholder="Contraseña"
-                      />
+                      <div className="relative">
+                        <input
+                          type={mostrarPassword ? "text" : "password"}
+                          name="password"
+                          required
+                          minLength={6}
+                          className="w-full px-3 py-2 pr-10 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                          placeholder="Contraseña"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setMostrarPassword(!mostrarPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary transition-colors"
+                          title={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {mostrarPassword ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -329,9 +397,15 @@ function GestionUsuarios() {
                       <input
                         type="tel"
                         name="telefono"
+                        pattern="[9][0-9]{8}"
+                        maxLength={9}
                         className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
                         placeholder="987654321"
+                        title="Debe ser un número de 9 dígitos que comience con 9"
                       />
+                      <p className="text-xs text-crm-text-muted mt-1">
+                        Formato: 9 dígitos comenzando con 9 (ej: 987654321)
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-crm-text-primary mb-2">
@@ -344,21 +418,40 @@ function GestionUsuarios() {
                         placeholder="usuario@amersur.com (opcional)"
                       />
                       <p className="text-xs text-crm-text-muted mt-1">
-                        Si no se proporciona, se generará automáticamente usando el DNI
+                        El login se hace con DNI. El email es opcional para notificaciones.
                       </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-crm-text-primary mb-2">
                         Contraseña Temporal *
                       </label>
-                      <input
-                        type="password"
-                        name="password"
-                        required
-                        minLength={6}
-                        className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                        placeholder="Contraseña temporal"
-                      />
+                      <div className="relative">
+                        <input
+                          type={mostrarPassword ? "text" : "password"}
+                          name="password"
+                          required
+                          minLength={6}
+                          className="w-full px-3 py-2 pr-10 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                          placeholder="Contraseña temporal"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setMostrarPassword(!mostrarPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary transition-colors"
+                          title={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {mostrarPassword ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-crm-text-primary mb-2">
@@ -396,6 +489,7 @@ function GestionUsuarios() {
                     onClick={() => {
                       setMostrarFormulario(false);
                       setRolSeleccionado("");
+                      setMostrarPassword(false);
                     }}
                     className="px-4 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors"
                   >
@@ -403,7 +497,8 @@ function GestionUsuarios() {
                   </button>
                   <button
                     type="submit"
-                    className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
+                    disabled={!getRolSeleccionado()}
+                    className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Crear Usuario
                   </button>
@@ -416,6 +511,43 @@ function GestionUsuarios() {
 
       {/* Lista de usuarios */}
       <div className="crm-card p-6">
+        {/* Barra de búsqueda */}
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar por nombre, username, DNI, email, teléfono o rol..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full px-4 py-2 pl-10 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+            />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-crm-text-muted"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {busqueda && (
+              <button
+                onClick={() => setBusqueda("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary"
+                title="Limpiar búsqueda"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {busqueda && (
+            <p className="text-sm text-crm-text-muted mt-2">
+              Se encontraron {usuariosFiltrados.length} de {usuarios.length} usuarios
+            </p>
+          )}
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -442,8 +574,14 @@ function GestionUsuarios() {
                     No hay usuarios registrados
                   </td>
                 </tr>
+              ) : usuariosFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-crm-text-muted">
+                    No se encontraron usuarios con el criterio de búsqueda "{busqueda}"
+                  </td>
+                </tr>
               ) : (
-                usuarios.map((usuario) => (
+                usuariosPaginados.map((usuario) => (
                   <tr key={usuario.id} className="border-b border-crm-border/50">
                     <td className="py-3 px-4">
                       <div className="flex items-center space-x-3">
@@ -574,6 +712,63 @@ function GestionUsuarios() {
             </tbody>
           </table>
         </div>
+
+        {/* Controles de paginación */}
+        {totalPaginas > 1 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-crm-border">
+            <div className="text-sm text-crm-text-muted">
+              Mostrando {indiceInicio + 1} a {Math.min(indiceFin, usuariosFiltrados.length)} de {usuariosFiltrados.length} usuarios
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setPaginaActual(paginaActual - 1)}
+                disabled={paginaActual === 1}
+                className="px-3 py-1 rounded border border-crm-border text-crm-text-primary hover:bg-crm-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Anterior
+              </button>
+
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pagina) => {
+                  // Mostrar solo algunas páginas alrededor de la actual
+                  if (
+                    pagina === 1 ||
+                    pagina === totalPaginas ||
+                    (pagina >= paginaActual - 1 && pagina <= paginaActual + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pagina}
+                        onClick={() => setPaginaActual(pagina)}
+                        className={`px-3 py-1 rounded border transition-colors ${
+                          paginaActual === pagina
+                            ? 'bg-crm-primary text-white border-crm-primary'
+                            : 'border-crm-border text-crm-text-primary hover:bg-crm-hover'
+                        }`}
+                      >
+                        {pagina}
+                      </button>
+                    );
+                  } else if (
+                    pagina === paginaActual - 2 ||
+                    pagina === paginaActual + 2
+                  ) {
+                    return <span key={pagina} className="px-2 text-crm-text-muted">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setPaginaActual(paginaActual + 1)}
+                disabled={paginaActual === totalPaginas}
+                className="px-3 py-1 rounded border border-crm-border text-crm-text-primary hover:bg-crm-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       {/* Modal de edición */}
       <UserEditModal

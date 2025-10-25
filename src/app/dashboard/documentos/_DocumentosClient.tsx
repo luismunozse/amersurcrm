@@ -3,65 +3,93 @@
 import { useState } from "react";
 import {
   FolderOpen,
-  Upload,
   Search,
   Grid,
   List,
-  Filter,
-  HardDrive,
   Cloud,
   File,
-  Download,
-  Trash2,
-  Share2,
-  Eye,
-  MoreVertical,
-  Plus,
-  Settings
+  RefreshCw,
+  Clock
 } from "lucide-react";
-import DocumentoUploader from "./_DocumentoUploader";
-import CarpetasTree from "./_CarpetasTree";
+import GoogleDriveFolders from "./_GoogleDriveFolders";
 import DocumentosList from "./_DocumentosList";
 import GoogleDriveStatus from "./_GoogleDriveStatus";
+import toast from "react-hot-toast";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
+import { useEffect, useState as useStateEffect } from "react";
 
 interface DocumentosClientProps {
-  carpetas: any[];
   documentosIniciales: any[];
   googleDriveConectado: boolean;
+  ultimaSincronizacion: string | null;
   stats: {
     total: number;
-    supabase: number;
-    googleDrive: number;
     tamanoTotal: number;
   };
 }
 
 export default function DocumentosClient({
-  carpetas,
   documentosIniciales,
   googleDriveConectado,
+  ultimaSincronizacion,
   stats
 }: DocumentosClientProps) {
   const [vistaActual, setVistaActual] = useState<'grid' | 'list'>('grid');
   const [carpetaSeleccionada, setCarpetaSeleccionada] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState<string>('todos');
-  const [mostrarUploader, setMostrarUploader] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [documentosEnCarpeta, setDocumentosEnCarpeta] = useState<any[]>([]);
+  const [cargandoDocumentos, setCargandoDocumentos] = useState(false);
+
+  // Cargar documentos de la carpeta actual desde Google Drive
+  useEffect(() => {
+    if (googleDriveConectado) {
+      cargarDocumentosDeCarpeta(carpetaSeleccionada);
+    }
+  }, [carpetaSeleccionada, googleDriveConectado]);
+
+  const cargarDocumentosDeCarpeta = async (folderId: string | null) => {
+    setCargandoDocumentos(true);
+    try {
+      const params = new URLSearchParams();
+      if (folderId) {
+        params.set('folderId', folderId);
+      }
+
+      const response = await fetch(`/api/google-drive/files?${params}`);
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Error al cargar archivos');
+      }
+
+      // Convertir formato de Google Drive a formato de documento
+      const documentos = (data.files || []).map((file: any) => ({
+        id: file.id,
+        nombre: file.name,
+        google_drive_file_id: file.id,
+        google_drive_web_view_link: file.webViewLink,
+        tipo_mime: file.mimeType,
+        tamano_bytes: file.size ? parseInt(file.size) : null,
+        created_at: file.createdTime,
+        updated_at: file.modifiedTime,
+      }));
+
+      setDocumentosEnCarpeta(documentos);
+    } catch (error) {
+      console.error('Error cargando documentos:', error);
+      setDocumentosEnCarpeta([]);
+    } finally {
+      setCargandoDocumentos(false);
+    }
+  };
 
   // Filtrar documentos
-  const documentosFiltrados = documentosIniciales.filter(doc => {
-    // Filtro por carpeta
-    if (carpetaSeleccionada && doc.carpeta_id !== carpetaSeleccionada) {
-      return false;
-    }
+  const documentosFiltrados = documentosEnCarpeta.filter(doc => {
 
     // Filtro por búsqueda
     if (busqueda && !doc.nombre.toLowerCase().includes(busqueda.toLowerCase())) {
-      return false;
-    }
-
-    // Filtro por tipo
-    if (filtroTipo !== 'todos' && doc.storage_tipo !== filtroTipo) {
       return false;
     }
 
@@ -77,6 +105,57 @@ export default function DocumentosClient({
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  // Sincronizar con Google Drive
+  const handleSincronizar = async () => {
+    if (!googleDriveConectado) {
+      toast.error('Google Drive no está conectado');
+      return;
+    }
+
+    setSincronizando(true);
+    const toastId = toast.loading('Sincronizando con Google Drive...');
+
+    try {
+      const response = await fetch('/api/google-drive/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullSync: false })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Error al sincronizar');
+      }
+
+      // Mostrar mensaje de éxito con estadísticas
+      let mensaje = `Sincronización completada: ${data.stats.inserted} nuevos, ${data.stats.updated} actualizados`;
+
+      if (data.stats.errors > 0) {
+        mensaje += `, ${data.stats.errors} errores`;
+        console.error('Errores de sincronización:', data.errorsDetails);
+      }
+
+      if (data.stats.total === 0) {
+        toast.warning('No se encontraron archivos en Google Drive', { id: toastId });
+      } else {
+        toast.success(mensaje, { id: toastId, duration: 5000 });
+      }
+
+      // Recargar la página para mostrar los nuevos documentos
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error sincronizando:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Error al sincronizar',
+        { id: toastId }
+      );
+    } finally {
+      setSincronizando(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -86,29 +165,27 @@ export default function DocumentosClient({
             <div className="p-2 bg-crm-primary rounded-xl">
               <FolderOpen className="w-6 h-6 text-white" />
             </div>
-            Documentos
+            Documentos de Google Drive
           </h1>
           <p className="text-crm-text-secondary mt-1">
-            Gestiona y organiza todos tus documentos en un solo lugar
+            Consulta y descarga documentos desde Google Drive
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setMostrarUploader(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
+            onClick={handleSincronizar}
+            disabled={!googleDriveConectado || sincronizando}
+            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Upload className="w-4 h-4" />
-            Subir Archivo
-          </button>
-          <button className="p-2 border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors">
-            <Settings className="w-5 h-5 text-crm-text-secondary" />
+            <RefreshCw className={`w-4 h-4 ${sincronizando ? 'animate-spin' : ''}`} />
+            {sincronizando ? 'Sincronizando...' : 'Sincronizar'}
           </button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="crm-card p-4 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
@@ -124,20 +201,8 @@ export default function DocumentosClient({
         <div className="crm-card p-4 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-crm-text-muted">Supabase Storage</p>
-              <p className="text-2xl font-bold text-crm-text-primary mt-1">{stats.supabase}</p>
-            </div>
-            <div className="p-3 bg-blue-500/10 rounded-lg">
-              <HardDrive className="w-6 h-6 text-blue-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="crm-card p-4 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
               <p className="text-sm text-crm-text-muted">Google Drive</p>
-              <p className="text-2xl font-bold text-crm-text-primary mt-1">{stats.googleDrive}</p>
+              <p className="text-2xl font-bold text-crm-text-primary mt-1">{stats.total}</p>
             </div>
             <div className="p-3 bg-green-500/10 rounded-lg">
               <Cloud className="w-6 h-6 text-green-500" />
@@ -148,36 +213,40 @@ export default function DocumentosClient({
         <div className="crm-card p-4 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-crm-text-muted">Espacio Usado</p>
-              <p className="text-2xl font-bold text-crm-text-primary mt-1">
-                {formatBytes(stats.tamanoTotal)}
+              <p className="text-sm text-crm-text-muted">Última Sincronización</p>
+              <p className="text-sm font-medium text-crm-text-primary mt-1">
+                {ultimaSincronizacion
+                  ? formatDistanceToNow(new Date(ultimaSincronizacion), { addSuffix: true, locale: es })
+                  : 'Nunca'
+                }
               </p>
             </div>
             <div className="p-3 bg-purple-500/10 rounded-lg">
-              <Download className="w-6 h-6 text-purple-500" />
+              <Clock className="w-6 h-6 text-purple-500" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Google Drive Status */}
-      <GoogleDriveStatus conectado={googleDriveConectado} />
+      <GoogleDriveStatus
+        conectado={googleDriveConectado}
+        onSincronizar={handleSincronizar}
+        sincronizando={sincronizando}
+      />
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Sidebar - Carpetas */}
+        {/* Sidebar - Carpetas de Google Drive */}
         <div className="lg:col-span-3">
           <div className="crm-card p-4 rounded-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-crm-text-primary">Carpetas</h3>
-              <button className="p-1 hover:bg-crm-card-hover rounded">
-                <Plus className="w-4 h-4 text-crm-text-secondary" />
-              </button>
+              <h3 className="font-semibold text-crm-text-primary">Carpetas de Drive</h3>
             </div>
-            <CarpetasTree
-              carpetas={carpetas}
-              carpetaSeleccionada={carpetaSeleccionada}
+            <GoogleDriveFolders
+              carpetaActual={carpetaSeleccionada}
               onSelectCarpeta={setCarpetaSeleccionada}
+              googleDriveConectado={googleDriveConectado}
             />
           </div>
         </div>
@@ -199,42 +268,28 @@ export default function DocumentosClient({
                 />
               </div>
 
-              {/* Filtros */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={filtroTipo}
-                  onChange={(e) => setFiltroTipo(e.target.value)}
-                  className="px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+              {/* Vista */}
+              <div className="flex items-center gap-1 p-1 bg-crm-card-hover rounded-lg">
+                <button
+                  onClick={() => setVistaActual('grid')}
+                  className={`p-2 rounded ${
+                    vistaActual === 'grid'
+                      ? 'bg-white shadow-sm'
+                      : 'hover:bg-white/50'
+                  }`}
                 >
-                  <option value="todos">Todos</option>
-                  <option value="supabase">Supabase</option>
-                  <option value="google_drive">Google Drive</option>
-                  <option value="externo">Enlaces</option>
-                </select>
-
-                {/* Vista */}
-                <div className="flex items-center gap-1 p-1 bg-crm-card-hover rounded-lg">
-                  <button
-                    onClick={() => setVistaActual('grid')}
-                    className={`p-2 rounded ${
-                      vistaActual === 'grid'
-                        ? 'bg-white shadow-sm'
-                        : 'hover:bg-white/50'
-                    }`}
-                  >
-                    <Grid className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setVistaActual('list')}
-                    className={`p-2 rounded ${
-                      vistaActual === 'list'
-                        ? 'bg-white shadow-sm'
-                        : 'hover:bg-white/50'
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
+                  <Grid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setVistaActual('list')}
+                  className={`p-2 rounded ${
+                    vistaActual === 'list'
+                      ? 'bg-white shadow-sm'
+                      : 'hover:bg-white/50'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -246,19 +301,6 @@ export default function DocumentosClient({
           />
         </div>
       </div>
-
-      {/* Modal Uploader */}
-      {mostrarUploader && (
-        <DocumentoUploader
-          carpetaId={carpetaSeleccionada}
-          onClose={() => setMostrarUploader(false)}
-          onSuccess={() => {
-            setMostrarUploader(false);
-            // Recargar página
-            window.location.reload();
-          }}
-        />
-      )}
     </div>
   );
 }

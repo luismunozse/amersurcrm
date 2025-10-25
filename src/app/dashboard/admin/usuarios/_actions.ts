@@ -6,16 +6,31 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
 
 /**
- * Genera una contraseña temporal aleatoria
+ * Genera una contraseña temporal aleatoria segura
+ * Incluye mayúsculas, minúsculas, números y caracteres especiales
+ * Longitud mínima: 12 caracteres
  */
 function generarPasswordTemporal(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const length = 8;
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  const special = '!@#$%&*-_+=';
+
+  // Garantizar al menos un caracter de cada tipo
   let password = '';
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+  password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  password += special.charAt(Math.floor(Math.random() * special.length));
+
+  // Completar hasta 12 caracteres con caracteres aleatorios
+  const allChars = lowercase + uppercase + numbers + special;
+  for (let i = password.length; i < 12; i++) {
+    password += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
-  return password;
+
+  // Mezclar los caracteres para que no sean predecibles
+  return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
 /**
@@ -129,19 +144,45 @@ export async function cambiarPasswordPerfil(
     // Obtener usuario actual
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!user || !user.email) {
       return { success: false, error: 'No autenticado' };
     }
 
-    // Actualizar contraseña directamente (Supabase validará automáticamente)
-    // No podemos validar la contraseña actual con signInWithPassword en un Server Action
-    // porque eso crearía una nueva sesión
+    // Validar que la contraseña nueva tenga al menos 6 caracteres
+    if (!passwordNueva || passwordNueva.length < 6) {
+      return {
+        success: false,
+        error: 'La contraseña nueva debe tener al menos 6 caracteres'
+      };
+    }
+
+    // Validar la contraseña actual intentando autenticar con un cliente temporal
+    // Esto NO afecta la sesión actual porque usamos un cliente anónimo
+    const { createClient } = await import('@supabase/supabase-js');
+    const anonClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const { error: signInError } = await anonClient.auth.signInWithPassword({
+      email: user.email,
+      password: passwordActual,
+    });
+
+    if (signInError) {
+      return {
+        success: false,
+        error: 'La contraseña actual es incorrecta'
+      };
+    }
+
+    // Si llegamos aquí, la contraseña actual es correcta
+    // Actualizar contraseña con el cliente del usuario actual
     const { error: updateError } = await supabase.auth.updateUser({
       password: passwordNueva
     });
 
     if (updateError) {
-      // Si falla, probablemente sea por política de contraseñas
       return {
         success: false,
         error: updateError.message || 'Error actualizando contraseña'
@@ -225,7 +266,14 @@ export async function eliminarUsuario(userId: string) {
       };
     }
 
-    // Primero eliminar el perfil del usuario
+    // Primero eliminar el usuario de Supabase Auth usando service role
+    const { error: authError } = await serviceRole.auth.admin.deleteUser(userId);
+
+    if (authError) {
+      throw new Error(`Error eliminando usuario de Auth: ${authError.message}`);
+    }
+
+    // Luego eliminar el perfil del usuario
     const { error: profileError } = await supabase
       .schema('crm')
       .from('usuario_perfil')
@@ -233,14 +281,10 @@ export async function eliminarUsuario(userId: string) {
       .eq('id', userId);
 
     if (profileError) {
-      throw new Error(`Error eliminando perfil: ${profileError.message}`);
-    }
-
-    // Luego eliminar el usuario de Supabase Auth usando service role
-    const { error: authError } = await serviceRole.auth.admin.deleteUser(userId);
-
-    if (authError) {
-      throw new Error(`Error eliminando usuario: ${authError.message}`);
+      // Si falla el perfil pero ya se eliminó el auth user, registrar el error pero continuar
+      console.error('Error eliminando perfil después de eliminar auth user:', profileError);
+      // Intentar recrear el auth user sería complejo, mejor loguear y notificar
+      throw new Error(`Usuario eliminado de Auth pero error al eliminar perfil: ${profileError.message}`);
     }
 
     revalidatePath('/dashboard/admin/usuarios');
