@@ -24,6 +24,12 @@ export interface UbigeoData {
   distritos: Distrito[];
 }
 
+export interface UbigeoSelection {
+  departamento: Departamento;
+  provincia?: Provincia;
+  distrito?: Distrito;
+}
+
 export function useUbigeo() {
   const [data, setData] = useState<UbigeoData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,13 +101,17 @@ export function useUbigeo() {
     return data.distritos.filter(d => d.departamento_code === departamentoCode);
   };
 
-  const findUbigeoByCodes = (departamentoCode: string, provinciaCode?: string, distritoCode?: string) => {
+  const findUbigeoByCodes = (
+    departamentoCode: string,
+    provinciaCode?: string,
+    distritoCode?: string
+  ): UbigeoSelection | null => {
     if (!data) return null;
     
     const departamento = data.departamentos.find(d => d.code === departamentoCode);
     if (!departamento) return null;
     
-    const result: any = { departamento };
+    const result: UbigeoSelection = { departamento };
     
     if (provinciaCode) {
       const provincia = data.provincias.find(p => p.code === provinciaCode && p.departamento_code === departamentoCode);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Download, Filter, TrendingUp, Users, Building, DollarSign, BarChart3, UserCheck, UserCog, RefreshCw } from "lucide-react";
+import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, RefreshCw } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import { exportarReportePDF } from "./_actions";
 import GraficosTendencias from "@/components/reportes/GraficosTendencias";
@@ -42,7 +42,8 @@ export default function ReportesPage() {
       } else {
         toast.error(result.error || 'Error generando reporte', { id: 'export' });
       }
-    } catch (error) {
+    } catch (err) {
+      console.error('Error exportando reporte:', err);
       toast.error('Error exportando reporte', { id: 'export' });
     }
   };
@@ -115,6 +116,12 @@ export default function ReportesPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

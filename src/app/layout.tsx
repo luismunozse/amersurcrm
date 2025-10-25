@@ -1,20 +1,64 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AppToaster from "@/components/Toaster";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: [
+    {
+      path: "../fonts/inter/Inter-400.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/inter/Inter-500.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/inter/Inter-600.ttf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/inter/Inter-700.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-inter",
   display: "swap",
+  fallback: ["system-ui", "Segoe UI", "sans-serif"],
 });
 
-const mont = Montserrat({
-  subsets: ["latin"],
+const mont = localFont({
+  src: [
+    {
+      path: "../fonts/montserrat/Montserrat-400.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/montserrat/Montserrat-500.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/montserrat/Montserrat-600.ttf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../fonts/montserrat/Montserrat-700.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-mont",
   display: "swap",
+  fallback: ["Inter", "system-ui", "sans-serif"],
 });
 
 export const metadata: Metadata = {

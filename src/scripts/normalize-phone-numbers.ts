@@ -63,17 +63,19 @@ async function normalizePhoneNumbers() {
       throw new Error(`Error obteniendo clientes: ${fetchError.message}`);
     }
     
-    if (!clientes || clientes.length === 0) {
+    const clientesNormalizados: Cliente[] = (clientes ?? []) as Cliente[];
+
+    if (clientesNormalizados.length === 0) {
       console.log('ℹ️  No se encontraron clientes');
       return;
     }
     
-    console.log(`📊 Encontrados ${clientes.length} clientes`);
+    console.log(`📊 Encontrados ${clientesNormalizados.length} clientes`);
     
     let updatedCount = 0;
     let errorCount = 0;
     
-    for (const cliente of clientes) {
+    for (const cliente of clientesNormalizados) {
       try {
         const normalizedTelefono = normalizePhoneNumber(cliente.telefono);
         const normalizedWhatsApp = normalizePhoneNumber(cliente.telefono_whatsapp);
@@ -115,7 +117,7 @@ async function normalizePhoneNumbers() {
     console.log('\n📈 Resumen de la migración:');
     console.log(`✅ Clientes actualizados: ${updatedCount}`);
     console.log(`❌ Errores: ${errorCount}`);
-    console.log(`📊 Total procesados: ${clientes.length}`);
+    console.log(`📊 Total procesados: ${clientesNormalizados.length}`);
     
     if (updatedCount > 0) {
       console.log('\n🎉 Migración completada exitosamente!');

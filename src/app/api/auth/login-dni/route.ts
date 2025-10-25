@@ -3,6 +3,14 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 
 const DNI_REGEX = /^\d{6,12}$/;
 
+interface PerfilConRol {
+  id: string;
+  email: string | null;
+  rol: {
+    nombre: string | null;
+  } | null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { dni, password } = await request.json();
@@ -31,9 +39,9 @@ export async function POST(request: NextRequest) {
       )
       .eq("dni", dniSanitized)
       .eq("activo", true)
-      .single();
+      .single<PerfilConRol>();
 
-    if (perfilError || !perfil || !perfil.rol || (perfil.rol as any).nombre !== "ROL_VENDEDOR") {
+    if (perfilError || !perfil || perfil.rol?.nombre !== "ROL_VENDEDOR") {
       return NextResponse.json(
         { error: "Credenciales inválidas" },
         { status: 401 }

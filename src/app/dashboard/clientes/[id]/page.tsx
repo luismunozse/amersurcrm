@@ -49,10 +49,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
   // Obtener datos del cliente
   const { data: cliente, error } = await supabase
     .from('cliente')
-    .select(`
-      *,
-      vendedor:usuario_perfil!vendedor_asignado(username, nombre_completo)
-    `)
+    .select('*')
     .eq('id', id)
     .single();
 
@@ -78,8 +75,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       lote:lote!lote_id(
         id,
         numero_lote,
-        precio_venta,
-        moneda,
         estado,
         proyecto:proyecto!proyecto_id(nombre)
       ),
@@ -96,9 +91,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       lote:lote!lote_id(
         id,
         numero_lote,
-        sup_m2,
-        precio,
-        moneda,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
@@ -114,9 +106,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       lote:lote!lote_id(
         id,
         numero_lote,
-        sup_m2,
-        precio,
-        moneda,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
@@ -132,9 +121,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       lote:lote!lote_id(
         id,
         numero_lote,
-        sup_m2,
-        precio,
-        moneda,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo),

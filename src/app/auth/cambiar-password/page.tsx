@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function CambiarPasswordPage() {
   const [passwordActual, setPasswordActual] = useState("");

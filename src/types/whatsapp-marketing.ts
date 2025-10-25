@@ -18,6 +18,16 @@ export type EstadoMensaje = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'
 
 export type TipoAudiencia = 'DINAMICO' | 'ESTATICO';
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type JsonObject = { [key: string]: JsonValue };
+
 // Credenciales de WhatsApp Cloud API
 export interface MarketingChannelCredential {
   id: string;
@@ -192,7 +202,7 @@ export interface MarketingAutomatizacion {
   nombre: string;
   descripcion?: string;
   trigger_evento: string;
-  condiciones: Record<string, any>;
+  condiciones: JsonObject;
   acciones: Array<{
     tipo: 'enviar_template' | 'esperar' | 'asignar_vendedor' | 'actualizar_etapa';
     template_id?: string;
@@ -217,7 +227,7 @@ export interface MarketingAutomatizacionEjecucion {
   conversacion_id?: string;
   estado: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   paso_actual: number;
-  pasos_ejecutados: any[];
+  pasos_ejecutados: JsonObject[];
   error_mensaje?: string;
   started_at: string;
   completed_at?: string;
@@ -231,7 +241,7 @@ export interface MarketingEventLog {
   conversacion_id?: string;
   mensaje_id?: string;
   campana_id?: string;
-  payload?: Record<string, any>;
+  payload?: JsonObject;
   resultado: 'SUCCESS' | 'ERROR' | 'WARNING';
   error_mensaje?: string;
   created_at: string;

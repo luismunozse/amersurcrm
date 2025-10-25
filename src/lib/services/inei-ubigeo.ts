@@ -50,6 +50,18 @@ interface ProcessedUbigeo {
   }>;
 }
 
+interface ProvinciaMapValue {
+  codigo: string;
+  nombre: string;
+  distritos: Array<{ codigo: string; nombre: string }>;
+}
+
+interface DepartamentoMapValue {
+  codigo: string;
+  nombre: string;
+  provincias: Map<string, ProvinciaMapValue>;
+}
+
 class INEIUbigeoService {
   private dataPath: string;
   private cachePath: string;
@@ -99,25 +111,39 @@ class INEIUbigeoService {
       const worksheet = workbook.Sheets[sheetName];
       
       // Convertir a JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
       
       // Procesar datos (asumiendo estructura estándar del INEI)
       const ubigeoData: UbigeoData[] = [];
       
       // Saltar encabezados y procesar filas
       for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as any[];
-        if (row && row.length >= 4) {
+        const row = jsonData[i];
+        if (!Array.isArray(row) || row.length < 4) continue;
+
+        const [
+          codigoCell,
+          departamentoCell,
+          provinciaCell,
+          distritoCell,
+          regionCell,
+          macroregionCell,
+          superficieCell,
+          latitudCell,
+          longitudCell
+        ] = row;
+
+        if (codigoCell !== undefined) {
           ubigeoData.push({
-            codigo: String(row[0] || '').padStart(6, '0'),
-            departamento: String(row[1] || ''),
-            provincia: String(row[2] || ''),
-            distrito: String(row[3] || ''),
-            region: row[4] ? String(row[4]) : undefined,
-            macroregion: row[5] ? String(row[5]) : undefined,
-            superficie: row[6] ? Number(row[6]) : undefined,
-            latitud: row[7] ? Number(row[7]) : undefined,
-            longitud: row[8] ? Number(row[8]) : undefined
+            codigo: String(codigoCell ?? '').padStart(6, '0'),
+            departamento: String(departamentoCell ?? ''),
+            provincia: String(provinciaCell ?? ''),
+            distrito: String(distritoCell ?? ''),
+            region: regionCell !== undefined && regionCell !== null ? String(regionCell) : undefined,
+            macroregion: macroregionCell !== undefined && macroregionCell !== null ? String(macroregionCell) : undefined,
+            superficie: superficieCell !== undefined ? Number(superficieCell) : undefined,
+            latitud: latitudCell !== undefined ? Number(latitudCell) : undefined,
+            longitud: longitudCell !== undefined ? Number(longitudCell) : undefined
           });
         }
       }
@@ -131,7 +157,7 @@ class INEIUbigeoService {
 
   // Estructurar datos en formato jerárquico
   private structureUbigeoData(data: UbigeoData[]): ProcessedUbigeo {
-    const departamentosMap = new Map<string, any>();
+    const departamentosMap = new Map<string, DepartamentoMapValue>();
     
     data.forEach(item => {
       const deptCode = item.codigo.substring(0, 2);
@@ -139,37 +165,39 @@ class INEIUbigeoService {
       const distCode = item.codigo;
 
       // Agregar departamento
-      if (!departamentosMap.has(deptCode)) {
-        departamentosMap.set(deptCode, {
+      let departamento = departamentosMap.get(deptCode);
+      if (!departamento) {
+        departamento = {
           codigo: deptCode,
           nombre: item.departamento,
-          provincias: new Map()
-        });
+          provincias: new Map<string, ProvinciaMapValue>()
+        };
+        departamentosMap.set(deptCode, departamento);
       }
 
-      const departamento = departamentosMap.get(deptCode);
-
       // Agregar provincia
-      if (!departamento.provincias.has(provCode)) {
-        departamento.provincias.set(provCode, {
+      let provincia = departamento.provincias.get(provCode);
+      if (!provincia) {
+        provincia = {
           codigo: provCode,
           nombre: item.provincia,
           distritos: []
-        });
+        };
+        departamento.provincias.set(provCode, provincia);
       }
 
       // Agregar distrito
-      departamento.provincias.get(provCode).distritos.push({
+      provincia.distritos.push({
         codigo: distCode,
         nombre: item.distrito
       });
     });
 
     // Convertir Maps a Arrays
-    const departamentos = Array.from(departamentosMap.values()).map(dept => ({
+    const departamentos = Array.from(departamentosMap.values()).map((dept) => ({
       codigo: dept.codigo,
       nombre: dept.nombre,
-      provincias: Array.from(dept.provincias.values()).map((prov: any) => ({
+      provincias: Array.from(dept.provincias.values()).map((prov) => ({
         codigo: prov.codigo,
         nombre: prov.nombre,
         distritos: prov.distritos
@@ -193,13 +221,15 @@ class INEIUbigeoService {
         });
 
         if (response.ok) {
-          const data = await response.json();
+          const rawData: unknown = await response.json();
           
           // Procesar según el formato de la fuente
-          if (Array.isArray(data)) {
-            return this.structureUbigeoData(data);
-          } else if (data.departamentos) {
-            return data;
+          if (Array.isArray(rawData)) {
+            return this.structureUbigeoData(rawData as UbigeoData[]);
+          }
+
+          if (rawData && typeof rawData === 'object' && 'departamentos' in rawData) {
+            return rawData as ProcessedUbigeo;
           }
         }
       } catch (error) {
@@ -227,7 +257,7 @@ class INEIUbigeoService {
       console.log('Datos del INEI actualizados exitosamente');
       return processedData;
     } catch (error) {
-      console.warn('Error descargando del INEI, intentando fuentes alternativas...');
+      console.warn('Error descargando del INEI, intentando fuentes alternativas...', error);
       
       try {
         const alternativeData = await this.downloadAlternativeData();

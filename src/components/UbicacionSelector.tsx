@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 
 interface Departamento { code: string; name: string }
 interface Provincia { code: string; name: string; departamento_code: string }
@@ -23,6 +23,46 @@ interface UbicacionSelectorProps {
   className?: string;
 }
 
+const toTrimmedString = (value: unknown): string => {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
+  if (value instanceof Date) return value.toISOString();
+  return "";
+};
+
+const toDepartamento = (raw: unknown): Departamento | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  const code = toTrimmedString(record.code ?? record.codigo ?? record.cod ?? record.id);
+  const name = toTrimmedString(record.name ?? record.nombre ?? record.descripcion);
+  if (!code || !name) return null;
+  return { code, name };
+};
+
+const toProvincia = (raw: unknown): Provincia | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  const code = toTrimmedString(record.code ?? record.codigo ?? record.cod ?? record.id);
+  const name = toTrimmedString(record.name ?? record.nombre ?? record.descripcion);
+  const departamentoCode = toTrimmedString(
+    record.departamento_code ?? record.dep_code ?? record.departamento ?? record.departamentoId
+  );
+  if (!code || !name || !departamentoCode) return null;
+  return { code, name, departamento_code: departamentoCode };
+};
+
+const toDistrito = (raw: unknown): Distrito | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  const code = toTrimmedString(record.code ?? record.codigo ?? record.cod ?? record.id);
+  const name = toTrimmedString(record.name ?? record.nombre ?? record.descripcion);
+  const provinciaCode = toTrimmedString(
+    record.provincia_code ?? record.prov_code ?? record.provincia ?? record.provinciaId
+  );
+  if (!code || !name || !provinciaCode) return null;
+  return { code, name, provincia_code: provinciaCode };
+};
+
 export default function UbicacionSelector({
   departamento: propDepartamento = "",
   provincia: propProvincia = "",
@@ -42,13 +82,14 @@ export default function UbicacionSelector({
   const [departamentoSeleccionado, setDepartamentoSeleccionado] = useState(propDepartamento);
   const [provinciaSeleccionada, setProvinciaSeleccionada] = useState(propProvincia);
   const [distritoSeleccionado, setDistritoSeleccionado] = useState(propDistrito);
+  const idBase = useId();
 
   // Solo sincronizar en la inicialización, no en cada cambio
   useEffect(() => {
     setDepartamentoSeleccionado(propDepartamento);
     setProvinciaSeleccionada(propProvincia);
     setDistritoSeleccionado(propDistrito);
-  }, []); // Solo ejecutar una vez al montar
+  }, [propDepartamento, propProvincia, propDistrito]);
 
   const [departamentoAbierto, setDepartamentoAbierto] = useState(false);
   const [provinciaAbierta, setProvinciaAbierta] = useState(false);
@@ -90,25 +131,20 @@ export default function UbicacionSelector({
             `API Error: ${depsRes.status}, ${provsRes.status}, ${distsRes.status}`
           );
         }
-        const [departamentosData, provinciasData, distritosData] = await Promise.all([
+        const [departamentosData, provinciasData, distritosData]: [unknown, unknown, unknown] = await Promise.all([
           depsRes.json(),
           provsRes.json(),
           distsRes.json(),
         ]);
-        const depsFixed = (departamentosData || []).map((it: any) => ({
-          code: String(it.code ?? it.codigo ?? it.cod ?? '').trim(),
-          name: String(it.name ?? it.nombre ?? '').trim(),
-        }));
-        const provsFixed = (provinciasData || []).map((it: any) => ({
-          code: String(it.code ?? it.codigo ?? it.cod ?? '').trim(),
-          name: String(it.name ?? it.nombre ?? '').trim(),
-          departamento_code: String(it.departamento_code ?? it.dep_code ?? it.departamento ?? '').trim(),
-        }));
-        const distsFixed = (distritosData || []).map((it: any) => ({
-          code: String(it.code ?? it.codigo ?? it.cod ?? '').trim(),
-          name: String(it.name ?? it.nombre ?? '').trim(),
-          provincia_code: String(it.provincia_code ?? it.prov_code ?? it.provincia ?? '').trim(),
-        }));
+        const depsFixed = Array.isArray(departamentosData)
+          ? departamentosData.map(toDepartamento).filter((item): item is Departamento => item !== null)
+          : [];
+        const provsFixed = Array.isArray(provinciasData)
+          ? provinciasData.map(toProvincia).filter((item): item is Provincia => item !== null)
+          : [];
+        const distsFixed = Array.isArray(distritosData)
+          ? distritosData.map(toDistrito).filter((item): item is Distrito => item !== null)
+          : [];
         setDepartamentos(depsFixed);
         setProvincias(provsFixed);
         setDistritos(distsFixed);
@@ -238,12 +274,15 @@ export default function UbicacionSelector({
           </svg>
           Departamento <span className="text-red-500">*</span>
         </label>
-        <div className="relative" role="combobox" aria-expanded={departamentoAbierto}>
+        <div className="relative">
           <button
             type="button"
             onClick={() => setDepartamentoAbierto(a => !a)}
             disabled={disabled}
             className={triggerClass}
+            aria-haspopup="listbox"
+            aria-expanded={departamentoAbierto}
+            aria-controls={`${idBase}-departamentos`}
           >
             <span className={depNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
               {depNombre || "Selecciona"}
@@ -254,7 +293,7 @@ export default function UbicacionSelector({
           </button>
 
           {departamentoAbierto && (
-            <div className={listClass} role="listbox">
+            <div className={listClass} role="listbox" id={`${idBase}-departamentos`}>
               {departamentos.map((d) => (
                 <div
                   role="option"
@@ -288,12 +327,15 @@ export default function UbicacionSelector({
           </svg>
           Provincia <span className="text-red-500">*</span>
         </label>
-        <div className="relative" role="combobox" aria-expanded={provinciaAbierta}>
+        <div className="relative">
           <button
             type="button"
             onClick={() => setProvinciaAbierta(a => !a)}
             disabled={disabled || !departamentoSeleccionado || provinciasFiltradas.length === 0}
             className={triggerClass}
+            aria-haspopup="listbox"
+            aria-expanded={provinciaAbierta}
+            aria-controls={`${idBase}-provincias`}
           >
             <span className={provNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
               {provNombre || (departamentoSeleccionado ? "Selecciona" : "Selecciona dpto.")}
@@ -304,7 +346,7 @@ export default function UbicacionSelector({
           </button>
 
           {provinciaAbierta && provinciasFiltradas.length > 0 && (
-            <div className={listClass} role="listbox">
+            <div className={listClass} role="listbox" id={`${idBase}-provincias`}>
               {provinciasFiltradas.map((p) => (
                 <div
                   role="option"
@@ -338,12 +380,15 @@ export default function UbicacionSelector({
           </svg>
           Distrito <span className="text-red-500">*</span>
         </label>
-        <div className="relative" role="combobox" aria-expanded={distritoAbierto}>
+        <div className="relative">
           <button
             type="button"
             onClick={() => setDistritoAbierto(a => !a)}
             disabled={disabled || !provinciaSeleccionada || distritosFiltrados.length === 0}
             className={triggerClass}
+            aria-haspopup="listbox"
+            aria-expanded={distritoAbierto}
+            aria-controls={`${idBase}-distritos`}
           >
             <span className={distNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
               {distNombre || (provinciaSeleccionada ? "Selecciona" : "Selecciona prov.")}
@@ -354,7 +399,7 @@ export default function UbicacionSelector({
           </button>
 
           {distritoAbierto && distritosFiltrados.length > 0 && (
-            <div className={listClass} role="listbox">
+            <div className={listClass} role="listbox" id={`${idBase}-distritos`}>
               {distritosFiltrados.map((d) => (
                 <div
                   role="option"

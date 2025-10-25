@@ -1,5 +1,20 @@
 import type { WhatsAppSendMessageRequest, WhatsAppSendMessageResponse } from "@/types/whatsapp-marketing";
 
+type TemplateComponents = NonNullable<NonNullable<WhatsAppSendMessageRequest["template"]>["components"]>;
+
+interface WhatsAppImageMessageRequest {
+  messaging_product: 'whatsapp';
+  recipient_type: 'individual';
+  to: string;
+  type: 'image';
+  image: {
+    link: string;
+    caption?: string;
+  };
+}
+
+type WhatsAppMessagePayload = WhatsAppSendMessageRequest | WhatsAppImageMessageRequest;
+
 export class WhatsAppClient {
   private phoneNumberId: string;
   private accessToken: string;
@@ -35,20 +50,25 @@ export class WhatsAppClient {
     to: string,
     templateName: string,
     languageCode: string = 'es',
-    components?: any[]
+    components?: TemplateComponents
   ): Promise<WhatsAppSendMessageResponse> {
+    const template: NonNullable<WhatsAppSendMessageRequest["template"]> = {
+      name: templateName,
+      language: {
+        code: languageCode
+      }
+    };
+
+    if (components && components.length > 0) {
+      template.components = components;
+    }
+
     const request: WhatsAppSendMessageRequest = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: to,
       type: 'template',
-      template: {
-        name: templateName,
-        language: {
-          code: languageCode
-        },
-        components: components
-      }
+      template
     };
 
     return this.enviarMensaje(request);
@@ -58,7 +78,7 @@ export class WhatsAppClient {
    * Envía un mensaje con imagen
    */
   async enviarMensajeImagen(to: string, imageUrl: string, caption?: string): Promise<WhatsAppSendMessageResponse> {
-    const request: any = {
+    const request: WhatsAppImageMessageRequest = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: to,
@@ -75,7 +95,7 @@ export class WhatsAppClient {
   /**
    * Método base para enviar mensajes
    */
-  private async enviarMensaje(request: WhatsAppSendMessageRequest | any): Promise<WhatsAppSendMessageResponse> {
+  private async enviarMensaje(request: WhatsAppMessagePayload): Promise<WhatsAppSendMessageResponse> {
     const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}/messages`;
 
     const response = await fetch(url, {
@@ -125,7 +145,8 @@ export class WhatsAppClient {
   /**
    * Obtiene información de un template
    */
-  async obtenerTemplate(templateName: string): Promise<any> {
+  async obtenerTemplate(templateName: string): Promise<null> {
+    void templateName;
     // Nota: Esto requiere el WhatsApp Business Account ID
     // Por ahora retornamos null, implementar cuando se tenga el WABA ID
     return null;

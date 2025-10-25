@@ -3,7 +3,6 @@
 import { useState, useTransition, memo, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
-  actualizarCliente,
   eliminarCliente,
   actualizarEstadoCliente,
   eliminarClientesMasivo,
@@ -15,38 +14,14 @@ import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Pagination } from "@/components/Pagination";
-import { usePagination } from "@/hooks/usePagination";
 import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
 import {
-  getEstadoClienteColor,
   getEstadoClienteLabel,
   ESTADOS_CLIENTE_OPTIONS,
   EstadoCliente,
-  formatCapacidadCompra,
-  formatSaldoPendiente,
+  DireccionCliente,
 } from "@/lib/types/clientes";
-
-// Función para determinar el nivel del cliente basado en capacidad de compra
-function getNivelCliente(capacidad: number | null): { nivel: string; className: string } {
-  if (!capacidad) return { 
-    nivel: 'No especificado', 
-    className: 'text-crm-text-muted bg-crm-border/20' 
-  };
-  
-  if (capacidad >= 500000) return { 
-    nivel: 'Alto', 
-    className: 'text-green-700 bg-green-100 border border-green-200' 
-  };
-  if (capacidad >= 100000) return { 
-    nivel: 'Medio', 
-    className: 'text-yellow-700 bg-yellow-100 border border-yellow-200' 
-  };
-  return { 
-    nivel: 'Desestimado', 
-    className: 'text-red-700 bg-red-100 border border-red-200' 
-  };
-}
 
 type Cliente = {
   id: string;
@@ -71,7 +46,7 @@ type Cliente = {
   propiedades_alquiladas: number;
   saldo_pendiente: number;
   notas: string | null;
-  direccion: any;
+  direccion: DireccionCliente | null;
   propiedades?: Array<{
     direccion?: string;
     distrito?: string;
@@ -123,12 +98,11 @@ export default function ClientesTable({
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const router = useRouter();
-  const [sortBy, setSortBy] = useState<keyof Cliente>(initialSortBy as keyof Cliente);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(initialSortOrder);
+  const sortBy = initialSortBy as keyof Cliente;
+  const sortOrder = initialSortOrder;
 
   // Estado para selección múltiple
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showBulkActions, setShowBulkActions] = useState(false);
   const [bulkAction, setBulkAction] = useState<'delete' | 'assignVendedor' | 'changeEstado' | null>(null);
   const [bulkVendedor, setBulkVendedor] = useState('');
   const [bulkEstado, setBulkEstado] = useState<EstadoCliente>('por_contactar');
@@ -304,21 +278,32 @@ export default function ClientesTable({
     return sortOrder === 'asc' ? '↑' : '↓';
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
   if (editing) {
     const cliente = clientes.find(c => c.id === editing);
     if (!cliente) return null;
+
+    type ClienteFormProps = React.ComponentProps<typeof ClienteForm>;
+    type ClienteFormCliente = NonNullable<ClienteFormProps["cliente"]>;
+
+    const clienteForForm: ClienteFormCliente = {
+      id: cliente.id,
+      nombre: cliente.nombre,
+      tipo_cliente: cliente.tipo_cliente,
+      ...(cliente.email ? { email: cliente.email } : {}),
+      ...(cliente.telefono ? { telefono: cliente.telefono } : {}),
+      ...(cliente.documento_identidad ? { documento_identidad: cliente.documento_identidad } : {}),
+      ...(cliente.telefono_whatsapp ? { telefono_whatsapp: cliente.telefono_whatsapp } : {}),
+      ...(cliente.direccion ? { direccion: cliente.direccion } : {}),
+      estado_cliente: cliente.estado_cliente,
+      ...(cliente.origen_lead ? { origen_lead: cliente.origen_lead } : {}),
+      ...(cliente.vendedor_asignado ? { vendedor_asignado: cliente.vendedor_asignado } : {}),
+      ...(cliente.interes_principal ? { interes_principal: cliente.interes_principal } : {}),
+      ...(cliente.notas ? { notas: cliente.notas } : {}),
+    };
     
     return (
       <ClienteForm
-        cliente={cliente as any}
+        cliente={clienteForForm}
         isEditing={true}
         onSuccess={handleAfterSave}
         onCancel={handleCancelEdit}
@@ -326,8 +311,80 @@ export default function ClientesTable({
     );
   }
 
+  // Estado local para búsqueda
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+
+  // Actualizar búsqueda local cuando cambie el prop
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
+
+  // Función para aplicar búsqueda
+  const handleSearch = (value: string) => {
+    const params = new URLSearchParams();
+    if (value.trim()) params.set('q', value.trim());
+    if (searchTelefono) params.set('telefono', searchTelefono);
+    if (searchDni) params.set('dni', searchDni);
+    if (estado) params.set('estado', estado);
+    if (tipo) params.set('tipo', tipo);
+    if (vendedor) params.set('vendedor', vendedor);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    params.set('page', '1'); // Resetear a página 1 al buscar
+
+    router.push(`/dashboard/clientes?${params.toString()}`);
+  };
+
+  // Limpiar búsqueda
+  const handleClearSearch = () => {
+    setLocalSearchQuery('');
+    handleSearch('');
+  };
+
   return (
     <div className="space-y-6">
+      {/* Barra de búsqueda */}
+      <div className="crm-card p-4">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Buscar por nombre, email, teléfono o DNI..."
+            value={localSearchQuery}
+            onChange={(e) => setLocalSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSearch(localSearchQuery);
+              }
+            }}
+            className="w-full px-4 py-2 pl-10 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+          />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-crm-text-muted"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {localSearchQuery && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary"
+              title="Limpiar búsqueda"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-crm-text-muted mt-2">
+            Se encontraron {total} resultado{total === 1 ? '' : 's'} para "{searchQuery}"
+          </p>
+        )}
+      </div>
+
       {/* Barra de acciones masivas */}
       {selectedIds.size > 0 && (
         <div className="crm-card p-4 bg-crm-card-hover border border-crm-border">
@@ -410,6 +467,14 @@ export default function ClientesTable({
       {/* Tabla */}
       <div className="crm-card overflow-hidden">
         <div className="overflow-x-auto">
+          <div className="flex justify-between items-start px-4 py-3 border-b border-crm-border bg-crm-card-hover">
+            <div>
+              <h3 className="text-sm font-semibold text-crm-text-primary">Listado de clientes</h3>
+              <p className="text-xs text-crm-text-muted">
+                Mostrando {clientes.length} de {total} cliente{total === 1 ? '' : 's'}
+              </p>
+            </div>
+          </div>
           <table className="w-full">
             <thead className="bg-crm-card-hover border-b border-crm-border">
               <tr>
@@ -562,15 +627,6 @@ const ClienteRow = memo(function ClienteRow({
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
 }) {
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'por_contactar': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'contactado': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'transferido': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   const getOrigenLeadLabel = (origen?: string | null) => {
     switch (origen) {
       case 'web':

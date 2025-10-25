@@ -3,6 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import csv from 'csv-parser';
 
+interface DistritoItem {
+  code: string;
+  name: string;
+  provincia_code: string;
+  departamento_code: string;
+}
+
+interface DistritoCsvRow extends Partial<DistritoItem> {
+  [key: string]: string | undefined;
+}
+
 export async function GET() {
   try {
     const csvPath = path.join(process.cwd(), 'data/inei-csvs/distritos.csv');
@@ -11,12 +22,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Archivo de distritos no encontrado' }, { status: 404 });
     }
 
-    const distritos: any[] = [];
+    const distritos: DistritoItem[] = [];
     
     await new Promise((resolve, reject) => {
       fs.createReadStream(csvPath)
         .pipe(csv())
-        .on('data', (row) => {
+        .on('data', (row: DistritoCsvRow) => {
+          if (!row.code || !row.name || !row.provincia_code || !row.departamento_code) return;
+
           distritos.push({
             code: row.code,
             name: row.name,

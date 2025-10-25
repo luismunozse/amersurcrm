@@ -32,7 +32,7 @@ WHERE email = 'admin@amersur.admin';
 -- NO funcionará en Supabase Cloud por razones de seguridad
 --
 -- Para Supabase Cloud, DEBES usar la opción A o ejecutar el script Node.js
--- que se encuentra en scripts/reset-admin-password.js
+-- que se encuentra en scripts/reset-admin-password.mjs
 
 -- 3. Verificar el perfil del usuario
 SELECT

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Building, Home, MapPin, DollarSign, Calendar, Download } from "lucide-react";
+import { Building, Calendar, Download } from "lucide-react";
 
 export default function ReportePropiedades() {
   const propertyStats = [

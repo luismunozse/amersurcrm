@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
 
@@ -6,7 +6,7 @@ import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
  * GET /api/google-drive/test
  * Endpoint de prueba para verificar conexión con Google Drive
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Verificar autenticación
     const supabase = await createServerOnlyClient();

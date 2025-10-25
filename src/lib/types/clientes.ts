@@ -95,7 +95,7 @@ export interface ClienteCompleto {
   
   // Información adicional
   notas?: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }

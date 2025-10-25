@@ -125,7 +125,7 @@ export interface AtributosOficina {
 export interface AtributosOtros {
   nombre_propiedad: string;
   categoria_custom: string;
-  caracteristicas_personalizadas: Record<string, any>;
+  caracteristicas_personalizadas: Record<string, unknown>;
 }
 
 // Estructura principal de propiedad mejorada
@@ -149,7 +149,7 @@ export interface Propiedad {
   opciones_financiacion_alquiler?: OpcionesFinanciacionAlquiler;
   marketing: Marketing;
   atributos_especificos: AtributosLote | AtributosCasa | AtributosDepartamento | AtributosOficina | AtributosOtros;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -180,7 +180,7 @@ export interface PropiedadWizardData {
   distrito: string;
   
   // Paso 3: Características específicas (dinámicas según tipo)
-  caracteristicas: Record<string, any>;
+  caracteristicas: Record<string, unknown>;
   
   // Paso 4: Precios y condiciones comerciales
   precio_venta: number;

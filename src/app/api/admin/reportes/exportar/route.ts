@@ -2,6 +2,64 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 
+type ReporteTipo = "ventas" | "clientes" | "propiedades" | "rendimiento" | "general";
+
+interface ReportePeriodo {
+  dias?: number;
+  inicio?: string;
+  fin?: string;
+}
+
+interface VentasMetricas {
+  valorTotal?: number;
+  propiedadesVendidas?: number;
+  promedioVenta?: number;
+  nuevas?: number;
+}
+
+interface ClientesMetricas {
+  activos?: number;
+  nuevos?: number;
+  tasaConversion?: number;
+}
+
+interface PropiedadesMetricas {
+  disponibles?: number;
+  vendidas?: number;
+  total?: number;
+  nuevas?: number;
+}
+
+interface VendedorMetricas {
+  nombre?: string;
+  username?: string;
+  ventas?: number;
+  propiedades?: number;
+  meta?: number;
+}
+
+interface VendedoresMetricas {
+  topVendedores?: VendedorMetricas[];
+}
+
+interface ReporteMetricas {
+  ventas?: VentasMetricas;
+  clientes?: ClientesMetricas;
+  propiedades?: PropiedadesMetricas;
+  vendedores?: VendedoresMetricas;
+}
+
+interface ReporteDatos {
+  periodo?: ReportePeriodo;
+  metricas?: ReporteMetricas;
+}
+
+interface ReporteRequestBody {
+  tipo: ReporteTipo;
+  periodo?: string;
+  datos: ReporteDatos;
+}
+
 // POST - Exportar reporte a PDF
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +75,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { tipo, periodo, datos } = body;
+    const rawBody: unknown = await request.json();
+    const { tipo, periodo = "", datos } = normalizarCuerpo(rawBody);
 
     if (!tipo || !datos) {
       return NextResponse.json({ error: "Faltan parámetros requeridos" }, { status: 400 });
@@ -43,9 +101,172 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generarHTMLReporte(tipo: string, periodo: string, datos: any): string {
+function normalizarCuerpo(raw: unknown): ReporteRequestBody {
+  if (!raw || typeof raw !== "object") {
+    return { tipo: "general", periodo: "", datos: {} };
+  }
+
+  const record = raw as Record<string, unknown>;
+  const tipo = esReporteTipo(record.tipo) ? record.tipo : "general";
+  const periodo = typeof record.periodo === "string" ? record.periodo : "";
+
+  return {
+    tipo,
+    periodo,
+    datos: normalizarDatos(record.datos),
+  };
+}
+
+function esReporteTipo(value: unknown): value is ReporteTipo {
+  return value === "ventas"
+    || value === "clientes"
+    || value === "propiedades"
+    || value === "rendimiento"
+    || value === "general";
+}
+
+function normalizarDatos(raw: unknown): ReporteDatos {
+  if (!raw || typeof raw !== "object") return {};
+
+  const record = raw as Record<string, unknown>;
+  const periodo = normalizarPeriodo(record.periodo);
+  const metricas = normalizarMetricas(record.metricas);
+
+  return {
+    ...(periodo ? { periodo } : {}),
+    ...(metricas ? { metricas } : {}),
+  };
+}
+
+function normalizarPeriodo(raw: unknown): ReportePeriodo | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+  const periodo: ReportePeriodo = {};
+
+  if (typeof record.dias === "number") periodo.dias = record.dias;
+  if (typeof record.inicio === "string") periodo.inicio = record.inicio;
+  if (typeof record.fin === "string") periodo.fin = record.fin;
+
+  return Object.keys(periodo).length > 0 ? periodo : undefined;
+}
+
+function normalizarMetricas(raw: unknown): ReporteMetricas | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+
+  const metricas: ReporteMetricas = {};
+  const ventas = normalizarVentasMetricas(record.ventas);
+  if (ventas) metricas.ventas = ventas;
+
+  const clientes = normalizarClientesMetricas(record.clientes);
+  if (clientes) metricas.clientes = clientes;
+
+  const propiedades = normalizarPropiedadesMetricas(record.propiedades);
+  if (propiedades) metricas.propiedades = propiedades;
+
+  const vendedores = normalizarVendedoresMetricas(record.vendedores);
+  if (vendedores) metricas.vendedores = vendedores;
+
+  return Object.keys(metricas).length > 0 ? metricas : undefined;
+}
+
+const numero = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+function normalizarVentasMetricas(raw: unknown): VentasMetricas | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+
+  const result: VentasMetricas = {};
+  const valorTotal = numero(record.valorTotal);
+  if (valorTotal !== undefined) result.valorTotal = valorTotal;
+  const propiedadesVendidas = numero(record.propiedadesVendidas);
+  if (propiedadesVendidas !== undefined) result.propiedadesVendidas = propiedadesVendidas;
+  const promedioVenta = numero(record.promedioVenta);
+  if (promedioVenta !== undefined) result.promedioVenta = promedioVenta;
+  const nuevas = numero(record.nuevas);
+  if (nuevas !== undefined) result.nuevas = nuevas;
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizarClientesMetricas(raw: unknown): ClientesMetricas | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+
+  const result: ClientesMetricas = {};
+  const activos = numero(record.activos);
+  if (activos !== undefined) result.activos = activos;
+  const nuevos = numero(record.nuevos);
+  if (nuevos !== undefined) result.nuevos = nuevos;
+  const tasaConversion = numero(record.tasaConversion);
+  if (tasaConversion !== undefined) result.tasaConversion = tasaConversion;
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizarPropiedadesMetricas(raw: unknown): PropiedadesMetricas | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+
+  const result: PropiedadesMetricas = {};
+  const disponibles = numero(record.disponibles);
+  if (disponibles !== undefined) result.disponibles = disponibles;
+  const vendidas = numero(record.vendidas);
+  if (vendidas !== undefined) result.vendidas = vendidas;
+  const total = numero(record.total);
+  if (total !== undefined) result.total = total;
+  const nuevas = numero(record.nuevas);
+  if (nuevas !== undefined) result.nuevas = nuevas;
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizarVendedoresMetricas(raw: unknown): VendedoresMetricas | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+  const topVendedoresRaw = Array.isArray(record.topVendedores) ? record.topVendedores : undefined;
+
+  if (!topVendedoresRaw) return undefined;
+
+  const topVendedores = topVendedoresRaw
+    .map((vendedor): VendedorMetricas | null => {
+      if (!vendedor || typeof vendedor !== "object") return null;
+      const data = vendedor as Record<string, unknown>;
+
+      const nombre = typeof data.nombre === "string" ? data.nombre : undefined;
+      const username = typeof data.username === "string" ? data.username : undefined;
+      const ventas = numero(data.ventas);
+      const propiedades = numero(data.propiedades);
+      const meta = numero(data.meta);
+
+      const result: VendedorMetricas = {};
+      if (nombre) result.nombre = nombre;
+      if (username) result.username = username;
+      if (ventas !== undefined) result.ventas = ventas;
+      if (propiedades !== undefined) result.propiedades = propiedades;
+      if (meta !== undefined) result.meta = meta;
+
+      return Object.keys(result).length > 0 ? result : null;
+    })
+    .filter((item): item is VendedorMetricas => item !== null);
+
+  return topVendedores.length > 0 ? { topVendedores } : undefined;
+}
+
+function generarHTMLReporte(tipo: ReporteTipo, periodo: string, datos: ReporteDatos): string {
   const fechaActual = new Date().toLocaleDateString('es-PE');
   const titulo = obtenerTituloReporte(tipo);
+  const periodoDesde = datos.periodo?.inicio
+    ? new Date(datos.periodo.inicio).toLocaleDateString('es-PE')
+    : 'N/A';
+  const periodoHasta = datos.periodo?.fin
+    ? new Date(datos.periodo.fin).toLocaleDateString('es-PE')
+    : 'N/A';
+  const periodoValue = Number(periodo);
+  const periodoDias = typeof datos.periodo?.dias === "number"
+    ? datos.periodo.dias
+    : Number.isFinite(periodoValue) && periodo.trim() !== "" ? periodoValue : undefined;
 
   return `
     <!DOCTYPE html>
@@ -194,21 +415,21 @@ function generarHTMLReporte(tipo: string, periodo: string, datos: any): string {
         <div class="header">
             <div class="logo">AMERSUR CRM</div>
             <h1 class="titulo">${titulo}</h1>
-            <p class="subtitulo">Generado el ${fechaActual} • Período: ${periodo} días</p>
+            <p class="subtitulo">Generado el ${fechaActual} • Período: ${periodoDias ?? 0} días</p>
         </div>
 
         <div class="metadatos">
             <div class="metadato">
                 <div class="metadato-label">Período</div>
-                <div class="metadato-valor">${datos.periodo?.dias || periodo} días</div>
+                <div class="metadato-valor">${periodoDias ?? 0} días</div>
             </div>
             <div class="metadato">
                 <div class="metadato-label">Desde</div>
-                <div class="metadato-valor">${datos.periodo?.inicio ? new Date(datos.periodo.inicio).toLocaleDateString('es-PE') : 'N/A'}</div>
+                <div class="metadato-valor">${periodoDesde}</div>
             </div>
             <div class="metadato">
                 <div class="metadato-label">Hasta</div>
-                <div class="metadato-valor">${datos.periodo?.fin ? new Date(datos.periodo.fin).toLocaleDateString('es-PE') : 'N/A'}</div>
+                <div class="metadato-valor">${periodoHasta}</div>
             </div>
         </div>
 
@@ -223,7 +444,7 @@ function generarHTMLReporte(tipo: string, periodo: string, datos: any): string {
   `;
 }
 
-function obtenerTituloReporte(tipo: string): string {
+function obtenerTituloReporte(tipo: ReporteTipo): string {
   const titulos: Record<string, string> = {
     'ventas': 'Reporte de Ventas',
     'clientes': 'Reporte de Clientes',
@@ -234,10 +455,9 @@ function obtenerTituloReporte(tipo: string): string {
   return titulos[tipo] || 'Reporte del Sistema';
 }
 
-function generarContenidoMetricas(tipo: string, datos: any): string {
-  if (!datos.metricas) return '<p>No hay datos disponibles</p>';
-
-  const { metricas } = datos;
+function generarContenidoMetricas(tipo: ReporteTipo, datos: ReporteDatos): string {
+  const metricas = datos.metricas;
+  if (!metricas) return '<p>No hay datos disponibles</p>';
 
   return `
     <div class="seccion">
@@ -245,22 +465,22 @@ function generarContenidoMetricas(tipo: string, datos: any): string {
       <div class="metricas-grid">
         <div class="metrica">
           <div class="metrica-titulo">Ventas Totales</div>
-          <div class="metrica-valor">S/ ${formatearNumero(metricas.ventas?.valorTotal || 0)}</div>
+          <div class="metrica-valor">S/ ${formatearNumero(metricas.ventas?.valorTotal ?? 0)}</div>
           <div class="metrica-cambio cambio-positivo">+12.5% vs período anterior</div>
         </div>
         <div class="metrica">
           <div class="metrica-titulo">Clientes Activos</div>
-          <div class="metrica-valor">${metricas.clientes?.activos || 0}</div>
-          <div class="metrica-cambio cambio-positivo">+${metricas.clientes?.nuevos || 0} nuevos</div>
+          <div class="metrica-valor">${metricas.clientes?.activos ?? 0}</div>
+          <div class="metrica-cambio cambio-positivo">+${metricas.clientes?.nuevos ?? 0} nuevos</div>
         </div>
         <div class="metrica">
           <div class="metrica-titulo">Propiedades Vendidas</div>
-          <div class="metrica-valor">${metricas.propiedades?.vendidas || 0}</div>
-          <div class="metrica-cambio cambio-positivo">+${metricas.propiedades?.nuevas || 0} nuevas</div>
+          <div class="metrica-valor">${metricas.propiedades?.vendidas ?? 0}</div>
+          <div class="metrica-cambio cambio-positivo">+${metricas.propiedades?.nuevas ?? 0} nuevas</div>
         </div>
         <div class="metrica">
           <div class="metrica-titulo">Tasa de Conversión</div>
-          <div class="metrica-valor">${metricas.clientes?.tasaConversion?.toFixed(1) || 0}%</div>
+          <div class="metrica-valor">${metricas.clientes?.tasaConversion?.toFixed(1) ?? 0}%</div>
           <div class="metrica-cambio cambio-positivo">+3.1% vs período anterior</div>
         </div>
       </div>
@@ -273,7 +493,7 @@ function generarContenidoMetricas(tipo: string, datos: any): string {
   `;
 }
 
-function generarSeccionVentas(metricas: any): string {
+function generarSeccionVentas(metricas: ReporteMetricas): string {
   return `
     <div class="seccion">
       <h2 class="seccion-titulo">Análisis de Ventas</h2>
@@ -288,17 +508,17 @@ function generarSeccionVentas(metricas: any): string {
         <tbody>
           <tr>
             <td>Valor Total de Ventas</td>
-            <td>S/ ${formatearNumero(metricas.ventas?.valorTotal || 0)}</td>
+            <td>S/ ${formatearNumero(metricas.ventas?.valorTotal ?? 0)}</td>
             <td class="cambio-positivo">+12.5%</td>
           </tr>
           <tr>
             <td>Propiedades Vendidas</td>
-            <td>${metricas.ventas?.propiedadesVendidas || 0}</td>
+            <td>${metricas.ventas?.propiedadesVendidas ?? 0}</td>
             <td class="cambio-positivo">+15.3%</td>
           </tr>
           <tr>
             <td>Promedio por Venta</td>
-            <td>S/ ${formatearNumero(metricas.ventas?.promedioVenta || 0)}</td>
+            <td>S/ ${formatearNumero(metricas.ventas?.promedioVenta ?? 0)}</td>
             <td class="cambio-positivo">+5.2%</td>
           </tr>
         </tbody>
@@ -307,7 +527,7 @@ function generarSeccionVentas(metricas: any): string {
   `;
 }
 
-function generarSeccionClientes(metricas: any): string {
+function generarSeccionClientes(metricas: ReporteMetricas): string {
   return `
     <div class="seccion">
       <h2 class="seccion-titulo">Análisis de Clientes</h2>
@@ -322,17 +542,17 @@ function generarSeccionClientes(metricas: any): string {
         <tbody>
           <tr>
             <td>Clientes Activos</td>
-            <td>${metricas.clientes?.activos || 0}</td>
-            <td class="cambio-positivo">+${metricas.clientes?.nuevos || 0}</td>
+            <td>${metricas.clientes?.activos ?? 0}</td>
+            <td class="cambio-positivo">+${metricas.clientes?.nuevos ?? 0}</td>
           </tr>
           <tr>
             <td>Nuevos Clientes</td>
-            <td>${metricas.clientes?.nuevos || 0}</td>
+            <td>${metricas.clientes?.nuevos ?? 0}</td>
             <td class="cambio-positivo">+8.2%</td>
           </tr>
           <tr>
             <td>Tasa de Conversión</td>
-            <td>${metricas.clientes?.tasaConversion?.toFixed(1) || 0}%</td>
+            <td>${metricas.clientes?.tasaConversion?.toFixed(1) ?? 0}%</td>
             <td class="cambio-positivo">+3.1%</td>
           </tr>
         </tbody>
@@ -341,7 +561,7 @@ function generarSeccionClientes(metricas: any): string {
   `;
 }
 
-function generarSeccionPropiedades(metricas: any): string {
+function generarSeccionPropiedades(metricas: ReporteMetricas): string {
   return `
     <div class="seccion">
       <h2 class="seccion-titulo">Análisis de Propiedades</h2>
@@ -356,17 +576,17 @@ function generarSeccionPropiedades(metricas: any): string {
         <tbody>
           <tr>
             <td>Disponibles</td>
-            <td>${metricas.propiedades?.disponibles || 0}</td>
-            <td>${calcularPorcentaje(metricas.propiedades?.disponibles, metricas.propiedades?.total)}%</td>
+            <td>${metricas.propiedades?.disponibles ?? 0}</td>
+            <td>${calcularPorcentaje(metricas.propiedades?.disponibles ?? 0, metricas.propiedades?.total ?? 0)}%</td>
           </tr>
           <tr>
             <td>Vendidas</td>
-            <td>${metricas.propiedades?.vendidas || 0}</td>
-            <td>${calcularPorcentaje(metricas.propiedades?.vendidas, metricas.propiedades?.total)}%</td>
+            <td>${metricas.propiedades?.vendidas ?? 0}</td>
+            <td>${calcularPorcentaje(metricas.propiedades?.vendidas ?? 0, metricas.propiedades?.total ?? 0)}%</td>
           </tr>
           <tr>
             <td>Total</td>
-            <td>${metricas.propiedades?.total || 0}</td>
+            <td>${metricas.propiedades?.total ?? 0}</td>
             <td>100%</td>
           </tr>
         </tbody>
@@ -375,8 +595,8 @@ function generarSeccionPropiedades(metricas: any): string {
   `;
 }
 
-function generarSeccionRendimiento(metricas: any): string {
-  const topVendedores = metricas.vendedores?.topVendedores || [];
+function generarSeccionRendimiento(metricas: ReporteMetricas): string {
+  const topVendedores: VendedorMetricas[] = metricas.vendedores?.topVendedores ?? [];
   
   return `
     <div class="seccion">
@@ -392,14 +612,14 @@ function generarSeccionRendimiento(metricas: any): string {
           </tr>
         </thead>
         <tbody>
-          ${topVendedores.map((v: any) => `
+          ${topVendedores.map((v) => `
             <tr>
-              <td>${v.nombre || v.username}</td>
-              <td>S/ ${formatearNumero(v.ventas)}</td>
-              <td>${v.propiedades}</td>
-              <td>S/ ${formatearNumero(v.meta)}</td>
-              <td class="${v.ventas >= v.meta ? 'cambio-positivo' : 'cambio-negativo'}">
-                ${calcularCumplimiento(v.ventas, v.meta)}%
+              <td>${v.nombre || v.username || 'Sin nombre'}</td>
+              <td>S/ ${formatearNumero(v.ventas ?? 0)}</td>
+              <td>${v.propiedades ?? 0}</td>
+              <td>S/ ${formatearNumero(v.meta ?? 0)}</td>
+              <td class="${(v.ventas ?? 0) >= (v.meta ?? 0) ? 'cambio-positivo' : 'cambio-negativo'}">
+                ${calcularCumplimiento(v.ventas ?? 0, v.meta ?? 0)}%
               </td>
             </tr>
           `).join('')}
@@ -427,4 +647,3 @@ function calcularCumplimiento(ventas: number, meta: number): string {
   if (!meta || meta === 0) return '0';
   return ((ventas / meta) * 100).toFixed(1);
 }
-

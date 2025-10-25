@@ -2,6 +2,50 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 
+interface ClienteRecord {
+  id: string;
+  estado_cliente: string | null;
+  fecha_alta: string;
+  vendedor_asignado: string | null;
+}
+
+interface PropiedadRecord {
+  id: string;
+  estado_comercial: string | null;
+  precio: number | string | null;
+  created_at?: string;
+}
+
+interface ProyectoRecord {
+  id: string;
+  nombre: string;
+  estado: string | null;
+  created_at: string;
+}
+
+interface VendedorRecord {
+  id: string;
+  username: string | null;
+  nombre_completo: string | null;
+  activo: boolean;
+  rol_id: string | null;
+  meta_mensual_ventas: number | null;
+  comision_porcentaje: number | null;
+}
+
+interface TendenciaRegistro {
+  created_at: string | null;
+  estado_comercial: string | null;
+  precio: number | string | null;
+}
+
+interface TendenciaMensual {
+  mes: string;
+  ventas: number;
+  propiedades: number;
+  clientes: number;
+}
+
 // GET - Obtener métricas principales de reportes
 export async function GET(request: NextRequest) {
   try {
@@ -37,99 +81,130 @@ export async function GET(request: NextRequest) {
     }
 
     // 1. Métricas de Clientes
-    const { data: clientesData, error: clientesError } = await supabase
+    const clientesResponse = await supabase
       .schema('crm')
       .from('cliente')
       .select('id, estado_cliente, fecha_alta, vendedor_asignado')
       .gte('fecha_alta', startDate)
       .lte('fecha_alta', endDate);
 
-    if (clientesError) {
-      console.error('Error obteniendo clientes:', clientesError);
+    if (clientesResponse.error) {
+      console.error('Error obteniendo clientes:', clientesResponse.error);
     }
 
+    const clientesData = (clientesResponse.data ?? []) as ClienteRecord[];
+
     // Clientes totales (no solo del período)
-    const { data: totalClientes, error: totalClientesError } = await supabase
+    const totalClientesResponse = await supabase
       .schema('crm')
       .from('cliente')
       .select('id, estado_cliente')
       .eq('estado_cliente', 'cliente');
 
+    if (totalClientesResponse.error) {
+      console.error('Error obteniendo total de clientes:', totalClientesResponse.error);
+    }
+
+    const totalClientes = (totalClientesResponse.data ?? []) as ClienteRecord[];
+
     // 2. Métricas de Propiedades
-    const { data: propiedadesData, error: propiedadesError } = await supabase
+    const propiedadesResponse = await supabase
       .schema('crm')
       .from('propiedad')
       .select('id, estado_comercial, precio, created_at')
       .gte('created_at', startDate)
       .lte('created_at', endDate);
 
-    if (propiedadesError) {
-      console.error('Error obteniendo propiedades:', propiedadesError);
+    if (propiedadesResponse.error) {
+      console.error('Error obteniendo propiedades:', propiedadesResponse.error);
     }
 
+    const propiedadesData = (propiedadesResponse.data ?? []) as PropiedadRecord[];
+
     // Propiedades totales por estado
-    const { data: propiedadesEstados, error: propiedadesEstadosError } = await supabase
+    const propiedadesEstadosResponse = await supabase
       .schema('crm')
       .from('propiedad')
       .select('id, estado_comercial, precio');
 
+    if (propiedadesEstadosResponse.error) {
+      console.error('Error obteniendo propiedades por estado:', propiedadesEstadosResponse.error);
+    }
+
+    const propiedadesEstados = (propiedadesEstadosResponse.data ?? []) as PropiedadRecord[];
+
     // 3. Métricas de Proyectos
-    const { data: proyectosData, error: proyectosError } = await supabase
+    const proyectosResponse = await supabase
       .schema('crm')
       .from('proyecto')
       .select('id, nombre, estado, created_at')
       .gte('created_at', startDate)
       .lte('created_at', endDate);
 
+    if (proyectosResponse.error) {
+      console.error('Error obteniendo proyectos:', proyectosResponse.error);
+    }
+
+    const proyectosData = (proyectosResponse.data ?? []) as ProyectoRecord[];
+
     // 4. Métricas de Usuarios/Vendedores
-    const { data: vendedoresData, error: vendedoresError } = await supabase
+    const vendedoresResponse = await supabase
       .schema('crm')
       .from('usuario_perfil')
       .select('id, username, nombre_completo, activo, rol_id, meta_mensual_ventas, comision_porcentaje')
       .eq('activo', true);
 
+    if (vendedoresResponse.error) {
+      console.error('Error obteniendo vendedores:', vendedoresResponse.error);
+    }
+
+    const vendedoresData = (vendedoresResponse.data ?? []) as VendedorRecord[];
+
     // 5. Calcular métricas
-    const clientesNuevos = clientesData?.length || 0;
-    const clientesActivos = totalClientes?.length || 0;
-    
-    const propiedadesNuevas = propiedadesData?.length || 0;
-    const propiedadesVendidas = propiedadesEstados?.filter(p => p.estado_comercial === 'vendido').length || 0;
-    const propiedadesDisponibles = propiedadesEstados?.filter(p => p.estado_comercial === 'disponible').length || 0;
-    
+    const clientesNuevos = clientesData.length;
+    const clientesActivos = totalClientes.length;
+
+    const propiedadesNuevas = propiedadesData.length;
+    const propiedadesVendidas = propiedadesEstados.filter(p => p.estado_comercial === 'vendido').length;
+    const propiedadesDisponibles = propiedadesEstados.filter(p => p.estado_comercial === 'disponible').length;
+
     // Calcular valor total de propiedades vendidas
     const valorTotalVentas = propiedadesEstados
-      ?.filter(p => p.estado_comercial === 'vendido')
-      ?.reduce((sum, p) => sum + (Number(p.precio) || 0), 0) || 0;
+      .filter(p => p.estado_comercial === 'vendido')
+      .reduce((sum, p) => sum + (Number(p.precio) || 0), 0);
 
-    const proyectosNuevos = proyectosData?.length || 0;
-    const vendedoresActivos = vendedoresData?.length || 0;
+    const proyectosNuevos = proyectosData.length;
+    const vendedoresActivos = vendedoresData.length;
 
     // Calcular tasa de conversión (clientes activos / total de leads)
-    const totalLeads = clientesData?.length || 0;
+    const totalLeads = clientesData.length;
     const tasaConversion = totalLeads > 0 ? (clientesActivos / totalLeads) * 100 : 0;
 
     // 6. Datos para gráficos de tendencias (últimos 6 meses)
     const seisMesesAtras = new Date();
     seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
     
-    const { data: tendenciasData, error: tendenciasError } = await supabase
+    const tendenciasResponse = await supabase
       .schema('crm')
       .from('propiedad')
       .select('created_at, estado_comercial, precio')
       .gte('created_at', seisMesesAtras.toISOString())
       .order('created_at', { ascending: true });
+    if (tendenciasResponse.error) {
+      console.error('Error obteniendo tendencias:', tendenciasResponse.error);
+    }
 
     // Procesar datos para gráficos mensuales
-    const tendenciasMensuales = procesarTendenciasMensuales(tendenciasData || []);
+    const tendenciasMensuales = procesarTendenciasMensuales((tendenciasResponse.data ?? []) as TendenciaRegistro[]);
 
     // 7. Top vendedores por ventas (simulado por ahora)
-    const topVendedores = vendedoresData?.slice(0, 5).map(v => ({
-      username: v.username,
-      nombre: v.nombre_completo,
+    const topVendedores = vendedoresData.slice(0, 5).map((v) => ({
+      username: v.username ?? undefined,
+      nombre: v.nombre_completo ?? undefined,
       ventas: Math.floor(Math.random() * 500000) + 100000, // Simulado
       propiedades: Math.floor(Math.random() * 20) + 5,
-      meta: v.meta_mensual_ventas || 0
-    })) || [];
+      meta: v.meta_mensual_ventas ?? 0
+    }));
 
     const reporte = {
       periodo: {
@@ -149,7 +224,7 @@ export async function GET(request: NextRequest) {
           tasaConversion: Math.round(tasaConversion * 100) / 100
         },
         propiedades: {
-          total: propiedadesEstados?.length || 0,
+          total: propiedadesEstados.length,
           nuevas: propiedadesNuevas,
           vendidas: propiedadesVendidas,
           disponibles: propiedadesDisponibles,
@@ -157,7 +232,7 @@ export async function GET(request: NextRequest) {
         },
         proyectos: {
           nuevos: proyectosNuevos,
-          total: proyectosData?.length || 0
+          total: proyectosData.length
         },
         vendedores: {
           activos: vendedoresActivos,
@@ -176,37 +251,35 @@ export async function GET(request: NextRequest) {
 }
 
 // Función para procesar tendencias mensuales
-function procesarTendenciasMensuales(datos: any[]) {
+function procesarTendenciasMensuales(datos: TendenciaRegistro[]): TendenciaMensual[] {
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  const tendencias: any = {};
+  const acumulados: Record<string, TendenciaAcumulada> = {};
 
-  // Inicializar meses
-  meses.forEach(mes => {
-    tendencias[mes] = {
-      ventas: 0,
-      propiedades: 0,
-      clientes: 0
-    };
+  meses.forEach((mes) => {
+    acumulados[mes] = { ventas: 0, propiedades: 0, clientes: 0 };
   });
 
-  // Procesar datos
-  datos.forEach(item => {
+  datos.forEach((item) => {
+    if (!item.created_at) return;
     const fecha = new Date(item.created_at);
+    if (Number.isNaN(fecha.getTime())) return;
+
     const mes = meses[fecha.getMonth()];
-    
-    if (tendencias[mes]) {
-      tendencias[mes].propiedades++;
-      if (item.estado_comercial === 'vendido') {
-        tendencias[mes].ventas += Number(item.precio) || 0;
-      }
+    if (!mes) return;
+
+    const tendenciaMes = acumulados[mes];
+    tendenciaMes.propiedades += 1;
+
+    if (item.estado_comercial === 'vendido') {
+      const precio = typeof item.precio === 'string' ? Number(item.precio) : item.precio ?? 0;
+      tendenciaMes.ventas += Number.isFinite(precio) ? precio : 0;
     }
   });
 
-  // Convertir a array para gráficos
-  return Object.entries(tendencias).map(([mes, data]: [string, any]) => ({
+  return meses.map((mes) => ({
     mes,
-    ventas: data.ventas,
-    propiedades: data.propiedades,
-    clientes: data.clientes
+    ventas: acumulados[mes].ventas,
+    propiedades: acumulados[mes].propiedades,
+    clientes: acumulados[mes].clientes,
   }));
 }

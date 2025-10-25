@@ -8,14 +8,6 @@ import Papa from "papaparse";
 import { getErrorMessage } from "@/lib/errors";
 import { downloadTemplate } from "@/lib/generateTemplate";
 import { downloadAMERSURTemplate } from "@/lib/generateTemplateAMERSUR";
-import { 
-  TIPOS_CLIENTE_OPTIONS, 
-  ESTADOS_CLIENTE_OPTIONS, 
-  ORIGENES_LEAD_OPTIONS, 
-  FORMAS_PAGO_OPTIONS, 
-  INTERESES_PRINCIPALES_OPTIONS 
-} from "@/lib/types/clientes";
-
 interface ImportarClientesProps {
   onClose: () => void;
 }
@@ -55,42 +47,40 @@ interface ImportResult {
   }>;
 }
 
+type RawCell = string | number | boolean | Date | null | undefined;
+type RawRow = RawCell[];
+const IMPORTABLE_FIELDS: Array<keyof ClienteImportData> = [
+  'codigo_cliente',
+  'nombre',
+  'tipo_cliente',
+  'documento_identidad',
+  'email',
+  'telefono',
+  'telefono_whatsapp',
+  'direccion_calle',
+  'direccion_numero',
+  'direccion_barrio',
+  'direccion_ciudad',
+  'direccion_provincia',
+  'direccion_pais',
+  'estado_cliente',
+  'origen_lead',
+  'vendedor_asignado',
+  'proxima_accion',
+  'interes_principal',
+  'capacidad_compra_estimada',
+  'forma_pago_preferida',
+  'notas',
+];
+
 export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);
   const [data, setData] = useState<ClienteImportData[]>([]);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-
-  const requiredFields = [
-    'nombre',
-    'email',
-    'telefono'
-  ];
-
-  const optionalFields = [
-    'codigo_cliente',
-    'tipo_cliente',
-    'documento_identidad',
-    'telefono_whatsapp',
-    'direccion_calle',
-    'direccion_numero',
-    'direccion_barrio',
-    'direccion_ciudad',
-    'direccion_provincia',
-    'direccion_pais',
-    'estado_cliente',
-    'origen_lead',
-    'vendedor_asignado',
-    'proxima_accion',
-    'interes_principal',
-    'capacidad_compra_estimada',
-    'forma_pago_preferida',
-    'notas'
-  ];
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -104,7 +94,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   const parseFile = async (file: File) => {
     try {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      let rawData: any[] = [];
+      let rawData: RawRow[] = [];
 
       if (fileExtension === 'xlsx' || fileExtension === 'xls') {
         // Parsear Excel
@@ -112,12 +102,13 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const sheetData = XLSX.utils.sheet_to_json<RawCell[]>(worksheet, { header: 1 });
+        rawData = sheetData.map((row) => row as RawRow);
       } else if (fileExtension === 'csv') {
         // Parsear CSV
         const text = await file.text();
-        const result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        rawData = result.data;
+        const result = Papa.parse<RawCell[]>(text, { header: false, skipEmptyLines: true });
+        rawData = result.data.map((row) => row as RawRow);
       } else {
         throw new Error('Formato de archivo no soportado. Use .xlsx, .xls o .csv');
       }
@@ -127,20 +118,44 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       }
 
       // Convertir a formato esperado
-      const headers = rawData[0] as string[];
-      const rows = rawData.slice(1) as any[][];
+      const headerRow = rawData[0] ?? [];
+      const headers = headerRow.map((cell) => String(cell ?? '').trim());
+      const rows = rawData.slice(1);
 
-      const parsedData: ClienteImportData[] = rows.map((row, index) => {
-        const rowData: any = {};
+      const parsedData: ClienteImportData[] = rows.map((row) => {
+        const rowData: Partial<ClienteImportData> = {};
         headers.forEach((header, colIndex) => {
-          if (header && row[colIndex] !== undefined) {
-            // Normalizar nombres de columnas para ser más flexibles
-            const normalizedHeader = normalizeColumnName(header);
-            rowData[normalizedHeader] = row[colIndex];
+          const cellValue = row[colIndex];
+          if (!header || cellValue === undefined || cellValue === null) {
+            return;
           }
+
+            // Normalizar nombres de columnas para ser más flexibles
+          const normalizedHeader = normalizeColumnName(header);
+          if (!IMPORTABLE_FIELDS.includes(normalizedHeader as keyof ClienteImportData)) {
+            return;
+          }
+
+          const targetKey = normalizedHeader as keyof ClienteImportData;
+          if (targetKey === 'capacidad_compra_estimada') {
+            const numericValue = typeof cellValue === 'number' ? cellValue : Number(cellValue);
+            if (!Number.isNaN(numericValue)) {
+              rowData[targetKey] = numericValue;
+            }
+            return;
+          }
+
+          const stringValue =
+            typeof cellValue === 'string'
+              ? cellValue.trim()
+              : cellValue instanceof Date
+                ? cellValue.toISOString()
+                : String(cellValue);
+
+          rowData[targetKey] = stringValue as ClienteImportData[typeof targetKey];
         });
-        return rowData;
-      });
+        return rowData as ClienteImportData;
+      }).filter((row) => Object.values(row).some((value) => value !== undefined && value !== null && String(value).trim() !== ''));
 
       setData(parsedData);
       setStep(3);
@@ -220,13 +235,6 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     };
     
     return columnMapping[normalized] || normalized;
-  };
-
-  const handleMappingChange = (excelColumn: string, ourField: string) => {
-    setMapping(prev => ({
-      ...prev,
-      [excelColumn]: ourField
-    }));
   };
 
   const validateData = (data: ClienteImportData[]): ImportResult => {
@@ -317,7 +325,10 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
 
       // Filtrar filas válidas y continuar con importación parcial
       const invalidRowNumbers = new Set(validation.errorsList.map(e => e.row));
-      const validRows = data.filter((_, idx) => !invalidRowNumbers.has(idx + 2));
+      const validRows = data.filter((row, idx) => {
+        void row;
+        return !invalidRowNumbers.has(idx + 2);
+      });
 
       if (validRows.length === 0) {
         setStep(4);
@@ -397,7 +408,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
             console.error('Import batch error text:', details);
           }
           msg = [msg, apiMsg, details, firstErrors].filter(Boolean).join(' - ');
-        } catch (_) {
+        } catch {
           // Ignorar fallo al leer cuerpo y usar mensaje con status
         }
         toast.dismiss('import-progress');
@@ -409,7 +420,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
         const payload = await response.json();
         totalImported += Number(payload?.imported || 0);
         totalSkippedDuplicates += Number(payload?.skippedDuplicates || 0);
-      } catch (_) {
+      } catch {
         // si no es JSON, ignorar
       }
 
@@ -434,7 +445,6 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     setStep(1);
     setFile(null);
     setData([]);
-    setMapping({});
     setResult(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -522,7 +532,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                   <p><strong>Formato mínimo:</strong> Nombre, Celular (como tu archivo actual)</p>
                   <p><strong>Formato completo:</strong> nombre, email, telefono, tipo_cliente, direccion, etc.</p>
                   <p><strong>Límite:</strong> Hasta 20,000 registros por importación</p>
-                  <p><strong>Nota:</strong> El sistema mapea automáticamente "Nombre" → "nombre" y "Celular" → "telefono"</p>
+                  <p><strong>Nota:</strong> El sistema mapea automáticamente &quot;Nombre&quot; → &quot;nombre&quot; y &quot;Celular&quot; → &quot;telefono&quot;</p>
                 </div>
                 <div className="mt-3 space-y-2">
                   <button

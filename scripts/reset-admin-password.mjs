@@ -2,15 +2,17 @@
  * Script para resetear la contraseña del administrador
  *
  * Uso:
- * node scripts/reset-admin-password.js
+ * node scripts/reset-admin-password.mjs
  *
  * Requisitos:
  * - Tener la variable SUPABASE_SERVICE_ROLE_KEY en tu archivo .env
  * - El usuario admin@amersur.admin debe existir en Supabase
  */
 
-require('dotenv').config({ path: '.env.local' });
-const { createClient } = require('@supabase/supabase-js');
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+dotenv.config({ path: ".env.local" });
 
 // Configuración
 const ADMIN_EMAIL = 'admin@amersur.admin';
@@ -64,7 +66,7 @@ async function resetAdminPassword() {
     // 2. Actualizar la contraseña
     console.log('🔐 Actualizando contraseña...');
 
-    const { data: updateData, error: updateError } = await supabase.auth.admin.updateUserById(
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
       adminUser.id,
       { password: NEW_PASSWORD }
     );

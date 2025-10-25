@@ -16,10 +16,15 @@ export async function createOptimizedServerClient() {
           return cookieStore.get(name)?.value;
         },
         // Solo lectura en Server Components - no modificar cookies
-        set(name: string, value: string, options: Record<string, unknown>) {
+        set(_name: string, _value: string, _options: Record<string, unknown>) {
+          void _name;
+          void _value;
+          void _options;
           // No-op: no se pueden modificar cookies en Server Components
         },
-        remove(name: string, options: Record<string, unknown>) {
+        remove(_name: string, _options: Record<string, unknown>) {
+          void _name;
+          void _options;
           // No-op: no se pueden modificar cookies en Server Components
         },
       },

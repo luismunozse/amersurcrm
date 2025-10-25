@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
 
+type DownloadRouteContext = {
+  params: Promise<{
+    fileId: string;
+  }>;
+};
+
 /**
  * GET /api/google-drive/download/[fileId]
  * Descarga un archivo de Google Drive
@@ -10,9 +16,13 @@ import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fileId: string } }
+  context: DownloadRouteContext
 ) {
+  let fileId: string | undefined;
   try {
+    const resolvedParams = await context.params;
+    fileId = resolvedParams?.fileId;
+
     // Verificar autenticación
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,8 +30,6 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
-
-    const { fileId } = params;
 
     if (!fileId) {
       return NextResponse.json({ error: "fileId es requerido" }, { status: 400 });
@@ -73,7 +81,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error(`Error en GET /api/google-drive/download/${params?.fileId}:`, error);
+    console.error(`Error en GET /api/google-drive/download/${fileId ?? "unknown"}:`, error);
 
     return NextResponse.json({
       error: "Error descargando archivo",

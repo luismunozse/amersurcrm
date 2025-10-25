@@ -1,13 +1,22 @@
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { GoogleDriveClient, getGoogleDriveClient } from "./client";
 
+interface GoogleDriveSyncConfig {
+  id: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
+  ultima_sincronizacion_at?: string | null;
+  [key: string]: unknown;
+}
+
 /**
  * Obtiene el cliente de Google Drive configurado desde la base de datos
  * Incluye refresh automático de tokens si es necesario
  */
 export async function getConfiguredGoogleDriveClient(): Promise<{
   client: GoogleDriveClient;
-  config: any;
+  config: GoogleDriveSyncConfig;
 } | null> {
   try {
     // Usar service role para acceder a la configuración (bypasea RLS)
@@ -18,7 +27,7 @@ export async function getConfiguredGoogleDriveClient(): Promise<{
       .from('google_drive_sync_config')
       .select('*')
       .eq('activo', true)
-      .maybeSingle();
+      .maybeSingle<GoogleDriveSyncConfig>();
 
     if (error || !config) {
       console.log('No hay configuración activa de Google Drive');

@@ -39,6 +39,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!perfil) {
+      return NextResponse.json(
+        { error: "Perfil de usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    if (!perfil.requiere_cambio_password) {
+      return NextResponse.json(
+        { error: "La contraseña ya fue actualizada anteriormente" },
+        { status: 400 }
+      );
+    }
+
     // Primero, verificar la contraseña actual intentando hacer sign in
     const { error: verifyError } = await supabase.auth.signInWithPassword({
       email: user.email!,

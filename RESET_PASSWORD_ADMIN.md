@@ -47,7 +47,7 @@ SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui
 
 #### 3. Modificar la contraseña (opcional)
 
-Abre el archivo `scripts/reset-admin-password.js` y cambia esta línea si quieres una contraseña diferente:
+Abre el archivo `scripts/reset-admin-password.mjs` y cambia esta línea si quieres una contraseña diferente:
 
 ```javascript
 const NEW_PASSWORD = 'Admin123!'; // Cambia aquí
@@ -56,7 +56,7 @@ const NEW_PASSWORD = 'Admin123!'; // Cambia aquí
 #### 4. Ejecutar el script
 
 ```bash
-node scripts/reset-admin-password.js
+node scripts/reset-admin-password.mjs
 ```
 
 Deberías ver algo como:
@@ -138,6 +138,6 @@ Tu Service Role Key es incorrecta o ha expirado. Obtén una nueva desde Settings
 
 ## Archivos relacionados
 
-- `/scripts/reset-admin-password.js` - Script Node.js para resetear contraseña
+- `/scripts/reset-admin-password.mjs` - Script Node.js para resetear contraseña
 - `/scripts/reset-admin-password.sql` - Script SQL con instrucciones
 - `/.env` - Archivo con variables de entorno (NO subir a git)

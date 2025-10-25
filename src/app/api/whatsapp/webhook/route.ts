@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import crypto from "crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WhatsAppWebhookMessage } from "@/types/whatsapp-marketing";
+
+type ServiceSupabaseClient = SupabaseClient;
+
+type WhatsAppMessageEntry = WhatsAppWebhookMessage["entry"][number]["changes"][number]["value"]["messages"];
+type WhatsAppStatusEntry = WhatsAppWebhookMessage["entry"][number]["changes"][number]["value"]["statuses"];
+
+type WhatsAppIncomingMessage = WhatsAppMessageEntry extends Array<infer Item> ? Item : never;
+type WhatsAppIncomingStatus = WhatsAppStatusEntry extends Array<infer Item> ? Item : never;
 
 // GET - Verificación del webhook (requerido por WhatsApp)
 export async function GET(request: NextRequest) {
@@ -37,10 +46,15 @@ export async function POST(request: NextRequest) {
     
     // Verificar firma (opcional pero recomendado)
     const signature = request.headers.get('x-hub-signature-256');
-    if (signature) {
-      // TODO: Verificar firma con el app secret
-      // const isValid = verificarFirma(body, signature);
-      // if (!isValid) return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (signature && appSecret) {
+      const isValid = verificarFirma(body, signature, appSecret);
+      if (!isValid) {
+        console.warn('Firma de webhook inválida');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
+      }
+    } else if (signature && !appSecret) {
+      console.warn('Firma recibida pero falta WHATSAPP_APP_SECRET. Se omite validación.');
     }
 
     // Usar service role client para operaciones del webhook
@@ -54,7 +68,7 @@ export async function POST(request: NextRequest) {
         // Procesar mensajes entrantes
         if (value.messages) {
           for (const message of value.messages) {
-            await procesarMensajeEntrante(supabase, message, value.metadata.phone_number_id);
+            await procesarMensajeEntrante(supabase, message);
           }
         }
 
@@ -99,14 +113,14 @@ export async function POST(request: NextRequest) {
 }
 
 // Función para procesar mensaje entrante
-async function procesarMensajeEntrante(supabase: any, message: any, phoneNumberId: string) {
+async function procesarMensajeEntrante(supabase: ServiceSupabaseClient, message: WhatsAppIncomingMessage) {
   try {
     const telefono = message.from;
     const texto = message.text?.body || '';
     const waMessageId = message.id;
 
     // Buscar o crear conversación
-    let { data: conversacion, error: convError } = await supabase
+    const { data: conversacionInicial, error: convError } = await supabase
       .schema('crm')
       .from('marketing_conversacion')
       .select('id, cliente_id')
@@ -114,7 +128,13 @@ async function procesarMensajeEntrante(supabase: any, message: any, phoneNumberI
       .eq('estado', 'ABIERTA')
       .single();
 
-    if (convError || !conversacion) {
+    if (convError) {
+      console.error('Error obteniendo conversación existente:', convError);
+    }
+
+    let conversacion = conversacionInicial;
+
+    if (!conversacion) {
       // Buscar cliente por teléfono
       const { data: cliente } = await supabase
         .schema('crm')
@@ -179,13 +199,21 @@ async function procesarMensajeEntrante(supabase: any, message: any, phoneNumberI
 }
 
 // Función para procesar actualización de estado
-async function procesarActualizacionEstado(supabase: any, status: any) {
+async function procesarActualizacionEstado(supabase: ServiceSupabaseClient, status: WhatsAppIncomingStatus) {
   try {
     const waMessageId = status.id;
     const nuevoEstado = status.status.toUpperCase();
 
     // Actualizar estado del mensaje
-    const updateData: any = {
+    const updateData: {
+      estado: string;
+      updated_at: string;
+      delivered_at?: string;
+      read_at?: string;
+      failed_at?: string;
+      error_code?: string;
+      error_message?: string;
+    } = {
       estado: nuevoEstado,
       updated_at: new Date().toISOString()
     };
@@ -240,7 +268,7 @@ async function procesarActualizacionEstado(supabase: any, status: any) {
 }
 
 // Función para verificar firma (seguridad)
-function verificarFirma(payload: any, signature: string, appSecret: string): boolean {
+function verificarFirma(payload: WhatsAppWebhookMessage, signature: string, appSecret: string): boolean {
   const expectedSignature = crypto
     .createHmac('sha256', appSecret)
     .update(JSON.stringify(payload))

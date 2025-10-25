@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { obtenerMetricasReportes, ReporteMetricas } from "@/app/dashboard/admin/reportes/_actions";
 
 export interface UseReportesOptions {
@@ -22,7 +22,7 @@ export function useReportes(options: UseReportesOptions = {}) {
     autoLoad = true
   } = options;
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -39,17 +39,17 @@ export function useReportes(options: UseReportesOptions = {}) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [periodo, fechaInicio, fechaFin]);
 
-  const recargar = () => {
-    cargarDatos();
-  };
+  const recargar = useCallback(() => {
+    void cargarDatos();
+  }, [cargarDatos]);
 
   useEffect(() => {
     if (autoLoad) {
-      cargarDatos();
+      void cargarDatos();
     }
-  }, [periodo, fechaInicio, fechaFin, autoLoad]);
+  }, [autoLoad, cargarDatos]);
 
   // Función para formatear números de moneda
   const formatearMoneda = (valor: number): string => {
@@ -139,4 +139,3 @@ export function useReportes(options: UseReportesOptions = {}) {
     calcularCambio
   };
 }
-

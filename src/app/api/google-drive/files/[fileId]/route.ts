@@ -2,15 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
 
+type FileRouteContext = {
+  params: Promise<{
+    fileId: string;
+  }>;
+};
+
 /**
  * GET /api/google-drive/files/[fileId]
  * Obtiene metadatos de un archivo específico de Google Drive
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fileId: string } }
+  context: FileRouteContext
 ) {
+  let fileId: string | undefined;
   try {
+    const resolvedParams = await context.params;
+    fileId = resolvedParams?.fileId;
+
     // Verificar autenticación
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -18,8 +28,6 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
-
-    const { fileId } = params;
 
     if (!fileId) {
       return NextResponse.json({ error: "fileId es requerido" }, { status: 400 });
@@ -46,7 +54,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error(`Error en GET /api/google-drive/files/${params?.fileId}:`, error);
+    console.error(`Error en GET /api/google-drive/files/${fileId ?? "unknown"}:`, error);
 
     return NextResponse.json({
       error: "Error obteniendo archivo",

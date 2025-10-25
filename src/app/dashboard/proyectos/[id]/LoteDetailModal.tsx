@@ -63,7 +63,6 @@ export default function LoteDetailModal({
           {/* Imagen / placeholder */}
           <div className="w-full h-56 bg-crm-card-hover rounded-lg overflow-hidden flex items-center justify-center">
             {foto ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={foto} alt={`Lote ${lote.codigo}`} className="w-full h-full object-cover" />
             ) : (
               <div className="text-center text-crm-text-muted">
@@ -116,5 +115,4 @@ function parseData(data: any) {
 function capitalize(s: string) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
-
 

@@ -461,7 +461,6 @@ export async function duplicarLote(loteId: string, proyectoId: string) {
   const base = `${original.codigo}-copy`;
   let candidate = base;
   let idx = 2;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { data: exists, error: errExists } = await supabase
       .from('lote')

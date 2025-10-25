@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Calendar, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { obtenerMetricasReportes, ReporteMetricas } from "@/app/dashboard/admin/reportes/_actions";
 
@@ -18,7 +18,25 @@ export default function ComparacionPeriodos({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const cargarDatosComparacion = async () => {
+  const obtenerEtiquetaPeriodo = (periodo: string): string => {
+    switch (periodo) {
+      case "7":
+        return "los últimos 7 días";
+      case "30":
+        return "los últimos 30 días";
+      case "90":
+        return "los últimos 90 días";
+      case "365":
+        return "el último año";
+      default:
+        return `los últimos ${periodo} días`;
+    }
+  };
+
+  const periodoActualEtiqueta = obtenerEtiquetaPeriodo(periodoActual);
+  const periodoComparacionEtiqueta = obtenerEtiquetaPeriodo(periodoComparacion);
+
+  const cargarDatosComparacion = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -36,11 +54,11 @@ export default function ComparacionPeriodos({
     } finally {
       setLoading(false);
     }
-  };
+  }, [periodoComparacion, onPeriodoComparacionChange]);
 
   useEffect(() => {
     cargarDatosComparacion();
-  }, [periodoComparacion]);
+  }, [cargarDatosComparacion]);
 
   const formatearMoneda = (valor: number): string => {
     return new Intl.NumberFormat('es-PE', {
@@ -130,30 +148,42 @@ export default function ComparacionPeriodos({
     propiedades: { total: 1456, nuevas: 45, vendidas: 89, disponibles: 892 }
   };
 
+  const metricasComparacion = datosComparacion.metricas;
+
+  if (!metricasComparacion) {
+    return (
+      <div className="bg-crm-card border border-crm-border rounded-xl p-6">
+        <div className="text-center text-crm-text-secondary">
+          No hay métricas disponibles para el período seleccionado.
+        </div>
+      </div>
+    );
+  }
+
   const comparaciones = [
     {
       titulo: "Ventas Totales",
       actual: formatearMoneda(datosActuales.ventas.valorTotal),
-      anterior: formatearMoneda(datosComparacion.metricas.ventas.valorTotal),
-      cambio: calcularCambio(datosActuales.ventas.valorTotal, datosComparacion.metricas.ventas.valorTotal)
+      anterior: formatearMoneda(metricasComparacion.ventas?.valorTotal ?? 0),
+      cambio: calcularCambio(datosActuales.ventas.valorTotal, metricasComparacion.ventas?.valorTotal ?? 0)
     },
     {
       titulo: "Clientes Activos",
       actual: datosActuales.clientes.activos.toString(),
-      anterior: datosComparacion.metricas.clientes.activos.toString(),
-      cambio: calcularCambio(datosActuales.clientes.activos, datosComparacion.metricas.clientes.activos)
+      anterior: (metricasComparacion.clientes?.activos ?? 0).toString(),
+      cambio: calcularCambio(datosActuales.clientes.activos, metricasComparacion.clientes?.activos ?? 0)
     },
     {
       titulo: "Propiedades Vendidas",
       actual: datosActuales.propiedades.vendidas.toString(),
-      anterior: datosComparacion.metricas.propiedades.vendidas.toString(),
-      cambio: calcularCambio(datosActuales.propiedades.vendidas, datosComparacion.metricas.propiedades.vendidas)
+      anterior: (metricasComparacion.propiedades?.vendidas ?? 0).toString(),
+      cambio: calcularCambio(datosActuales.propiedades.vendidas, metricasComparacion.propiedades?.vendidas ?? 0)
     },
     {
       titulo: "Tasa de Conversión",
       actual: formatearPorcentaje(datosActuales.clientes.tasaConversion),
-      anterior: formatearPorcentaje(datosComparacion.metricas.clientes.tasaConversion),
-      cambio: calcularCambio(datosActuales.clientes.tasaConversion, datosComparacion.metricas.clientes.tasaConversion)
+      anterior: formatearPorcentaje(metricasComparacion.clientes?.tasaConversion ?? 0),
+      cambio: calcularCambio(datosActuales.clientes.tasaConversion, metricasComparacion.clientes?.tasaConversion ?? 0)
     }
   ];
 
@@ -180,7 +210,7 @@ export default function ComparacionPeriodos({
           </div>
         </div>
         <p className="text-crm-text-secondary text-sm">
-          Comparación entre el período actual y el período seleccionado
+          Comparación entre {periodoActualEtiqueta} y {periodoComparacionEtiqueta}.
         </p>
       </div>
 
@@ -235,4 +265,3 @@ export default function ComparacionPeriodos({
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 // Script para generar datos completos de ubigeo del Perú
-const fs = require('fs');
+import fs from "fs";
 
 // Datos completos de ubigeo (estructura simplificada pero completa)
 const ubigeoCompleto = {

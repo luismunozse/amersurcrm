@@ -9,7 +9,7 @@ export interface BaseSearchResult {
   description?: string;
   icon: string;
   url: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PropiedadSearchResult extends BaseSearchResult {

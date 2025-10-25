@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 
+interface RolRelacion {
+  nombre: string | null;
+}
+
+type RolData = RolRelacion | RolRelacion[] | null;
+
+interface UsuarioConRol {
+  email: string | null;
+  activo: boolean | null;
+  username: string | null;
+  rol: RolData;
+}
+
 /**
  * API endpoint para login de administradores usando username
  * Convierte el username a email para que Supabase Auth pueda autenticar
@@ -26,7 +39,7 @@ export async function POST(request: NextRequest) {
       .from('usuario_perfil')
       .select('email, activo, username, rol:rol!usuario_perfil_rol_fk(nombre)')
       .or(`username.eq.${username.trim()},email.eq.${username.trim()}`)
-      .single();
+      .single<UsuarioConRol>();
 
     console.log('Resultado búsqueda:', { usuario, error: usuarioError });
 
@@ -46,9 +59,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener el nombre del rol (manejar como any debido a la inferencia compleja de tipos)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rol = usuario.rol as any;
+    const rol = usuario.rol;
     const rolNombre = Array.isArray(rol) ? rol[0]?.nombre : rol?.nombre;
 
     // Retornar el email para que el cliente pueda hacer signInWithPassword

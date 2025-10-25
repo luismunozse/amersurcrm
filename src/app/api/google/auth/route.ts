@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Verificar que el usuario sea admin
     const supabase = await createServerOnlyClient();

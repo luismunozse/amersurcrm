@@ -1,4 +1,6 @@
 import { google } from 'googleapis';
+import type { drive_v3 } from 'googleapis';
+import type { OAuth2Client } from 'google-auth-library';
 
 export interface GoogleDriveFile {
   id: string;
@@ -23,7 +25,7 @@ export interface GoogleDriveFolder {
 }
 
 export class GoogleDriveClient {
-  private drive;
+  private drive: drive_v3.Drive;
 
   constructor(accessToken: string) {
     const oauth2Client = new google.auth.OAuth2();
@@ -83,7 +85,7 @@ export class GoogleDriveClient {
    */
   async createFolder(name: string, parentFolderId?: string): Promise<GoogleDriveFolder> {
     try {
-      const fileMetadata: any = {
+      const fileMetadata: drive_v3.Schema$File = {
         name,
         mimeType: 'application/vnd.google-apps.folder'
       };
@@ -114,7 +116,7 @@ export class GoogleDriveClient {
     folderId?: string
   ): Promise<GoogleDriveFile> {
     try {
-      const fileMetadata: any = {
+      const fileMetadata: drive_v3.Schema$File = {
         name: fileName
       };
 
@@ -123,7 +125,7 @@ export class GoogleDriveClient {
       }
 
       const { Readable } = await import('stream');
-      const media = {
+      const media: drive_v3.Schema$Media = {
         mimeType,
         body: Readable.from(fileBuffer)
       };
@@ -263,7 +265,7 @@ export class GoogleDriveClient {
  * Clase para gestionar tokens OAuth de Google
  */
 export class GoogleOAuthClient {
-  private oauth2Client;
+  private oauth2Client: OAuth2Client;
 
   constructor(clientId: string, clientSecret: string, redirectUri: string) {
     this.oauth2Client = new google.auth.OAuth2(

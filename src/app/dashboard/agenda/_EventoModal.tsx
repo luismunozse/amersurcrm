@@ -132,7 +132,6 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
     }
 
     if (evento) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const eventoAny = evento as any;
 
       setFormData({

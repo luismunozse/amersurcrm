@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { z } from "zod";
 
+type EstadoCivil = 'soltero' | 'casado' | 'viudo' | 'divorciado' | 'conviviente' | 'otro';
+type TipoCliente = 'persona' | 'empresa';
+type EstadoCliente = 'activo' | 'prospecto' | 'lead' | 'inactivo';
+
 const ClienteImportSchema = z.object({
   codigo_cliente: z.string().optional(),
   nombre: z.string().min(1, "Nombre requerido"),
@@ -28,6 +32,51 @@ const ClienteImportSchema = z.object({
   año: z.string().optional(), // Campo adicional para el año
 });
 
+type ClienteImportSchemaType = z.infer<typeof ClienteImportSchema>;
+
+interface ClienteInsertPayload {
+  codigo_cliente: string | null;
+  nombre: string;
+  tipo_cliente: TipoCliente;
+  documento_identidad: string | null;
+  estado_civil: EstadoCivil | null;
+  email: string | null;
+  telefono: string | null;
+  telefono_whatsapp: string | null;
+  origen_lead: string | null;
+  vendedor_asignado: string | null;
+  proxima_accion: string | null;
+  interes_principal: string | null;
+  capacidad_compra_estimada: number | null;
+  forma_pago_preferida: string | null;
+  notas: string | null;
+  estado_cliente?: EstadoCliente;
+  direccion: {
+    calle: string;
+    numero: string;
+    barrio: string;
+    ciudad: string;
+    provincia: string;
+    pais: string;
+  };
+  created_by: string;
+}
+
+interface ClienteImportErrorDetail {
+  row: number;
+  errors: string[];
+}
+
+interface ImportResponsePayload {
+  success: boolean;
+  imported: number;
+  skippedDuplicates: number;
+  received: number;
+  partial?: true;
+  invalid?: number;
+  errors?: ClienteImportErrorDetail[];
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -37,11 +86,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No data provided" }, { status: 400 });
     }
 
-    const clientesData = JSON.parse(dataJson as string);
+    const rawClientes: unknown = JSON.parse(dataJson as string);
     
-    if (!Array.isArray(clientesData)) {
+    if (!Array.isArray(rawClientes)) {
       return NextResponse.json({ error: "Data must be an array" }, { status: 400 });
     }
+
+    const clientesData: unknown[] = rawClientes;
 
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -51,18 +102,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar y transformar datos
-    const validatedClientes = [];
-    const errors = [];
+    const validatedClientes: ClienteInsertPayload[] = [];
+    const errors: ClienteImportErrorDetail[] = [];
 
     for (let i = 0; i < clientesData.length; i++) {
       try {
-        const cliente = ClienteImportSchema.parse(clientesData[i]);
+        const cliente = ClienteImportSchema.parse(clientesData[i]) as ClienteImportSchemaType;
 
         // Preparar datos para inserción (solo columnas existentes en la tabla)
-        const insertData = {
-          codigo_cliente: cliente.codigo_cliente || null,
+        const insertData: ClienteInsertPayload = {
+          codigo_cliente: cliente.codigo_cliente?.trim() || null,
           nombre: cliente.nombre,
-          tipo_cliente: cliente.tipo_cliente || 'persona',
+          tipo_cliente: cliente.tipo_cliente ?? 'persona',
           documento_identidad: cliente.documento_identidad && cliente.documento_identidad.trim() !== '' ? cliente.documento_identidad : null,
           estado_civil: cliente.estado_civil ?? null,
           email: cliente.email && cliente.email.trim() !== '' ? cliente.email : null,
@@ -86,17 +137,21 @@ export async function POST(request: NextRequest) {
           created_by: user.id,
         } as const;
 
-        validatedClientes.push(insertData as any);
+        if (cliente.estado_cliente) {
+          insertData.estado_cliente = cliente.estado_cliente;
+        }
+
+        validatedClientes.push(insertData);
       } catch (error) {
         if (error instanceof z.ZodError) {
           errors.push({
             row: i + 1,
-            errors: (error as any).errors.map((e: any) => e.message)
+            errors: error.errors.map((issue) => issue.message)
           });
         } else {
           errors.push({
             row: i + 1,
-            errors: [String(error)]
+            errors: [error instanceof Error ? error.message : String(error)]
           });
         }
       }
@@ -109,7 +164,7 @@ export async function POST(request: NextRequest) {
       for (const row of validatedClientes) {
         const { error } = await supabase
           .from("cliente")
-          .insert(row as any);
+          .insert(row);
         if (error) {
           const msg = String(error.message || '');
           if (msg.includes('duplicate key value') && msg.includes('uniq_cliente_phone_normalized')) {
@@ -125,18 +180,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const responsePayload: any = {
+    const responsePayload: ImportResponsePayload = {
       success: true,
       imported: importedCount,
       skippedDuplicates,
-      received: (clientesData as any[]).length,
+      received: clientesData.length,
     };
 
     if (errors.length > 0) {
       responsePayload.partial = true;
       responsePayload.errors = errors;
       responsePayload.invalid = errors.length;
-      responsePayload.received = (clientesData as any[]).length;
+      responsePayload.received = clientesData.length;
     }
 
     return NextResponse.json(responsePayload);

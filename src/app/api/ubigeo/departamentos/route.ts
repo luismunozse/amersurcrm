@@ -3,6 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import csv from 'csv-parser';
 
+interface UbigeoItem {
+  code: string;
+  name: string;
+}
+
+interface UbigeoCsvRow {
+  code?: string;
+  name?: string;
+  [key: string]: string | undefined;
+}
+
 export async function GET() {
   try {
     const csvPath = path.join(process.cwd(), 'data/inei-csvs/departamentos.csv');
@@ -11,16 +22,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Archivo de departamentos no encontrado' }, { status: 404 });
     }
 
-    const departamentos: any[] = [];
+    const departamentos: UbigeoItem[] = [];
     
     await new Promise((resolve, reject) => {
       fs.createReadStream(csvPath)
         .pipe(csv())
-        .on('data', (row) => {
-          departamentos.push({
-            code: row.code,
-            name: row.name
-          });
+        .on('data', (row: UbigeoCsvRow) => {
+          if (row.code && row.name) {
+            departamentos.push({
+              code: row.code,
+              name: row.name
+            });
+          }
         })
         .on('end', resolve)
         .on('error', reject);

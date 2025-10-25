@@ -3,6 +3,47 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { SearchResult, SearchResponse, PropiedadSearchResult, ProyectoSearchResult, EventoSearchResult } from "@/types/search";
 
+type RelationValue<T> = T | T[] | null | undefined;
+
+interface PropiedadRow {
+  id: string;
+  codigo: string | null;
+  tipo: string;
+  tipo_operacion: string;
+  identificacion_interna: string | null;
+  estado_comercial: string | null;
+  precio_venta: number | null;
+  precio_alquiler: number | null;
+  moneda: string | null;
+  proyecto: RelationValue<{ nombre: string | null }>;
+}
+
+interface ProyectoRow {
+  id: string;
+  nombre: string | null;
+  estado: string | null;
+  ubicacion: string | null;
+  descripcion: string | null;
+}
+
+interface EventoRow {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  tipo: string;
+  estado: string | null;
+  fecha_inicio: string;
+  cliente: RelationValue<{ id?: string; nombre: string | null }>;
+  propiedad: RelationValue<{ id?: string; codigo: string | null; identificacion_interna: string | null }>;
+}
+
+function getFirstRelation<T>(value: RelationValue<T>): T | null {
+  if (!value) {
+    return null;
+  }
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
 export async function globalSearch(query: string, limit: number = 10): Promise<SearchResponse> {
   if (!query || query.trim().length < 2) {
     return { results: [], total: 0, hasMore: false };
@@ -13,7 +54,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
 
   try {
     // Búsqueda en propiedades
-    const { data: propiedades, error: propError } = await supabase
+    const { data: propiedadesRaw, error: propError } = await supabase
       .from('propiedad')
       .select(`
         id,
@@ -30,17 +71,21 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
       .or(`codigo.ilike.%${query}%, identificacion_interna.ilike.%${query}%`)
       .limit(limit);
 
-    if (!propError && propiedades) {
-      propiedades.forEach(prop => {
-        // Manejar proyecto que puede ser array u objeto
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const proyecto = prop.proyecto as any;
-        const proyectoNombre = Array.isArray(proyecto) ? proyecto[0]?.nombre : proyecto?.nombre;
+    if (propError) {
+      console.error('Error buscando propiedades:', propError);
+    }
+
+    const propiedades = (propiedadesRaw ?? []) as PropiedadRow[];
+
+    if (!propError && propiedades.length > 0) {
+      propiedades.forEach((prop) => {
+        const proyecto = getFirstRelation(prop.proyecto);
+        const proyectoNombre = proyecto?.nombre ?? undefined;
 
         const result: PropiedadSearchResult = {
           id: prop.id,
           type: 'propiedad',
-          title: prop.identificacion_interna,
+          title: prop.identificacion_interna || prop.codigo || 'Propiedad',
           subtitle: `${prop.tipo} - ${prop.tipo_operacion}`,
           description: prop.codigo,
           icon: getPropiedadIcon(prop.tipo),
@@ -62,7 +107,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
     }
 
     // Búsqueda en proyectos
-    const { data: proyectos, error: projError } = await supabase
+    const { data: proyectosRaw, error: projError } = await supabase
       .from('proyecto')
       .select(`
         id,
@@ -74,8 +119,14 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
       .or(`nombre.ilike.%${query}%, ubicacion.ilike.%${query}%`)
       .limit(limit);
 
-    if (!projError && proyectos) {
-      proyectos.forEach(proj => {
+    if (projError) {
+      console.error('Error buscando proyectos:', projError);
+    }
+
+    const proyectos = (proyectosRaw ?? []) as ProyectoRow[];
+
+    if (!projError && proyectos.length > 0) {
+      proyectos.forEach((proj) => {
         const result: ProyectoSearchResult = {
           id: proj.id,
           type: 'proyecto',
@@ -96,7 +147,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
     }
 
     // Búsqueda en eventos/tareas
-    const { data: eventos, error: eventError } = await supabase
+    const { data: eventosRaw, error: eventError } = await supabase
       .from('evento')
       .select(`
         id,
@@ -111,18 +162,19 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
       .or(`titulo.ilike.%${query}%, descripcion.ilike.%${query}%`)
       .limit(limit);
 
-    if (!eventError && eventos) {
-      eventos.forEach(event => {
-        // Manejar cliente y propiedad que pueden ser array u objeto
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const cliente = event.cliente as any;
-        const clienteNombre = Array.isArray(cliente) ? cliente[0]?.nombre : cliente?.nombre;
+    if (eventError) {
+      console.error('Error buscando eventos:', eventError);
+    }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const propiedad = event.propiedad as any;
-        const propiedadCodigo = Array.isArray(propiedad)
-          ? (propiedad[0]?.codigo || propiedad[0]?.identificacion_interna)
-          : (propiedad?.codigo || propiedad?.identificacion_interna);
+    const eventos = (eventosRaw ?? []) as EventoRow[];
+
+    if (!eventError && eventos.length > 0) {
+      eventos.forEach((event) => {
+        const cliente = getFirstRelation(event.cliente);
+        const clienteNombre = cliente?.nombre ?? undefined;
+
+        const propiedad = getFirstRelation(event.propiedad);
+        const propiedadCodigo = propiedad?.codigo || propiedad?.identificacion_interna || undefined;
 
         const result: EventoSearchResult = {
           id: event.id,
@@ -140,8 +192,8 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
           propiedad_codigo: propiedadCodigo,
           metadata: {
             descripcion: event.descripcion,
-            cliente_id: Array.isArray(cliente) ? cliente[0]?.id : cliente?.id,
-            propiedad_id: Array.isArray(propiedad) ? propiedad[0]?.id : propiedad?.id
+            cliente_id: cliente?.id,
+            propiedad_id: propiedad?.id
           }
         };
         results.push(result);

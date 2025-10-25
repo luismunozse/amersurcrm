@@ -4,6 +4,75 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { revalidatePath } from "next/cache";
 
 // ============================================================
+// HELPERS
+// ============================================================
+
+/**
+ * Obtiene el username del usuario autenticado
+ * Reutilizable en todas las acciones para evitar código duplicado
+ */
+async function obtenerUsernameActual(supabase: Awaited<ReturnType<typeof createServerActionClient>>) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: 'No autenticado' } as const;
+  }
+
+  const { data: perfil } = await supabase
+    .from('usuario_perfil')
+    .select('username')
+    .eq('id', user.id)
+    .single();
+
+  if (!perfil?.username) {
+    return { success: false, error: 'Usuario sin username' } as const;
+  }
+
+  return { success: true, username: perfil.username } as const;
+}
+
+/**
+ * Valida que un monto sea positivo
+ */
+function validarMonto(monto: number, nombreCampo: string = 'Monto'): { valid: boolean; error?: string } {
+  if (monto <= 0) {
+    return { valid: false, error: `${nombreCampo} debe ser mayor a cero` };
+  }
+  if (!isFinite(monto) || isNaN(monto)) {
+    return { valid: false, error: `${nombreCampo} no es válido` };
+  }
+  return { valid: true };
+}
+
+/**
+ * Valida que una fecha sea futura (para vencimientos)
+ */
+function validarFechaFutura(fecha: string, nombreCampo: string = 'Fecha'): { valid: boolean; error?: string } {
+  const fechaObj = new Date(fecha);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  if (isNaN(fechaObj.getTime())) {
+    return { valid: false, error: `${nombreCampo} no es válida` };
+  }
+
+  if (fechaObj < hoy) {
+    return { valid: false, error: `${nombreCampo} no puede ser en el pasado` };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Revalida paths de manera consistente
+ */
+function revalidarCliente(clienteId?: string) {
+  if (clienteId) {
+    revalidatePath(`/dashboard/clientes/${clienteId}`);
+  }
+  revalidatePath('/dashboard/clientes');
+}
+
+// ============================================================
 // INTERACCIONES
 // ============================================================
 
@@ -19,25 +88,25 @@ export async function registrarInteraccion(data: {
   const supabase = await createServerActionClient();
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    // Obtener username usando helper
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) {
+      return authResult;
+    }
 
-    // Obtener username del vendedor
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('id', user.id)
-      .single();
-
-    if (!perfil?.username) {
-      return { success: false, error: 'Usuario sin username' };
+    // Validar fecha de próxima acción si se proporciona
+    if (data.fechaProximaAccion) {
+      const validacionFecha = validarFechaFutura(data.fechaProximaAccion, 'Fecha de próxima acción');
+      if (!validacionFecha.valid) {
+        return { success: false, error: validacionFecha.error };
+      }
     }
 
     const { error } = await supabase
       .from('cliente_interaccion')
       .insert({
         cliente_id: data.clienteId,
-        vendedor_username: perfil.username,
+        vendedor_username: authResult.username,
         tipo: data.tipo,
         resultado: data.resultado,
         notas: data.notas,
@@ -48,22 +117,28 @@ export async function registrarInteraccion(data: {
 
     if (error) throw error;
 
-    revalidatePath('/dashboard/clientes');
+    revalidarCliente(data.clienteId);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
-export async function obtenerInteracciones(clienteId: string) {
+export async function obtenerInteracciones(
+  clienteId: string,
+  options?: { limit?: number }
+) {
   const supabase = await createServerActionClient();
 
   try {
+    const limit = options?.limit ?? 100;
+
     const { data, error } = await supabase
       .from('cliente_interaccion')
       .select('*, vendedor:usuario_perfil!vendedor_username(nombre_completo, username)')
       .eq('cliente_id', clienteId)
-      .order('fecha_interaccion', { ascending: false });
+      .order('fecha_interaccion', { ascending: false })
+      .limit(limit);
 
     if (error) throw error;
 
@@ -87,17 +162,10 @@ export async function agregarPropiedadInteres(data: {
   const supabase = await createServerActionClient();
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
-
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('id', user.id)
-      .single();
-
-    if (!perfil?.username) {
-      return { success: false, error: 'Usuario sin username' };
+    // Obtener username usando helper
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) {
+      return authResult;
     }
 
     const { error } = await supabase
@@ -108,12 +176,12 @@ export async function agregarPropiedadInteres(data: {
         propiedad_id: data.propiedadId,
         prioridad: data.prioridad || 2,
         notas: data.notas,
-        agregado_por: perfil.username,
+        agregado_por: authResult.username,
       });
 
     if (error) throw error;
 
-    revalidatePath('/dashboard/clientes');
+    revalidarCliente(data.clienteId);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -136,17 +204,10 @@ export async function registrarVisita(data: {
   const supabase = await createServerActionClient();
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
-
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('id', user.id)
-      .single();
-
-    if (!perfil?.username) {
-      return { success: false, error: 'Usuario sin username' };
+    // Obtener username usando helper
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) {
+      return authResult;
     }
 
     const { error } = await supabase
@@ -155,7 +216,7 @@ export async function registrarVisita(data: {
         cliente_id: data.clienteId,
         lote_id: data.loteId,
         propiedad_id: data.propiedadId,
-        vendedor_username: perfil.username,
+        vendedor_username: authResult.username,
         fecha_visita: data.fechaVisita || new Date().toISOString(),
         duracion_minutos: data.duracionMinutos,
         feedback: data.feedback,
@@ -164,7 +225,7 @@ export async function registrarVisita(data: {
 
     if (error) throw error;
 
-    revalidatePath('/dashboard/clientes');
+    revalidarCliente(data.clienteId);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -180,7 +241,7 @@ export async function crearReserva(data: {
   loteId?: string;
   propiedadId?: string;
   montoReserva: number;
-  moneda?: 'PEN' | 'USD' | 'EUR';
+  moneda?: 'PEN' | 'USD';
   fechaVencimiento: string;
   metodoPago?: string;
   comprobanteUrl?: string;
@@ -189,17 +250,51 @@ export async function crearReserva(data: {
   const supabase = await createServerActionClient();
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    // Obtener username usando helper
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) {
+      return authResult;
+    }
 
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('id', user.id)
-      .single();
+    // Validar monto de reserva
+    const validacionMonto = validarMonto(data.montoReserva, 'Monto de reserva');
+    if (!validacionMonto.valid) {
+      return { success: false, error: validacionMonto.error };
+    }
 
-    if (!perfil?.username) {
-      return { success: false, error: 'Usuario sin username' };
+    // Validar fecha de vencimiento
+    const validacionFecha = validarFechaFutura(data.fechaVencimiento, 'Fecha de vencimiento');
+    if (!validacionFecha.valid) {
+      return { success: false, error: validacionFecha.error };
+    }
+
+    // Validar que no exista reserva activa para este lote
+    if (data.loteId) {
+      const { data: reservaExistente } = await supabase
+        .from('reserva')
+        .select('id, codigo_reserva')
+        .eq('lote_id', data.loteId)
+        .in('estado', ['activa', 'pendiente'])
+        .maybeSingle();
+
+      if (reservaExistente) {
+        return {
+          success: false,
+          error: `Este lote ya tiene una reserva activa (${reservaExistente.codigo_reserva})`
+        };
+      }
+
+      // Reservar el lote usando RPC (valida estado y hace la transición de forma segura)
+      const { error: rpcError } = await supabase.rpc('reservar_lote', {
+        p_lote: data.loteId
+      });
+
+      if (rpcError) {
+        return {
+          success: false,
+          error: `No se pudo reservar el lote: ${rpcError.message}`
+        };
+      }
     }
 
     // Crear reserva
@@ -209,7 +304,7 @@ export async function crearReserva(data: {
         cliente_id: data.clienteId,
         lote_id: data.loteId,
         propiedad_id: data.propiedadId,
-        vendedor_username: perfil.username,
+        vendedor_username: authResult.username,
         monto_reserva: data.montoReserva,
         moneda: data.moneda || 'PEN',
         fecha_vencimiento: data.fechaVencimiento,
@@ -221,17 +316,15 @@ export async function crearReserva(data: {
       .select()
       .single();
 
-    if (error) throw error;
-
-    // Actualizar estado del lote a "reservado"
-    if (data.loteId) {
-      await supabase
-        .from('lote')
-        .update({ estado: 'reservado' })
-        .eq('id', data.loteId);
+    if (error) {
+      // Si falla la creación de la reserva, liberar el lote
+      if (data.loteId) {
+        await supabase.rpc('liberar_lote', { p_lote: data.loteId });
+      }
+      throw error;
     }
 
-    revalidatePath('/dashboard/clientes');
+    revalidarCliente(data.clienteId);
     revalidatePath('/dashboard/proyectos');
 
     return { success: true, data: reserva };
@@ -247,9 +340,22 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
     // Obtener datos de la reserva antes de cancelar
     const { data: reserva } = await supabase
       .from('reserva')
-      .select('lote_id')
+      .select('lote_id, estado, cliente_id')
       .eq('id', reservaId)
       .single();
+
+    if (!reserva) {
+      return { success: false, error: 'Reserva no encontrada' };
+    }
+
+    // Validar que la reserva esté en un estado cancelable
+    if (reserva.estado === 'cancelada') {
+      return { success: false, error: 'Esta reserva ya está cancelada' };
+    }
+
+    if (reserva.estado === 'convertida_venta') {
+      return { success: false, error: 'No se puede cancelar una reserva que ya fue convertida en venta' };
+    }
 
     // Cancelar reserva
     const { error } = await supabase
@@ -257,20 +363,25 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
       .update({
         estado: 'cancelada',
         motivo_cancelacion: motivo,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', reservaId);
 
     if (error) throw error;
 
-    // Liberar lote (volver a disponible)
-    if (reserva?.lote_id) {
-      await supabase
-        .from('lote')
-        .update({ estado: 'disponible' })
-        .eq('id', reserva.lote_id);
+    // Liberar lote usando RPC (valida estado y hace la transición de forma segura)
+    if (reserva.lote_id) {
+      const { error: rpcError } = await supabase.rpc('liberar_lote', {
+        p_lote: reserva.lote_id
+      });
+
+      if (rpcError) {
+        console.warn(`Error liberando lote ${reserva.lote_id}:`, rpcError);
+        // No fallar la cancelación si el lote ya está liberado
+      }
     }
 
-    revalidatePath('/dashboard/clientes');
+    revalidarCliente(reserva.cliente_id);
     revalidatePath('/dashboard/proyectos');
 
     return { success: true };
@@ -286,7 +397,7 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
 export async function convertirReservaEnVenta(data: {
   reservaId: string;
   precioTotal: number;
-  moneda?: 'PEN' | 'USD' | 'EUR';
+  moneda?: 'PEN' | 'USD';
   formaPago: 'contado' | 'financiado' | 'credito_bancario' | 'mixto';
   montoInicial?: number;
   numeroCuotas?: number;
@@ -298,17 +409,28 @@ export async function convertirReservaEnVenta(data: {
   const supabase = await createServerActionClient();
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    // Obtener username usando helper
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) {
+      return authResult;
+    }
 
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('id', user.id)
-      .single();
+    // Validar precio total
+    const validacionPrecio = validarMonto(data.precioTotal, 'Precio total');
+    if (!validacionPrecio.valid) {
+      return { success: false, error: validacionPrecio.error };
+    }
 
-    if (!perfil?.username) {
-      return { success: false, error: 'Usuario sin username' };
+    // Validar monto inicial si se proporciona
+    if (data.montoInicial !== undefined && data.montoInicial !== null) {
+      const validacionInicial = validarMonto(data.montoInicial, 'Monto inicial');
+      if (!validacionInicial.valid) {
+        return { success: false, error: validacionInicial.error };
+      }
+
+      if (data.montoInicial > data.precioTotal) {
+        return { success: false, error: 'El monto inicial no puede ser mayor al precio total' };
+      }
     }
 
     // Obtener datos de la reserva
@@ -322,8 +444,30 @@ export async function convertirReservaEnVenta(data: {
       return { success: false, error: 'Reserva no encontrada' };
     }
 
+    // Validar que la reserva esté en estado activo
+    if (reserva.estado !== 'activa') {
+      return {
+        success: false,
+        error: `No se puede convertir una reserva con estado "${reserva.estado}". Solo se permiten reservas activas.`
+      };
+    }
+
     // Calcular saldo pendiente
     const saldoPendiente = data.precioTotal - (data.montoInicial || 0);
+
+    // Vender el lote usando RPC (valida estado y hace la transición de forma segura)
+    if (reserva.lote_id) {
+      const { error: rpcError } = await supabase.rpc('vender_lote', {
+        p_lote: reserva.lote_id
+      });
+
+      if (rpcError) {
+        return {
+          success: false,
+          error: `No se pudo marcar el lote como vendido: ${rpcError.message}`
+        };
+      }
+    }
 
     // Crear venta
     const { data: venta, error: ventaError } = await supabase
@@ -333,7 +477,7 @@ export async function convertirReservaEnVenta(data: {
         cliente_id: reserva.cliente_id,
         lote_id: reserva.lote_id,
         propiedad_id: reserva.propiedad_id,
-        vendedor_username: perfil.username,
+        vendedor_username: authResult.username,
         precio_total: data.precioTotal,
         moneda: data.moneda || reserva.moneda,
         forma_pago: data.formaPago,
@@ -349,21 +493,22 @@ export async function convertirReservaEnVenta(data: {
       .select()
       .single();
 
-    if (ventaError) throw ventaError;
+    if (ventaError) {
+      // Si falla la creación de la venta, revertir el lote a reservado
+      if (reserva.lote_id) {
+        await supabase.rpc('reservar_lote', { p_lote: reserva.lote_id });
+      }
+      throw ventaError;
+    }
 
     // Actualizar reserva a convertida
     await supabase
       .from('reserva')
-      .update({ estado: 'convertida_venta' })
+      .update({
+        estado: 'convertida_venta',
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', data.reservaId);
-
-    // Actualizar lote a vendido
-    if (reserva.lote_id) {
-      await supabase
-        .from('lote')
-        .update({ estado: 'vendido' })
-        .eq('id', reserva.lote_id);
-    }
 
     // Si hay monto inicial, registrar como primer pago
     if (data.montoInicial && data.montoInicial > 0) {
@@ -375,12 +520,12 @@ export async function convertirReservaEnVenta(data: {
           monto: data.montoInicial,
           moneda: data.moneda || reserva.moneda,
           metodo_pago: 'inicial',
-          registrado_por: perfil.username,
+          registrado_por: authResult.username,
           notas: 'Pago inicial de la venta',
         });
     }
 
-    revalidatePath('/dashboard/clientes');
+    revalidarCliente(reserva.cliente_id);
     revalidatePath('/dashboard/proyectos');
     revalidatePath('/dashboard/ventas');
 
@@ -394,7 +539,7 @@ export async function registrarPago(data: {
   ventaId: string;
   numeroCuota?: number;
   monto: number;
-  moneda?: 'PEN' | 'USD' | 'EUR';
+  moneda?: 'PEN' | 'USD';
   fechaPago?: string;
   fechaVencimiento?: string;
   metodoPago: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque' | 'deposito';
@@ -406,19 +551,38 @@ export async function registrarPago(data: {
   const supabase = await createServerActionClient();
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
-
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username')
-      .eq('id', user.id)
-      .single();
-
-    if (!perfil?.username) {
-      return { success: false, error: 'Usuario sin username' };
+    // Obtener username usando helper
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) {
+      return authResult;
     }
 
+    // Validar monto del pago
+    const validacionMonto = validarMonto(data.monto, 'Monto del pago');
+    if (!validacionMonto.valid) {
+      return { success: false, error: validacionMonto.error };
+    }
+
+    // Obtener datos de la venta para actualizar el saldo pendiente
+    const { data: venta, error: ventaError } = await supabase
+      .from('venta')
+      .select('saldo_pendiente, cliente_id')
+      .eq('id', data.ventaId)
+      .single();
+
+    if (ventaError || !venta) {
+      return { success: false, error: 'Venta no encontrada' };
+    }
+
+    // Validar que el monto del pago no exceda el saldo pendiente
+    if (data.monto > venta.saldo_pendiente) {
+      return {
+        success: false,
+        error: `El monto del pago (${data.monto}) no puede ser mayor al saldo pendiente (${venta.saldo_pendiente})`
+      };
+    }
+
+    // Insertar el pago
     const { data: pago, error } = await supabase
       .from('pago')
       .insert({
@@ -432,7 +596,7 @@ export async function registrarPago(data: {
         numero_operacion: data.numeroOperacion,
         banco: data.banco,
         comprobante_url: data.comprobanteUrl,
-        registrado_por: perfil.username,
+        registrado_por: authResult.username,
         notas: data.notas,
       })
       .select()
@@ -440,6 +604,23 @@ export async function registrarPago(data: {
 
     if (error) throw error;
 
+    // CRITICAL: Actualizar el saldo pendiente de la venta
+    const nuevoSaldo = venta.saldo_pendiente - data.monto;
+    const { error: updateError } = await supabase
+      .from('venta')
+      .update({
+        saldo_pendiente: nuevoSaldo,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', data.ventaId);
+
+    if (updateError) {
+      console.error('Error actualizando saldo pendiente:', updateError);
+      // No lanzamos error porque el pago ya se registró exitosamente
+      // pero advertimos del problema
+    }
+
+    revalidarCliente(venta.cliente_id);
     revalidatePath('/dashboard/ventas');
 
     return { success: true, data: pago };
@@ -452,35 +633,49 @@ export async function registrarPago(data: {
 // TIMELINE / HISTORIAL COMPLETO
 // ============================================================
 
-export async function obtenerTimelineCliente(clienteId: string) {
+export async function obtenerTimelineCliente(
+  clienteId: string,
+  options?: { limit?: number; offset?: number }
+) {
   const supabase = await createServerActionClient();
 
   try {
-    // Obtener todas las entidades relacionadas al cliente
+    const limit = options?.limit ?? 50;
+    const offset = options?.offset ?? 0;
+
+    // Obtener todas las entidades relacionadas al cliente con límite
     const [interacciones, visitas, reservas, ventas] = await Promise.all([
       // Interacciones
       supabase
         .from('cliente_interaccion')
         .select('*, vendedor:usuario_perfil!vendedor_username(username)')
-        .eq('cliente_id', clienteId),
+        .eq('cliente_id', clienteId)
+        .order('fecha_interaccion', { ascending: false })
+        .limit(limit),
 
       // Visitas
       supabase
         .from('visita_propiedad')
         .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username)')
-        .eq('cliente_id', clienteId),
+        .eq('cliente_id', clienteId)
+        .order('fecha_visita', { ascending: false })
+        .limit(limit),
 
       // Reservas
       supabase
         .from('reserva')
         .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username)')
-        .eq('cliente_id', clienteId),
+        .eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
 
       // Ventas con pagos
       supabase
         .from('venta')
         .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username), pagos:pago(*)')
-        .eq('cliente_id', clienteId),
+        .eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
     ]);
 
     const eventos: any[] = [];
@@ -580,7 +775,16 @@ export async function obtenerTimelineCliente(clienteId: string) {
     // Ordenar eventos por fecha (más reciente primero)
     eventos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-    return { success: true, data: eventos };
+    // Aplicar paginación al resultado combinado
+    const total = eventos.length;
+    const eventosPaginados = eventos.slice(offset, offset + limit);
+
+    return {
+      success: true,
+      data: eventosPaginados,
+      total,
+      hasMore: offset + limit < total,
+    };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
