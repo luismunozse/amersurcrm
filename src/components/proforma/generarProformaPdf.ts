@@ -1,12 +1,12 @@
 "use client";
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import type { ProformaRecord } from "@/types/proforma";
+import type { ProformaDatos, ProformaMoneda, ProformaRecord } from "@/types/proforma";
 
 const TEMPLATE_PATH = "/proforma/plantilla-proforma.pdf";
 const PAGE_WIDTH = 595.2; // pts
 const PAGE_HEIGHT = 841.92; // pts
-const ORIGINAL_WIDTH = 1240; // px extracted from template raster
+const ORIGINAL_WIDTH = 1240; // px medidos del diseño
 const SCALE = PAGE_WIDTH / ORIGINAL_WIDTH;
 const DEFAULT_FONT_SIZE = 10;
 const CELL_PADDING_PX = 14;
@@ -23,6 +23,7 @@ type DrawOptions = {
   paddingPx?: number;
   maxLines?: number;
   color?: ReturnType<typeof rgb>;
+  verticalAlign?: "bottom" | "center";
 };
 
 const COLOR_TEXT = rgb(29 / 255, 41 / 255, 59 / 255);
@@ -70,35 +71,35 @@ const CELLS = {
   fechaEmision: bounds(940, 330, 1131, 365),
 };
 
-const DEFAULT_DATOS = {
+const DEFAULT_DATOS: ProformaDatos = {
   cliente: { nombre: "", dni: "", telefono: "", email: "" },
-  asesor: { nombre: "", celular: "", email: "", observacion: "" },
-  terreno: {
-    proyecto: "",
-    lote: "",
-    etapa: "",
-    area: "",
-    precioLista: null as number | null,
-  },
-  precios: {
-    precioLista: null as number | null,
-    descuento: null as number | null,
-    precioFinal: null as number | null,
-  },
-  formaPago: {
-    separacion: null as number | null,
-    abonoPrincipal: null as number | null,
-    numeroCuotas: null as number | null,
-  },
-  mediosPago: {
-    soles: "",
-    dolares: "",
-  },
+  asesor: { nombre: "", celular: "" },
+  terreno: {},
+  precios: {},
+  formaPago: {},
+  condicionesComerciales: [],
+  mediosPago: { soles: "", dolares: "" },
+  requisitosContrato: [],
+  cuentasEmpresa: [],
   comentariosAdicionales: "",
   validezDias: 3,
 };
 
-export async function generarProformaPdf(proforma: ProformaRecord) {
+export interface ProformaPdfInput {
+  numero?: string | null;
+  moneda: ProformaMoneda;
+  total?: number | null;
+  datos: ProformaDatos;
+  created_at?: string | Date | null;
+  updated_at?: string | Date | null;
+}
+
+interface ProformaPdfResult {
+  bytes: Uint8Array;
+  fileName: string;
+}
+
+export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<ProformaPdfResult> {
   const response = await fetch(TEMPLATE_PATH);
   if (!response.ok) {
     throw new Error("No se pudo cargar la plantilla de proforma.");
@@ -113,7 +114,7 @@ export async function generarProformaPdf(proforma: ProformaRecord) {
 
   const datos = mergeDatos(DEFAULT_DATOS, proforma.datos);
 
-  // Cabecera: número y fecha
+  // Cabecera
   if (proforma.numero) {
     drawTextInBounds(page, regularFont, `N° ${proforma.numero}`, CELLS.numeroProforma, {
       fontSize: 11,
@@ -124,53 +125,77 @@ export async function generarProformaPdf(proforma: ProformaRecord) {
   drawTextInBounds(
     page,
     regularFont,
-    `Emitida el ${formatFecha(proforma.created_at ?? proforma.updated_at ?? new Date().toISOString())}`,
+    `Emitida el ${formatFecha(proforma.created_at ?? proforma.updated_at ?? new Date())}`,
     CELLS.fechaEmision,
     { fontSize: 9, paddingPx: 6, maxLines: 1 },
   );
 
-  // Datos del cliente
-  drawTextInBounds(page, boldFont, textOrDash(datos.cliente.nombre), CELLS.cliente.nombre);
-  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.dni), CELLS.cliente.dni);
-  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.telefono), CELLS.cliente.telefono);
-  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.email), CELLS.cliente.email);
+  // Datos cliente
+  drawTextInBounds(page, boldFont, textOrDash(datos.cliente.nombre), CELLS.cliente.nombre, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.dni), CELLS.cliente.dni, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.telefono), CELLS.cliente.telefono, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.cliente.email), CELLS.cliente.email, {
+    verticalAlign: "center",
+  });
 
-  // Datos del asesor
-  drawTextInBounds(page, boldFont, textOrDash(datos.asesor.nombre), CELLS.asesor.nombre);
-  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.celular), CELLS.asesor.celular);
-  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.email), CELLS.asesor.email);
-  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.observacion), CELLS.asesor.observacion);
+  // Asesor
+  drawTextInBounds(page, boldFont, textOrDash(datos.asesor.nombre), CELLS.asesor.nombre, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.asesor.celular), CELLS.asesor.celular, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, "", CELLS.asesor.email, { verticalAlign: "center" });
+  drawTextInBounds(page, regularFont, "", CELLS.asesor.observacion, { verticalAlign: "center" });
 
   // Terreno
-  drawTextInBounds(page, boldFont, textOrDash(datos.terreno.proyecto), CELLS.terreno.proyecto);
-  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.lote), CELLS.terreno.lote);
-  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.etapa), CELLS.terreno.etapa);
-  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.area), CELLS.terreno.area);
+  drawTextInBounds(page, boldFont, textOrDash(datos.terreno.proyecto), CELLS.terreno.proyecto, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.lote), CELLS.terreno.lote, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.etapa), CELLS.terreno.etapa, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.terreno.area), CELLS.terreno.area, {
+    verticalAlign: "center",
+  });
   drawTextInBounds(
     page,
     boldFont,
     formatCurrency(datos.terreno.precioLista ?? datos.precios.precioLista, proforma.moneda),
     CELLS.terreno.precioLista,
+    { verticalAlign: "center" },
   );
 
-  // Tabla de precios
+  // Precios
   drawTextInBounds(
     page,
     regularFont,
     formatCurrency(datos.precios.precioLista, proforma.moneda),
     CELLS.precios.lista,
+    { verticalAlign: "center" },
   );
   drawTextInBounds(
     page,
     regularFont,
     formatCurrency(datos.precios.descuento, proforma.moneda),
     CELLS.precios.descuento,
+    { verticalAlign: "center" },
   );
   drawTextInBounds(
     page,
     boldFont,
     formatCurrency(datos.precios.precioFinal ?? proforma.total, proforma.moneda),
     CELLS.precios.final,
+    { verticalAlign: "center" },
   );
 
   // Forma de pago
@@ -179,25 +204,32 @@ export async function generarProformaPdf(proforma: ProformaRecord) {
     regularFont,
     formatCurrency(datos.formaPago.separacion, proforma.moneda),
     CELLS.formaPago.separacion,
+    { verticalAlign: "center" },
   );
   drawTextInBounds(
     page,
     regularFont,
     formatCurrency(datos.formaPago.abonoPrincipal, proforma.moneda),
     CELLS.formaPago.abonoPrincipal,
+    { verticalAlign: "center" },
   );
   drawTextInBounds(
     page,
     regularFont,
     textOrDash(datos.formaPago.numeroCuotas?.toString()),
     CELLS.formaPago.cuotas,
+    { verticalAlign: "center" },
   );
 
   // Medios de pago
-  drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.soles), CELLS.mediosPago.soles);
-  drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.dolares), CELLS.mediosPago.dolares);
+  drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.soles), CELLS.mediosPago.soles, {
+    verticalAlign: "center",
+  });
+  drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.dolares), CELLS.mediosPago.dolares, {
+    verticalAlign: "center",
+  });
 
-  // Comentarios adicionales (opcional)
+  // Comentarios
   if (datos.comentariosAdicionales) {
     drawParagraph(page, regularFont, datos.comentariosAdicionales, CELLS.comentarios, {
       fontSize: 9,
@@ -209,18 +241,35 @@ export async function generarProformaPdf(proforma: ProformaRecord) {
   drawTextInBounds(page, regularFont, textOrDash(datos.cliente.nombre), CELLS.firmas.cliente, {
     fontSize: 9,
     paddingPx: 6,
+    verticalAlign: "center",
   });
   drawTextInBounds(page, regularFont, textOrDash(datos.asesor.nombre), CELLS.firmas.asesor, {
     fontSize: 9,
     paddingPx: 6,
+    verticalAlign: "center",
   });
 
-  // Nota de validez y total
+  // Nota
   const nota = `Oferta válida por ${datos.validezDias ?? 3} día(s) hábil(es) desde la fecha de emisión.`;
   drawText(page, regularFont, nota, px(103), pxY(1275), { fontSize: 8 });
 
   const pdfBytes = await pdfDoc.save();
-  downloadPdf(pdfBytes, buildFileName(proforma));
+  return {
+    bytes: pdfBytes,
+    fileName: buildFileName(proforma.numero ?? null, datos),
+  };
+}
+
+export async function generarProformaPdf(proforma: ProformaRecord) {
+  const { bytes, fileName } = await buildProformaPdf({
+    numero: proforma.numero,
+    total: proforma.total,
+    moneda: proforma.moneda,
+    datos: proforma.datos,
+    created_at: proforma.created_at,
+    updated_at: proforma.updated_at,
+  });
+  downloadPdf(bytes, fileName);
 }
 
 function bounds(left: number, top: number, right: number, bottom: number): BoundsPx {
@@ -262,7 +311,16 @@ function drawTextInBounds(
   const maxLines = options.maxLines ?? Math.max(1, Math.floor((rect.height - padding * 2) / (fontSize + lineGap)));
 
   const lines = wrapText(value, font, fontSize, maxWidth, maxLines);
-  let cursorY = rect.y + rect.height - padding - fontSize;
+  const lineHeight = fontSize + lineGap;
+  const totalHeight = lineHeight * lines.length - lineGap;
+
+  let cursorY: number;
+  if (options.verticalAlign === "center") {
+    const space = rect.height - totalHeight;
+    cursorY = rect.y + Math.max(space / 2, 0) + totalHeight - fontSize;
+  } else {
+    cursorY = rect.y + rect.height - padding - fontSize;
+  }
 
   lines.forEach((line) => {
     page.drawText(line, {
@@ -272,7 +330,7 @@ function drawTextInBounds(
       size: fontSize,
       color: options.color ?? COLOR_TEXT,
     });
-    cursorY -= fontSize + lineGap;
+    cursorY -= lineHeight;
   });
 }
 
@@ -348,7 +406,6 @@ function wrapText(
     }
 
     if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
-      // Split very long word
       let buffer = "";
       for (const char of word) {
         const candidateWord = buffer + char;
@@ -373,7 +430,7 @@ function wrapText(
   return lines.slice(0, maxLines);
 }
 
-function formatCurrency(value: number | null | undefined, currency?: string) {
+function formatCurrency(value: number | null | undefined, currency?: ProformaMoneda) {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return "—";
   }
@@ -396,10 +453,10 @@ function textOrDash(value: string | number | null | undefined) {
 }
 
 function mergeDatos<T>(defaults: T, source: unknown): T {
-  if (!source || typeof source !== "object") {
-    return clone(defaults);
-  }
   const result = clone(defaults);
+  if (!source || typeof source !== "object") {
+    return result;
+  }
   deepAssign(result as Record<string, unknown>, source as Record<string, unknown>);
   return result;
 }
@@ -431,9 +488,10 @@ function downloadPdf(bytes: Uint8Array, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function buildFileName(proforma: ProformaRecord) {
-  const base = proforma.numero ?? "proforma";
-  const clienteNombre = clienteSlug(proforma.datos?.cliente?.nombre ?? "cliente");
+function buildFileName(numero: string | null, datos: ProformaDatos) {
+  const base = numero ?? "proforma";
+
+  const clienteNombre = clienteSlug(datos?.cliente?.nombre ?? "cliente");
   return `${base}_${clienteNombre}.pdf`.replace(/\s+/g, "_");
 }
 
@@ -446,9 +504,9 @@ function clienteSlug(text: string) {
     .toLowerCase();
 }
 
-function formatFecha(value: string | Date) {
+function formatFecha(value: string | Date | null | undefined) {
   try {
-    const date = value instanceof Date ? value : new Date(value);
+    const date = value instanceof Date ? value : new Date(value ?? Date.now());
     return date.toLocaleDateString("es-PE", {
       year: "numeric",
       month: "2-digit",

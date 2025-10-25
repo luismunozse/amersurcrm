@@ -18,6 +18,7 @@ import {
   actualizarProformaAction,
   type CrearProformaInput,
 } from "./proformas/_actions";
+import { buildProformaPdf } from "@/components/proforma/generarProformaPdf";
 
 interface CrearProformaModalProps {
   isOpen: boolean;
@@ -107,6 +108,10 @@ export default function CrearProformaModal({
   );
   const [requisitosTexto, setRequisitosTexto] = useState<string>(REQUISITOS_CONTRATO_DEFAULT.join("\n"));
   const [cuentasTexto, setCuentasTexto] = useState<string>(CUENTAS_EMPRESA_DEFAULT.join("\n"));
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -158,6 +163,93 @@ export default function CrearProformaModal({
       }
     }
   }, [isOpen, proformaInicial, cliente, asesorActual]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    const generarPreview = async () => {
+      setIsPreviewLoading(true);
+      setPreviewError(null);
+
+      try {
+        const datosPreview: ProformaDatos = {
+          cliente: { ...form.datos.cliente },
+          asesor: { ...form.datos.asesor },
+          terreno: { ...form.datos.terreno },
+          precios: { ...form.datos.precios },
+          formaPago: { ...form.datos.formaPago },
+          condicionesComerciales: sanitizeList(condicionesTexto),
+          mediosPago: {
+            soles: form.datos.mediosPago?.soles ?? "",
+            dolares: form.datos.mediosPago?.dolares ?? "",
+          },
+          requisitosContrato: sanitizeList(requisitosTexto),
+          cuentasEmpresa: sanitizeList(cuentasTexto),
+          comentariosAdicionales: form.datos.comentariosAdicionales ?? "",
+          validezDias: form.datos.validezDias ?? 3,
+        };
+
+        const { bytes } = await buildProformaPdf({
+          numero: proformaInicial?.numero ?? null,
+          moneda: form.moneda,
+          total: form.datos.precios?.precioFinal ?? null,
+          datos: datosPreview,
+          created_at: proformaInicial?.created_at ?? new Date(),
+          updated_at: proformaInicial?.updated_at ?? new Date(),
+        });
+
+        if (cancelled) return;
+
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const nextUrl = URL.createObjectURL(blob);
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return nextUrl;
+        });
+      } catch (error) {
+        console.error("Error generando vista previa de proforma:", error);
+        if (!cancelled) {
+          setPreviewError("No se pudo generar la vista previa");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsPreviewLoading(false);
+        }
+      }
+    };
+
+    void generarPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    form,
+    condicionesTexto,
+    requisitosTexto,
+    cuentasTexto,
+    proformaInicial?.numero,
+    proformaInicial?.created_at,
+    proformaInicial?.updated_at,
+    previewVersion,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const reservasOptions = useMemo(
     () =>
@@ -340,7 +432,9 @@ export default function CrearProformaModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex-1 space-y-6">
           {/* Tipo y moneda */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -735,6 +829,42 @@ export default function CrearProformaModal({
                 Este texto aparecerá como nota al pie antes de las firmas.
               </p>
             </div>
+          </div>
+            </div>
+            <aside className="mt-6 lg:mt-0 lg:w-[360px] flex-shrink-0 space-y-3">
+              <div className="p-4 bg-crm-background rounded-xl border border-crm-border shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
+                    Vista previa
+                  </h3>
+                  {isPreviewLoading && <span className="text-xs text-crm-text-muted">Generando…</span>}
+                </div>
+                <div className="relative w-full h-[420px] bg-white border border-crm-border rounded-lg overflow-hidden flex items-center justify-center">
+                  {previewError ? (
+                    <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
+                      <p className="text-sm text-red-600">{previewError}</p>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewVersion((prev) => prev + 1)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                      >
+                        Reintentar
+                      </button>
+                    </div>
+                  ) : previewUrl ? (
+                    <iframe
+                      title="Vista previa proforma"
+                      src={previewUrl}
+                      className="absolute inset-0 h-full w-full"
+                    />
+                  ) : (
+                    <div className="px-4 text-center text-sm text-crm-text-muted">
+                      Completa los datos para ver la proforma en tiempo real.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
 
