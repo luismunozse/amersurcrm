@@ -54,7 +54,7 @@ export async function GET(
     const fileBuffer = await client.downloadFile(fileId);
 
     // Registrar la descarga en documento_actividad
-    await supabase
+    const { error: actividadError } = await supabase
       .from('documento_actividad')
       .insert({
         documento_id: fileId,
@@ -64,14 +64,18 @@ export async function GET(
           nombre: fileMetadata.name,
           tamano: fileMetadata.size,
         },
-      })
-      .catch((err) => {
-        console.error('Error registrando actividad de descarga:', err);
-        // No fallar si no se puede registrar la actividad
       });
 
+    if (actividadError) {
+      console.error('Error registrando actividad de descarga:', actividadError);
+      // No fallar si no se puede registrar la actividad
+    }
+
     // Devolver el archivo con los headers apropiados
-    return new NextResponse(fileBuffer, {
+    // Convertir Buffer a Uint8Array para compatibilidad con NextResponse
+    const uint8Array = new Uint8Array(fileBuffer);
+
+    return new NextResponse(uint8Array, {
       status: 200,
       headers: {
         'Content-Type': fileMetadata.mimeType || 'application/octet-stream',

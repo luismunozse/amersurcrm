@@ -127,7 +127,7 @@ export default function DocumentosClient({
       }
 
       if (data.stats.total === 0) {
-        toast.warning('No se encontraron archivos en Google Drive', { id: toastId });
+        toast('No se encontraron archivos en Google Drive', { id: toastId, icon: '⚠️' });
       } else {
         toast.success(mensaje, { id: toastId, duration: 5000 });
       }

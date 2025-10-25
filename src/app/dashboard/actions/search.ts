@@ -87,14 +87,14 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
           type: 'propiedad',
           title: prop.identificacion_interna || prop.codigo || 'Propiedad',
           subtitle: `${prop.tipo} - ${prop.tipo_operacion}`,
-          description: prop.codigo,
+          description: prop.codigo ?? undefined,
           icon: getPropiedadIcon(prop.tipo),
           url: `/dashboard/propiedades/${prop.id}`,
-          codigo: prop.codigo,
+          codigo: prop.codigo || prop.id,
           tipo: prop.tipo,
-          precio: prop.precio_venta || prop.precio_alquiler,
-          moneda: prop.moneda,
-          estado: prop.estado_comercial,
+          precio: prop.precio_venta ?? prop.precio_alquiler ?? undefined,
+          moneda: prop.moneda ?? undefined,
+          estado: prop.estado_comercial || 'sin_estado',
           proyecto_nombre: proyectoNombre,
           metadata: {
             precio_venta: prop.precio_venta,
@@ -130,14 +130,14 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
         const result: ProyectoSearchResult = {
           id: proj.id,
           type: 'proyecto',
-          title: proj.nombre,
+          title: proj.nombre || 'Proyecto sin nombre',
           subtitle: proj.ubicacion || '',
           description: proj.descripcion || '',
           icon: '🏗️',
           url: `/dashboard/proyectos/${proj.id}`,
-          nombre: proj.nombre,
-          estado: proj.estado,
-          ubicacion: proj.ubicacion,
+          nombre: proj.nombre || 'Proyecto sin nombre',
+          estado: proj.estado || 'sin_estado',
+          ubicacion: proj.ubicacion ?? undefined,
           metadata: {
             descripcion: proj.descripcion
           }
@@ -187,7 +187,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
           titulo: event.titulo,
           tipo: event.tipo,
           fecha_inicio: event.fecha_inicio,
-          estado: event.estado,
+          estado: event.estado || 'sin_estado',
           cliente_nombre: clienteNombre,
           propiedad_codigo: propiedadCodigo,
           metadata: {

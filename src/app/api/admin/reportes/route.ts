@@ -46,6 +46,12 @@ interface TendenciaMensual {
   clientes: number;
 }
 
+interface TendenciaAcumulada {
+  ventas: number;
+  propiedades: number;
+  clientes: number;
+}
+
 // GET - Obtener métricas principales de reportes
 export async function GET(request: NextRequest) {
   try {

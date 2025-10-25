@@ -10,8 +10,8 @@ import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
  * Ejemplo: [{ id: 'root', name: 'Mi Drive' }, { id: 'xxx', name: 'Documentos' }, { id: 'yyy', name: 'Contratos' }]
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { folderId: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ folderId: string }> }
 ) {
   try {
     // Verificar autenticación
@@ -22,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const folderId = params.folderId;
+    const { folderId } = await params;
 
     // Si es root, retornar solo root
     if (folderId === 'root' || !folderId) {

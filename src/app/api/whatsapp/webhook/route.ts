@@ -4,13 +4,35 @@ import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WhatsAppWebhookMessage } from "@/types/whatsapp-marketing";
 
-type ServiceSupabaseClient = SupabaseClient;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ServiceSupabaseClient = SupabaseClient<any, any, any>;
 
-type WhatsAppMessageEntry = WhatsAppWebhookMessage["entry"][number]["changes"][number]["value"]["messages"];
-type WhatsAppStatusEntry = WhatsAppWebhookMessage["entry"][number]["changes"][number]["value"]["statuses"];
+type WhatsAppIncomingMessage = {
+  from: string;
+  id: string;
+  timestamp: string;
+  type: string;
+  text?: {
+    body: string;
+  };
+  image?: {
+    id: string;
+    mime_type: string;
+    sha256: string;
+    caption?: string;
+  };
+};
 
-type WhatsAppIncomingMessage = WhatsAppMessageEntry extends Array<infer Item> ? Item : never;
-type WhatsAppIncomingStatus = WhatsAppStatusEntry extends Array<infer Item> ? Item : never;
+type WhatsAppIncomingStatus = {
+  id: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  timestamp: string;
+  recipient_id: string;
+  errors?: Array<{
+    code: number;
+    title: string;
+  }>;
+};
 
 // GET - Verificación del webhook (requerido por WhatsApp)
 export async function GET(request: NextRequest) {

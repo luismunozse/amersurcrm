@@ -151,10 +151,10 @@ export default function ClienteDetailTabs({
         )}
         {activeTab === 'timeline' && <TabTimeline clienteId={cliente.id} />}
         {activeTab === 'interacciones' && <TabInteracciones clienteId={cliente.id} clienteNombre={cliente.nombre} interacciones={interacciones} />}
-        {activeTab === 'propiedades' && <TabPropiedadesInteres clienteId={cliente.id} propiedades={propiedadesInteres} />}
-        {activeTab === 'visitas' && <TabVisitas clienteId={cliente.id} visitas={visitas} />}
+        {activeTab === 'propiedades' && <TabPropiedadesInteres propiedades={propiedadesInteres} />}
+        {activeTab === 'visitas' && <TabVisitas visitas={visitas} />}
         {activeTab === 'reservas' && <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} />}
-        {activeTab === 'ventas' && <TabVentas clienteId={cliente.id} ventas={ventas} />}
+        {activeTab === 'ventas' && <TabVentas ventas={ventas} />}
         {activeTab === 'proformas' && (
           <TabProformas
             cliente={cliente}

@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
         if (error instanceof z.ZodError) {
           errors.push({
             row: i + 1,
-            errors: error.errors.map((issue) => issue.message)
+            errors: error.issues.map((issue) => issue.message)
           });
         } else {
           errors.push({

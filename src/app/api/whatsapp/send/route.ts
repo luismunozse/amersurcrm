@@ -62,12 +62,19 @@ export async function POST(request: NextRequest) {
       }
 
       // Construir componentes de la plantilla
-      const components = [];
+      const components: Array<{
+        type: 'body' | 'header' | 'button';
+        parameters?: Array<{
+          type: 'text' | 'image' | 'video' | 'document';
+          text?: string;
+        }>;
+      }> = [];
+
       if (template_variables && Object.keys(template_variables).length > 0) {
         components.push({
           type: 'body',
           parameters: Object.values(template_variables).map(value => ({
-            type: 'text',
+            type: 'text' as const,
             text: String(value)
           }))
         });

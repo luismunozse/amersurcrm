@@ -147,9 +147,10 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     .eq('activo', true)
     .order('nombre_completo', { ascending: true });
 
-  const vendedores = (vendedoresRaw || []).filter((v) =>
-    v.rol?.nombre && ['ROL_VENDEDOR', 'ROL_COORDINADOR_VENTAS', 'ROL_GERENTE'].includes(v.rol.nombre)
-  );
+  const vendedores = (vendedoresRaw || []).filter((v) => {
+    const rol = Array.isArray(v.rol) ? v.rol[0] : v.rol;
+    return rol?.nombre && ['ROL_VENDEDOR', 'ROL_COORDINADOR_VENTAS', 'ROL_GERENTE'].includes(rol.nombre);
+  });
 
   const vendedorAsignado = vendedores?.find((v) => v.username === cliente.vendedor_username);
 

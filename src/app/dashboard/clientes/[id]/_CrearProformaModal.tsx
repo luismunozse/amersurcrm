@@ -208,7 +208,8 @@ export default function CrearProformaModal({
 
         if (cancelled) return;
 
-        const blob = new Blob([bytes], { type: "application/pdf" });
+        const arrayBuffer = new Uint8Array(bytes).buffer;
+        const blob = new Blob([arrayBuffer], { type: "application/pdf" });
         const nextUrl = URL.createObjectURL(blob);
         setPreviewUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);

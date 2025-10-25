@@ -143,12 +143,19 @@ export async function POST(request: NextRequest) {
     );
 
     // Construir componentes de la plantilla con variables
-    const components = [];
+    const components: Array<{
+      type: 'body' | 'header' | 'button';
+      parameters?: Array<{
+        type: 'text' | 'image' | 'video' | 'document';
+        text?: string;
+      }>;
+    }> = [];
+
     if (variables && Object.keys(variables).length > 0) {
       components.push({
         type: 'body',
         parameters: Object.values(variables).map(value => ({
-          type: 'text',
+          type: 'text' as const,
           text: String(value)
         }))
       });

@@ -29,8 +29,8 @@ export default function ReportesPage() {
 
     try {
       toast.loading('Generando reporte...', { id: 'export' });
-      
-      const result = await exportarReportePDF('general', selectedPeriod, data);
+
+      const result = await exportarReportePDF();
       
       if (result.success && result.url) {
         // Abrir el reporte en una nueva ventana
