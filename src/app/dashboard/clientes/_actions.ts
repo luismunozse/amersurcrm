@@ -377,10 +377,69 @@ export async function eliminarCliente(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { error } = await supabase.from("cliente").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  console.log('🗑️ Intentando eliminar cliente:', id);
+
+  // Primero verificar si el cliente existe
+  const { data: clienteExiste } = await supabase
+    .from("cliente")
+    .select("id, nombre")
+    .eq("id", id)
+    .single();
+
+  if (!clienteExiste) {
+    throw new Error("El cliente no existe");
+  }
+
+  console.log('📋 Cliente encontrado:', clienteExiste.nombre);
+
+  // Verificar relaciones que podrían impedir la eliminación
+  const { data: reservas } = await supabase
+    .from("reserva")
+    .select("id")
+    .eq("cliente_id", id)
+    .limit(1);
+
+  const { data: ventas } = await supabase
+    .from("venta")
+    .select("id")
+    .eq("cliente_id", id)
+    .limit(1);
+
+  if (reservas && reservas.length > 0) {
+    throw new Error("No se puede eliminar el cliente porque tiene reservas asociadas. Elimine primero las reservas.");
+  }
+
+  if (ventas && ventas.length > 0) {
+    throw new Error("No se puede eliminar el cliente porque tiene ventas asociadas. Elimine primero las ventas.");
+  }
+
+  // Intentar eliminar
+  const { error, count } = await supabase
+    .from("cliente")
+    .delete({ count: 'exact' })
+    .eq("id", id);
+
+  if (error) {
+    console.error('❌ Error al eliminar cliente:', error);
+
+    // Manejar errores específicos
+    if (error.code === '23503') {
+      throw new Error("No se puede eliminar el cliente porque tiene datos relacionados. Elimine primero las relaciones.");
+    }
+
+    throw new Error(error.message);
+  }
+
+  console.log('✅ Cliente eliminado, registros afectados:', count);
+
+  if (count === 0) {
+    throw new Error("El cliente no pudo ser eliminado. Verifique los permisos.");
+  }
 
   revalidatePath("/dashboard/clientes");
+  revalidatePath(`/dashboard/clientes/${id}`);
+
+  return { success: true, count };
 }
 
 // Server Action para obtener clientes con paginación y filtros

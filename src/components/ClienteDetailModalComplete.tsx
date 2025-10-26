@@ -275,7 +275,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                             href={getWhatsappLink(cliente.telefono_whatsapp) ?? undefined}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-[#25D366]/90 hover:bg-[#25D366] text-white p-2 rounded-lg transition-all duration-200"
+                            className="bg-crm-success hover:bg-crm-success/90 text-white p-2 rounded-lg transition-all duration-200"
                             title="WhatsApp"
                             onClick={(event) => {
                               if (!getWhatsappLink(cliente.telefono_whatsapp)) {
@@ -388,7 +388,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                         )}
 
                         {cliente.telefono_whatsapp && (
-                          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800 rounded-lg hover:border-green-500 dark:hover:border-green-600 hover:shadow-md transition-all group">
+                          <div className="flex items-center justify-between p-3 bg-crm-success/10 dark:bg-green-900/20 border-2 border-crm-success/40 dark:border-green-800 rounded-lg hover:border-crm-success dark:hover:border-green-600 hover:shadow-md transition-all group">
                             <a
                               href={getWhatsappLink(cliente.telefono_whatsapp) ?? undefined}
                               target="_blank"
@@ -400,7 +400,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                                 }
                               }}
                             >
-                              <WhatsAppIcon className="w-5 h-5 text-[#25D366]" />
+                              <WhatsAppIcon className="w-5 h-5 text-crm-success" />
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">WhatsApp</p>
                                 <p className="text-sm text-gray-700 dark:text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
