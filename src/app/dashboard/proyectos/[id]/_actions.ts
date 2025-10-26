@@ -707,3 +707,297 @@ export async function eliminarProyecto(proyectoId: string) {
     throw new Error(error instanceof Error ? error.message : "Error eliminando proyecto");
   }
 }
+
+// ============================================
+// SISTEMA DE RESERVAS
+// ============================================
+
+/**
+ * Genera un código único para reserva
+ */
+async function generarCodigoReserva(): Promise<string> {
+  const supabase = await createServerActionClient();
+
+  // Formato: RSV-YYYYMMDD-XXX (ej: RSV-20250126-001)
+  const fecha = new Date();
+  const año = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  const fechaStr = `${año}${mes}${dia}`;
+
+  // Buscar el último código del día
+  const { data: ultimaReserva } = await supabase
+    .schema('crm')
+    .from('reserva')
+    .select('codigo_reserva')
+    .like('codigo_reserva', `RSV-${fechaStr}%`)
+    .order('codigo_reserva', { ascending: false })
+    .limit(1)
+    .single();
+
+  let secuencia = 1;
+  if (ultimaReserva?.codigo_reserva) {
+    const partes = ultimaReserva.codigo_reserva.split('-');
+    secuencia = parseInt(partes[2] || '0') + 1;
+  }
+
+  return `RSV-${fechaStr}-${String(secuencia).padStart(3, '0')}`;
+}
+
+/**
+ * Obtiene los datos del vendedor actual para la proforma
+ */
+export async function obtenerDatosVendedorActual(): Promise<{
+  nombre: string | null;
+  telefono: string | null;
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { nombre: null, telefono: null, error: "No autenticado" };
+    }
+
+    const { data: perfil } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('nombre_completo, telefono')
+      .eq('id', user.id)
+      .single();
+
+    if (!perfil) {
+      return { nombre: null, telefono: null, error: "No se pudo obtener el perfil del vendedor" };
+    }
+
+    return {
+      nombre: perfil.nombre_completo || null,
+      telefono: perfil.telefono || null,
+      error: null
+    };
+  } catch (error) {
+    return { nombre: null, telefono: null, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Obtiene lista de clientes para el selector (con búsqueda opcional)
+ */
+export async function obtenerClientesParaSelect(busqueda?: string): Promise<{
+  data: Array<{ id: string; nombre: string; email: string | null; telefono: string | null }> | null;
+  error: string | null
+}> {
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autenticado" };
+    }
+
+    let query = supabase
+      .schema('crm')
+      .from('cliente')
+      .select('id, nombre, email, telefono')
+      .order('nombre', { ascending: true })
+      .limit(500); // Aumentado a 500 clientes
+
+    // Si hay búsqueda, filtrar por nombre, email o teléfono
+    if (busqueda && busqueda.trim()) {
+      const termino = busqueda.trim();
+      query = query.or(`nombre.ilike.%${termino}%,email.ilike.%${termino}%,telefono.ilike.%${termino}%`);
+    }
+
+    const { data: clientes, error } = await query;
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    return { data: clientes, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Crea un cliente rápido desde el modal de reserva
+ */
+export async function crearClienteRapido(datos: {
+  nombre: string;
+  email?: string;
+  telefono?: string;
+  documento?: string;
+}): Promise<{ data: { id: string } | null; error: string | null }> {
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autenticado" };
+    }
+
+    // Validar datos requeridos
+    if (!datos.nombre || datos.nombre.trim().length === 0) {
+      return { data: null, error: "El nombre es requerido" };
+    }
+
+    const { data: nuevoCliente, error } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .insert({
+        nombre: datos.nombre.trim(),
+        email: datos.email?.trim() || null,
+        telefono: datos.telefono?.trim() || null,
+        documento: datos.documento?.trim() || null,
+        estado_cliente: 'lead',
+        origen_lead: 'crm_manual',
+        created_by: user.id
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    revalidatePath('/dashboard/clientes');
+    return { data: nuevoCliente, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Error creando cliente' };
+  }
+}
+
+/**
+ * Crea una reserva con vinculación completa: cliente, vendedor, lote
+ */
+export async function crearReservaConVinculacion(datos: {
+  loteId: string;
+  proyectoId: string;
+  clienteId: string;
+  precioVenta: number;
+  montoInicial: number;
+  numeroCuotas: number;
+  formaPago: string;
+  fechaVencimiento: string;
+  notas?: string;
+}): Promise<{ data: any | null; error: string | null }> {
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autenticado" };
+    }
+
+    // Obtener perfil del vendedor
+    const perfil = await obtenerPerfilUsuario();
+    if (!perfil || !perfil.username) {
+      return { data: null, error: "No se pudo obtener el perfil del vendedor" };
+    }
+
+    // Validaciones
+    if (datos.precioVenta <= 0) {
+      return { data: null, error: "El precio de venta debe ser mayor a 0" };
+    }
+
+    if (datos.montoInicial < 0 || datos.montoInicial > datos.precioVenta) {
+      return { data: null, error: "El monto inicial no es válido" };
+    }
+
+    if (datos.numeroCuotas < 0) {
+      return { data: null, error: "El número de cuotas no es válido" };
+    }
+
+    // Verificar que el lote esté disponible
+    const { data: lote, error: loteError } = await supabase
+      .schema('crm')
+      .from('lote')
+      .select('estado, codigo')
+      .eq('id', datos.loteId)
+      .single();
+
+    if (loteError || !lote) {
+      return { data: null, error: "Lote no encontrado" };
+    }
+
+    if (lote.estado !== 'disponible') {
+      return { data: null, error: `El lote ${lote.codigo} no está disponible (estado actual: ${lote.estado})` };
+    }
+
+    // Generar código de reserva
+    const codigoReserva = await generarCodigoReserva();
+
+    // Iniciar transacción: Crear reserva + Cambiar estado lote + Asignar vendedor a cliente
+    // 1. Crear reserva
+    const { data: nuevaReserva, error: reservaError } = await supabase
+      .schema('crm')
+      .from('reserva')
+      .insert({
+        codigo_reserva: codigoReserva,
+        cliente_id: datos.clienteId,
+        lote_id: datos.loteId,
+        vendedor_username: perfil.username,
+        monto_reserva: datos.montoInicial,
+        moneda: 'PEN',
+        fecha_vencimiento: datos.fechaVencimiento,
+        estado: 'activa',
+        metodo_pago: datos.formaPago,
+        notas: datos.notas || null
+      })
+      .select()
+      .single();
+
+    if (reservaError) {
+      return { data: null, error: `Error creando reserva: ${reservaError.message}` };
+    }
+
+    // 2. Cambiar estado del lote a reservado
+    const { error: estadoError } = await supabase
+      .schema('crm')
+      .from('lote')
+      .update({ estado: 'reservado' })
+      .eq('id', datos.loteId);
+
+    if (estadoError) {
+      // Revertir reserva
+      await supabase.schema('crm').from('reserva').delete().eq('id', nuevaReserva.id);
+      return { data: null, error: `Error cambiando estado del lote: ${estadoError.message}` };
+    }
+
+    // 3. Asignar vendedor al cliente (si no lo tiene)
+    const { data: cliente } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .select('vendedor_asignado')
+      .eq('id', datos.clienteId)
+      .single();
+
+    if (cliente && !cliente.vendedor_asignado) {
+      await supabase
+        .schema('crm')
+        .from('cliente')
+        .update({ vendedor_asignado: perfil.username })
+        .eq('id', datos.clienteId);
+    }
+
+    // Revalidar páginas
+    revalidatePath(`/dashboard/proyectos/${datos.proyectoId}`);
+    revalidatePath('/dashboard/clientes');
+
+    return {
+      data: {
+        ...nuevaReserva,
+        codigo_lote: lote.codigo
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('Error en crearReservaConVinculacion:', error);
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Error desconocido creando reserva'
+    };
+  }
+}

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { actualizarLote, eliminarLote, duplicarLote } from "./_actions";
 import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
+import ModalReservaLote from "./ModalReservaLote";
 
 type Lote = {
   id: string;
@@ -43,6 +44,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
 
   // Sincronizar el estado cuando cambien los lotes
   useEffect(() => {
@@ -207,14 +209,14 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
 
   const getEstadoButtons = (lote: Lote) => {
     const buttons = [];
-    
+
     if (lote.estado === 'disponible') {
       buttons.push(
         <Button
           key="reservar"
           variant="outline"
           size="sm"
-          onClick={() => handleEstadoChange(lote.id, 'reservado')}
+          onClick={() => setReservandoLoteId(lote.id)}
           className="px-2 py-1 text-xs font-medium text-yellow-600 bg-yellow-100 border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-colors"
         >
           <Clock className="w-3 h-3 mr-1" />
@@ -680,6 +682,24 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
       onClose={() => setDetailId(null)}
       lote={lotesAMostrar.find(l => l.id === detailId) || null}
     />
+    {reservandoLoteId && (
+      <ModalReservaLote
+        open={!!reservandoLoteId}
+        onClose={() => setReservandoLoteId(null)}
+        lote={lotesAMostrar.find(l => l.id === reservandoLoteId) || { id: '', codigo: '', precio: null, sup_m2: null }}
+        proyectoId={proyectoId}
+        onSuccess={() => {
+          // Actualizar el lote a reservado localmente
+          setLotesState(prevLotes =>
+            prevLotes.map(lote =>
+              lote.id === reservandoLoteId
+                ? { ...lote, estado: 'reservado' as const }
+                : lote
+            )
+          );
+        }}
+      />
+    )}
     </>
   );
 }

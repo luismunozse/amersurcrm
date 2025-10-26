@@ -8,6 +8,204 @@ import { RecentActivities } from "@/components/RecentActivities";
 import { RecentProjects } from "@/components/RecentProjects";
 import { getCachedClientes, getCachedProyectos, getCachedNotificacionesNoLeidas } from "@/lib/cache.server";
 
+type ClienteLite = {
+  ultimo_contacto?: string | null;
+  proxima_accion?: string | null;
+  estado_cliente?: string | null;
+};
+
+type ProyectoLite = {
+  estado?: string | null;
+  planos_url?: string | null;
+};
+
+interface DashboardMetrics {
+  totalClientes: number;
+  clientesSinSeguimiento: number;
+  clientesConAccion: number;
+  clientesFueraDeRango: number;
+  proyectosActivos: number;
+  proyectosSinPlanos: number;
+  notificacionesPendientes: number;
+  hasError: boolean;
+}
+
+const initialMetrics: DashboardMetrics = {
+  totalClientes: 0,
+  clientesSinSeguimiento: 0,
+  clientesConAccion: 0,
+  clientesFueraDeRango: 0,
+  proyectosActivos: 0,
+  proyectosSinPlanos: 0,
+  notificacionesPendientes: 0,
+  hasError: false,
+};
+
+async function loadDashboardMetrics(): Promise<DashboardMetrics> {
+  try {
+    const [clientesResult, proyectosData, notificacionesData] = await Promise.all([
+      getCachedClientes(),
+      getCachedProyectos(),
+      getCachedNotificacionesNoLeidas(),
+    ]);
+
+    const clientes = Array.isArray(clientesResult?.data)
+      ? (clientesResult.data as ClienteLite[])
+      : [];
+    const proyectos = Array.isArray(proyectosData)
+      ? (proyectosData as ProyectoLite[])
+      : [];
+    const notificaciones = Array.isArray(notificacionesData) ? notificacionesData : [];
+
+    const clienteMetrics = clientes.reduce(
+      (acc, cliente) => {
+        const ultimoContacto = cliente.ultimo_contacto ? new Date(cliente.ultimo_contacto) : null;
+
+        if (!ultimoContacto) {
+          acc.sinSeguimiento += 1;
+          acc.fueraDeRango += 1;
+        } else {
+          const dias = differenceInCalendarDays(new Date(), ultimoContacto);
+          if (dias >= 7) acc.fueraDeRango += 1;
+        }
+
+        if (cliente.proxima_accion) acc.conAccion += 1;
+
+        return acc;
+      },
+      { sinSeguimiento: 0, conAccion: 0, fueraDeRango: 0 },
+    );
+
+    const proyectoMetrics = proyectos.reduce(
+      (acc, proyecto) => {
+        if (proyecto.estado === "activo") acc.activos += 1;
+        if (!proyecto.planos_url) acc.sinPlanos += 1;
+        return acc;
+      },
+      { activos: 0, sinPlanos: 0 },
+    );
+
+    return {
+      totalClientes: clientesResult?.total ?? clientes.length,
+      clientesSinSeguimiento: clienteMetrics.sinSeguimiento,
+      clientesConAccion: clienteMetrics.conAccion,
+      clientesFueraDeRango: clienteMetrics.fueraDeRango,
+      proyectosActivos: proyectoMetrics.activos,
+      proyectosSinPlanos: proyectoMetrics.sinPlanos,
+      notificacionesPendientes: notificaciones.length,
+      hasError: false,
+    } satisfies DashboardMetrics;
+  } catch (error) {
+    console.error("Error cargando métricas del dashboard:", error);
+    return { ...initialMetrics, hasError: true };
+  }
+}
+
+function buildHeroHighlights(metrics: DashboardMetrics) {
+  return [
+    {
+      label: "Clientes activos",
+      description: `${metrics.totalClientes.toLocaleString()} totales • ${metrics.clientesSinSeguimiento} sin seguimiento`,
+      href: "/dashboard/clientes",
+      icon: (
+        <svg className="w-5 h-5" role="img" aria-label="Ir a clientes" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />
+        </svg>
+      ),
+    },
+    {
+      label: "Agenda coordinada",
+      description: `${metrics.clientesConAccion} recordatorios asignados • ${metrics.notificacionesPendientes} alertas nuevas`,
+      href: "/dashboard/agenda",
+      icon: (
+        <svg className="w-5 h-5" role="img" aria-label="Ir a agenda" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Proyectos vigentes",
+      description: `${metrics.proyectosActivos} activos • ${metrics.proyectosSinPlanos} sin planos`,
+      href: "/dashboard/proyectos",
+      icon: (
+        <svg className="w-5 h-5" role="img" aria-label="Ir a proyectos" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4" />
+        </svg>
+      ),
+    },
+  ];
+}
+
+function buildQuickActions(metrics: DashboardMetrics) {
+  return [
+    {
+      title: "Registrar cliente",
+      description: `${metrics.clientesFueraDeRango} clientes sin contacto en 7 días.`,
+      href: "/dashboard/clientes",
+      color: "primary" as const,
+      icon: (
+        <svg className="w-6 h-6" role="img" aria-label="Registrar cliente" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+    },
+    {
+      title: "Publicar proyecto",
+      description: `${metrics.proyectosSinPlanos} proyectos necesitan planos o renders`,
+      href: "/dashboard/proyectos",
+      color: "success" as const,
+      icon: (
+        <svg className="w-6 h-6" role="img" aria-label="Publicar proyecto" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h7" />
+        </svg>
+      ),
+    },
+    {
+      title: "Planificar agenda",
+      description: `${metrics.clientesConAccion} recordatorios listos para asignar`,
+      href: "/dashboard/agenda",
+      color: "info" as const,
+      icon: (
+        <svg className="w-6 h-6" role="img" aria-label="Planificar agenda" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      title: "Analizar reportes",
+      description: `${metrics.notificacionesPendientes} indicadores pendientes de revisar`,
+      href: "/dashboard/admin/reportes",
+      color: "warning" as const,
+      icon: (
+        <svg className="w-6 h-6" role="img" aria-label="Analizar reportes" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9h4l3 8 4-16 3 8h4" />
+        </svg>
+      ),
+    },
+  ];
+}
+
+function buildFocusAreas(metrics: DashboardMetrics) {
+  return [
+    {
+      title: "Actualizar estados de clientes",
+      description: `${metrics.clientesSinSeguimiento} clientes aún no tienen seguimiento registrado`,
+      href: "/dashboard/clientes",
+    },
+    {
+      title: "Subir nuevos planos o renders",
+      description: `${metrics.proyectosSinPlanos} proyectos activos requieren archivos visuales`,
+      href: "/dashboard/proyectos",
+    },
+    {
+      title: "Confirmar visitas de la semana",
+      description: `${metrics.clientesConAccion} reuniones y recordatorios en agenda`,
+      href: "/dashboard/agenda",
+    },
+  ];
+}
+
 // Loading component para el dashboard
 function DashboardLoading() {
   return (
@@ -72,137 +270,17 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
-  const [clientesResult, proyectosData, notificacionesData] = await Promise.all([
-    getCachedClientes(),
-    getCachedProyectos(),
-    getCachedNotificacionesNoLeidas(),
-  ]);
-
-  // Ensure we have arrays, default to empty arrays if null/undefined
-  // getCachedClientes devuelve { data: [], total: number }
-  const clientes = Array.isArray(clientesResult?.data) ? clientesResult.data : [];
-  const totalClientes = clientesResult?.total ?? 0; // Total real de clientes
-  const proyectos = Array.isArray(proyectosData) ? proyectosData : [];
-  const notificaciones = Array.isArray(notificacionesData) ? notificacionesData : [];
-
   const today = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
+  const metrics = await loadDashboardMetrics();
 
-  const clientesSinSeguimiento = clientes.filter((cliente) => !cliente.ultimo_contacto).length;
-  const clientesConAccion = clientes.filter((cliente) => Boolean(cliente.proxima_accion)).length;
-  const clientesFueraDeRango = clientes.filter((cliente) => {
-    if (!cliente.ultimo_contacto) return true;
-    const dias = differenceInCalendarDays(new Date(), new Date(cliente.ultimo_contacto));
-    return dias >= 7;
-  }).length;
-
-  const proyectosActivos = proyectos.filter((proyecto) => proyecto.estado === "activo").length;
-  const proyectosSinPlanos = proyectos.filter((proyecto) => !proyecto.planos_url).length;
-
-  const notificacionesPendientes = notificaciones.length;
-
-  const heroHighlights = [
-    {
-      label: "Clientes activos",
-      description: `${totalClientes.toLocaleString()} totales • ${clientesSinSeguimiento} sin seguimiento`,
-      href: "/dashboard/clientes",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />
-        </svg>
-      ),
-    },
-    {
-      label: "Agenda coordinada",
-      description: `${clientesConAccion} recordatorios asignados • ${notificacionesPendientes} alertas nuevas`,
-      href: "/dashboard/agenda",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
-        </svg>
-      ),
-    },
-    {
-      label: "Proyectos vigentes",
-      description: `${proyectosActivos} activos • ${proyectosSinPlanos} sin planos`,
-      href: "/dashboard/proyectos",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4" />
-        </svg>
-      ),
-    },
-  ];
-
-  const quickActions = [
-    {
-      title: "Registrar cliente",
-      description: `${clientesFueraDeRango} clientes sin contacto en 7 días.`,
-      href: "/dashboard/clientes",
-      color: "primary" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      ),
-    },
-    {
-      title: "Publicar proyecto",
-      description: `${proyectosSinPlanos} proyectos necesitan planos o renders`,
-      href: "/dashboard/proyectos",
-      color: "success" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h7" />
-        </svg>
-      ),
-    },
-    {
-      title: "Planificar agenda",
-      description: `${clientesConAccion} recordatorios listos para asignar`,
-      href: "/dashboard/agenda",
-      color: "info" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    {
-      title: "Analizar reportes",
-      description: `${notificacionesPendientes} indicadores pendientes de revisar`,
-      href: "/dashboard/admin/reportes",
-      color: "warning" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9h4l3 8 4-16 3 8h4" />
-        </svg>
-      ),
-    },
-  ];
-
-  const focusAreas = [
-    {
-      title: "Actualizar estados de clientes",
-      description: `${clientesSinSeguimiento} clientes aún no tienen seguimiento registrado`,
-      href: "/dashboard/clientes",
-    },
-    {
-      title: "Subir nuevos planos o renders",
-      description: `${proyectosSinPlanos} proyectos activos requieren archivos visuales`,
-      href: "/dashboard/proyectos",
-    },
-    {
-      title: "Confirmar visitas de la semana",
-      description: `${clientesConAccion} reuniones y recordatorios en agenda`,
-      href: "/dashboard/agenda",
-    },
-  ];
+  const heroHighlights = buildHeroHighlights(metrics);
+  const quickActions = buildQuickActions(metrics);
+  const focusAreas = buildFocusAreas(metrics);
 
   const pulseItems = [
     {
       label: "Seguimientos pendientes",
-      value: `${clientesFueraDeRango} clientes requieren contacto esta semana`,
+      value: `${metrics.clientesFueraDeRango} clientes requieren contacto esta semana`,
       tone: "primary" as const,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -213,7 +291,7 @@ async function DashboardContent() {
     },
     {
       label: "Visitas programadas",
-      value: `${clientesConAccion} recordatorios con fecha asignada`,
+      value: `${metrics.clientesConAccion} recordatorios con fecha asignada`,
       tone: "success" as const,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -223,7 +301,7 @@ async function DashboardContent() {
     },
     {
       label: "Reportes disponibles",
-      value: `${notificacionesPendientes} alertas por revisar`,
+      value: `${metrics.notificacionesPendientes} alertas por revisar`,
       tone: "info" as const,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -242,6 +320,11 @@ async function DashboardContent() {
 
   return (
     <div className="space-y-10">
+      {metrics.hasError && (
+        <div className="rounded-2xl border border-crm-warning/40 bg-crm-warning/10 px-4 py-3 text-sm text-crm-warning">
+          No pudimos cargar todas las métricas. Se muestran valores parciales; intenta refrescar en unos minutos.
+        </div>
+      )}
       <section className="grid gap-6 xl:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
         <Card
           variant="elevated"

@@ -6,17 +6,18 @@ import { obtenerMetricasReportes, ReporteMetricas } from "@/app/dashboard/admin/
 
 interface ComparacionPeriodosProps {
   periodoActual: string;
+  datosActuales: ReporteMetricas;
   onPeriodoComparacionChange?: (periodo: string) => void;
 }
 
-export default function ComparacionPeriodos({ 
-  periodoActual, 
-  onPeriodoComparacionChange 
+export default function ComparacionPeriodos({
+  periodoActual,
+  datosActuales,
+  onPeriodoComparacionChange
 }: ComparacionPeriodosProps) {
-  const [periodoComparacion, setPeriodoComparacion] = useState("30");
-  const [datosComparacion, setDatosComparacion] = useState<ReporteMetricas | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [datosAnteriores, setDatosAnteriores] = useState<ReporteMetricas | null>(null);
 
   const obtenerEtiquetaPeriodo = (periodo: string): string => {
     switch (periodo) {
@@ -33,32 +34,40 @@ export default function ComparacionPeriodos({
     }
   };
 
-  const periodoActualEtiqueta = obtenerEtiquetaPeriodo(periodoActual);
-  const periodoComparacionEtiqueta = obtenerEtiquetaPeriodo(periodoComparacion);
-
-  const cargarDatosComparacion = useCallback(async () => {
+  const cargarDatosPeriodoAnterior = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await obtenerMetricasReportes(periodoComparacion);
+      // Calcular fechas del período anterior
+      const dias = parseInt(periodoActual);
+      const fechaFinAnterior = new Date(datosActuales.periodo.inicio);
+      const fechaInicioAnterior = new Date(fechaFinAnterior);
+      fechaInicioAnterior.setDate(fechaInicioAnterior.getDate() - dias);
+
+      // Obtener métricas del período anterior
+      const result = await obtenerMetricasReportes(
+        periodoActual,
+        fechaInicioAnterior.toISOString(),
+        fechaFinAnterior.toISOString()
+      );
 
       if (result.data) {
-        setDatosComparacion(result.data);
-        onPeriodoComparacionChange?.(periodoComparacion);
+        setDatosAnteriores(result.data);
+        onPeriodoComparacionChange?.(periodoActual);
       } else {
-        setError(result.error || 'Error cargando datos de comparación');
+        setError(result.error || 'Error cargando datos del período anterior');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
-  }, [periodoComparacion, onPeriodoComparacionChange]);
+  }, [periodoActual, datosActuales.periodo.inicio, onPeriodoComparacionChange]);
 
   useEffect(() => {
-    cargarDatosComparacion();
-  }, [cargarDatosComparacion]);
+    cargarDatosPeriodoAnterior();
+  }, [cargarDatosPeriodoAnterior]);
 
   const formatearMoneda = (valor: number): string => {
     return new Intl.NumberFormat('es-PE', {
@@ -74,8 +83,11 @@ export default function ComparacionPeriodos({
   };
 
   const calcularCambio = (actual: number, anterior: number) => {
-    if (anterior === 0) return { valor: 0, tipo: 'sin-cambio' as const };
-    
+    if (anterior === 0) {
+      if (actual === 0) return { valor: 0, tipo: 'sin-cambio' as const };
+      return { valor: 100, tipo: 'positive' as const };
+    }
+
     const cambio = ((actual - anterior) / anterior) * 100;
     return {
       valor: Math.abs(cambio),
@@ -97,11 +109,11 @@ export default function ComparacionPeriodos({
   const getColorCambio = (tipo: string) => {
     switch (tipo) {
       case 'positive':
-        return 'text-green-600 bg-green-50';
+        return 'text-green-600 bg-green-50 dark:bg-green-900/20';
       case 'negative':
-        return 'text-red-600 bg-red-50';
+        return 'text-red-600 bg-red-50 dark:bg-red-900/20';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20';
     }
   };
 
@@ -120,18 +132,18 @@ export default function ComparacionPeriodos({
     );
   }
 
-  if (error || !datosComparacion) {
+  if (error || !datosAnteriores) {
     return (
       <div className="bg-crm-card border border-crm-border rounded-xl p-6">
         <div className="text-center py-8">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-red-600 text-lg">⚠️</span>
           </div>
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error en Comparación</h3>
-          <p className="text-sm text-red-600 mb-4">{error}</p>
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-400 mb-2">Error en Comparación</h3>
+          <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error || 'No se pudieron cargar los datos'}</p>
           <button
-            onClick={cargarDatosComparacion}
-            className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+            onClick={cargarDatosPeriodoAnterior}
+            className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
           >
             Reintentar
           </button>
@@ -140,52 +152,50 @@ export default function ComparacionPeriodos({
     );
   }
 
-  // Nota: En un escenario real, necesitarías datos del período actual para comparar
-  // Por ahora, simularé datos del período actual
-  const datosActuales = {
-    ventas: { valorTotal: 2450000, propiedadesVendidas: 89 },
-    clientes: { activos: 1247, nuevos: 156, tasaConversion: 24.8 },
-    propiedades: { total: 1456, nuevas: 45, vendidas: 89, disponibles: 892 }
-  };
-
-  const metricasComparacion = datosComparacion.metricas;
-
-  if (!metricasComparacion) {
-    return (
-      <div className="bg-crm-card border border-crm-border rounded-xl p-6">
-        <div className="text-center text-crm-text-secondary">
-          No hay métricas disponibles para el período seleccionado.
-        </div>
-      </div>
-    );
-  }
-
+  // Usar datos reales del período actual y anterior
   const comparaciones = [
     {
       titulo: "Ventas Totales",
-      actual: formatearMoneda(datosActuales.ventas.valorTotal),
-      anterior: formatearMoneda(metricasComparacion.ventas?.valorTotal ?? 0),
-      cambio: calcularCambio(datosActuales.ventas.valorTotal, metricasComparacion.ventas?.valorTotal ?? 0)
+      actual: formatearMoneda(datosActuales.metricas.ventas.valorTotal),
+      anterior: formatearMoneda(datosAnteriores.metricas.ventas.valorTotal),
+      cambio: calcularCambio(
+        datosActuales.metricas.ventas.valorTotal,
+        datosAnteriores.metricas.ventas.valorTotal
+      )
     },
     {
       titulo: "Clientes Activos",
-      actual: datosActuales.clientes.activos.toString(),
-      anterior: (metricasComparacion.clientes?.activos ?? 0).toString(),
-      cambio: calcularCambio(datosActuales.clientes.activos, metricasComparacion.clientes?.activos ?? 0)
+      actual: datosActuales.metricas.clientes.activos.toString(),
+      anterior: datosAnteriores.metricas.clientes.activos.toString(),
+      cambio: calcularCambio(
+        datosActuales.metricas.clientes.activos,
+        datosAnteriores.metricas.clientes.activos
+      )
     },
     {
       titulo: "Propiedades Vendidas",
-      actual: datosActuales.propiedades.vendidas.toString(),
-      anterior: (metricasComparacion.propiedades?.vendidas ?? 0).toString(),
-      cambio: calcularCambio(datosActuales.propiedades.vendidas, metricasComparacion.propiedades?.vendidas ?? 0)
+      actual: datosActuales.metricas.ventas.propiedadesVendidas.toString(),
+      anterior: datosAnteriores.metricas.ventas.propiedadesVendidas.toString(),
+      cambio: calcularCambio(
+        datosActuales.metricas.ventas.propiedadesVendidas,
+        datosAnteriores.metricas.ventas.propiedadesVendidas
+      )
     },
     {
       titulo: "Tasa de Conversión",
-      actual: formatearPorcentaje(datosActuales.clientes.tasaConversion),
-      anterior: formatearPorcentaje(metricasComparacion.clientes?.tasaConversion ?? 0),
-      cambio: calcularCambio(datosActuales.clientes.tasaConversion, metricasComparacion.clientes?.tasaConversion ?? 0)
+      actual: formatearPorcentaje(datosActuales.metricas.clientes.tasaConversion),
+      anterior: formatearPorcentaje(datosAnteriores.metricas.clientes.tasaConversion),
+      cambio: calcularCambio(
+        datosActuales.metricas.clientes.tasaConversion,
+        datosAnteriores.metricas.clientes.tasaConversion
+      )
     }
   ];
+
+  const fechaInicioActual = new Date(datosActuales.periodo.inicio).toLocaleDateString('es-PE');
+  const fechaFinActual = new Date(datosActuales.periodo.fin).toLocaleDateString('es-PE');
+  const fechaInicioAnterior = new Date(datosAnteriores.periodo.inicio).toLocaleDateString('es-PE');
+  const fechaFinAnterior = new Date(datosAnteriores.periodo.fin).toLocaleDateString('es-PE');
 
   return (
     <div className="bg-crm-card border border-crm-border rounded-xl p-6">
@@ -195,23 +205,17 @@ export default function ComparacionPeriodos({
             <Calendar className="w-5 h-5" />
             Comparación de Períodos
           </h2>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-crm-text-secondary">Comparar con:</label>
-            <select
-              value={periodoComparacion}
-              onChange={(e) => setPeriodoComparacion(e.target.value)}
-              className="px-3 py-1.5 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
-            >
-              <option value="7">Últimos 7 días</option>
-              <option value="30">Últimos 30 días</option>
-              <option value="90">Últimos 90 días</option>
-              <option value="365">Último año</option>
-            </select>
-          </div>
         </div>
-        <p className="text-crm-text-secondary text-sm">
-          Comparación entre {periodoActualEtiqueta} y {periodoComparacionEtiqueta}.
-        </p>
+        <div className="space-y-2 text-sm text-crm-text-secondary">
+          <p>
+            <span className="font-medium text-crm-text-primary">Período Actual:</span>{' '}
+            {fechaInicioActual} - {fechaFinActual} ({datosActuales.periodo.dias} días)
+          </p>
+          <p>
+            <span className="font-medium text-crm-text-primary">Período Anterior:</span>{' '}
+            {fechaInicioAnterior} - {fechaFinAnterior} ({datosAnteriores.periodo.dias} días)
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -220,26 +224,28 @@ export default function ComparacionPeriodos({
             <h3 className="text-sm font-medium text-crm-text-secondary mb-3">
               {item.titulo}
             </h3>
-            
+
             <div className="space-y-2">
               {/* Período Actual */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-crm-text-muted">Período Actual:</span>
                 <span className="font-semibold text-crm-text-primary">{item.actual}</span>
               </div>
-              
+
               {/* Período Anterior */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-crm-text-muted">Período Anterior:</span>
                 <span className="font-medium text-crm-text-secondary">{item.anterior}</span>
               </div>
-              
+
               {/* Cambio */}
               <div className="flex items-center justify-between pt-2 border-t border-crm-border">
                 <span className="text-xs text-crm-text-muted">Cambio:</span>
                 <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getColorCambio(item.cambio.tipo)}`}>
                   {getIconoCambio(item.cambio.tipo)}
-                  {item.cambio.tipo === 'sin-cambio' ? 'Sin cambio' : `${item.cambio.valor.toFixed(1)}%`}
+                  {item.cambio.tipo === 'sin-cambio'
+                    ? 'Sin cambio'
+                    : `${item.cambio.tipo === 'positive' ? '+' : '-'}${item.cambio.valor.toFixed(1)}%`}
                 </div>
               </div>
             </div>
@@ -248,16 +254,17 @@ export default function ComparacionPeriodos({
       </div>
 
       {/* Resumen */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-blue-600 text-sm">📊</span>
+          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+            <span className="text-blue-600 dark:text-blue-400 text-sm">📊</span>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-blue-800 mb-1">Resumen de Comparación</h4>
-            <p className="text-xs text-blue-700">
-              Comparando período actual con los últimos {periodoComparacion} días. 
-              Los datos muestran las tendencias y cambios en las métricas principales del sistema.
+            <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">Análisis de Tendencia</h4>
+            <p className="text-xs text-blue-700 dark:text-blue-400">
+              Comparación entre el período actual ({obtenerEtiquetaPeriodo(periodoActual)}) y el período
+              inmediatamente anterior de igual duración. Los porcentajes muestran el crecimiento o
+              decrecimiento en cada métrica clave.
             </p>
           </div>
         </div>

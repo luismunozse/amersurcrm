@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { InfoDialog } from "@/components/ui/InfoDialog";
 import LoteWizard from "@/components/LoteWizard";
 
 interface Proyecto {
@@ -18,6 +19,7 @@ export default function NewLoteForm({
   proyectos: Proyecto[];
 }) {
   const [showWizard, setShowWizard] = useState(false);
+  const [showImportInfo, setShowImportInfo] = useState(false);
   
   // Encontrar el proyecto actual
   const proyectoActual = proyectos.find(p => p.id === proyectoId);
@@ -28,7 +30,7 @@ export default function NewLoteForm({
         <button
           onClick={() => {
             // TODO: Implementar importación masiva
-            alert('Funcionalidad de importación masiva en desarrollo');
+            setShowImportInfo(true);
           }}
           className="crm-button-secondary px-6 py-3 rounded-lg text-sm font-medium flex items-center space-x-2"
         >
@@ -57,6 +59,14 @@ export default function NewLoteForm({
           onClose={() => setShowWizard(false)}
         />
       )}
+
+      <InfoDialog
+        open={showImportInfo}
+        onClose={() => setShowImportInfo(false)}
+        tone="info"
+        title="Importación masiva en desarrollo"
+        description="Estamos trabajando en esta funcionalidad. Mientras tanto, puedes crear lotes manualmente con el asistente."
+      />
     </>
   );
 }

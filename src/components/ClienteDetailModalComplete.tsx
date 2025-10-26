@@ -38,12 +38,13 @@ interface ClienteDetailModalCompleteProps {
 }
 
 const WhatsAppIcon = ({ className, ...props }: SVGProps<SVGSVGElement>) => (
-  <svg
-    viewBox="0 0 32 32"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-    aria-hidden="true"
-    focusable="false"
+        <svg
+          viewBox="0 0 32 32"
+          xmlns="http://www.w3.org/2000/svg"
+          className={className}
+          role="img"
+          aria-label="WhatsApp"
+          focusable="false"
     {...props}
   >
     <path

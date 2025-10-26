@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Upload, X, File, AlertCircle } from "lucide-react";
+import { InfoDialog } from "@/components/ui/InfoDialog";
 
 interface DocumentoUploaderProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ export default function DocumentoUploader({
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [storageType, setStorageType] = useState<'supabase' | 'google_drive'>('supabase');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -57,7 +59,7 @@ export default function DocumentoUploader({
       onSuccess();
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Error subiendo archivo');
+      setErrorMessage("No se pudo subir el archivo. Inténtalo nuevamente en unos minutos.");
     } finally {
       setUploading(false);
     }
@@ -236,6 +238,13 @@ export default function DocumentoUploader({
           </button>
         </div>
       </div>
+      <InfoDialog
+        open={Boolean(errorMessage)}
+        title="Error al subir documento"
+        description={errorMessage ?? ""}
+        tone="danger"
+        onClose={() => setErrorMessage(null)}
+      />
     </div>
   );
 }

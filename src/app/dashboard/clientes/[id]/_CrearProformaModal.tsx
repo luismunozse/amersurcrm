@@ -51,17 +51,6 @@ const TIPOS_OPERACION: { value: ProformaTipoOperacion; label: string }[] = [
   { value: "venta", label: "Venta" },
 ];
 
-function sanitizeList(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function formatList(list: string[] | undefined): string {
-  return (list && list.length > 0 ? list : [""]).join("\n");
-}
-
 function initialFormState(cliente: any, asesorActual: any | null): ProformaFormState {
   const datosCliente = {
     nombre: cliente?.nombre ?? "",
@@ -103,7 +92,7 @@ export default function CrearProformaModal({
   const [mounted, setMounted] = useState(false);
   const [isSubmitting, startTransition] = useTransition();
   const [form, setForm] = useState<ProformaFormState>(() => initialFormState(cliente, asesorActual));
-  const [cuentasTexto, setCuentasTexto] = useState<string>(CUENTAS_EMPRESA_DEFAULT.join("\n"));
+  const [cuentasEmpresa, setCuentasEmpresa] = useState<string[]>([...CUENTAS_EMPRESA_DEFAULT]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -112,6 +101,13 @@ export default function CrearProformaModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Calcular precio final automáticamente
+  const precioFinalCalculado = useMemo(() => {
+    const precioLista = form.datos.precios?.precioLista ?? 0;
+    const descuento = form.datos.precios?.descuento ?? 0;
+    return precioLista - descuento;
+  }, [form.datos.precios?.precioLista, form.datos.precios?.descuento]);
 
   useEffect(() => {
     if (isOpen) {
@@ -147,15 +143,16 @@ export default function CrearProformaModal({
             validezDias: proformaInicial.datos.validezDias ?? 3,
           },
         });
-        setCuentasTexto(formatList(proformaInicial.datos.cuentasEmpresa));
+        setCuentasEmpresa(proformaInicial.datos.cuentasEmpresa?.length ? proformaInicial.datos.cuentasEmpresa : [...CUENTAS_EMPRESA_DEFAULT]);
       } else {
         const state = initialFormState(cliente, asesorActual);
         setForm(state);
-        setCuentasTexto(formatList(state.datos.cuentasEmpresa));
+        setCuentasEmpresa(state.datos.cuentasEmpresa?.length ? state.datos.cuentasEmpresa : [...CUENTAS_EMPRESA_DEFAULT]);
       }
     }
   }, [isOpen, proformaInicial, cliente, asesorActual]);
 
+  // Generar PDF con debounce
   useEffect(() => {
     if (!isOpen) {
       setPreviewUrl((prev) => {
@@ -167,71 +164,76 @@ export default function CrearProformaModal({
 
     let cancelled = false;
 
-    const generarPreview = async () => {
-      setIsPreviewLoading(true);
-      setPreviewError(null);
+    // Debounce de 500ms
+    const debounceTimer = setTimeout(() => {
+      const generarPreview = async () => {
+        setIsPreviewLoading(true);
+        setPreviewError(null);
 
-      try {
-        const datosPreview: ProformaDatos = {
-          cliente: { ...form.datos.cliente },
-          asesor: { ...form.datos.asesor },
-          terreno: { ...form.datos.terreno },
-          precios: { ...form.datos.precios },
-          formaPago: { ...form.datos.formaPago },
-          condicionesComerciales: [...(form.datos.condicionesComerciales ?? CONDICIONES_COMERCIALES_DEFAULT)],
-          mediosPago: {
-            soles: form.datos.mediosPago?.soles ?? "",
-            dolares: form.datos.mediosPago?.dolares ?? "",
-          },
-          requisitosContrato: [...(form.datos.requisitosContrato ?? REQUISITOS_CONTRATO_DEFAULT)],
-          cuentasEmpresa: sanitizeList(cuentasTexto),
-          comentariosAdicionales: form.datos.comentariosAdicionales ?? "",
-          validezDias: form.datos.validezDias ?? 3,
-        };
+        try {
+          const datosPreview: ProformaDatos = {
+            cliente: { ...form.datos.cliente },
+            asesor: { ...form.datos.asesor },
+            terreno: { ...form.datos.terreno },
+            precios: { ...form.datos.precios, precioFinal: precioFinalCalculado },
+            formaPago: { ...form.datos.formaPago },
+            condicionesComerciales: [...(form.datos.condicionesComerciales ?? CONDICIONES_COMERCIALES_DEFAULT)],
+            mediosPago: {
+              soles: form.datos.mediosPago?.soles ?? "",
+              dolares: form.datos.mediosPago?.dolares ?? "",
+            },
+            requisitosContrato: [...(form.datos.requisitosContrato ?? REQUISITOS_CONTRATO_DEFAULT)],
+            cuentasEmpresa: [...cuentasEmpresa],
+            comentariosAdicionales: form.datos.comentariosAdicionales ?? "",
+            validezDias: form.datos.validezDias ?? 3,
+          };
 
-        const { bytes } = await buildProformaPdf({
-          numero: proformaInicial?.numero ?? null,
-          moneda: form.moneda,
-          total: form.datos.precios?.precioFinal ?? null,
-          datos: datosPreview,
-          created_at: proformaInicial?.created_at ?? new Date(),
-          updated_at: proformaInicial?.updated_at ?? new Date(),
-        });
+          const { bytes } = await buildProformaPdf({
+            numero: proformaInicial?.numero ?? null,
+            moneda: form.moneda,
+            total: form.datos.precios?.precioFinal ?? null,
+            datos: datosPreview,
+            created_at: proformaInicial?.created_at ?? new Date(),
+            updated_at: proformaInicial?.updated_at ?? new Date(),
+          });
 
-        if (cancelled) return;
+          if (cancelled) return;
 
-        const arrayBuffer = new Uint8Array(bytes).buffer;
-        const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-        const nextUrl = URL.createObjectURL(blob);
-        setPreviewUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return nextUrl;
-        });
-      } catch (error) {
-        console.error("Error generando vista previa de proforma:", error);
-        if (!cancelled) {
-          setPreviewError("No se pudo generar la vista previa");
+          const arrayBuffer = new Uint8Array(bytes).buffer;
+          const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+          const nextUrl = URL.createObjectURL(blob);
+          setPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return nextUrl;
+          });
+        } catch (error) {
+          console.error("Error generando vista previa de proforma:", error);
+          if (!cancelled) {
+            setPreviewError("No se pudo generar la vista previa");
+          }
+        } finally {
+          if (!cancelled) {
+            setIsPreviewLoading(false);
+          }
         }
-      } finally {
-        if (!cancelled) {
-          setIsPreviewLoading(false);
-        }
-      }
-    };
+      };
 
-    void generarPreview();
+      void generarPreview();
+    }, 500);
 
     return () => {
       cancelled = true;
+      clearTimeout(debounceTimer);
     };
   }, [
     isOpen,
     form,
-    cuentasTexto,
+    cuentasEmpresa,
     proformaInicial?.numero,
     proformaInicial?.created_at,
     proformaInicial?.updated_at,
     previewVersion,
+    precioFinalCalculado,
   ]);
 
   useEffect(() => {
@@ -363,11 +365,15 @@ export default function CrearProformaModal({
         loteId: form.loteId ?? null,
         tipoOperacion: form.tipoOperacion,
         moneda: form.moneda,
-        total: form.datos.precios?.precioFinal ?? null,
+        total: precioFinalCalculado,
         descuento: form.datos.precios?.descuento ?? null,
         datos: {
           ...form.datos,
-          cuentasEmpresa: sanitizeList(cuentasTexto),
+          precios: {
+            ...form.datos.precios,
+            precioFinal: precioFinalCalculado
+          },
+          cuentasEmpresa: [...cuentasEmpresa],
         },
       };
 
@@ -401,7 +407,7 @@ export default function CrearProformaModal({
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
-      <div className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl">
+      <div className="relative z-10 w-full max-w-7xl max-h-[90vh] overflow-y-auto bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-crm-border bg-crm-card/80 backdrop-blur">
           <div>
             <h2 className="text-xl font-semibold text-crm-text-primary">
@@ -528,70 +534,85 @@ export default function CrearProformaModal({
             </div>
           </div>
 
-          {/* Datos cliente y asesor */}
+          {/* Datos cliente y asesor (readonly) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3 p-4 bg-crm-background rounded-xl border border-crm-border">
-              <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
-                Datos del cliente
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                {[
-                  { label: "Nombre completo", field: "nombre" },
-                  { label: "Documento (DNI)", field: "dni" },
-                  { label: "Teléfono", field: "telefono" },
-                  { label: "Correo electrónico", field: "email" },
-                ].map((item) => (
-                  <div key={item.field}>
-                    <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                      {item.label}
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      value={(form.datos.cliente as any)[item.field] ?? ""}
-                      onChange={(e) =>
-                        updateDatos((prev) => ({
-                          ...prev,
-                          cliente: {
-                            ...prev.cliente,
-                            [item.field]: e.target.value,
-                          },
-                        }))
-                      }
-                    />
+            <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 uppercase tracking-wider">
+                  Datos del cliente
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                    Nombre completo
+                  </label>
+                  <div className="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 text-crm-text text-sm border border-blue-100 dark:border-blue-900">
+                    {form.datos.cliente?.nombre || <span className="text-crm-text-muted italic">No especificado</span>}
                   </div>
-                ))}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                    DNI
+                  </label>
+                  <div className="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 text-crm-text text-sm border border-blue-100 dark:border-blue-900">
+                    {form.datos.cliente?.dni || <span className="text-crm-text-muted italic">No especificado</span>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                      Teléfono
+                    </label>
+                    <div className="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 text-crm-text text-sm border border-blue-100 dark:border-blue-900">
+                      {form.datos.cliente?.telefono || "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                      Email
+                    </label>
+                    <div className="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 text-crm-text text-sm border border-blue-100 dark:border-blue-900 truncate">
+                      {form.datos.cliente?.email || "-"}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3 p-4 bg-crm-background rounded-xl border border-crm-border">
-              <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
-                Atendido por
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                {[
-                  { label: "Asesor de ventas", field: "nombre" },
-                  { label: "Celular", field: "celular" },
-                ].map((item) => (
-                  <div key={item.field}>
-                    <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                      {item.label}
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      value={(form.datos.asesor as any)[item.field] ?? ""}
-                      onChange={(e) =>
-                        updateDatos((prev) => ({
-                          ...prev,
-                          asesor: {
-                            ...prev.asesor,
-                            [item.field]: e.target.value,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                ))}
+            <div className="space-y-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-xl border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 uppercase tracking-wider">
+                  Atendido por
+                </h3>
               </div>
+              <div className="grid grid-cols-1 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
+                    Asesor de ventas
+                  </label>
+                  <div className="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 text-crm-text text-sm border border-green-100 dark:border-green-900">
+                    {form.datos.asesor?.nombre || <span className="text-crm-text-muted italic">No especificado</span>}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
+                    Celular
+                  </label>
+                  <div className="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 text-crm-text text-sm border border-green-100 dark:border-green-900">
+                    {form.datos.asesor?.celular || <span className="text-crm-text-muted italic">No especificado</span>}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-green-700 dark:text-green-300 italic">
+                Los datos del cliente y asesor se obtienen automáticamente
+              </p>
             </div>
           </div>
 
@@ -637,33 +658,61 @@ export default function CrearProformaModal({
                 Descuentos y promociones
               </h3>
               <div className="space-y-3">
-                {[
-                  { label: "Precio en lista", field: "precioLista" },
-                  { label: "Descuento", field: "descuento" },
-                  { label: "Precio final", field: "precioFinal" },
-                ].map((item) => (
-                  <div key={item.field}>
-                    <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                      {item.label}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      value={(form.datos.precios as any)[item.field] ?? ""}
-                      onChange={(e) => {
-                        const value = e.target.value === "" ? null : Number(e.target.value);
-                        updateDatos((prev) => ({
-                          ...prev,
-                          precios: {
-                            ...prev.precios,
-                            [item.field]: e.target.value === "" ? null : value,
-                          },
-                        }));
-                      }}
-                    />
+                {/* Precio en lista */}
+                <div>
+                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                    Precio en lista
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    value={form.datos.precios?.precioLista ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? null : Number(e.target.value);
+                      updateDatos((prev) => ({
+                        ...prev,
+                        precios: {
+                          ...prev.precios,
+                          precioLista: value,
+                        },
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* Descuento */}
+                <div>
+                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                    Descuento
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    value={form.datos.precios?.descuento ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? null : Number(e.target.value);
+                      updateDatos((prev) => ({
+                        ...prev,
+                        precios: {
+                          ...prev.precios,
+                          descuento: value,
+                        },
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* Precio final (readonly, calculado) */}
+                <div>
+                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                    Precio final (calculado)
+                  </label>
+                  <div className="w-full px-3 py-2 rounded-lg border border-crm-border bg-crm-background text-crm-text font-semibold text-lg">
+                    {form.moneda === "USD" ? "$" : "S/"} {precioFinalCalculado.toFixed(2)}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
 
@@ -672,40 +721,125 @@ export default function CrearProformaModal({
                 Forma de pago
               </h3>
               <div className="space-y-3">
-                {[
-                  { label: "Separación", field: "separacion" },
-                  { label: "Abono principal", field: "abonoPrincipal" },
-                  { label: "Número de cuotas", field: "numeroCuotas" },
-                ].map((item) => (
-                  <div key={item.field}>
-                    <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                      {item.label}
-                    </label>
-                    <input
-                      type={item.field === "numeroCuotas" ? "number" : "number"}
-                      step="0.01"
-                      min={item.field === "numeroCuotas" ? 0 : undefined}
-                      className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      value={(form.datos.formaPago as any)[item.field] ?? ""}
-                      onChange={(e) => {
-                        const value =
-                          e.target.value === ""
-                            ? null
-                            : item.field === "numeroCuotas"
-                              ? Number.parseInt(e.target.value, 10)
-                              : Number(e.target.value);
-                        updateDatos((prev) => ({
-                          ...prev,
-                          formaPago: {
-                            ...prev.formaPago,
-                            [item.field]: e.target.value === "" ? null : value,
-                          },
-                        }));
-                      }}
-                    />
-                  </div>
-                ))}
+                {/* Separación */}
+                <div>
+                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                    Separación
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    value={form.datos.formaPago?.separacion ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? null : Number(e.target.value);
+                      updateDatos((prev) => ({
+                        ...prev,
+                        formaPago: {
+                          ...prev.formaPago,
+                          separacion: value,
+                        },
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* Abono principal */}
+                <div>
+                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                    Abono principal
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    value={form.datos.formaPago?.abonoPrincipal ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? null : Number(e.target.value);
+                      updateDatos((prev) => ({
+                        ...prev,
+                        formaPago: {
+                          ...prev.formaPago,
+                          abonoPrincipal: value,
+                        },
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* Número de cuotas */}
+                <div>
+                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                    Número de cuotas
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    value={form.datos.formaPago?.numeroCuotas ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? null : Number.parseInt(e.target.value, 10);
+                      updateDatos((prev) => ({
+                        ...prev,
+                        formaPago: {
+                          ...prev.formaPago,
+                          numeroCuotas: value,
+                        },
+                      }));
+                    }}
+                  />
+                </div>
               </div>
+
+              {/* Resumen de cuotas */}
+              {precioFinalCalculado > 0 && (
+                <div className="mt-4 p-3 bg-white rounded-lg border border-crm-primary/20">
+                  <h4 className="text-xs font-semibold text-crm-text-muted uppercase mb-2">Resumen</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-crm-text-muted">Precio total:</span>
+                      <span className="font-semibold text-crm-text">
+                        {form.moneda === "USD" ? "$" : "S/"} {precioFinalCalculado.toFixed(2)}
+                      </span>
+                    </div>
+                    {(form.datos.formaPago?.separacion ?? 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-crm-text-muted">- Separación:</span>
+                        <span className="text-crm-text">
+                          {form.moneda === "USD" ? "$" : "S/"} {(form.datos.formaPago?.separacion ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {(form.datos.formaPago?.abonoPrincipal ?? 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-crm-text-muted">- Abono:</span>
+                        <span className="text-crm-text">
+                          {form.moneda === "USD" ? "$" : "S/"} {(form.datos.formaPago?.abonoPrincipal ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t border-crm-border">
+                      <span className="text-crm-text-muted font-semibold">Saldo:</span>
+                      <span className="font-bold text-crm-primary">
+                        {form.moneda === "USD" ? "$" : "S/"}{" "}
+                        {(precioFinalCalculado - (form.datos.formaPago?.separacion ?? 0) - (form.datos.formaPago?.abonoPrincipal ?? 0)).toFixed(2)}
+                      </span>
+                    </div>
+                    {(form.datos.formaPago?.numeroCuotas ?? 0) > 0 && (
+                      <div className="flex justify-between text-xs pt-1">
+                        <span className="text-crm-text-muted">
+                          {form.datos.formaPago?.numeroCuotas} cuota{(form.datos.formaPago?.numeroCuotas ?? 0) > 1 ? "s" : ""} de:
+                        </span>
+                        <span className="font-semibold text-crm-accent">
+                          {form.moneda === "USD" ? "$" : "S/"}{" "}
+                          {((precioFinalCalculado - (form.datos.formaPago?.separacion ?? 0) - (form.datos.formaPago?.abonoPrincipal ?? 0)) / (form.datos.formaPago?.numeroCuotas ?? 1)).toFixed(2)}
+                          /mes
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -757,15 +891,54 @@ export default function CrearProformaModal({
           {/* Cuentas y comentarios */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
-              <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
-                Cuentas de la empresa
-              </label>
-              <textarea
-                rows={5}
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                value={cuentasTexto}
-                onChange={(e) => setCuentasTexto(e.target.value)}
-              />
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
+                  Cuentas de la empresa
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setCuentasEmpresa([...cuentasEmpresa, ""])}
+                  className="p-1.5 text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
+                  title="Agregar cuenta"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {cuentasEmpresa.map((cuenta, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={cuenta}
+                      onChange={(e) => {
+                        const nuevasCuentas = [...cuentasEmpresa];
+                        nuevasCuentas[index] = e.target.value;
+                        setCuentasEmpresa(nuevasCuentas);
+                      }}
+                      placeholder="Ej: BCP Soles: 123-456-789"
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nuevasCuentas = cuentasEmpresa.filter((_, i) => i !== index);
+                        setCuentasEmpresa(nuevasCuentas.length > 0 ? nuevasCuentas : [""]);
+                      }}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar cuenta"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-crm-text-muted mt-2">
+                Las cuentas aparecerán en el PDF de la proforma
+              </p>
             </div>
 
             <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
@@ -789,22 +962,71 @@ export default function CrearProformaModal({
             </div>
           </div>
             </div>
-            <aside className="mt-6 lg:mt-0 lg:w-[360px] flex-shrink-0 space-y-3">
-              <div className="p-4 bg-crm-background rounded-xl border border-crm-border shadow-sm">
+            <aside className="mt-6 lg:mt-0 lg:w-[500px] flex-shrink-0 space-y-3">
+              <div className="p-4 bg-crm-background rounded-xl border border-crm-border shadow-sm sticky top-20">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
                     Vista previa
                   </h3>
-                  {isPreviewLoading && <span className="text-xs text-crm-text-muted">Generando…</span>}
+                  <div className="flex items-center gap-2">
+                    {isPreviewLoading && (
+                      <div className="flex items-center gap-2 text-xs text-crm-text-muted">
+                        <svg className="animate-spin h-4 w-4 text-crm-primary" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Generando…</span>
+                      </div>
+                    )}
+                    {previewUrl && !isPreviewLoading && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (previewUrl) {
+                              const a = document.createElement('a');
+                              a.href = previewUrl;
+                              a.download = `proforma-${cliente?.codigo_cliente || 'draft'}-${Date.now()}.pdf`;
+                              a.click();
+                            }
+                          }}
+                          className="p-1.5 text-crm-text-muted hover:text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
+                          title="Descargar PDF"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const modal = document.getElementById('proforma-fullscreen-modal');
+                            if (modal) {
+                              modal.style.display = 'flex';
+                            }
+                          }}
+                          className="p-1.5 text-crm-text-muted hover:text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
+                          title="Ver en pantalla completa"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="relative w-full h-[420px] bg-white border border-crm-border rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="relative w-full h-[700px] bg-white border border-crm-border rounded-lg overflow-hidden flex items-center justify-center">
                   {previewError ? (
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
-                      <p className="text-sm text-red-600">{previewError}</p>
+                      <svg className="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm text-red-600 font-medium">{previewError}</p>
                       <button
                         type="button"
                         onClick={() => setPreviewVersion((prev) => prev + 1)}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                        className="px-4 py-2 text-sm font-medium rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-colors"
                       >
                         Reintentar
                       </button>
@@ -816,8 +1038,13 @@ export default function CrearProformaModal({
                       className="absolute inset-0 h-full w-full"
                     />
                   ) : (
-                    <div className="px-4 text-center text-sm text-crm-text-muted">
-                      Completa los datos para ver la proforma en tiempo real.
+                    <div className="flex flex-col items-center gap-3 px-4 text-center">
+                      <svg className="w-16 h-16 text-crm-text-muted opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-sm text-crm-text-muted">
+                        Completa los datos para ver la proforma en tiempo real
+                      </p>
                     </div>
                   )}
                 </div>
@@ -855,6 +1082,69 @@ export default function CrearProformaModal({
             >
               Generar PDF
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de pantalla completa */}
+      <div
+        id="proforma-fullscreen-modal"
+        className="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            e.currentTarget.style.display = 'none';
+          }
+        }}
+      >
+        <div className="relative w-full h-full flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">
+              Vista previa - Proforma
+            </h3>
+            <div className="flex items-center gap-2">
+              {previewUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (previewUrl) {
+                      const a = document.createElement('a');
+                      a.href = previewUrl;
+                      a.download = `proforma-${cliente?.codigo_cliente || 'draft'}-${Date.now()}.pdf`;
+                      a.click();
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Descargar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const modal = document.getElementById('proforma-fullscreen-modal');
+                  if (modal) {
+                    modal.style.display = 'none';
+                  }
+                }}
+                className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 bg-white rounded-lg overflow-hidden">
+            {previewUrl && (
+              <iframe
+                title="Vista previa proforma fullscreen"
+                src={previewUrl}
+                className="w-full h-full"
+              />
+            )}
           </div>
         </div>
       </div>

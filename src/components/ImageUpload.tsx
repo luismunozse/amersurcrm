@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { InfoDialog } from "@/components/ui/InfoDialog";
 
 interface ImageUploadProps {
   onImagesChange: (images: File[]) => void;
@@ -18,14 +19,15 @@ export default function ImageUpload({
   className = ""
 }: ImageUploadProps) {
   const [dragActive, setDragActive] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (files: FileList) => {
     const fileArray = Array.from(files);
     const imageFiles = fileArray.filter(file => file.type.startsWith('image/'));
     
-    if (imageFiles.length > maxImages) {
-      alert(`Solo puedes subir máximo ${maxImages} imágenes`);
+    if (existingImages.length + imageFiles.length > maxImages) {
+      setLimitReached(true);
       return;
     }
 
@@ -120,6 +122,14 @@ export default function ImageUpload({
           </p>
         </div>
       </div>
+
+      <InfoDialog
+        open={limitReached}
+        onClose={() => setLimitReached(false)}
+        title="Límite de imágenes"
+        description={`Solo puedes subir máximo ${maxImages} imágenes por propiedad. Actualmente ya tienes ${existingImages.length} en la galería.`}
+        tone="warning"
+      />
     </div>
   );
 }

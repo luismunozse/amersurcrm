@@ -1,25 +1,82 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { DollarSign, TrendingUp, Calendar, Download } from "lucide-react";
+import { DollarSign, TrendingUp, Calendar, Download, Loader2 } from "lucide-react";
+import { obtenerReporteVentas, obtenerMetricasRendimiento, obtenerObjetivosVsRealidad } from "../_actions";
+import toast from "react-hot-toast";
 
-export default function ReporteVentas() {
-  const salesData = [
-    { month: "Enero", sales: 450000, properties: 12 },
-    { month: "Febrero", sales: 520000, properties: 15 },
-    { month: "Marzo", sales: 480000, properties: 13 },
-    { month: "Abril", sales: 610000, properties: 18 },
-    { month: "Mayo", sales: 580000, properties: 16 },
-    { month: "Junio", sales: 720000, properties: 21 },
-  ];
+interface ReporteVentasProps {
+  periodo: string;
+}
 
-  const topProjects = [
-    { name: "Residencial Los Olivos", sales: 1800000, units: 24 },
-    { name: "Condominio San Isidro", sales: 1200000, units: 16 },
-    { name: "Torre Miraflores", sales: 950000, units: 12 },
-    { name: "Urbanización La Molina", sales: 800000, units: 10 },
-  ];
+export default function ReporteVentas({ periodo }: ReporteVentasProps) {
+  const [data, setData] = useState<any>(null);
+  const [metricas, setMetricas] = useState<any>(null);
+  const [objetivos, setObjetivos] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cargarDatos = async () => {
+      setLoading(true);
+      setError(null);
+
+      // Cargar todos los datos en paralelo
+      const [resultVentas, resultMetricas, resultObjetivos] = await Promise.all([
+        obtenerReporteVentas(periodo),
+        obtenerMetricasRendimiento(periodo),
+        obtenerObjetivosVsRealidad(periodo)
+      ]);
+
+      if (resultVentas.error) {
+        setError(resultVentas.error);
+        toast.error(resultVentas.error);
+      } else {
+        setData(resultVentas.data);
+      }
+
+      if (resultMetricas.data) {
+        setMetricas(resultMetricas.data);
+      }
+
+      if (resultObjetivos.data) {
+        setObjetivos(resultObjetivos.data);
+      }
+
+      setLoading(false);
+    };
+
+    cargarDatos();
+  }, [periodo]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-600 mb-4">{error || 'Error cargando datos'}</div>
+        <Button onClick={() => window.location.reload()}>Reintentar</Button>
+      </div>
+    );
+  }
+
+  const { resumen, salesData, topProjects, formasPago } = data;
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: 'PEN',
+      minimumFractionDigits: 0
+    }).format(value);
+  };
 
   return (
     <div className="space-y-6">
@@ -57,9 +114,9 @@ export default function ReporteVentas() {
             <DollarSign className="h-4 w-4 text-crm-text-muted" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-crm-text-primary">S/ 3,360,000</div>
-            <p className="text-xs text-green-600 mt-1">
-              +15.3% vs período anterior
+            <div className="text-2xl font-bold text-crm-text-primary">{formatCurrency(resumen.valorTotal)}</div>
+            <p className="text-xs text-crm-text-muted mt-1">
+              Período seleccionado
             </p>
           </CardContent>
         </Card>
@@ -72,9 +129,9 @@ export default function ReporteVentas() {
             <TrendingUp className="h-4 w-4 text-crm-text-muted" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-crm-text-primary">95</div>
-            <p className="text-xs text-green-600 mt-1">
-              +12.7% vs período anterior
+            <div className="text-2xl font-bold text-crm-text-primary">{resumen.propiedadesVendidas}</div>
+            <p className="text-xs text-crm-text-muted mt-1">
+              Unidades vendidas
             </p>
           </CardContent>
         </Card>
@@ -87,78 +144,91 @@ export default function ReporteVentas() {
             <DollarSign className="h-4 w-4 text-crm-text-muted" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-crm-text-primary">S/ 35,368</div>
-            <p className="text-xs text-green-600 mt-1">
-              +2.3% vs período anterior
+            <div className="text-2xl font-bold text-crm-text-primary">{formatCurrency(resumen.promedioVenta)}</div>
+            <p className="text-xs text-crm-text-muted mt-1">
+              Por unidad
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Sales Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Evolución de Ventas</CardTitle>
-          <CardDescription>
-            Ventas mensuales de los últimos 6 meses
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {salesData.map((data, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border border-crm-border rounded-lg">
-                <div>
-                  <h4 className="font-medium text-crm-text-primary">{data.month}</h4>
-                  <p className="text-sm text-crm-text-secondary">{data.properties} propiedades</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-crm-text-primary">
-                    S/ {data.sales.toLocaleString()}
-                  </p>
-                  <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
-                    <div 
-                      className="bg-crm-primary h-2 rounded-full" 
-                      style={{ width: `${(data.sales / 720000) * 100}%` }}
-                    ></div>
+      {salesData && salesData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Evolución de Ventas</CardTitle>
+            <CardDescription>
+              Ventas mensuales del período
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {salesData.map((item: any, index: number) => {
+                const maxSales = Math.max(...salesData.map((d: any) => d.sales));
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 border border-crm-border rounded-lg">
+                    <div>
+                      <h4 className="font-medium text-crm-text-primary">{item.month}</h4>
+                      <p className="text-sm text-crm-text-secondary">{item.properties} propiedades</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-crm-text-primary">
+                        {formatCurrency(item.sales)}
+                      </p>
+                      <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
+                        <div
+                          className="bg-crm-primary h-2 rounded-full"
+                          style={{ width: `${maxSales > 0 ? (item.sales / maxSales) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Projects */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Proyectos Más Vendidos</CardTitle>
-          <CardDescription>
-            Ranking de proyectos por volumen de ventas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {topProjects.map((project, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border border-crm-border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-crm-primary text-white rounded-full flex items-center justify-center font-bold text-sm">
-                    {index + 1}
+      {topProjects && topProjects.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Proyectos Más Vendidos</CardTitle>
+            <CardDescription>
+              Ranking de proyectos por volumen de ventas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {topProjects.map((project: any, index: number) => (
+                <div key={index} className="flex items-center justify-between p-4 border border-crm-border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-crm-primary text-white rounded-full flex items-center justify-center font-bold text-sm">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-crm-text-primary">{project.name}</h4>
+                      <p className="text-sm text-crm-text-secondary">{project.units} unidades</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium text-crm-text-primary">{project.name}</h4>
-                    <p className="text-sm text-crm-text-secondary">{project.units} unidades</p>
+                  <div className="text-right">
+                    <p className="font-bold text-crm-text-primary">
+                      {formatCurrency(project.sales)}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-crm-text-primary">
-                    S/ {project.sales.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="py-8 text-center text-crm-text-secondary">
+            No hay datos de proyectos disponibles para este período
+          </CardContent>
+        </Card>
+      )}
 
       {/* Performance Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -167,22 +237,30 @@ export default function ReporteVentas() {
             <CardTitle>Métricas de Rendimiento</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-crm-text-secondary">Tasa de Conversión</span>
-              <span className="font-bold text-crm-text-primary">24.8%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-crm-text-secondary">Tiempo Promedio de Venta</span>
-              <span className="font-bold text-crm-text-primary">45 días</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-crm-text-secondary">Lead Quality Score</span>
-              <span className="font-bold text-crm-text-primary">8.2/10</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-crm-text-secondary">Customer Satisfaction</span>
-              <span className="font-bold text-crm-text-primary">4.7/5</span>
-            </div>
+            {metricas ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-crm-text-secondary">Tasa de Conversión</span>
+                  <span className="font-bold text-crm-text-primary">{metricas.tasaConversion}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-crm-text-secondary">Tiempo Promedio de Venta</span>
+                  <span className="font-bold text-crm-text-primary">{metricas.tiempoPromedioVenta} días</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-crm-text-secondary">Total Leads</span>
+                  <span className="font-bold text-crm-text-primary">{metricas.totalLeads}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-crm-text-secondary">Clientes Convertidos</span>
+                  <span className="font-bold text-crm-text-primary">{metricas.clientesConvertidos}</span>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-crm-text-secondary py-4">
+                Cargando métricas...
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -191,35 +269,58 @@ export default function ReporteVentas() {
             <CardTitle>Objetivos vs Realidad</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-crm-text-secondary">Ventas Mensuales</span>
-                <span className="text-sm text-crm-text-muted">560K / 600K</span>
+            {objetivos ? (
+              <>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-crm-text-secondary">Ventas Mensuales</span>
+                    <span className="text-sm text-crm-text-muted">
+                      {formatCurrency(objetivos.ventasMensuales.realizado)} / {formatCurrency(objetivos.ventasMensuales.meta)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${objetivos.ventasMensuales.porcentaje >= 90 ? 'bg-green-500' : objetivos.ventasMensuales.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                      style={{ width: `${Math.min(objetivos.ventasMensuales.porcentaje, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-crm-text-secondary">Propiedades</span>
+                    <span className="text-sm text-crm-text-muted">
+                      {objetivos.propiedades.realizado} / {objetivos.propiedades.meta}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${objetivos.propiedades.porcentaje >= 90 ? 'bg-green-500' : objetivos.propiedades.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                      style={{ width: `${Math.min(objetivos.propiedades.porcentaje, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-crm-text-secondary">Clientes Nuevos</span>
+                    <span className="text-sm text-crm-text-muted">
+                      {objetivos.clientesNuevos.realizado} / {objetivos.clientesNuevos.meta}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${objetivos.clientesNuevos.porcentaje >= 90 ? 'bg-green-500' : objetivos.clientesNuevos.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                      style={{ width: `${Math.min(objetivos.clientesNuevos.porcentaje, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-crm-text-secondary py-4">
+                Cargando objetivos...
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{ width: '93%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-crm-text-secondary">Propiedades</span>
-                <span className="text-sm text-crm-text-muted">95 / 100</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full" style={{ width: '95%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-crm-text-secondary">Clientes Nuevos</span>
-                <span className="text-sm text-crm-text-muted">45 / 50</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-purple-500 h-2 rounded-full" style={{ width: '90%' }}></div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

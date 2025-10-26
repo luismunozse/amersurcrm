@@ -3,9 +3,13 @@
 import { useState } from "react";
 import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, RefreshCw } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
-import { exportarReportePDF } from "./_actions";
 import GraficosTendencias from "@/components/reportes/GraficosTendencias";
 import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
+import ReporteVentas from "./components/ReporteVentas";
+import ReporteClientes from "./components/ReporteClientes";
+import ReportePropiedades from "./components/ReportePropiedades";
+import ReporteRendimientoVendedores from "./components/ReporteRendimientoVendedores";
+import { abrirReportePDF } from "@/lib/pdfGenerator";
 import toast from "react-hot-toast";
 
 export default function ReportesPage() {
@@ -28,23 +32,15 @@ export default function ReportesPage() {
     }
 
     try {
-      toast.loading('Generando reporte...', { id: 'export' });
+      toast.loading('Generando PDF...', { id: 'export' });
 
-      const result = await exportarReportePDF();
-      
-      if (result.success && result.url) {
-        // Abrir el reporte en una nueva ventana
-        const newWindow = window.open(result.url, '_blank');
-        if (newWindow) {
-          newWindow.document.title = `Reporte AMERSUR - ${new Date().toLocaleDateString('es-PE')}`;
-        }
-        toast.success('Reporte generado exitosamente', { id: 'export' });
-      } else {
-        toast.error(result.error || 'Error generando reporte', { id: 'export' });
-      }
+      // Generar y abrir el PDF usando los datos cargados
+      abrirReportePDF(data);
+
+      toast.success('Reporte PDF generado exitosamente', { id: 'export' });
     } catch (err) {
       console.error('Error exportando reporte:', err);
-      toast.error('Error exportando reporte', { id: 'export' });
+      toast.error('Error generando PDF. Por favor intenta nuevamente.', { id: 'export' });
     }
   };
 
@@ -203,8 +199,9 @@ export default function ReportesPage() {
 
       {/* Comparación de Períodos */}
       {data && !loading && !error && (
-        <ComparacionPeriodos 
+        <ComparacionPeriodos
           periodoActual={selectedPeriod}
+          datosActuales={data}
         />
       )}
 
@@ -239,49 +236,10 @@ export default function ReportesPage() {
         </div>
         
         {/* Tab Content */}
-        {reportTypes.map((report) => (
-          activeTab === report.id && (
-            <div key={report.id} className="bg-crm-card border border-crm-border rounded-xl p-6">
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-crm-text-primary flex items-center gap-2 mb-2">
-                  <report.icon className="w-5 h-5" />
-                  {report.title}
-                </h3>
-                <p className="text-crm-text-secondary">{report.description}</p>
-              </div>
-              
-              <div className="text-center py-12">
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-full ${
-                  report.icon === DollarSign ? 'bg-green-50' : 
-                  report.icon === UserCheck ? 'bg-blue-50' : 
-                  report.icon === Building ? 'bg-purple-50' : 'bg-orange-50'
-                } flex items-center justify-center`}>
-                  <report.icon className={`w-8 h-8 ${
-                    report.icon === DollarSign ? 'text-green-600' : 
-                    report.icon === UserCheck ? 'text-blue-600' : 
-                    report.icon === Building ? 'text-purple-600' : 'text-orange-600'
-                  }`} />
-                </div>
-                <h4 className="text-lg font-semibold text-crm-text-primary mb-2">
-                  {report.title}
-                </h4>
-                <p className="text-crm-text-secondary mb-6 max-w-md mx-auto">
-                  {report.description}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors">
-                    <BarChart3 className="w-4 h-4" />
-                    Generar Reporte
-                  </button>
-                  <button className="flex items-center gap-2 px-4 py-2 border border-crm-border bg-transparent text-crm-text-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-                    <Download className="w-4 h-4" />
-                    Descargar PDF
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        ))}
+        {activeTab === "ventas" && <ReporteVentas periodo={selectedPeriod} />}
+        {activeTab === "clientes" && <ReporteClientes periodo={selectedPeriod} />}
+        {activeTab === "propiedades" && <ReportePropiedades periodo={selectedPeriod} />}
+        {activeTab === "rendimiento" && <ReporteRendimientoVendedores periodo={selectedPeriod} />}
       </div>
 
       {/* Quick Actions */}
