@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { createServiceRoleClient } from "@/lib/supabase.server";
 
 type AnySupabaseClient =
-  | SupabaseClient<Record<string, unknown>, "public", Record<string, unknown>>
+  | SupabaseClient
   | ReturnType<typeof createServiceRoleClient>;
 type WebPushModule = typeof import("web-push");
 
