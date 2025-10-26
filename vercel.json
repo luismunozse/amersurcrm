@@ -7,10 +7,7 @@
   "crons": [
     {
       "path": "/api/notifications/send-recordatorios",
-      "schedule": "*/10 * * * *",
-      "headers": {
-        "Authorization": "Bearer ${NOTIFICATIONS_CRON_SECRET}"
-      }
+      "schedule": "*/10 * * * *"
     }
   ],
   "env": {

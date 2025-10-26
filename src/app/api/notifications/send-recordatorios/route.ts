@@ -11,11 +11,17 @@ function unauthorizedResponse() {
 }
 
 export async function POST(req: NextRequest) {
+  const cronHeader = req.headers.get("x-vercel-cron") === "1";
+
   if (CRON_SECRET) {
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || authHeader !== `Bearer ${CRON_SECRET}`) {
+    const hasBearer = authHeader === `Bearer ${CRON_SECRET}`;
+    if (!hasBearer && !cronHeader) {
       return unauthorizedResponse();
     }
+  } else if (!cronHeader) {
+    // Sin secreto y sin cabecera de Vercel Cron no permitimos la invocación
+    return unauthorizedResponse();
   }
 
   const supabase = createServiceRoleClient();
