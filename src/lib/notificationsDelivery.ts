@@ -150,9 +150,9 @@ async function sendPushNotification(
 
 async function loadWebPushModule(): Promise<WebPushModule | null> {
   try {
-    const dynamicImport = new Function("moduleName", "return import(moduleName);");
-    const mod = (await dynamicImport("web-push")) as Record<string, unknown>;
-    const webpushModule = ((mod as { default?: unknown }).default ?? mod) as WebPushModule;
+    const mod = await import("web-push");
+    const webpushModule =
+      ("default" in mod && mod.default ? mod.default : (mod as unknown)) as WebPushModule;
     return webpushModule;
   } catch (error) {
     console.warn("No se pudo cargar el módulo web-push:", error);
