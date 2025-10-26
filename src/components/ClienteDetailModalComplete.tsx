@@ -185,13 +185,6 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
     return parts.length > 0 ? parts.join(', ') : 'No especificada';
   };
 
-  const getNivelCliente = (capacidad: number | null) => {
-    if (!capacidad) return { nivel: 'No especificado', color: 'text-crm-text-secondary bg-crm-card-hover' };
-    if (capacidad >= 500000) return { nivel: 'Alto', color: 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30' };
-    if (capacidad >= 100000) return { nivel: 'Medio', color: 'text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30' };
-    return { nivel: 'Bajo', color: 'text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30' };
-  };
-
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -296,13 +289,10 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                     </div>
                   </div>
 
-                  {/* Estado y Nivel */}
+                  {/* Estado */}
                   <div className="mt-4 flex items-center flex-wrap gap-2">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getEstadoColor(cliente.estado_cliente)}`}>
                       {getEstadoText(cliente.estado_cliente)}
-                    </span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getNivelCliente(cliente.capacidad_compra_estimada).color}`}>
-                      Nivel: {getNivelCliente(cliente.capacidad_compra_estimada).nivel}
                     </span>
                     {/* Indicadores de Urgencia */}
                     {getAlertas().map((alerta, index) => (
