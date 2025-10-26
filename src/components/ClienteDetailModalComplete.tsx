@@ -211,7 +211,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
               leaveFrom="opacity-100 scale-100 translate-y-0"
               leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-crm-card border-2 border-crm-border text-left align-middle shadow-2xl transition-all">
+              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-crm-card border-2 border-gray-200 dark:border-crm-border text-left align-middle shadow-2xl transition-all">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 px-6 py-6">
                   <div className="flex items-start justify-between">
@@ -319,12 +319,12 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       
                       <div className="space-y-3">
                         {cliente.email && (
-                          <div className="flex items-center justify-between p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors group">
+                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg hover:border-crm-primary hover:shadow-md transition-all group">
                             <div className="flex items-center space-x-3">
                               <EnvelopeIcon className="w-5 h-5 text-crm-primary" />
                               <div>
-                                <p className="text-sm font-medium text-crm-text-primary">Email</p>
-                                <p className="text-sm text-crm-text-secondary">{cliente.email}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Email</p>
+                                <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{cliente.email}</p>
                               </div>
                             </div>
                             <button
@@ -342,12 +342,12 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                         )}
 
                         {cliente.telefono && (
-                          <div className="flex items-center justify-between p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors group">
+                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg hover:border-crm-primary hover:shadow-md transition-all group">
                             <div className="flex items-center space-x-3">
                               <PhoneIcon className="w-5 h-5 text-crm-primary" />
                               <div>
-                                <p className="text-sm font-medium text-crm-text-primary">Teléfono</p>
-                                <p className="text-sm text-crm-text-secondary">{cliente.telefono}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Teléfono</p>
+                                <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{cliente.telefono}</p>
                               </div>
                             </div>
                             <button
@@ -365,12 +365,12 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                         )}
 
                         {cliente.telefono_whatsapp && (
-                          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-colors group">
+                          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800 rounded-lg hover:border-green-500 dark:hover:border-green-600 hover:shadow-md transition-all group">
                             <div className="flex items-center space-x-3">
                               <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
                               <div>
-                                <p className="text-sm font-medium text-crm-text-primary">WhatsApp</p>
-                                <p className="text-sm text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">WhatsApp</p>
+                                <p className="text-sm text-gray-700 dark:text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
                               </div>
                             </div>
                             <button
@@ -388,12 +388,12 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                         )}
 
                         {cliente.documento_identidad && (
-                          <div className="flex items-center justify-between p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors group">
+                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg hover:border-crm-primary hover:shadow-md transition-all group">
                             <div className="flex items-center space-x-3">
                               <DocumentTextIcon className="w-5 h-5 text-crm-primary" />
                               <div>
-                                <p className="text-sm font-medium text-crm-text-primary">Documento</p>
-                                <p className="text-sm text-crm-text-secondary">{cliente.documento_identidad}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Documento</p>
+                                <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{cliente.documento_identidad}</p>
                               </div>
                             </div>
                             <button
@@ -421,37 +421,37 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       
                       <div className="space-y-3">
                         {cliente.interes_principal && (
-                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Interés Principal</p>
-                            <p className="text-sm text-crm-text-secondary">{cliente.interes_principal}</p>
+                          <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Interés Principal</p>
+                            <p className="text-sm text-gray-600 dark:text-crm-text-secondary capitalize">{cliente.interes_principal}</p>
                           </div>
                         )}
 
                         {cliente.origen_lead && (
-                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Origen del Lead</p>
-                            <p className="text-sm text-crm-text-secondary">{cliente.origen_lead}</p>
+                          <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Origen del Lead</p>
+                            <p className="text-sm text-gray-600 dark:text-crm-text-secondary capitalize">{cliente.origen_lead}</p>
                           </div>
                         )}
 
                         {cliente.capacidad_compra_estimada && (
-                          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Capacidad de Compra</p>
+                          <div className="p-3 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Capacidad de Compra</p>
                             <p className="text-lg font-bold text-green-700 dark:text-green-400">{formatCapacidad(cliente.capacidad_compra_estimada)}</p>
                           </div>
                         )}
-                        
+
                         {cliente.forma_pago_preferida && (
-                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Forma de Pago Preferida</p>
-                            <p className="text-sm text-crm-text-secondary">{cliente.forma_pago_preferida}</p>
+                          <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Forma de Pago Preferida</p>
+                            <p className="text-sm text-gray-600 dark:text-crm-text-secondary capitalize">{cliente.forma_pago_preferida}</p>
                           </div>
                         )}
 
                         {cliente.vendedor_asignado && (
-                          <div className="p-3 bg-crm-card-hover border border-crm-border rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Vendedor Asignado</p>
-                            <p className="text-sm text-crm-text-secondary">{cliente.vendedor_asignado}</p>
+                          <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Vendedor Asignado</p>
+                            <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{cliente.vendedor_asignado}</p>
                           </div>
                         )}
                       </div>

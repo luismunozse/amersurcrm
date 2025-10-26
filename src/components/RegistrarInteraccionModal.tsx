@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
-import { registrarInteraccion } from "@/app/dashboard/clientes/_actions_crm";
+import { registrarInteraccion, actualizarInteraccion } from "@/app/dashboard/clientes/_actions_crm";
 import {
   TIPOS_INTERACCION,
   RESULTADOS_INTERACCION,
@@ -18,6 +18,7 @@ interface Props {
   onClose: () => void;
   clienteId: string;
   clienteNombre: string;
+  interaccionToEdit?: any | null;
 }
 
 export default function RegistrarInteraccionModal({
@@ -25,8 +26,10 @@ export default function RegistrarInteraccionModal({
   onClose,
   clienteId,
   clienteNombre,
+  interaccionToEdit = null,
 }: Props) {
   const [isPending, startTransition] = useTransition();
+  const isEditMode = !!interaccionToEdit;
 
   // Form state
   const [tipo, setTipo] = useState<TipoInteraccion>("llamada");
@@ -36,26 +39,64 @@ export default function RegistrarInteraccionModal({
   const [proximaAccion, setProximaAccion] = useState<ProximaAccion | "">("");
   const [fechaProximaAccion, setFechaProximaAccion] = useState("");
 
+  // Poblar formulario cuando se edita
+  useEffect(() => {
+    if (interaccionToEdit) {
+      setTipo(interaccionToEdit.tipo || "llamada");
+      setResultado(interaccionToEdit.resultado || "");
+      setNotas(interaccionToEdit.notas || "");
+      setDuracionMinutos(interaccionToEdit.duracion_minutos?.toString() || "");
+      setProximaAccion(interaccionToEdit.proxima_accion || "");
+
+      // Formatear fecha si existe
+      if (interaccionToEdit.fecha_proxima_accion) {
+        const fecha = new Date(interaccionToEdit.fecha_proxima_accion);
+        const formatted = fecha.toISOString().slice(0, 16);
+        setFechaProximaAccion(formatted);
+      } else {
+        setFechaProximaAccion("");
+      }
+    } else {
+      resetForm();
+    }
+  }, [interaccionToEdit]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     startTransition(async () => {
-      const result = await registrarInteraccion({
-        clienteId,
-        tipo,
-        resultado: resultado || undefined,
-        notas: notas || undefined,
-        duracionMinutos: duracionMinutos ? parseInt(duracionMinutos) : undefined,
-        proximaAccion: proximaAccion || undefined,
-        fechaProximaAccion: fechaProximaAccion || undefined,
-      });
+      let result;
+
+      if (isEditMode && interaccionToEdit) {
+        // Modo edición
+        result = await actualizarInteraccion({
+          interaccionId: interaccionToEdit.id,
+          tipo,
+          resultado: resultado || undefined,
+          notas: notas || undefined,
+          duracionMinutos: duracionMinutos ? parseInt(duracionMinutos) : undefined,
+          proximaAccion: proximaAccion || undefined,
+          fechaProximaAccion: fechaProximaAccion || undefined,
+        });
+      } else {
+        // Modo creación
+        result = await registrarInteraccion({
+          clienteId,
+          tipo,
+          resultado: resultado || undefined,
+          notas: notas || undefined,
+          duracionMinutos: duracionMinutos ? parseInt(duracionMinutos) : undefined,
+          proximaAccion: proximaAccion || undefined,
+          fechaProximaAccion: fechaProximaAccion || undefined,
+        });
+      }
 
       if (result.success) {
-        toast.success("Interacción registrada exitosamente");
+        toast.success(isEditMode ? "Interacción actualizada exitosamente" : "Interacción registrada exitosamente");
         resetForm();
         onClose();
       } else {
-        toast.error(result.error || "Error al registrar interacción");
+        toast.error(result.error || (isEditMode ? "Error al actualizar interacción" : "Error al registrar interacción"));
       }
     });
   };
@@ -85,7 +126,7 @@ export default function RegistrarInteraccionModal({
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-crm-text-primary">
-              Registrar Interacción
+              {isEditMode ? "Editar Interacción" : "Registrar Interacción"}
             </h2>
             <p className="text-sm text-crm-text-secondary mt-1">
               Cliente: {clienteNombre}
@@ -233,7 +274,7 @@ export default function RegistrarInteraccionModal({
               disabled={isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-crm-primary rounded-lg hover:bg-crm-primary/90 transition-colors disabled:opacity-50"
             >
-              {isPending ? "Guardando..." : "Guardar Interacción"}
+              {isPending ? "Guardando..." : (isEditMode ? "Actualizar Interacción" : "Guardar Interacción")}
             </button>
           </div>
         </form>

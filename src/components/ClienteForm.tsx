@@ -218,10 +218,23 @@ export default function ClienteForm({
                 <input
                   name="nombre"
                   required
+                  minLength={2}
                   defaultValue={cliente?.nombre || ""}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                   disabled={pending}
                   placeholder={tipoCliente === 'persona' ? 'Juan Pérez García' : 'Empresa Constructora S.A.C.'}
+                  onInvalid={(e) => {
+                    const target = e.target as HTMLInputElement;
+                    if (target.validity.valueMissing) {
+                      target.setCustomValidity('El nombre es obligatorio');
+                    } else if (target.validity.tooShort) {
+                      target.setCustomValidity('El nombre debe tener al menos 2 caracteres');
+                    }
+                  }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLInputElement;
+                    target.setCustomValidity('');
+                  }}
                 />
               </div>
 
@@ -269,8 +282,34 @@ export default function ClienteForm({
                     className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                     disabled={pending}
                     placeholder={tipoDocumento === 'DNI' ? '12345678' : tipoDocumento === 'RUC' ? '20123456789' : 'AB123456'}
-                    pattern={tipoDocumento === 'DNI' ? '[0-9]{8}' : tipoDocumento === 'RUC' ? '[0-9]{11}' : tipoDocumento === 'PAS' ? '[A-Z]{2}[0-9]{6}' : '[0-9]{8}'}
-                    title={tipoDocumento === 'DNI' ? 'Ingrese 8 dígitos' : tipoDocumento === 'RUC' ? 'Ingrese 11 dígitos' : 'Formato: AB123456'}
+                    minLength={tipoDocumento === 'DNI' ? 8 : tipoDocumento === 'RUC' ? 11 : 8}
+                    maxLength={tipoDocumento === 'DNI' ? 8 : tipoDocumento === 'RUC' ? 11 : 15}
+                    pattern={tipoDocumento === 'DNI' ? '[0-9]{8}' : tipoDocumento === 'RUC' ? '[0-9]{11}' : tipoDocumento === 'PAS' ? '[A-Z0-9]{6,15}' : '[A-Z0-9]{8,15}'}
+                    title={tipoDocumento === 'DNI' ? 'Debe tener exactamente 8 dígitos' : tipoDocumento === 'RUC' ? 'Debe tener exactamente 11 dígitos' : 'Ingrese un documento válido'}
+                    onInvalid={(e) => {
+                      const target = e.target as HTMLInputElement;
+                      if (target.validity.valueMissing) {
+                        target.setCustomValidity('El número de documento es obligatorio');
+                      } else if (target.validity.patternMismatch) {
+                        if (tipoDocumento === 'DNI') {
+                          target.setCustomValidity('El DNI debe tener exactamente 8 dígitos');
+                        } else if (tipoDocumento === 'RUC') {
+                          target.setCustomValidity('El RUC debe tener exactamente 11 dígitos');
+                        } else {
+                          target.setCustomValidity('Formato de documento inválido');
+                        }
+                      } else if (target.validity.tooShort || target.validity.tooLong) {
+                        if (tipoDocumento === 'DNI') {
+                          target.setCustomValidity('El DNI debe tener exactamente 8 dígitos');
+                        } else if (tipoDocumento === 'RUC') {
+                          target.setCustomValidity('El RUC debe tener exactamente 11 dígitos');
+                        }
+                      }
+                    }}
+                    onInput={(e) => {
+                      const target = e.target as HTMLInputElement;
+                      target.setCustomValidity('');
+                    }}
                   />
                 </div>
               </div>

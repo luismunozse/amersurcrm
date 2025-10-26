@@ -345,13 +345,23 @@ export default function ClientesTable({
   const handleEstadoChange = async (cliente: Cliente, nuevoEstado: EstadoCliente) => {
     const estadoActual = (cliente.estado_cliente || 'por_contactar') as EstadoCliente;
 
+    console.log('🔍 Cambiando estado:', {
+      estadoActual,
+      nuevoEstado,
+      cliente: cliente.nombre,
+      debeAbrirModal: estadoActual === 'por_contactar' && nuevoEstado === 'contactado'
+    });
+
     // Si está cambiando de "por_contactar" a "contactado", mostrar modal para registrar la interacción
     if (estadoActual === 'por_contactar' && nuevoEstado === 'contactado') {
+      console.log('✅ Abriendo modal de contacto');
       setSelectedCliente(cliente);
       setPendingEstadoChange({ clienteId: cliente.id, nuevoEstado });
       setShowContactoModal(true);
       return;
     }
+
+    console.log('⏭️ Cambio directo sin modal');
 
     // Para otros cambios de estado, proceder normalmente
     try {

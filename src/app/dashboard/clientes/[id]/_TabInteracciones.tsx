@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Phone, Mail, MessageSquare, Users, Video, FileText, Clock, Calendar, Loader2, RefreshCw } from "lucide-react";
+import { useState, useEffect, useCallback, useTransition } from "react";
+import { Plus, Phone, Mail, MessageSquare, Users, Video, FileText, Clock, Calendar, Loader2, RefreshCw, Edit2, Trash2 } from "lucide-react";
 import RegistrarInteraccionModal from "@/components/RegistrarInteraccionModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { TIPOS_INTERACCION, RESULTADOS_INTERACCION, PROXIMAS_ACCIONES } from "@/lib/types/crm-flujo";
-import { obtenerInteracciones } from "../_actions_crm";
+import { obtenerInteracciones, eliminarInteraccion } from "../_actions_crm";
+import toast from "react-hot-toast";
 
 interface Props {
   clienteId: string;
@@ -16,6 +18,12 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [interacciones, setInteracciones] = useState(initialInteracciones);
   const [loading, setLoading] = useState(false);
+  const [interaccionToEdit, setInteraccionToEdit] = useState<any | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; interaccionId: string | null }>({
+    open: false,
+    interaccionId: null,
+  });
+  const [isPending, startTransition] = useTransition();
 
   const cargarInteracciones = useCallback(async () => {
     setLoading(true);
@@ -33,8 +41,25 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
 
   const handleModalClose = () => {
     setIsModalOpen(false);
+    setInteraccionToEdit(null);
     // Recargar interacciones después de cerrar el modal
     cargarInteracciones();
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete.interaccionId) return;
+
+    startTransition(async () => {
+      const result = await eliminarInteraccion(confirmDelete.interaccionId!);
+
+      if (result.success) {
+        toast.success('Interacción eliminada exitosamente');
+        setConfirmDelete({ open: false, interaccionId: null });
+        cargarInteracciones();
+      } else {
+        toast.error(result.error || 'Error al eliminar la interacción');
+      }
+    });
   };
 
   const getIconoTipo = (tipo: string) => {
@@ -141,12 +166,35 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
                     </div>
                   </div>
 
-                  {interaccion.duracion_minutos && (
-                    <div className="flex items-center gap-1 text-sm text-crm-text-muted">
-                      <Clock className="h-3 w-3" />
-                      <span>{interaccion.duracion_minutos} min</span>
+                  <div className="flex items-center gap-2">
+                    {interaccion.duracion_minutos && (
+                      <div className="flex items-center gap-1 text-sm text-crm-text-muted">
+                        <Clock className="h-3 w-3" />
+                        <span>{interaccion.duracion_minutos} min</span>
+                      </div>
+                    )}
+
+                    {/* Botones de acción */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setInteraccionToEdit(interaccion);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-1.5 text-crm-text-muted hover:text-crm-primary hover:bg-crm-card-hover rounded transition-colors"
+                        title="Editar interacción"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete({ open: true, interaccionId: interaccion.id })}
+                        className="p-1.5 text-crm-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                        title="Eliminar interacción"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {interaccion.notas && (
@@ -192,6 +240,19 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
         onClose={handleModalClose}
         clienteId={clienteId}
         clienteNombre={clienteNombre}
+        interaccionToEdit={interaccionToEdit}
+      />
+
+      {/* Dialog de confirmación de eliminación */}
+      <ConfirmDialog
+        open={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, interaccionId: null })}
+        onConfirm={handleDelete}
+        title="Eliminar Interacción"
+        description="¿Estás seguro de que deseas eliminar esta interacción? Esta acción no se puede deshacer."
+        confirmText={isPending ? "Eliminando…" : "Eliminar"}
+        cancelText="Cancelar"
+        disabled={isPending}
       />
     </div>
   );

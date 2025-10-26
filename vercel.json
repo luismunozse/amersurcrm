@@ -4,6 +4,15 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/notifications/send-recordatorios",
+      "schedule": "*/10 * * * *",
+      "headers": {
+        "Authorization": "Bearer ${NOTIFICATIONS_CRON_SECRET}"
+      }
+    }
+  ],
   "env": {
     "NODE_OPTIONS": "--max-old-space-size=3072"
   }

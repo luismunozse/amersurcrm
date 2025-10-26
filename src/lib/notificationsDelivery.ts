@@ -1,6 +1,12 @@
 "use server";
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { createServiceRoleClient } from "@/lib/supabase.server";
+
+type AnySupabaseClient =
+  | SupabaseClient<Record<string, unknown>, "public", Record<string, unknown>>
+  | ReturnType<typeof createServiceRoleClient>;
 
 export interface NotificationDeliveryPayload {
   userId: string;
@@ -32,6 +38,7 @@ export async function dispatchNotificationChannels(
   payload: NotificationDeliveryPayload,
   prefs: NotificationPreferences,
   config?: NotificationChannelConfig,
+  context?: { supabaseClient?: AnySupabaseClient },
 ) {
   const isRecordatorio = Boolean((payload.data as Record<string, unknown> | undefined)?.recordatorio_id);
   const allowRecordatorio = !isRecordatorio || prefs.recordatoriosEnabled;
@@ -41,7 +48,7 @@ export async function dispatchNotificationChannels(
   }
 
   if (prefs.pushEnabled && allowRecordatorio && config?.push) {
-    await sendPushNotification(payload, config.push);
+    await sendPushNotification(payload, config.push, context);
   }
 }
 
@@ -61,6 +68,7 @@ async function sendEmailNotification(payload: NotificationDeliveryPayload) {
 async function sendPushNotification(
   payload: NotificationDeliveryPayload,
   pushConfig: NonNullable<NotificationChannelConfig["push"]>,
+  context?: { supabaseClient?: AnySupabaseClient },
 ) {
   const webpush = await loadWebPushModule();
   if (!webpush) {
@@ -68,7 +76,7 @@ async function sendPushNotification(
     return;
   }
 
-  const supabase = await createServerActionClient();
+  const supabase = context?.supabaseClient ?? (await createServerActionClient());
 
   const {
     data: subscriptions,

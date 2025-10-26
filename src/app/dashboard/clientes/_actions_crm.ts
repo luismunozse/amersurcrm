@@ -88,38 +88,55 @@ export async function registrarInteraccion(data: {
   const supabase = await createServerActionClient();
 
   try {
+    console.log('📝 Registrando interacción:', data);
+
     // Obtener username usando helper
     const authResult = await obtenerUsernameActual(supabase);
     if (!authResult.success) {
+      console.error('❌ Error obteniendo username:', authResult);
       return authResult;
     }
+
+    console.log('👤 Usuario:', authResult.username);
 
     // Validar fecha de próxima acción si se proporciona
     if (data.fechaProximaAccion) {
       const validacionFecha = validarFechaFutura(data.fechaProximaAccion, 'Fecha de próxima acción');
       if (!validacionFecha.valid) {
+        console.error('❌ Error validando fecha:', validacionFecha.error);
         return { success: false, error: validacionFecha.error };
       }
     }
 
-    const { error } = await supabase
-      .from('cliente_interaccion')
-      .insert({
-        cliente_id: data.clienteId,
-        vendedor_username: authResult.username,
-        tipo: data.tipo,
-        resultado: data.resultado,
-        notas: data.notas,
-        duracion_minutos: data.duracionMinutos,
-        proxima_accion: data.proximaAccion,
-        fecha_proxima_accion: data.fechaProximaAccion,
-      });
+    const insertData = {
+      cliente_id: data.clienteId,
+      vendedor_username: authResult.username,
+      tipo: data.tipo,
+      resultado: data.resultado,
+      notas: data.notas,
+      duracion_minutos: data.duracionMinutos,
+      proxima_accion: data.proximaAccion,
+      fecha_proxima_accion: data.fechaProximaAccion,
+    };
 
-    if (error) throw error;
+    console.log('💾 Insertando en BD:', insertData);
+
+    const { data: insertedData, error } = await supabase
+      .from('cliente_interaccion')
+      .insert(insertData)
+      .select();
+
+    if (error) {
+      console.error('❌ Error insertando:', error);
+      throw error;
+    }
+
+    console.log('✅ Interacción guardada exitosamente:', insertedData);
 
     revalidarCliente(data.clienteId);
-    return { success: true };
+    return { success: true, data: insertedData };
   } catch (error: any) {
+    console.error('❌ Error en registrarInteraccion:', error);
     return { success: false, error: error.message };
   }
 }
@@ -133,17 +150,144 @@ export async function obtenerInteracciones(
   try {
     const limit = options?.limit ?? 100;
 
-    const { data, error } = await supabase
+    console.log('🔍 Obteniendo interacciones para cliente:', clienteId);
+
+    // Obtener interacciones sin el join problemático
+    let { data, error } = await supabase
       .from('cliente_interaccion')
-      .select('*, vendedor:usuario_perfil!vendedor_username(nombre_completo, username)')
+      .select('*')
       .eq('cliente_id', clienteId)
       .order('fecha_interaccion', { ascending: false })
       .limit(limit);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error obteniendo interacciones:', error);
+      throw error;
+    }
+
+    // Si hay datos, obtener la información del vendedor por separado
+    if (data && data.length > 0) {
+      const vendedorUsernames = [...new Set(data.map(d => d.vendedor_username).filter(Boolean))];
+
+      if (vendedorUsernames.length > 0) {
+        const { data: vendedores } = await supabase
+          .from('usuario_perfil')
+          .select('username, nombre_completo')
+          .in('username', vendedorUsernames);
+
+        // Combinar los datos
+        if (vendedores) {
+          const vendedoresMap = Object.fromEntries(
+            vendedores.map(v => [v.username, v])
+          );
+
+          data = data.map(interaccion => ({
+            ...interaccion,
+            vendedor: vendedoresMap[interaccion.vendedor_username] || { username: interaccion.vendedor_username }
+          }));
+        }
+      }
+    }
+
+    console.log(`✅ Interacciones obtenidas: ${data?.length || 0}`, data);
 
     return { success: true, data };
   } catch (error: any) {
+    console.error('❌ Error en obtenerInteracciones:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function actualizarInteraccion(data: {
+  interaccionId: string;
+  tipo?: 'llamada' | 'email' | 'whatsapp' | 'visita' | 'reunion' | 'mensaje';
+  resultado?: 'contesto' | 'no_contesto' | 'reagendo' | 'interesado' | 'no_interesado' | 'cerrado' | 'pendiente';
+  notas?: string;
+  duracionMinutos?: number;
+  proximaAccion?: 'llamar' | 'enviar_propuesta' | 'reunion' | 'visita' | 'seguimiento' | 'cierre' | 'ninguna';
+  fechaProximaAccion?: string;
+}) {
+  const supabase = await createServerActionClient();
+
+  try {
+    console.log('✏️ Actualizando interacción:', data);
+
+    // Validar fecha de próxima acción si se proporciona
+    if (data.fechaProximaAccion) {
+      const validacionFecha = validarFechaFutura(data.fechaProximaAccion, 'Fecha de próxima acción');
+      if (!validacionFecha.valid) {
+        console.error('❌ Error validando fecha:', validacionFecha.error);
+        return { success: false, error: validacionFecha.error };
+      }
+    }
+
+    const updateData: any = {};
+    if (data.tipo !== undefined) updateData.tipo = data.tipo;
+    if (data.resultado !== undefined) updateData.resultado = data.resultado;
+    if (data.notas !== undefined) updateData.notas = data.notas;
+    if (data.duracionMinutos !== undefined) updateData.duracion_minutos = data.duracionMinutos;
+    if (data.proximaAccion !== undefined) updateData.proxima_accion = data.proximaAccion;
+    if (data.fechaProximaAccion !== undefined) updateData.fecha_proxima_accion = data.fechaProximaAccion;
+
+    const { data: updatedData, error } = await supabase
+      .from('cliente_interaccion')
+      .update(updateData)
+      .eq('id', data.interaccionId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error actualizando:', error);
+      throw error;
+    }
+
+    console.log('✅ Interacción actualizada exitosamente:', updatedData);
+
+    // Revalidar el cliente
+    if (updatedData.cliente_id) {
+      revalidarCliente(updatedData.cliente_id);
+    }
+
+    return { success: true, data: updatedData };
+  } catch (error: any) {
+    console.error('❌ Error en actualizarInteraccion:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function eliminarInteraccion(interaccionId: string) {
+  const supabase = await createServerActionClient();
+
+  try {
+    console.log('🗑️ Eliminando interacción:', interaccionId);
+
+    // Primero obtener la interacción para saber el cliente_id
+    const { data: interaccion } = await supabase
+      .from('cliente_interaccion')
+      .select('cliente_id')
+      .eq('id', interaccionId)
+      .single();
+
+    const { error } = await supabase
+      .from('cliente_interaccion')
+      .delete()
+      .eq('id', interaccionId);
+
+    if (error) {
+      console.error('❌ Error eliminando:', error);
+      throw error;
+    }
+
+    console.log('✅ Interacción eliminada exitosamente');
+
+    // Revalidar el cliente
+    if (interaccion?.cliente_id) {
+      revalidarCliente(interaccion.cliente_id);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('❌ Error en eliminarInteraccion:', error);
     return { success: false, error: error.message };
   }
 }
