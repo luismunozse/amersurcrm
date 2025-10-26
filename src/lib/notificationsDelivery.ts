@@ -7,6 +7,7 @@ import type { createServiceRoleClient } from "@/lib/supabase.server";
 type AnySupabaseClient =
   | SupabaseClient<Record<string, unknown>, "public", Record<string, unknown>>
   | ReturnType<typeof createServiceRoleClient>;
+type WebPushModule = typeof import("web-push");
 
 export interface NotificationDeliveryPayload {
   userId: string;
@@ -147,11 +148,12 @@ async function sendPushNotification(
   );
 }
 
-async function loadWebPushModule(): Promise<typeof import("web-push")["default"] | null> {
+async function loadWebPushModule(): Promise<WebPushModule | null> {
   try {
     const dynamicImport = new Function("moduleName", "return import(moduleName);");
-    const mod = (await dynamicImport("web-push")) as { default: typeof import("web-push")["default"] };
-    return mod.default;
+    const mod = (await dynamicImport("web-push")) as Record<string, unknown>;
+    const webpushModule = ((mod as { default?: unknown }).default ?? mod) as WebPushModule;
+    return webpushModule;
   } catch (error) {
     console.warn("No se pudo cargar el módulo web-push:", error);
     return null;
