@@ -103,10 +103,6 @@ export default function CrearProformaModal({
   const [mounted, setMounted] = useState(false);
   const [isSubmitting, startTransition] = useTransition();
   const [form, setForm] = useState<ProformaFormState>(() => initialFormState(cliente, asesorActual));
-  const [condicionesTexto, setCondicionesTexto] = useState<string>(
-    CONDICIONES_COMERCIALES_DEFAULT.join("\n"),
-  );
-  const [requisitosTexto, setRequisitosTexto] = useState<string>(REQUISITOS_CONTRATO_DEFAULT.join("\n"));
   const [cuentasTexto, setCuentasTexto] = useState<string>(CUENTAS_EMPRESA_DEFAULT.join("\n"));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -151,14 +147,10 @@ export default function CrearProformaModal({
             validezDias: proformaInicial.datos.validezDias ?? 3,
           },
         });
-        setCondicionesTexto(formatList(proformaInicial.datos.condicionesComerciales));
-        setRequisitosTexto(formatList(proformaInicial.datos.requisitosContrato));
         setCuentasTexto(formatList(proformaInicial.datos.cuentasEmpresa));
       } else {
         const state = initialFormState(cliente, asesorActual);
         setForm(state);
-        setCondicionesTexto(formatList(state.datos.condicionesComerciales));
-        setRequisitosTexto(formatList(state.datos.requisitosContrato));
         setCuentasTexto(formatList(state.datos.cuentasEmpresa));
       }
     }
@@ -186,12 +178,12 @@ export default function CrearProformaModal({
           terreno: { ...form.datos.terreno },
           precios: { ...form.datos.precios },
           formaPago: { ...form.datos.formaPago },
-          condicionesComerciales: sanitizeList(condicionesTexto),
+          condicionesComerciales: [...(form.datos.condicionesComerciales ?? CONDICIONES_COMERCIALES_DEFAULT)],
           mediosPago: {
             soles: form.datos.mediosPago?.soles ?? "",
             dolares: form.datos.mediosPago?.dolares ?? "",
           },
-          requisitosContrato: sanitizeList(requisitosTexto),
+          requisitosContrato: [...(form.datos.requisitosContrato ?? REQUISITOS_CONTRATO_DEFAULT)],
           cuentasEmpresa: sanitizeList(cuentasTexto),
           comentariosAdicionales: form.datos.comentariosAdicionales ?? "",
           validezDias: form.datos.validezDias ?? 3,
@@ -235,8 +227,6 @@ export default function CrearProformaModal({
   }, [
     isOpen,
     form,
-    condicionesTexto,
-    requisitosTexto,
     cuentasTexto,
     proformaInicial?.numero,
     proformaInicial?.created_at,
@@ -377,8 +367,6 @@ export default function CrearProformaModal({
         descuento: form.datos.precios?.descuento ?? null,
         datos: {
           ...form.datos,
-          condicionesComerciales: sanitizeList(condicionesTexto),
-          requisitosContrato: sanitizeList(requisitosTexto),
           cuentasEmpresa: sanitizeList(cuentasTexto),
         },
       };
@@ -721,77 +709,46 @@ export default function CrearProformaModal({
             </div>
           </div>
 
-          {/* Condiciones y medios de pago */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
-              <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
-                Condiciones comerciales
-              </label>
-              <textarea
-                rows={6}
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                value={condicionesTexto}
-                onChange={(e) => setCondicionesTexto(e.target.value)}
-              />
-              <p className="text-xs text-crm-text-muted mt-1">
-                Una condición por línea. Se mostrarán como lista en la proforma.
-              </p>
-            </div>
-
-            <div className="p-4 bg-crm-background rounded-xl border border-crm-border space-y-4">
+          {/* Medios de pago */}
+          <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
+            <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
+              Medios de pago
+            </label>
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
-                  Medios de pago
+                <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                  Cuenta en soles
                 </label>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                      Cuenta en soles
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      value={form.datos.mediosPago?.soles ?? ""}
-                      onChange={(e) =>
-                        updateDatos((prev) => ({
-                          ...prev,
-                          mediosPago: {
-                            ...prev.mediosPago,
-                            soles: e.target.value,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                      Cuenta en dólares
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      value={form.datos.mediosPago?.dolares ?? ""}
-                      onChange={(e) =>
-                        updateDatos((prev) => ({
-                          ...prev,
-                          mediosPago: {
-                            ...prev.mediosPago,
-                            dolares: e.target.value,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
-                  Requisitos para emisión de contrato
-                </label>
-                <textarea
-                  rows={5}
+                <input
                   className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  value={requisitosTexto}
-                  onChange={(e) => setRequisitosTexto(e.target.value)}
+                  value={form.datos.mediosPago?.soles ?? ""}
+                  onChange={(e) =>
+                    updateDatos((prev) => ({
+                      ...prev,
+                      mediosPago: {
+                        ...prev.mediosPago,
+                        soles: e.target.value,
+                      },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
+                  Cuenta en dólares
+                </label>
+                <input
+                  className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                  value={form.datos.mediosPago?.dolares ?? ""}
+                  onChange={(e) =>
+                    updateDatos((prev) => ({
+                      ...prev,
+                      mediosPago: {
+                        ...prev.mediosPago,
+                        dolares: e.target.value,
+                      },
+                    }))
+                  }
                 />
               </div>
             </div>

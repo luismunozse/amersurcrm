@@ -125,7 +125,7 @@ export class GoogleDriveClient {
       }
 
       const { Readable } = await import('stream');
-      const media: drive_v3.Schema$Media = {
+      const media = {
         mimeType,
         body: Readable.from(fileBuffer)
       };

@@ -70,7 +70,7 @@ export default function ConvertirReservaVentaModal({
       const result = await convertirReservaEnVenta({
         reservaId: reserva.id,
         precioTotal: precio,
-        moneda,
+        moneda: moneda === 'PEN' || moneda === 'USD' ? moneda : undefined,
         formaPago,
         montoInicial: inicial || undefined,
         numeroCuotas: numeroCuotas ? parseInt(numeroCuotas) : undefined,

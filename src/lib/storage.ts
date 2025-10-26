@@ -17,7 +17,7 @@ interface UploadFileResult {
 }
 
 interface DeleteFileResult {
-  data: { path: string }[] | null;
+  data: { name: string }[] | null;
   error: StorageError | null;
 }
 

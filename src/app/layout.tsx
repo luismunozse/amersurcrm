@@ -71,14 +71,6 @@ export const metadata: Metadata = {
   authors: [{ name: "AMERSUR" }],
   creator: "AMERSUR",
   publisher: "AMERSUR",
-  icons: {
-    icon: [
-      { url: "/icon.png", type: "image/png" },
-    ],
-    apple: [
-      { url: "/apple-icon.png", type: "image/png" },
-    ],
-  },
   manifest: "/manifest.json",
 };
 

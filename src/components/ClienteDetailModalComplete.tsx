@@ -2,7 +2,9 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, ChatBubbleLeftRightIcon, DocumentTextIcon, ClockIcon, TagIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, ChatBubbleLeftRightIcon, DocumentTextIcon, ClockIcon, TagIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 interface ClienteDetailModalCompleteProps {
   isOpen: boolean;
@@ -36,6 +38,8 @@ interface ClienteDetailModalCompleteProps {
 
 export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }: ClienteDetailModalCompleteProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     console.log('Modal isOpen changed:', isOpen);
@@ -52,6 +56,83 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
   if (!isOpen || !cliente) {
     return null;
   }
+
+  // Función para copiar al portapapeles
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      toast.success(`${field} copiado al portapapeles`);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (error) {
+      toast('Error al copiar', { icon: '❌' });
+    }
+  };
+
+  // Calcular días sin contactar
+  const getDiasSinContactar = () => {
+    if (!cliente.ultimo_contacto) return null;
+    const now = new Date();
+    const lastContact = new Date(cliente.ultimo_contacto);
+    const diffTime = Math.abs(now.getTime() - lastContact.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Verificar alertas
+  const getAlertas = () => {
+    const alertas = [];
+    const diasSinContactar = getDiasSinContactar();
+
+    if (diasSinContactar && diasSinContactar > 15) {
+      alertas.push({
+        tipo: 'urgente',
+        mensaje: `¡No contactado hace ${diasSinContactar} días!`,
+        color: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
+      });
+    } else if (diasSinContactar && diasSinContactar > 7) {
+      alertas.push({
+        tipo: 'warning',
+        mensaje: `Hace ${diasSinContactar} días sin contacto`,
+        color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
+      });
+    }
+
+    if (cliente.saldo_pendiente > 0) {
+      alertas.push({
+        tipo: 'info',
+        mensaje: `Saldo pendiente: ${formatCapacidad(cliente.saldo_pendiente)}`,
+        color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700'
+      });
+    }
+
+    return alertas;
+  };
+
+  // Acciones rápidas
+  const handleCall = () => {
+    if (cliente.telefono) {
+      window.location.href = `tel:${cliente.telefono}`;
+    }
+  };
+
+  const handleWhatsApp = () => {
+    if (cliente.telefono_whatsapp) {
+      const phone = cliente.telefono_whatsapp.replace(/\D/g, '');
+      window.open(`https://wa.me/${phone}`, '_blank');
+    }
+  };
+
+  const handleEmail = () => {
+    if (cliente.email) {
+      window.location.href = `mailto:${cliente.email}`;
+    }
+  };
+
+  const handleGoToProfile = () => {
+    router.push(`/dashboard/clientes/${cliente.id}`);
+    onClose();
+  };
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -152,27 +233,87 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                         <p className="text-white/80 text-lg">
                           {cliente.tipo_cliente === 'persona' ? 'Persona' : 'Empresa'}
                         </p>
-                        <p className="text-white/70 text-sm">
+                        <p className="text-white/70 text-sm flex items-center gap-2">
                           Código: {cliente.codigo_cliente}
+                          <button
+                            onClick={() => copyToClipboard(cliente.codigo_cliente, 'Código')}
+                            className="text-white/60 hover:text-white transition-colors"
+                            title="Copiar código"
+                          >
+                            {copiedField === 'Código' ? (
+                              <CheckIcon className="w-4 h-4" />
+                            ) : (
+                              <ClipboardDocumentIcon className="w-4 h-4" />
+                            )}
+                          </button>
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={onClose}
-                      className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-all duration-200"
-                    >
-                      <XMarkIcon className="w-6 h-6" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Botones de Acciones Rápidas */}
+                      <div className="flex gap-2 mr-2">
+                        {cliente.telefono && (
+                          <button
+                            onClick={handleCall}
+                            className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all duration-200 backdrop-blur-sm"
+                            title="Llamar"
+                          >
+                            <PhoneIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        {cliente.telefono_whatsapp && (
+                          <button
+                            onClick={handleWhatsApp}
+                            className="bg-green-500/90 hover:bg-green-500 text-white p-2 rounded-lg transition-all duration-200"
+                            title="WhatsApp"
+                          >
+                            <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        {cliente.email && (
+                          <button
+                            onClick={handleEmail}
+                            className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all duration-200 backdrop-blur-sm"
+                            title="Enviar email"
+                          >
+                            <EnvelopeIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={handleGoToProfile}
+                          className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all duration-200 backdrop-blur-sm"
+                          title="Ver perfil completo"
+                        >
+                          <ArrowTopRightOnSquareIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={onClose}
+                        className="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-all duration-200"
+                      >
+                        <XMarkIcon className="w-6 h-6" />
+                      </button>
+                    </div>
                   </div>
-                  
+
                   {/* Estado y Nivel */}
-                  <div className="mt-4 flex items-center space-x-3">
+                  <div className="mt-4 flex items-center flex-wrap gap-2">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getEstadoColor(cliente.estado_cliente)}`}>
                       {getEstadoText(cliente.estado_cliente)}
                     </span>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getNivelCliente(cliente.capacidad_compra_estimada).color}`}>
                       Nivel: {getNivelCliente(cliente.capacidad_compra_estimada).nivel}
                     </span>
+                    {/* Indicadores de Urgencia */}
+                    {getAlertas().map((alerta, index) => (
+                      <span
+                        key={index}
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${alerta.color}`}
+                      >
+                        {alerta.tipo === 'urgente' && <ExclamationTriangleIcon className="w-4 h-4" />}
+                        {alerta.mensaje}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
@@ -188,42 +329,94 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       
                       <div className="space-y-3">
                         {cliente.email && (
-                          <div className="flex items-center space-x-3 p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors">
-                            <EnvelopeIcon className="w-5 h-5 text-crm-primary" />
-                            <div>
-                              <p className="text-sm font-medium text-crm-text-primary">Email</p>
-                              <p className="text-sm text-crm-text-secondary">{cliente.email}</p>
+                          <div className="flex items-center justify-between p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors group">
+                            <div className="flex items-center space-x-3">
+                              <EnvelopeIcon className="w-5 h-5 text-crm-primary" />
+                              <div>
+                                <p className="text-sm font-medium text-crm-text-primary">Email</p>
+                                <p className="text-sm text-crm-text-secondary">{cliente.email}</p>
+                              </div>
                             </div>
+                            <button
+                              onClick={() => copyToClipboard(cliente.email!, 'Email')}
+                              className="opacity-0 group-hover:opacity-100 text-crm-primary hover:text-crm-primary/80 transition-all p-1 rounded"
+                              title="Copiar email"
+                            >
+                              {copiedField === 'Email' ? (
+                                <CheckIcon className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <ClipboardDocumentIcon className="w-5 h-5" />
+                              )}
+                            </button>
                           </div>
                         )}
 
                         {cliente.telefono && (
-                          <div className="flex items-center space-x-3 p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors">
-                            <PhoneIcon className="w-5 h-5 text-crm-primary" />
-                            <div>
-                              <p className="text-sm font-medium text-crm-text-primary">Teléfono</p>
-                              <p className="text-sm text-crm-text-secondary">{cliente.telefono}</p>
+                          <div className="flex items-center justify-between p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors group">
+                            <div className="flex items-center space-x-3">
+                              <PhoneIcon className="w-5 h-5 text-crm-primary" />
+                              <div>
+                                <p className="text-sm font-medium text-crm-text-primary">Teléfono</p>
+                                <p className="text-sm text-crm-text-secondary">{cliente.telefono}</p>
+                              </div>
                             </div>
+                            <button
+                              onClick={() => copyToClipboard(cliente.telefono!, 'Teléfono')}
+                              className="opacity-0 group-hover:opacity-100 text-crm-primary hover:text-crm-primary/80 transition-all p-1 rounded"
+                              title="Copiar teléfono"
+                            >
+                              {copiedField === 'Teléfono' ? (
+                                <CheckIcon className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <ClipboardDocumentIcon className="w-5 h-5" />
+                              )}
+                            </button>
                           </div>
                         )}
 
                         {cliente.telefono_whatsapp && (
-                          <div className="flex items-center space-x-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-colors">
-                            <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-                            <div>
-                              <p className="text-sm font-medium text-crm-text-primary">WhatsApp</p>
-                              <p className="text-sm text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
+                          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-colors group">
+                            <div className="flex items-center space-x-3">
+                              <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                              <div>
+                                <p className="text-sm font-medium text-crm-text-primary">WhatsApp</p>
+                                <p className="text-sm text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
+                              </div>
                             </div>
+                            <button
+                              onClick={() => copyToClipboard(cliente.telefono_whatsapp!, 'WhatsApp')}
+                              className="opacity-0 group-hover:opacity-100 text-green-600 hover:text-green-500 transition-all p-1 rounded"
+                              title="Copiar WhatsApp"
+                            >
+                              {copiedField === 'WhatsApp' ? (
+                                <CheckIcon className="w-5 h-5" />
+                              ) : (
+                                <ClipboardDocumentIcon className="w-5 h-5" />
+                              )}
+                            </button>
                           </div>
                         )}
 
                         {cliente.documento_identidad && (
-                          <div className="flex items-center space-x-3 p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors">
-                            <DocumentTextIcon className="w-5 h-5 text-crm-primary" />
-                            <div>
-                              <p className="text-sm font-medium text-crm-text-primary">Documento</p>
-                              <p className="text-sm text-crm-text-secondary">{cliente.documento_identidad}</p>
+                          <div className="flex items-center justify-between p-3 bg-crm-card-hover border border-crm-border rounded-lg hover:border-crm-primary/30 transition-colors group">
+                            <div className="flex items-center space-x-3">
+                              <DocumentTextIcon className="w-5 h-5 text-crm-primary" />
+                              <div>
+                                <p className="text-sm font-medium text-crm-text-primary">Documento</p>
+                                <p className="text-sm text-crm-text-secondary">{cliente.documento_identidad}</p>
+                              </div>
                             </div>
+                            <button
+                              onClick={() => copyToClipboard(cliente.documento_identidad!, 'Documento')}
+                              className="opacity-0 group-hover:opacity-100 text-crm-primary hover:text-crm-primary/80 transition-all p-1 rounded"
+                              title="Copiar documento"
+                            >
+                              {copiedField === 'Documento' ? (
+                                <CheckIcon className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <ClipboardDocumentIcon className="w-5 h-5" />
+                              )}
+                            </button>
                           </div>
                         )}
                       </div>

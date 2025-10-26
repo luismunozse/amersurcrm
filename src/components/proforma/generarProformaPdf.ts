@@ -60,6 +60,10 @@ const CELLS = {
   comentarios: bounds(103, 1188, 1131, 1265),
   numeroProforma: bounds(940, 300, 1131, 335),
   fechaEmision: bounds(940, 330, 1131, 365),
+  cuentas: {
+    etiquetas: bounds(103, 1100, 260, 1180),
+    valores: bounds(260, 1100, 411, 1180),
+  },
 };
 
 const DEFAULT_DATOS: ProformaDatos = {
@@ -208,29 +212,29 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
       verticalAlign: "center",
     });
 
-  const cuentas = datos.cuentasEmpresa.join("\n");
-  setFieldText(fields, "cuentas_empresa", cuentas) ||
-    drawParagraph(page, regularFont, cuentas, bounds(103, 1100, 411, 1180), {
+  const cuentas = normalizarCuentasEmpresa(datos.cuentasEmpresa);
+  drawParagraph(
+    page,
+    regularFont,
+    cuentas.map((c) => c.label).join("\n"),
+    CELLS.cuentas.etiquetas,
+    {
       fontSize: 8.5,
-      paddingPx: 12,
-      maxLines: 6,
-    });
-
-  if (datos.condicionesComerciales.length > 0) {
-    drawParagraph(page, regularFont, datos.condicionesComerciales.join("\n"), bounds(103, 1015, 561, 1100), {
+      paddingPx: 8,
+      maxLines: 4,
+    },
+  );
+  drawParagraph(
+    page,
+    regularFont,
+    cuentas.map((c) => c.valor).join("\n"),
+    CELLS.cuentas.valores,
+    {
       fontSize: 8.5,
-      paddingPx: 12,
-      maxLines: 10,
-    });
-  }
-
-  if (datos.requisitosContrato.length > 0) {
-    drawParagraph(page, regularFont, datos.requisitosContrato.join("\n"), bounds(704, 1015, 1131, 1100), {
-      fontSize: 8,
-      paddingPx: 12,
-      maxLines: 10,
-    });
-  }
+      paddingPx: 8,
+      maxLines: 4,
+    },
+  );
 
   if (datos.comentariosAdicionales) {
     drawParagraph(page, regularFont, datos.comentariosAdicionales, CELLS.comentarios, {
@@ -474,6 +478,28 @@ function textOrDash(value: string | number | null | undefined) {
   return str.length > 0 ? str : "—";
 }
 
+function normalizarCuentasEmpresa(valores: string[] | undefined) {
+  const DEFAULT = [
+    { label: "CCI BCP Soles", valor: "002-123-45678901234-56" },
+    { label: "CCI BCP Dólares", valor: "002-987-65432109876-54" },
+  ];
+
+  if (!valores || valores.length === 0) {
+    return DEFAULT;
+  }
+
+  const cuentas = valores.map((linea) => {
+    const [label, ...resto] = linea.split(":");
+    const valor = resto.join(":").trim();
+    if (!valor) {
+      return { label: linea.trim(), valor: "" };
+    }
+    return { label: label.trim(), valor };
+  });
+
+  return cuentas.length > 0 ? cuentas : DEFAULT;
+}
+
 function collectTextFields(form: ReturnType<PDFDocument["getForm"]>) {
   const map = new Map<string, PDFTextField>();
   form.getFields().forEach((field) => {
@@ -493,6 +519,17 @@ function setFieldText(fields: Map<string, PDFTextField>, name: string, value: st
   if (!field) return false;
   field.setText(value ? value.toString() : "");
   return true;
+}
+
+function fillField(
+  fields: Map<string, PDFTextField>,
+  name: string,
+  value: string | null | undefined,
+  fallback: () => void,
+) {
+  if (!setFieldText(fields, name, value)) {
+    fallback();
+  }
 }
 
 function mergeDatos<T>(defaults: T, source: unknown): T {
@@ -522,7 +559,7 @@ function clone<T>(value: T): T {
 }
 
 function downloadPdf(bytes: Uint8Array, filename: string) {
-  const blob = new Blob([bytes], { type: "application/pdf" });
+  const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

@@ -704,12 +704,12 @@ function Paso4Precios({ data, updateData, proyectos }: {
               <span className="text-sm font-medium text-crm-text-muted">Superficie Total:</span>
               <p className="text-crm-text-primary">{data.superficie_total} m²</p>
             </div>
-            {data.caracteristicas?.superficie_construida && (
+            {data.caracteristicas?.superficie_construida ? (
             <div>
                 <span className="text-sm font-medium text-crm-text-muted">Superficie Construida:</span>
-                <p className="text-crm-text-primary">{data.caracteristicas.superficie_construida} m²</p>
+                <p className="text-crm-text-primary">{String(data.caracteristicas.superficie_construida)} m²</p>
             </div>
-            )}
+            ) : null}
             <div>
               <span className="text-sm font-medium text-crm-text-muted">Precio Venta:</span>
               <p className="text-crm-text-primary font-semibold">S/. {data.precio_venta?.toLocaleString()}</p>

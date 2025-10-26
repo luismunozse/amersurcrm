@@ -150,7 +150,6 @@ export default async function MiPerfilPage() {
         </h2>
         <EditarPerfilForm
           perfil={perfil}
-          userEmail={user.email || ''}
           isAdmin={isAdmin}
         />
       </div>

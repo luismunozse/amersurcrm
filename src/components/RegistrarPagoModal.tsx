@@ -78,7 +78,7 @@ export default function RegistrarPagoModal({
         ventaId,
         numeroCuota: numeroCuota !== "" ? Number(numeroCuota) : undefined,
         monto: parseFloat(monto),
-        moneda,
+        moneda: moneda === 'PEN' || moneda === 'USD' ? moneda : undefined,
         fechaPago,
         fechaVencimiento: fechaVencimiento || undefined,
         metodoPago: metodoPago as any,

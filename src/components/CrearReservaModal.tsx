@@ -57,7 +57,7 @@ export default function CrearReservaModal({
         clienteId,
         loteId,
         montoReserva: parseFloat(montoReserva),
-        moneda,
+        moneda: moneda === 'PEN' || moneda === 'USD' ? moneda : undefined,
         fechaVencimiento,
         metodoPago: metodoPago || undefined,
         notas: notas || undefined,
