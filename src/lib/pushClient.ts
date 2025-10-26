@@ -49,10 +49,7 @@ export async function registerPushSubscription({
 
   const swRegistration = await navigator.serviceWorker.register(serviceWorkerPath, { scope: "/" });
 
-  let permission = Notification.permission;
-  if (permission === "default") {
-    permission = await Notification.requestPermission();
-  }
+  const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
     onPermissionDenied?.();
