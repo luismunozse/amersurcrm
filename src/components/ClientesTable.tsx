@@ -704,6 +704,10 @@ const ClienteRow = memo(function ClienteRow({
         return 'Feria';
       case 'campaña':
         return 'Campaña';
+      case 'campaña_facebook':
+        return 'Campaña Facebook';
+      case 'campaña_tiktok':
+        return 'Campaña TikTok';
       case 'redes_sociales':
         return 'Redes sociales';
       case 'publicidad':

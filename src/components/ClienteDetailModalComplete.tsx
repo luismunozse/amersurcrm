@@ -1,8 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useState } from 'react';
+import type { SVGProps } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, ChatBubbleLeftRightIcon, DocumentTextIcon, ClockIcon, TagIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, DocumentTextIcon, ClockIcon, TagIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -35,6 +36,22 @@ interface ClienteDetailModalCompleteProps {
     direccion: any;
   } | null;
 }
+
+const WhatsAppIcon = ({ className, ...props }: SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 32 32"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+    focusable="false"
+    {...props}
+  >
+    <path
+      fill="currentColor"
+      d="M27.6 4.4A15.84 15.84 0 0 0 16 0C7.2 0 .02 7.18.02 16a15.86 15.86 0 0 0 2.18 8l-1.43 5.24a1 1 0 0 0 1.23 1.22l5.24-1.43A15.86 15.86 0 0 0 16 31.98C24.82 32 32 24.82 32 16a15.84 15.84 0 0 0-4.4-11.6ZM16 29.98a13.9 13.9 0 0 1-7.42-2.13 1 1 0 0 0-.71-.13l-4.06 1.11 1.12-4.06a1 1 0 0 0-.13-.71A13.9 13.9 0 0 1 2.02 16C2.02 8.29 8.27 2 16 2s13.98 6.27 13.98 14S23.73 29.98 16 29.98Zm7.74-10.93c-.42-.21-2.48-1.22-2.87-1.36-.39-.14-.67-.21-.96.21s-1.1 1.36-1.36 1.64-.5.32-.92.11a11.36 11.36 0 0 1-3.34-2.06 12.5 12.5 0 0 1-2.32-2.86c-.24-.42 0-.65.18-.86.19-.21.42-.54.63-.8.21-.26.28-.42.43-.7s.07-.53-.03-.74c-.11-.21-.96-2.32-1.33-3.19-.35-.84-.71-.73-.96-.75h-.81c-.26 0-.69.1-1.05.53s-1.38 1.35-1.38 3.28 1.41 3.81 1.61 4.07c.21.28 2.78 4.25 6.73 5.82.94.41 1.67.66 2.24.84.94.3 1.8.26 2.48.16.76-.1 2.48-1.01 2.83-1.98.35-.97.35-1.8.24-1.98-.1-.17-.38-.28-.8-.49Z"
+    />
+  </svg>
+);
 
 export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }: ClienteDetailModalCompleteProps) {
   const [isVisible, setIsVisible] = useState(false);
@@ -116,11 +133,10 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
     }
   };
 
-  const handleWhatsApp = () => {
-    if (cliente.telefono_whatsapp) {
-      const phone = cliente.telefono_whatsapp.replace(/\D/g, '');
-      window.open(`https://wa.me/${phone}`, '_blank');
-    }
+  const getWhatsappLink = (whatsapp: string | null) => {
+    if (!whatsapp) return null;
+    const digits = whatsapp.replace(/\D/g, '');
+    return digits ? `https://wa.me/${digits}` : null;
   };
 
   const handleEmail = () => {
@@ -255,13 +271,20 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                           </button>
                         )}
                         {cliente.telefono_whatsapp && (
-                          <button
-                            onClick={handleWhatsApp}
-                            className="bg-green-500/90 hover:bg-green-500 text-white p-2 rounded-lg transition-all duration-200"
+                          <a
+                            href={getWhatsappLink(cliente.telefono_whatsapp) ?? undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-[#25D366]/90 hover:bg-[#25D366] text-white p-2 rounded-lg transition-all duration-200"
                             title="WhatsApp"
+                            onClick={(event) => {
+                              if (!getWhatsappLink(cliente.telefono_whatsapp)) {
+                                event.preventDefault();
+                              }
+                            }}
                           >
-                            <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                          </button>
+                            <WhatsAppIcon className="w-5 h-5" />
+                          </a>
                         )}
                         {cliente.email && (
                           <button
@@ -312,7 +335,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Información de Contacto */}
                     <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-crm-text-primary flex items-center">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary flex items-center">
                         <PhoneIcon className="w-5 h-5 mr-2 text-crm-primary" />
                         Información de Contacto
                       </h4>
@@ -366,13 +389,23 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
 
                         {cliente.telefono_whatsapp && (
                           <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800 rounded-lg hover:border-green-500 dark:hover:border-green-600 hover:shadow-md transition-all group">
-                            <div className="flex items-center space-x-3">
-                              <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            <a
+                              href={getWhatsappLink(cliente.telefono_whatsapp) ?? undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-1 items-center space-x-3"
+                              onClick={(event) => {
+                                if (!getWhatsappLink(cliente.telefono_whatsapp)) {
+                                  event.preventDefault();
+                                }
+                              }}
+                            >
+                              <WhatsAppIcon className="w-5 h-5 text-[#25D366]" />
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">WhatsApp</p>
                                 <p className="text-sm text-gray-700 dark:text-crm-text-secondary">{cliente.telefono_whatsapp}</p>
                               </div>
-                            </div>
+                            </a>
                             <button
                               onClick={() => copyToClipboard(cliente.telefono_whatsapp!, 'WhatsApp')}
                               className="opacity-0 group-hover:opacity-100 text-green-600 hover:text-green-500 transition-all p-1 rounded"
@@ -414,7 +447,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
 
                     {/* Información Comercial */}
                     <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-crm-text-primary flex items-center">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary flex items-center">
                         <BuildingOfficeIcon className="w-5 h-5 mr-2 text-crm-primary" />
                         Información Comercial
                       </h4>
@@ -459,40 +492,40 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
 
                     {/* Dirección */}
                     <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-crm-text-primary flex items-center">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary flex items-center">
                         <MapPinIcon className="w-5 h-5 mr-2 text-crm-primary" />
                         Dirección
                       </h4>
-                      
-                      <div className="p-3 bg-crm-card-hover rounded-lg">
-                        <p className="text-sm text-crm-text-secondary">{formatDireccion(cliente.direccion)}</p>
+
+                      <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                        <p className="text-sm text-gray-700 dark:text-crm-text-secondary">{formatDireccion(cliente.direccion)}</p>
                       </div>
                     </div>
 
                     {/* Fechas y Acciones */}
                     <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-crm-text-primary flex items-center">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary flex items-center">
                         <CalendarIcon className="w-5 h-5 mr-2 text-crm-primary" />
                         Fechas y Acciones
                       </h4>
-                      
+
                       <div className="space-y-3">
-                        <div className="p-3 bg-crm-card-hover rounded-lg">
-                          <p className="text-sm font-medium text-crm-text-primary">Fecha de Alta</p>
-                          <p className="text-sm text-crm-text-secondary">{formatDate(cliente.fecha_alta)}</p>
+                        <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                          <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Fecha de Alta</p>
+                          <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{formatDate(cliente.fecha_alta)}</p>
                         </div>
-                        
+
                         {cliente.ultimo_contacto && (
-                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Último Contacto</p>
-                            <p className="text-sm text-crm-text-secondary">{formatDate(cliente.ultimo_contacto)}</p>
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Último Contacto</p>
+                            <p className="text-sm text-gray-700 dark:text-crm-text-secondary">{formatDate(cliente.ultimo_contacto)}</p>
                           </div>
                         )}
 
                         {cliente.proxima_accion && (
-                          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                            <p className="text-sm font-medium text-crm-text-primary">Próxima Acción</p>
-                            <p className="text-sm text-crm-text-secondary">{cliente.proxima_accion}</p>
+                          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-800 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Próxima Acción</p>
+                            <p className="text-sm text-gray-700 dark:text-crm-text-secondary capitalize">{cliente.proxima_accion}</p>
                           </div>
                         )}
                       </div>
@@ -500,30 +533,30 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                   </div>
 
                   {/* Estadísticas de Propiedades */}
-                  <div className="mt-6 pt-6 border-t border-crm-border">
-                    <h4 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center">
+                  <div className="mt-6 pt-6 border-t-2 border-gray-200 dark:border-crm-border">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary mb-4 flex items-center">
                       <CurrencyDollarIcon className="w-5 h-5 mr-2 text-crm-primary" />
                       Estadísticas de Propiedades
                     </h4>
-                    
+
                     <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cliente.propiedades_reservadas}</div>
-                        <div className="text-sm text-blue-800 dark:text-blue-300">Reservadas</div>
+                        <div className="text-sm font-medium text-blue-800 dark:text-blue-300">Reservadas</div>
                       </div>
-                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800 rounded-lg">
                         <div className="text-2xl font-bold text-green-600 dark:text-green-400">{cliente.propiedades_compradas}</div>
-                        <div className="text-sm text-green-800 dark:text-green-300">Compradas</div>
+                        <div className="text-sm font-medium text-green-800 dark:text-green-300">Compradas</div>
                       </div>
-                      <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-800 rounded-lg">
                         <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{cliente.propiedades_alquiladas}</div>
-                        <div className="text-sm text-yellow-800 dark:text-yellow-300">Alquiladas</div>
+                        <div className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Alquiladas</div>
                       </div>
                     </div>
-                    
+
                     {cliente.saldo_pendiente > 0 && (
-                      <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                        <p className="text-sm font-medium text-red-800 dark:text-red-300">Saldo Pendiente</p>
+                      <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg">
+                        <p className="text-sm font-medium text-gray-900 dark:text-red-300">Saldo Pendiente</p>
                         <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatCapacidad(cliente.saldo_pendiente)}</p>
                       </div>
                     )}
@@ -531,20 +564,20 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
 
                   {/* Notas */}
                   {cliente.notas && (
-                    <div className="mt-6 pt-6 border-t border-crm-border">
-                      <h4 className="text-lg font-semibold text-crm-text-primary mb-3 flex items-center">
+                    <div className="mt-6 pt-6 border-t-2 border-gray-200 dark:border-crm-border">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary mb-3 flex items-center">
                         <DocumentTextIcon className="w-5 h-5 mr-2 text-crm-primary" />
                         Notas
                       </h4>
-                      <div className="p-4 bg-crm-card-hover rounded-lg">
-                        <p className="text-sm text-crm-text-secondary whitespace-pre-wrap">{cliente.notas}</p>
+                      <div className="p-4 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
+                        <p className="text-sm text-gray-700 dark:text-crm-text-secondary whitespace-pre-wrap">{cliente.notas}</p>
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 bg-crm-card-hover border-t border-crm-border flex justify-end">
+                <div className="px-6 py-4 bg-gray-100 dark:bg-crm-card-hover border-t-2 border-gray-200 dark:border-crm-border flex justify-end">
                   <button
                     onClick={onClose}
                     className="px-6 py-2.5 bg-crm-primary text-white rounded-lg hover:bg-crm-primary/90 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"

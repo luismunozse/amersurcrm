@@ -17,6 +17,8 @@ export type OrigenLead =
   | 'recomendacion' 
   | 'feria' 
   | 'campaña' 
+  | 'campaña_facebook'
+  | 'campaña_tiktok'
   | 'redes_sociales' 
   | 'publicidad' 
   | 'referido' 
@@ -161,6 +163,8 @@ export const ORIGENES_LEAD_OPTIONS = [
   { value: 'recomendacion', label: 'Recomendación' },
   { value: 'feria', label: 'Feria/Evento' },
   { value: 'campaña', label: 'Campaña Publicitaria' },
+  { value: 'campaña_facebook', label: 'Campaña de Facebook' },
+  { value: 'campaña_tiktok', label: 'Campaña de TikTok' },
   { value: 'redes_sociales', label: 'Redes Sociales' },
   { value: 'publicidad', label: 'Publicidad' },
   { value: 'referido', label: 'Referido' },
