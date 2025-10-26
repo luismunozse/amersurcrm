@@ -16,6 +16,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { Pagination } from "@/components/Pagination";
 import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
+import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import {
   getEstadoClienteLabel,
   ESTADOS_CLIENTE_OPTIONS,
@@ -97,6 +98,11 @@ export default function ClientesTable({
   });
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showContactoModal, setShowContactoModal] = useState(false);
+  const [pendingEstadoChange, setPendingEstadoChange] = useState<{
+    clienteId: string;
+    nuevoEstado: EstadoCliente;
+  } | null>(null);
   const router = useRouter();
 
   // Estado local para búsqueda
@@ -335,6 +341,48 @@ export default function ClientesTable({
     handleSearch('');
   };
 
+  // Manejar cambio de estado con modal de contacto
+  const handleEstadoChange = async (cliente: Cliente, nuevoEstado: EstadoCliente) => {
+    const estadoActual = (cliente.estado_cliente || 'por_contactar') as EstadoCliente;
+
+    // Si está cambiando de "por_contactar" a "contactado", mostrar modal para registrar la interacción
+    if (estadoActual === 'por_contactar' && nuevoEstado === 'contactado') {
+      setSelectedCliente(cliente);
+      setPendingEstadoChange({ clienteId: cliente.id, nuevoEstado });
+      setShowContactoModal(true);
+      return;
+    }
+
+    // Para otros cambios de estado, proceder normalmente
+    try {
+      await actualizarEstadoCliente(cliente.id, nuevoEstado);
+      toast.success(`Estado cambiado a ${getEstadoClienteLabel(nuevoEstado)}`);
+      router.refresh();
+    } catch (error) {
+      toast.error(getErrorMessage(error) || 'Error cambiando estado');
+    }
+  };
+
+  // Manejar el registro de contacto exitoso
+  const handleContactoRegistrado = async () => {
+    // Cerrar el modal
+    setShowContactoModal(false);
+
+    // Cambiar el estado del cliente
+    if (pendingEstadoChange) {
+      try {
+        await actualizarEstadoCliente(pendingEstadoChange.clienteId, pendingEstadoChange.nuevoEstado);
+        toast.success(`Estado cambiado a ${getEstadoClienteLabel(pendingEstadoChange.nuevoEstado)}`);
+        router.refresh();
+      } catch (error) {
+        toast.error(getErrorMessage(error) || 'Error cambiando estado');
+      } finally {
+        setPendingEstadoChange(null);
+        setSelectedCliente(null);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Barra de búsqueda */}
@@ -525,6 +573,7 @@ export default function ClientesTable({
                   onEdit={handleEdit}
                   onDelete={askDelete}
                   onShowDetail={handleShowDetail}
+                  onEstadoChange={handleEstadoChange}
                   isPending={isPending}
                   isSelected={selectedIds.has(cliente.id)}
                   onToggleSelect={toggleSelectOne}
@@ -579,6 +628,21 @@ export default function ClientesTable({
         cliente={selectedCliente}
       />
 
+      {/* Modal para registrar contacto al cambiar estado */}
+      <RegistrarContactoModal
+        isOpen={showContactoModal}
+        onClose={() => {
+          setShowContactoModal(false);
+          setPendingEstadoChange(null);
+          setSelectedCliente(null);
+          // Refrescar para que el select vuelva al estado original
+          router.refresh();
+        }}
+        clienteId={selectedCliente?.id || ''}
+        clienteNombre={selectedCliente?.nombre || ''}
+        onSuccess={handleContactoRegistrado}
+      />
+
       {/* Diálogo de confirmación de eliminación masiva */}
       <ConfirmDialog
         open={confirmBulkDelete}
@@ -606,6 +670,7 @@ const ClienteRow = memo(function ClienteRow({
   onEdit,
   onDelete,
   onShowDetail,
+  onEstadoChange,
   isPending,
   isSelected,
   onToggleSelect,
@@ -614,6 +679,7 @@ const ClienteRow = memo(function ClienteRow({
   onEdit: (id: string) => void;
   onDelete: (c: Cliente) => void;
   onShowDetail: (c: Cliente) => void;
+  onEstadoChange: (cliente: Cliente, nuevoEstado: EstadoCliente) => void;
   isPending: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
@@ -667,7 +733,7 @@ const ClienteRow = memo(function ClienteRow({
     return (
       <select
         value={estadoActual}
-        onChange={(event) => handleEstadoChange(cliente.id, event.target.value as EstadoCliente)}
+        onChange={(event) => onEstadoChange(cliente, event.target.value as EstadoCliente)}
         className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${getEstadoSelectClasses(estadoActual)}`}
         disabled={isPending}
       >
@@ -678,18 +744,6 @@ const ClienteRow = memo(function ClienteRow({
         ))}
       </select>
     );
-  };
-
-  const router = useRouter();
-
-  const handleEstadoChange = async (clienteId: string, nuevoEstado: EstadoCliente) => {
-    try {
-      await actualizarEstadoCliente(clienteId, nuevoEstado);
-      toast.success(`Estado cambiado a ${getEstadoClienteLabel(nuevoEstado)}`);
-      router.refresh();
-    } catch (error) {
-      toast.error(getErrorMessage(error) || 'Error cambiando estado');
-    }
   };
 
   const formatDate = (dateString: string) => {

@@ -137,7 +137,11 @@ export async function crearCliente(formData: FormData) {
     created_by: user.id,
   };
 
-  const { error } = await supabase.from("cliente").insert(insertData);
+  const { data: inserted, error } = await supabase
+    .from("cliente")
+    .insert(insertData)
+    .select("id, nombre")
+    .single();
   if (error) throw new Error(error.message);
 
   // Crear notificación
@@ -147,7 +151,7 @@ export async function crearCliente(formData: FormData) {
       "cliente",
       "Nuevo cliente registrado",
       `Se ha registrado un nuevo cliente: ${parsed.data.nombre}`,
-      { cliente_id: user.id, cliente_nombre: parsed.data.nombre }
+      { cliente_id: inserted?.id, cliente_nombre: parsed.data.nombre }
     );
   } catch (error) {
     console.warn("No se pudo crear notificación:", error);

@@ -27,11 +27,33 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect("/auth/cambiar-password");
   }
 
-  const [notifications, notificationsCount, exchangeRates] = await Promise.all([
+  const [notifications, notificationsCount, exchangeRates, configuracionResult] = await Promise.all([
     getCachedNotificacionesNoLeidas(),
     getCachedNotificacionesCount(),
     getSunatExchangeRates(),
+    s
+      .from("configuracion_sistema")
+      .select(
+        "notificaciones_push, push_vapid_public, push_provider",
+      )
+      .eq("id", 1)
+      .maybeSingle(),
   ]);
+
+  const configuracion = configuracionResult?.data ?? null;
+  const pushConfig =
+    configuracion &&
+    configuracion.notificaciones_push &&
+    configuracion.push_provider === "webpush" &&
+    configuracion.push_vapid_public
+      ? {
+          enabled: true,
+          vapidPublicKey: configuracion.push_vapid_public as string,
+        }
+      : {
+          enabled: false,
+          vapidPublicKey: null,
+        };
 
   return (
     <DashboardClient
@@ -44,6 +66,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       notifications={notifications}
       notificationsCount={notificationsCount}
       exchangeRates={exchangeRates}
+      pushConfig={pushConfig}
     >
       {children}
     </DashboardClient>

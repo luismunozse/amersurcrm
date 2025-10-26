@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
 import { UserProfileProvider } from "./UserProfileContext";
+import { registerPushSubscription } from "@/lib/pushClient";
 
 export default function DashboardClient({
   children,
@@ -19,6 +20,7 @@ export default function DashboardClient({
   notifications = [],
   notificationsCount = 0,
   exchangeRates = [],
+  pushConfig,
 }: {
   children: React.ReactNode;
   userEmail?: string;
@@ -30,10 +32,15 @@ export default function DashboardClient({
   notifications?: NotificacionNoLeida[];
   notificationsCount?: number;
   exchangeRates?: ExchangeRate[];
+  pushConfig?: {
+    enabled: boolean;
+    vapidPublicKey: string | null;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userAvatarUrl ?? null);
+  const hasRegisteredPush = useRef(false);
 
   useEffect(() => {
     setAvatarUrl(userAvatarUrl ?? null);
@@ -42,6 +49,34 @@ export default function DashboardClient({
   const handleAvatarUpdate = (url: string | null) => {
     setAvatarUrl(url);
   };
+
+  useEffect(() => {
+    if (
+      hasRegisteredPush.current ||
+      !pushConfig?.enabled ||
+      !pushConfig.vapidPublicKey ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      hasRegisteredPush.current = true;
+      return;
+    }
+
+    hasRegisteredPush.current = true;
+
+    void registerPushSubscription({
+      vapidPublicKey: pushConfig.vapidPublicKey,
+      onPermissionDenied: () => {
+        hasRegisteredPush.current = false;
+      },
+    }).catch((error) => {
+      console.error("Error registrando push subscription:", error);
+      hasRegisteredPush.current = false;
+    });
+  }, [pushConfig?.enabled, pushConfig?.vapidPublicKey]);
 
   return (
     <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>

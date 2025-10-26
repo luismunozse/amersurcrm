@@ -7,6 +7,7 @@ import {
   Evento,
   EstadoEvento,
 } from "@/lib/types/agenda";
+import { crearNotificacion } from "@/app/_actionsNotifications";
 import { 
   startOfMonth,
   endOfMonth,
@@ -213,6 +214,20 @@ export async function crearEvento(formData: FormData) {
       throw new Error(`Error creando evento: ${error.message}`);
     }
 
+    if (evento?.id) {
+      try {
+        await crearNotificacion(
+          user.id,
+          "sistema",
+          "Nuevo evento agendado",
+          `Has creado el evento "${datos.titulo}" para ${new Date(datos.fecha_inicio).toLocaleString("es-PE")}.`,
+          { evento_id: evento.id, prioridad: datos.prioridad, tipo: datos.tipo }
+        );
+      } catch (notifyError) {
+        console.warn("No se pudo crear notificación de evento:", notifyError);
+      }
+    }
+
     revalidatePath('/dashboard/agenda');
     return { success: true, message: "Evento creado exitosamente", data: evento };
 
@@ -277,6 +292,20 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
 
     if (error) {
       throw new Error(`Error actualizando evento: ${error.message}`);
+    }
+
+    if (datos.titulo) {
+      try {
+        await crearNotificacion(
+          user.id,
+          "sistema",
+          "Evento actualizado",
+          `Actualizaste el evento "${datos.titulo}".`,
+          { evento_id: eventoId }
+        );
+      } catch (notifyError) {
+        console.warn("No se pudo crear notificación de actualización de evento:", notifyError);
+      }
     }
 
     revalidatePath('/dashboard/agenda');
@@ -417,6 +446,20 @@ export async function crearRecordatorio(formData: FormData) {
 
     if (error) {
       throw new Error(`Error creando recordatorio: ${error.message}`);
+    }
+
+    if (recordatorio?.id) {
+      try {
+        await crearNotificacion(
+          user.id,
+          "sistema",
+          "Nuevo recordatorio creado",
+          `Has creado un recordatorio: "${datos.titulo}".`,
+          { recordatorio_id: recordatorio.id, prioridad: datos.prioridad, tipo: datos.tipo }
+        );
+      } catch (notifyError) {
+        console.warn("No se pudo crear notificación de recordatorio:", notifyError);
+      }
     }
 
     revalidatePath('/dashboard/agenda');

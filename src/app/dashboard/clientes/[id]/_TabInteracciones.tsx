@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Phone, Mail, MessageSquare, Users, Video, FileText, Clock, Calendar } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Phone, Mail, MessageSquare, Users, Video, FileText, Clock, Calendar, Loader2, RefreshCw } from "lucide-react";
 import RegistrarInteraccionModal from "@/components/RegistrarInteraccionModal";
 import { TIPOS_INTERACCION, RESULTADOS_INTERACCION, PROXIMAS_ACCIONES } from "@/lib/types/crm-flujo";
+import { obtenerInteracciones } from "../_actions_crm";
 
 interface Props {
   clienteId: string;
@@ -11,8 +12,30 @@ interface Props {
   interacciones: any[];
 }
 
-export default function TabInteracciones({ clienteId, clienteNombre, interacciones }: Props) {
+export default function TabInteracciones({ clienteId, clienteNombre, interacciones: initialInteracciones }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [interacciones, setInteracciones] = useState(initialInteracciones);
+  const [loading, setLoading] = useState(false);
+
+  const cargarInteracciones = useCallback(async () => {
+    setLoading(true);
+    const result = await obtenerInteracciones(clienteId);
+    if (result.success && result.data) {
+      setInteracciones(result.data);
+    }
+    setLoading(false);
+  }, [clienteId]);
+
+  useEffect(() => {
+    // Cargar interacciones al montar el componente
+    cargarInteracciones();
+  }, [cargarInteracciones]);
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    // Recargar interacciones después de cerrar el modal
+    cargarInteracciones();
+  };
 
   const getIconoTipo = (tipo: string) => {
     const tipos = {
@@ -44,17 +67,31 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
       {/* Botón para nueva interacción */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-crm-text">Historial de Interacciones</h3>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Registrar Interacción
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={cargarInteracciones}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 text-crm-text-secondary hover:text-crm-text-primary border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors disabled:opacity-50"
+            title="Recargar interacciones"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Registrar Interacción
+          </button>
+        </div>
       </div>
 
-      {/* Lista de interacciones */}
-      {!interacciones || interacciones.length === 0 ? (
+      {/* Loading state */}
+      {loading && interacciones.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-crm-primary" />
+        </div>
+      ) : !interacciones || interacciones.length === 0 ? (
         <div className="text-center py-12 bg-crm-background rounded-lg">
           <MessageSquare className="h-12 w-12 mx-auto mb-3 text-crm-text-muted opacity-50" />
           <p className="text-crm-text-muted mb-4">No hay interacciones registradas</p>
@@ -152,7 +189,7 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
       {/* Modal */}
       <RegistrarInteraccionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         clienteId={clienteId}
         clienteNombre={clienteNombre}
       />

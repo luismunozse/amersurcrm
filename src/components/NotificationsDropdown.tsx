@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifications";
 import type { NotificacionNoLeida } from "@/types/crm";
 
@@ -25,8 +26,16 @@ const tipoColors = {
 };
 
 export default function NotificationsDropdown({ notificaciones, count }: NotificationsDropdownProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [items, setItems] = useState(notificaciones);
+  const [unreadCount, setUnreadCount] = useState(count);
+
+  useEffect(() => {
+    setItems(notificaciones);
+    setUnreadCount(count);
+  }, [notificaciones, count]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,6 +55,9 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   const handleMarkAsRead = async (notificacionId: string) => {
     try {
       await marcarNotificacionLeida(notificacionId);
+      setItems((prev) => prev.filter((item) => item.id !== notificacionId));
+      setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
+      router.refresh();
     } catch (error) {
       console.error("Error al marcar notificación como leída:", error);
     }
@@ -54,7 +66,10 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   const handleMarkAllAsRead = async () => {
     try {
       await marcarTodasLeidas();
+      setItems([]);
+      setUnreadCount(0);
       setIsOpen(false);
+      router.refresh();
     } catch (error) {
       console.error("Error al marcar todas como leídas:", error);
     }
@@ -80,9 +95,9 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
         aria-label="Notificaciones"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
-        {count > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[18px] px-1 h-[18px] bg-crm-danger text-white rounded-full text-[10px] leading-[18px] font-semibold text-center">
-            {count > 9 ? "9+" : count}
+            {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
@@ -97,7 +112,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
                 <h3 className="text-lg font-semibold text-crm-text-primary">
                   Notificaciones
                 </h3>
-                {count > 0 && (
+                {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}
                     className="text-sm text-crm-primary hover:text-crm-primary/80"
@@ -109,9 +124,9 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
             </div>
 
             <div className="max-h-96 overflow-y-auto">
-              {notificaciones.length > 0 ? (
+              {items.length > 0 ? (
                 <div className="divide-y divide-crm-border">
-                  {notificaciones.map((notificacion) => (
+                  {items.map((notificacion) => (
                     <div
                       key={notificacion.id}
                       className="p-4 hover:bg-crm-card-hover transition-colors cursor-pointer"
