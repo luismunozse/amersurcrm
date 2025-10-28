@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   FolderOpen,
   Search,
@@ -46,12 +46,39 @@ export default function DocumentosClient({
   const [sincronizando, setSincronizando] = useState(false);
   const [documentosEnCarpeta, setDocumentosEnCarpeta] = useState<GoogleDriveDocumento[]>([]);
   const [, setCargandoDocumentos] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState<'all' | 'carpetas' | 'pdf' | 'images' | 'docs' | 'sheets' | 'other'>('all');
+  const [orden, setOrden] = useState<'recientes' | 'antiguos' | 'nombre-asc' | 'nombre-desc' | 'tamano-desc' | 'tamano-asc'>('recientes');
+  const [breadcrumbs, setBreadcrumbs] = useState<Array<{ id: string; name: string }>>([{ id: 'root', name: 'Mi Drive' }]);
 
   // Cargar documentos de la carpeta actual desde Google Drive
   useEffect(() => {
     if (googleDriveConectado) {
       cargarDocumentosDeCarpeta(carpetaSeleccionada);
     }
+  }, [carpetaSeleccionada, googleDriveConectado]);
+
+  useEffect(() => {
+    const cargarBreadcrumbs = async (folderId: string | null) => {
+      if (!googleDriveConectado) return;
+
+      if (!folderId || folderId === 'root') {
+        setBreadcrumbs([{ id: 'root', name: 'Mi Drive' }]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/google-drive/folders/${folderId}/path`);
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          setBreadcrumbs(data.path);
+        }
+      } catch (error) {
+        console.error('Error cargando breadcrumbs principales:', error);
+      }
+    };
+
+    cargarBreadcrumbs(carpetaSeleccionada);
   }, [carpetaSeleccionada, googleDriveConectado]);
 
   const cargarDocumentosDeCarpeta = async (folderId: string | null) => {
@@ -101,15 +128,67 @@ export default function DocumentosClient({
   };
 
   // Filtrar documentos
-  const documentosFiltrados = documentosEnCarpeta.filter(doc => {
+  const documentosFiltrados = useMemo(() => {
+    const coincideTipo = (doc: GoogleDriveDocumento) => {
+      switch (filtroTipo) {
+        case 'carpetas':
+          return doc.es_carpeta;
+        case 'pdf':
+          return doc.tipo_mime?.includes('pdf');
+        case 'images':
+          return doc.tipo_mime?.startsWith('image/');
+        case 'docs':
+          return doc.tipo_mime?.includes('word') || doc.tipo_mime?.includes('document');
+        case 'sheets':
+          return doc.tipo_mime?.includes('spreadsheet') || doc.tipo_mime?.includes('excel');
+        case 'other':
+          return !doc.es_carpeta && !(
+            doc.tipo_mime?.includes('pdf') ||
+            doc.tipo_mime?.startsWith('image/') ||
+            doc.tipo_mime?.includes('word') ||
+            doc.tipo_mime?.includes('document') ||
+            doc.tipo_mime?.includes('spreadsheet') ||
+            doc.tipo_mime?.includes('excel')
+          );
+        default:
+          return true;
+      }
+    };
 
-    // Filtro por búsqueda
-    if (busqueda && !doc.nombre.toLowerCase().includes(busqueda.toLowerCase())) {
-      return false;
-    }
+    const filtrados = documentosEnCarpeta.filter((doc) => {
+      if (busqueda && !doc.nombre.toLowerCase().includes(busqueda.toLowerCase())) {
+        return false;
+      }
 
-    return true;
-  });
+      return coincideTipo(doc);
+    });
+
+    const sorted = [...filtrados].sort((a, b) => {
+      const fechaA = new Date(a.modificado_at || a.updated_at || a.created_at || 0).getTime();
+      const fechaB = new Date(b.modificado_at || b.updated_at || b.created_at || 0).getTime();
+      const tamA = a.tamano_bytes ?? 0;
+      const tamB = b.tamano_bytes ?? 0;
+
+      switch (orden) {
+        case 'recientes':
+          return fechaB - fechaA;
+        case 'antiguos':
+          return fechaA - fechaB;
+        case 'nombre-asc':
+          return a.nombre.localeCompare(b.nombre);
+        case 'nombre-desc':
+          return b.nombre.localeCompare(a.nombre);
+        case 'tamano-desc':
+          return tamB - tamA;
+        case 'tamano-asc':
+          return tamA - tamB;
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [documentosEnCarpeta, busqueda, filtroTipo, orden]);
 
 
   // Sincronizar con Google Drive
@@ -266,7 +345,7 @@ export default function DocumentosClient({
         <div className="lg:col-span-9 space-y-4">
           {/* Toolbar */}
           <div className="crm-card p-4 rounded-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex flex-col xl:flex-row xl:items-center gap-4">
               {/* Búsqueda */}
               <div className="flex-1 relative">
                 <Search className="w-4 h-4 text-crm-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
@@ -277,6 +356,44 @@ export default function DocumentosClient({
                   onChange={(e) => setBusqueda(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-crm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
                 />
+              </div>
+
+              {/* Filtros */}
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="filtroTipo" className="text-sm text-crm-text-muted">Tipo</label>
+                  <select
+                    id="filtroTipo"
+                    value={filtroTipo}
+                    onChange={(event) => setFiltroTipo(event.target.value as typeof filtroTipo)}
+                    className="px-3 py-2 border border-crm-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="carpetas">Carpetas</option>
+                    <option value="pdf">PDF</option>
+                    <option value="images">Imágenes</option>
+                    <option value="docs">Documentos</option>
+                    <option value="sheets">Hojas de cálculo</option>
+                    <option value="other">Otros</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label htmlFor="orden" className="text-sm text-crm-text-muted">Ordenar por</label>
+                  <select
+                    id="orden"
+                    value={orden}
+                    onChange={(event) => setOrden(event.target.value as typeof orden)}
+                    className="px-3 py-2 border border-crm-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+                  >
+                    <option value="recientes">Más recientes</option>
+                    <option value="antiguos">Más antiguos</option>
+                    <option value="nombre-asc">Nombre A-Z</option>
+                    <option value="nombre-desc">Nombre Z-A</option>
+                    <option value="tamano-desc">Tamaño (mayor a menor)</option>
+                    <option value="tamano-asc">Tamaño (menor a mayor)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Vista */}
@@ -306,6 +423,27 @@ export default function DocumentosClient({
           </div>
 
           {/* Lista de Documentos */}
+          <div className="flex flex-col gap-2">
+            {/* Breadcrumb principal */}
+            <div className="flex items-center flex-wrap gap-2 text-sm text-crm-text-secondary">
+              {breadcrumbs.map((crumb, index) => (
+                <div key={crumb.id} className="flex items-center gap-2">
+                  {index > 0 && <span className="text-crm-border">/</span>}
+                  <button
+                    onClick={() => setCarpetaSeleccionada(crumb.id === 'root' ? null : crumb.id)}
+                    className={`hover:text-crm-primary transition-colors ${
+                      index === breadcrumbs.length - 1 ? 'text-crm-primary font-medium' : ''
+                    }`}
+                  >
+                    {crumb.name}
+                  </button>
+                </div>
+              ))}
+              <span className="ml-auto text-xs text-crm-text-muted">
+                {documentosFiltrados.length} resultado{documentosFiltrados.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
           <DocumentosList
             documentos={documentosFiltrados}
             vista={vistaActual}
@@ -315,6 +453,7 @@ export default function DocumentosClient({
               }
             }}
           />
+          </div>
         </div>
       </div>
     </div>
