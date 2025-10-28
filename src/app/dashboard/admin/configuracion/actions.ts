@@ -58,6 +58,10 @@ function parseCustomFields(value?: string) {
     .filter(Boolean);
 }
 
+function getOptionalString(value: FormDataEntryValue | null) {
+  return typeof value === "string" ? value : undefined;
+}
+
 export async function actualizarConfiguracion(
   prevState: ConfiguracionFormState,
   formData: FormData
@@ -94,12 +98,12 @@ export async function actualizarConfiguracion(
       notificacionesEmail: formData.get("notificacionesEmail") === "on",
       notificacionesPush: formData.get("notificacionesPush") === "on",
       notificacionesRecordatorios: formData.get("notificacionesRecordatorios") === "on",
-      camposCliente: formData.get("camposCliente"),
-      camposPropiedad: formData.get("camposPropiedad"),
-      whatsappToken: formData.get("whatsappToken"),
+      camposCliente: getOptionalString(formData.get("camposCliente")),
+      camposPropiedad: getOptionalString(formData.get("camposPropiedad")),
+      whatsappToken: getOptionalString(formData.get("whatsappToken")),
       replaceWhatsappToken: formData.get("replaceWhatsappToken") === "true",
-      smtpHost: formData.get("smtpHost"),
-      googleDriveFolderId: formData.get("googleDriveFolderId"),
+      smtpHost: getOptionalString(formData.get("smtpHost")),
+      googleDriveFolderId: getOptionalString(formData.get("googleDriveFolderId")),
     };
 
     const parsed = configuracionSchema.safeParse(rawData);

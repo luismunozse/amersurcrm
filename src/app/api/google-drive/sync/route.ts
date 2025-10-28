@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const fullSync = body.fullSync === true;
 
     // Obtener cliente configurado de Google Drive
-    const driveData = await getConfiguredGoogleDriveClient();
+    const driveData = await getConfiguredGoogleDriveClient({ supabaseClient: serviceSupabase });
 
     if (!driveData) {
       return NextResponse.json({

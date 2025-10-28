@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const parentFolderId = searchParams.get('parentFolderId') || undefined;
 
     // Obtener cliente configurado de Google Drive
-    const driveData = await getConfiguredGoogleDriveClient();
+    const driveData = await getConfiguredGoogleDriveClient({ supabaseClient: supabase });
 
     if (!driveData) {
       return NextResponse.json({

@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { GoogleDriveClient, getGoogleDriveClient } from "./client";
 
 interface GoogleDriveSyncConfig {
@@ -14,22 +15,50 @@ interface GoogleDriveSyncConfig {
  * Obtiene el cliente de Google Drive configurado desde la base de datos
  * Incluye refresh automático de tokens si es necesario
  */
-export async function getConfiguredGoogleDriveClient(): Promise<{
+interface GetConfiguredClientOptions {
+  supabaseClient?: SupabaseClient<any>;
+}
+
+export async function getConfiguredGoogleDriveClient({
+  supabaseClient,
+}: GetConfiguredClientOptions = {}): Promise<{
   client: GoogleDriveClient;
   config: GoogleDriveSyncConfig;
 } | null> {
   try {
-    // Usar service role para acceder a la configuración (bypasea RLS)
-    const supabase = createServiceRoleClient();
+    let supabase = supabaseClient as SupabaseClient<any> | null | undefined;
+
+    if (!supabase) {
+      const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+      if (!hasServiceRole) {
+        console.error('Supabase service role key no está definido en el entorno');
+        return null;
+      }
+
+      supabase = createServiceRoleClient();
+    }
+
+    if (!supabase) {
+      console.error('No se pudo inicializar el cliente de Supabase para Google Drive');
+      return null;
+    }
 
     // Obtener configuración activa de Google Drive
-    const { data: config, error } = await supabase
+    const { data: configs, error } = await supabase
       .from('google_drive_sync_config')
       .select('*')
       .eq('activo', true)
-      .maybeSingle<GoogleDriveSyncConfig>();
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
-    if (error || !config) {
+    if (error) {
+      console.error('Error consultando google_drive_sync_config:', error);
+      return null;
+    }
+
+    const config = configs?.[0] as GoogleDriveSyncConfig | undefined;
+
+    if (!config) {
       console.log('No hay configuración activa de Google Drive');
       return null;
     }
@@ -45,7 +74,11 @@ export async function getConfiguredGoogleDriveClient(): Promise<{
     const redirectUri = process.env.GOOGLE_DRIVE_REDIRECT_URI;
 
     if (!clientId || !clientSecret || !redirectUri) {
-      console.error('Faltan credenciales de Google Drive en variables de entorno');
+      console.error('Faltan credenciales de Google Drive en variables de entorno', {
+        hasClientId: Boolean(clientId),
+        hasClientSecret: Boolean(clientSecret),
+        hasRedirectUri: Boolean(redirectUri),
+      });
       return null;
     }
 

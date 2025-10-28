@@ -7,91 +7,111 @@ import {
   File,
   Download,
   Eye,
-  ExternalLink
+  Folder,
+  FolderOpen
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import toast from "react-hot-toast";
 
-interface Documento {
+export interface GoogleDriveDocumento {
   id: string;
   nombre: string;
-  tipo_mime: string;
-  extension: string;
-  tamano_bytes: number;
-  storage_tipo: 'supabase' | 'google_drive' | 'externo';
+  tipo_mime?: string | null;
+  extension?: string | null;
+  tamano_bytes?: number | null;
+  storage_tipo?: "supabase" | "google_drive" | "externo";
   google_drive_file_id?: string;
   google_drive_web_view_link?: string;
-  created_at: string;
+  created_at?: string;
+  updated_at?: string;
+  modificado_at?: string;
   carpeta?: { nombre: string; color: string };
   proyecto?: { nombre: string };
   cliente?: { nombre_completo: string };
+  es_carpeta?: boolean;
 }
 
 interface DocumentosListProps {
-  documentos: Documento[];
-  vista: 'grid' | 'list';
+  documentos: GoogleDriveDocumento[];
+  vista: "grid" | "list";
+  onOpenFolder?: (doc: GoogleDriveDocumento) => void;
 }
 
-export default function DocumentosList({ documentos, vista }: DocumentosListProps) {
+function esCarpeta(doc: GoogleDriveDocumento): boolean {
+  return Boolean(doc.es_carpeta || doc.tipo_mime === "application/vnd.google-apps.folder");
+}
 
-  // Obtener icono según tipo
-  const getFileIcon = (mimeType: string) => {
-    if (mimeType?.startsWith('image/')) return Image;
-    if (mimeType?.includes('pdf')) return FileText;
-    if (mimeType?.includes('zip') || mimeType?.includes('rar')) return FileArchive;
-    return File;
-  };
+function obtenerIcono(doc: GoogleDriveDocumento) {
+  if (esCarpeta(doc)) return Folder;
+  const mimeType = doc.tipo_mime ?? "";
+  if (mimeType.startsWith("image/")) return Image;
+  if (mimeType.includes("pdf")) return FileText;
+  if (mimeType.includes("zip") || mimeType.includes("rar")) return FileArchive;
+  return File;
+}
 
-  // Obtener color según tipo
-  const getFileColor = (mimeType: string) => {
-    if (mimeType?.startsWith('image/')) return 'text-purple-600 bg-purple-100';
-    if (mimeType?.includes('pdf')) return 'text-red-600 bg-red-100';
-    if (mimeType?.includes('word')) return 'text-blue-600 bg-blue-100';
-    if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet')) return 'text-green-600 bg-green-100';
-    return 'text-gray-600 bg-gray-100';
-  };
+function obtenerColor(doc: GoogleDriveDocumento) {
+  if (esCarpeta(doc)) return "text-amber-600 bg-amber-100";
+  const mimeType = doc.tipo_mime ?? "";
+  if (mimeType.startsWith("image/")) return "text-purple-600 bg-purple-100";
+  if (mimeType.includes("pdf")) return "text-red-600 bg-red-100";
+  if (mimeType.includes("word")) return "text-blue-600 bg-blue-100";
+  if (mimeType.includes("excel") || mimeType.includes("spreadsheet")) return "text-green-600 bg-green-100";
+  return "text-gray-600 bg-gray-100";
+}
 
-  // Formatear tamaño
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
+function formatearBytes(bytes?: number | null) {
+  if (bytes === null || bytes === undefined) return "—";
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+}
 
-  // Ver documento en Google Drive
-  const handleVer = (doc: Documento) => {
-    if (doc.google_drive_web_view_link) {
-      window.open(doc.google_drive_web_view_link, '_blank');
-    } else {
-      toast.error('No hay enlace disponible para este documento');
-    }
-  };
+function formatearFecha(valor?: string) {
+  if (!valor) return "—";
+  return formatDistanceToNow(new Date(valor), { addSuffix: true, locale: es });
+}
 
-  // Descargar documento
-  const handleDescargar = async (doc: Documento) => {
-    if (!doc.google_drive_file_id) {
-      toast.error('No hay archivo para descargar');
+export default function DocumentosList({ documentos, vista, onOpenFolder }: DocumentosListProps) {
+  const handleVer = (doc: GoogleDriveDocumento) => {
+    if (esCarpeta(doc)) {
+      onOpenFolder?.(doc);
       return;
     }
 
-    const toastId = toast.loading('Descargando archivo...');
+    if (doc.google_drive_web_view_link) {
+      window.open(doc.google_drive_web_view_link, "_blank");
+    } else {
+      toast.error("No hay enlace disponible para este documento");
+    }
+  };
+
+  const handleDescargar = async (doc: GoogleDriveDocumento) => {
+    if (esCarpeta(doc)) {
+      onOpenFolder?.(doc);
+      return;
+    }
+
+    if (!doc.google_drive_file_id) {
+      toast.error("No hay archivo para descargar");
+      return;
+    }
+
+    const toastId = toast.loading("Descargando archivo...");
 
     try {
       const response = await fetch(`/api/google-drive/download/${doc.google_drive_file_id}`);
 
       if (!response.ok) {
-        throw new Error('Error al descargar el archivo');
+        throw new Error("Error al descargar el archivo");
       }
 
-      // Crear un blob con la respuesta
       const blob = await response.blob();
-
-      // Crear un enlace temporal y hacer click para descargar
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = doc.nombre;
       document.body.appendChild(a);
@@ -99,11 +119,10 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success('Archivo descargado', { id: toastId });
-
+      toast.success("Archivo descargado", { id: toastId });
     } catch (error) {
-      console.error('Error descargando archivo:', error);
-      toast.error('Error al descargar el archivo', { id: toastId });
+      console.error("Error descargando archivo:", error);
+      toast.error("Error al descargar el archivo", { id: toastId });
     }
   };
 
@@ -113,9 +132,7 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
         <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
           <File className="w-8 h-8 text-crm-text-muted" />
         </div>
-        <h3 className="text-lg font-semibold text-crm-text-primary mb-2">
-          No hay documentos
-        </h3>
+        <h3 className="text-lg font-semibold text-crm-text-primary mb-2">No hay documentos</h3>
         <p className="text-sm text-crm-text-secondary">
           Sincroniza con Google Drive para ver tus documentos
         </p>
@@ -123,17 +140,19 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
     );
   }
 
-  if (vista === 'grid') {
+  if (vista === "grid") {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {documentos.map((doc) => {
-          const Icon = getFileIcon(doc.tipo_mime);
-          const colorClass = getFileColor(doc.tipo_mime);
+          const Icon = obtenerIcono(doc);
+          const colorClass = obtenerColor(doc);
+          const carpeta = esCarpeta(doc);
 
           return (
             <div
               key={doc.id}
-              className="crm-card p-4 rounded-xl hover:shadow-md transition-all group"
+              className="crm-card p-4 rounded-xl hover:shadow-md transition-all group cursor-pointer"
+              onDoubleClick={() => (carpeta ? onOpenFolder?.(doc) : handleVer(doc))}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className={`p-3 rounded-lg ${colorClass}`}>
@@ -146,9 +165,12 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
               </h4>
 
               <div className="flex items-center gap-2 text-xs text-crm-text-muted mb-2">
-                <span>{formatBytes(doc.tamano_bytes)}</span>
-                <span>•</span>
-                <span>{doc.extension?.toUpperCase()}</span>
+                <span>{carpeta ? "Carpeta" : formatearBytes(doc.tamano_bytes)}</span>
+                {!carpeta && doc.extension && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-crm-card-hover text-crm-text-secondary uppercase">
+                    {doc.extension}
+                  </span>
+                )}
               </div>
 
               {doc.carpeta && (
@@ -159,23 +181,35 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
 
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-crm-border">
                 <span className="text-xs text-crm-text-muted">
-                  {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true, locale: es })}
+                  {carpeta ? `Actualizado ${formatearFecha(doc.modificado_at ?? doc.updated_at ?? doc.created_at)}` : formatearFecha(doc.created_at)}
                 </span>
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleVer(doc)}
-                    className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
-                    title="Ver en Google Drive"
-                  >
-                    <Eye className="w-4 h-4 text-crm-text-secondary" />
-                  </button>
-                  <button
-                    onClick={() => handleDescargar(doc)}
-                    className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
-                    title="Descargar"
-                  >
-                    <Download className="w-4 h-4 text-crm-text-secondary" />
-                  </button>
+                  {carpeta ? (
+                    <button
+                      onClick={() => onOpenFolder?.(doc)}
+                      className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                      title="Abrir carpeta"
+                    >
+                      <FolderOpen className="w-4 h-4 text-crm-text-secondary" />
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleVer(doc)}
+                        className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                        title="Ver en Google Drive"
+                      >
+                        <Eye className="w-4 h-4 text-crm-text-secondary" />
+                      </button>
+                      <button
+                        onClick={() => handleDescargar(doc)}
+                        className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
+                        title="Descargar"
+                      >
+                        <Download className="w-4 h-4 text-crm-text-secondary" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -185,7 +219,6 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
     );
   }
 
-  // Vista de lista
   return (
     <div className="crm-card rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -211,23 +244,31 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
           </thead>
           <tbody className="divide-y divide-crm-border">
             {documentos.map((doc) => {
-              const Icon = getFileIcon(doc.tipo_mime);
-              const colorClass = getFileColor(doc.tipo_mime);
+              const Icon = obtenerIcono(doc);
+              const colorClass = obtenerColor(doc);
+              const carpeta = esCarpeta(doc);
 
               return (
-                <tr key={doc.id} className="hover:bg-crm-card-hover transition-colors">
+                <tr
+                  key={doc.id}
+                  className="hover:bg-crm-card-hover transition-colors cursor-pointer"
+                  onDoubleClick={() => (carpeta ? onOpenFolder?.(doc) : handleVer(doc))}
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded ${colorClass}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-crm-text-primary">
-                          {doc.nombre}
-                        </p>
-                        <p className="text-xs text-crm-text-muted">
-                          {doc.extension?.toUpperCase()}
-                        </p>
+                        <p className="text-sm font-medium text-crm-text-primary">{doc.nombre}</p>
+                        <div className="flex items-center gap-2 text-xs text-crm-text-muted">
+                          <span>{carpeta ? "Carpeta" : doc.extension?.toUpperCase() || "—"}</span>
+                          {!carpeta && doc.extension && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-crm-card-hover text-crm-text-secondary uppercase">
+                              {doc.extension}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -239,37 +280,40 @@ export default function DocumentosList({ documentos, vista }: DocumentosListProp
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-crm-text-secondary">
-                    {formatBytes(doc.tamano_bytes)}
+                    {carpeta ? "—" : formatearBytes(doc.tamano_bytes)}
                   </td>
                   <td className="px-4 py-3 text-sm text-crm-text-secondary">
-                    {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true, locale: es })}
+                    {carpeta
+                      ? `Actualizado ${formatearFecha(doc.modificado_at ?? doc.updated_at ?? doc.created_at)}`
+                      : formatearFecha(doc.created_at)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleVer(doc)}
-                        className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
-                        title="Ver en Google Drive"
-                      >
-                        <Eye className="w-4 h-4 text-crm-text-secondary" />
-                      </button>
-                      <button
-                        onClick={() => handleDescargar(doc)}
-                        className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
-                        title="Descargar"
-                      >
-                        <Download className="w-4 h-4 text-crm-text-secondary" />
-                      </button>
-                      {doc.google_drive_web_view_link && (
-                        <a
-                          href={doc.google_drive_web_view_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 hover:bg-crm-card-hover rounded transition-colors"
-                          title="Abrir en Google Drive"
+                      {carpeta ? (
+                        <button
+                          onClick={() => onOpenFolder?.(doc)}
+                          className="p-2 hover:bg-crm-card-hover rounded-lg transition-colors"
+                          title="Abrir carpeta"
                         >
-                          <ExternalLink className="w-4 h-4 text-crm-text-secondary" />
-                        </a>
+                          <FolderOpen className="w-4 h-4 text-crm-text-secondary" />
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleVer(doc)}
+                            className="p-2 hover:bg-crm-card-hover rounded-lg transition-colors"
+                            title="Ver en Google Drive"
+                          >
+                            <Eye className="w-4 h-4 text-crm-text-secondary" />
+                          </button>
+                          <button
+                            onClick={() => handleDescargar(doc)}
+                            className="p-2 hover:bg-crm-card-hover rounded-lg transition-colors"
+                            title="Descargar"
+                          >
+                            <Download className="w-4 h-4 text-crm-text-secondary" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>

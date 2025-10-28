@@ -12,7 +12,7 @@ import {
   Clock
 } from "lucide-react";
 import GoogleDriveFolders from "./_GoogleDriveFolders";
-import DocumentosList from "./_DocumentosList";
+import DocumentosList, { GoogleDriveDocumento } from "./_DocumentosList";
 import GoogleDriveStatus from "./_GoogleDriveStatus";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -26,18 +26,25 @@ interface DocumentosClientProps {
     total: number;
     tamanoTotal: number;
   };
+  googleDriveStatus?: {
+    hasConfig: boolean;
+    envReady: boolean;
+    serviceRoleReady: boolean;
+    configError?: string | null;
+  };
 }
 
 export default function DocumentosClient({
   googleDriveConectado,
   ultimaSincronizacion,
-  stats
+  stats,
+  googleDriveStatus
 }: DocumentosClientProps) {
   const [vistaActual, setVistaActual] = useState<'grid' | 'list'>('grid');
   const [carpetaSeleccionada, setCarpetaSeleccionada] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [sincronizando, setSincronizando] = useState(false);
-  const [documentosEnCarpeta, setDocumentosEnCarpeta] = useState<any[]>([]);
+  const [documentosEnCarpeta, setDocumentosEnCarpeta] = useState<GoogleDriveDocumento[]>([]);
   const [, setCargandoDocumentos] = useState(false);
 
   // Cargar documentos de la carpeta actual desde Google Drive
@@ -63,16 +70,26 @@ export default function DocumentosClient({
       }
 
       // Convertir formato de Google Drive a formato de documento
-      const documentos = (data.files || []).map((file: any) => ({
-        id: file.id,
-        nombre: file.name,
-        google_drive_file_id: file.id,
-        google_drive_web_view_link: file.webViewLink,
-        tipo_mime: file.mimeType,
-        tamano_bytes: file.size ? parseInt(file.size) : null,
-        created_at: file.createdTime,
-        updated_at: file.modifiedTime,
-      }));
+      const documentos = (data.files || []).map((file: any) => {
+        const esCarpeta = file.mimeType === 'application/vnd.google-apps.folder';
+        const extension = !esCarpeta && file.name.includes('.')
+          ? file.name.split('.').pop()!.toLowerCase()
+          : null;
+
+        return {
+          id: file.id,
+          nombre: file.name,
+          google_drive_file_id: file.id,
+          google_drive_web_view_link: file.webViewLink,
+          tipo_mime: file.mimeType,
+          tamano_bytes: !esCarpeta && file.size ? parseInt(file.size) : null,
+          extension,
+          created_at: file.createdTime,
+          updated_at: file.modifiedTime,
+          es_carpeta: esCarpeta,
+          modificado_at: file.modifiedTime,
+        };
+      });
 
       setDocumentosEnCarpeta(documentos);
     } catch (error) {
@@ -223,6 +240,10 @@ export default function DocumentosClient({
         conectado={googleDriveConectado}
         onSincronizar={handleSincronizar}
         sincronizando={sincronizando}
+        hasConfig={googleDriveStatus?.hasConfig}
+        envReady={googleDriveStatus?.envReady}
+        serviceRoleReady={googleDriveStatus?.serviceRoleReady}
+        configError={googleDriveStatus?.configError}
       />
 
       {/* Main Content */}
@@ -288,6 +309,11 @@ export default function DocumentosClient({
           <DocumentosList
             documentos={documentosFiltrados}
             vista={vistaActual}
+            onOpenFolder={(doc) => {
+              if (doc.es_carpeta && doc.google_drive_file_id) {
+                setCarpetaSeleccionada(doc.google_drive_file_id);
+              }
+            }}
           />
         </div>
       </div>

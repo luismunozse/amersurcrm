@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       : 100;
 
     // Obtener cliente configurado de Google Drive
-    const driveData = await getConfiguredGoogleDriveClient();
+    const driveData = await getConfiguredGoogleDriveClient({ supabaseClient: supabase });
 
     if (!driveData) {
       return NextResponse.json({

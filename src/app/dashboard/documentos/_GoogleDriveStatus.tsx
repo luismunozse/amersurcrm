@@ -7,9 +7,21 @@ interface GoogleDriveStatusProps {
   conectado: boolean;
   onSincronizar?: () => void;
   sincronizando?: boolean;
+  hasConfig?: boolean;
+  envReady?: boolean;
+  serviceRoleReady?: boolean;
+  configError?: string | null;
 }
 
-export default function GoogleDriveStatus({ conectado, onSincronizar, sincronizando }: GoogleDriveStatusProps) {
+export default function GoogleDriveStatus({
+  conectado,
+  onSincronizar,
+  sincronizando,
+  hasConfig,
+  envReady,
+  serviceRoleReady,
+  configError
+}: GoogleDriveStatusProps) {
   if (conectado) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-xl p-4">
@@ -51,6 +63,20 @@ export default function GoogleDriveStatus({ conectado, onSincronizar, sincroniza
     );
   }
 
+  const issues: string[] = [];
+  if (!hasConfig) {
+    issues.push("Todavía no se ha conectado Google Drive desde la página de configuración.");
+  }
+  if (hasConfig && envReady === false) {
+    issues.push("Faltan variables de entorno GOOGLE_DRIVE_CLIENT_ID/SECRET/REDIRECT_URI en el servidor.");
+  }
+  if (hasConfig && serviceRoleReady === false) {
+    issues.push("Define SUPABASE_SERVICE_ROLE_KEY para permitir que el servidor consulte Google Drive.");
+  }
+  if (configError) {
+    issues.push(`Error consultando la configuración: ${configError}`);
+  }
+
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
       <div className="flex items-center justify-between">
@@ -61,8 +87,15 @@ export default function GoogleDriveStatus({ conectado, onSincronizar, sincroniza
           <div>
             <h4 className="font-medium text-amber-900">Google Drive No Configurado</h4>
             <p className="text-sm text-amber-700">
-              Conecta tu Google Drive para ver y descargar documentos desde el CRM
+              {issues.length > 0
+                ? issues[0]
+                : "Conecta tu Google Drive para ver y descargar documentos desde el CRM"}
             </p>
+            {issues.slice(1).map((issue, index) => (
+              <p key={index} className="text-xs text-amber-700 mt-1">
+                • {issue}
+              </p>
+            ))}
           </div>
         </div>
         <Link

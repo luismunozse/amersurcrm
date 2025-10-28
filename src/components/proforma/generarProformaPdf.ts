@@ -60,10 +60,7 @@ const CELLS = {
   comentarios: bounds(103, 1188, 1131, 1265),
   numeroProforma: bounds(940, 300, 1131, 335),
   fechaEmision: bounds(940, 330, 1131, 365),
-  cuentas: {
-    etiquetas: bounds(103, 1100, 260, 1180),
-    valores: bounds(260, 1100, 411, 1180),
-  },
+  cuentas: bounds(103, 1100, 1131, 1180),
 };
 
 const DEFAULT_DATOS: ProformaDatos = {
@@ -156,15 +153,15 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
     });
   });
 
-  setFieldText(fields, "terreno_proyecto", datos.terreno.proyecto) ||
+  setFieldText(fields, "terreno_proyecto_1", datos.terreno.proyecto) ||
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.proyecto), CELLS.terreno.proyecto, {
       verticalAlign: "center",
     });
-  setFieldText(fields, "terreno_lote", datos.terreno.lote) ||
+  setFieldText(fields, "terreno_lote_1", datos.terreno.lote) ||
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.lote), CELLS.terreno.lote, { verticalAlign: "center" });
-  setFieldText(fields, "terreno_etapa", datos.terreno.etapa) ||
+  setFieldText(fields, "terreno_etapa_1", datos.terreno.etapa) ||
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.etapa), CELLS.terreno.etapa, { verticalAlign: "center" });
-  setFieldText(fields, "terreno_area", datos.terreno.area) ||
+  setFieldText(fields, "terreno_area_1", datos.terreno.area) ||
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.area), CELLS.terreno.area, { verticalAlign: "center" });
 
   const terrenoPrecio = formatCurrencyValue(datos.terreno.precioLista ?? datos.precios.precioLista, proforma.moneda);
@@ -212,29 +209,20 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
       verticalAlign: "center",
     });
 
-  const cuentas = normalizarCuentasEmpresa(datos.cuentasEmpresa);
-  drawParagraph(
-    page,
-    regularFont,
-    cuentas.map((c) => c.label).join("\n"),
-    CELLS.cuentas.etiquetas,
-    {
-      fontSize: 8.5,
-      paddingPx: 8,
-      maxLines: 4,
-    },
-  );
-  drawParagraph(
-    page,
-    regularFont,
-    cuentas.map((c) => c.valor).join("\n"),
-    CELLS.cuentas.valores,
-    {
-      fontSize: 8.5,
-      paddingPx: 8,
-      maxLines: 4,
-    },
-  );
+  // Extraer y configurar cuentas bancarias
+  const cuentasBancarias = extraerCuentasBancarias(datos.cuentasEmpresa);
+
+  // Cuenta en Soles
+  if (cuentasBancarias.soles) {
+    setFieldText(fields, "tipo_cuenta_soles", cuentasBancarias.soles.tipo);
+    setFieldText(fields, "numero_cuenta_soles", cuentasBancarias.soles.numero);
+  }
+
+  // Cuenta en Dólares
+  if (cuentasBancarias.dolares) {
+    setFieldText(fields, "tipo_cuenta_dolares", cuentasBancarias.dolares.tipo);
+    setFieldText(fields, "numero_cuenta_dolares", cuentasBancarias.dolares.numero);
+  }
 
   if (datos.comentariosAdicionales) {
     drawParagraph(page, regularFont, datos.comentariosAdicionales, CELLS.comentarios, {
@@ -316,7 +304,7 @@ function drawTextInBounds(
     verticalAlign?: "bottom" | "center";
   } = {},
 ) {
-  const value = rawValue || "";
+  const value = sanitizeForWinAnsi(rawValue) || "";
   const rect = boundsToRect(boundsPx);
   const fontSize = options.fontSize ?? DEFAULT_FONT_SIZE;
   const padding = px(options.paddingPx ?? CELL_PADDING_PX);
@@ -354,12 +342,13 @@ function drawParagraph(
   boundsPx: { left: number; top: number; right: number; bottom: number },
   options: { fontSize?: number; paddingPx?: number; maxLines?: number; color?: ReturnType<typeof rgb> } = {},
 ) {
+  const sanitizedText = sanitizeForWinAnsi(text);
   const rect = boundsToRect(boundsPx);
   const padding = px(options.paddingPx ?? CELL_PADDING_PX);
   const fontSize = options.fontSize ?? 9;
   const maxWidth = rect.width - padding * 2;
   const maxLines = options.maxLines ?? Math.floor((rect.height - padding * 2) / (fontSize + LINE_GAP));
-  const lines = wrapText(text, font, fontSize, maxWidth, maxLines);
+  const lines = wrapText(sanitizedText, font, fontSize, maxWidth, maxLines);
 
   let cursorY = rect.y + rect.height - padding - fontSize;
   lines.forEach((line) => {
@@ -383,7 +372,8 @@ function drawText(
   options: { fontSize?: number; color?: ReturnType<typeof rgb> } = {},
 ) {
   if (!text) return;
-  page.drawText(text, {
+  const sanitizedText = sanitizeForWinAnsi(text);
+  page.drawText(sanitizedText, {
     x,
     y,
     font,
@@ -478,26 +468,83 @@ function textOrDash(value: string | number | null | undefined) {
   return str.length > 0 ? str : "—";
 }
 
-function normalizarCuentasEmpresa(valores: string[] | undefined) {
-  const DEFAULT = [
-    { label: "CCI BCP Soles", valor: "002-123-45678901234-56" },
-    { label: "CCI BCP Dólares", valor: "002-987-65432109876-54" },
-  ];
+/**
+ * Sanitiza texto para que sea compatible con WinAnsi encoding (Latin-1).
+ * Remueve o reemplaza caracteres que no pueden ser codificados por fuentes estándar PDF.
+ */
+function sanitizeForWinAnsi(text: string | null | undefined): string {
+  if (!text) return "";
+
+  // Normalizar y remover diacríticos
+  let sanitized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // Reemplazar caracteres fuera del rango WinAnsi (0x00-0xFF)
+  // con su equivalente más cercano o removerlos
+  sanitized = sanitized.replace(/[^\x00-\xFF]/g, "");
+
+  return sanitized;
+}
+
+interface CuentaBancaria {
+  tipo: string;
+  numero: string;
+}
+
+interface CuentasBancarias {
+  soles: CuentaBancaria | null;
+  dolares: CuentaBancaria | null;
+}
+
+function extraerCuentasBancarias(valores: string[] | undefined): CuentasBancarias {
+  const resultado: CuentasBancarias = {
+    soles: null,
+    dolares: null,
+  };
+
+  // Valores por defecto
+  const DEFAULT_SOLES = { tipo: "CCI BCP Soles", numero: "002-123-45678901234-56" };
+  const DEFAULT_DOLARES = { tipo: "CCI BCP Dólares", numero: "002-987-65432109876-54" };
 
   if (!valores || valores.length === 0) {
-    return DEFAULT;
+    return {
+      soles: DEFAULT_SOLES,
+      dolares: DEFAULT_DOLARES,
+    };
   }
 
-  const cuentas = valores.map((linea) => {
-    const [label, ...resto] = linea.split(":");
-    const valor = resto.join(":").trim();
-    if (!valor) {
-      return { label: linea.trim(), valor: "" };
+  // Buscar cuentas en soles y dólares
+  valores.forEach((linea) => {
+    if (!linea || linea.trim().length === 0) return;
+
+    const lineaNormalizada = linea.toLowerCase();
+
+    // Detectar si es cuenta en soles o dólares
+    const esSoles = lineaNormalizada.includes("sole") || lineaNormalizada.includes("pen");
+    const esDolares = lineaNormalizada.includes("dólar") || lineaNormalizada.includes("dolar") || lineaNormalizada.includes("usd");
+
+    // Extraer tipo y número separados por ":"
+    const partes = linea.split(":");
+    if (partes.length >= 2) {
+      const tipo = partes[0].trim();
+      const numero = partes.slice(1).join(":").trim();
+
+      if (esSoles && !resultado.soles) {
+        resultado.soles = { tipo, numero };
+      } else if (esDolares && !resultado.dolares) {
+        resultado.dolares = { tipo, numero };
+      }
     }
-    return { label: label.trim(), valor };
   });
 
-  return cuentas.length > 0 ? cuentas : DEFAULT;
+  // Si no se encontraron cuentas, usar las por defecto
+  if (!resultado.soles) {
+    resultado.soles = DEFAULT_SOLES;
+  }
+  if (!resultado.dolares) {
+    resultado.dolares = DEFAULT_DOLARES;
+  }
+
+  return resultado;
 }
 
 function collectTextFields(form: ReturnType<PDFDocument["getForm"]>) {
@@ -517,7 +564,8 @@ function collectTextFields(form: ReturnType<PDFDocument["getForm"]>) {
 function setFieldText(fields: Map<string, PDFTextField>, name: string, value: string | null | undefined) {
   const field = fields.get(name);
   if (!field) return false;
-  field.setText(value ? value.toString() : "");
+  const sanitizedValue = value ? sanitizeForWinAnsi(value.toString()) : "";
+  field.setText(sanitizedValue);
   return true;
 }
 
