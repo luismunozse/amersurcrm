@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
 type Tone = "info" | "warning" | "danger" | "success";
 
-const toneConfig: Record<Tone, { bg: string; border: string; icon: JSX.Element }> = {
+const toneConfig: Record<Tone, { bg: string; border: string; icon: React.ReactElement }> = {
   info: {
     bg: "bg-blue-50 dark:bg-blue-900/20",
     border: "border-blue-200 dark:border-blue-800",
@@ -32,7 +32,7 @@ const toneConfig: Record<Tone, { bg: string; border: string; icon: JSX.Element }
 export interface InfoDialogProps {
   open: boolean;
   title: string;
-  description?: string | JSX.Element;
+  description?: string | React.ReactNode;
   tone?: Tone;
   actionLabel?: string;
   onAction?: () => void;

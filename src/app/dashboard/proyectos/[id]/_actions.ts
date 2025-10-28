@@ -893,7 +893,7 @@ export async function crearReservaConVinculacion(datos: {
 
     // Obtener perfil del vendedor
     const perfil = await obtenerPerfilUsuario();
-    if (!perfil || !perfil.username) {
+    if (!perfil || !perfil.id) {
       return { data: null, error: "No se pudo obtener el perfil del vendedor" };
     }
 
@@ -938,7 +938,7 @@ export async function crearReservaConVinculacion(datos: {
         codigo_reserva: codigoReserva,
         cliente_id: datos.clienteId,
         lote_id: datos.loteId,
-        vendedor_username: perfil.username,
+        vendedor_username: perfil.email,
         monto_reserva: datos.montoInicial,
         moneda: 'PEN',
         fecha_vencimiento: datos.fechaVencimiento,
@@ -978,7 +978,7 @@ export async function crearReservaConVinculacion(datos: {
       await supabase
         .schema('crm')
         .from('cliente')
-        .update({ vendedor_asignado: perfil.username })
+        .update({ vendedor_asignado: perfil.email })
         .eq('id', datos.clienteId);
     }
 

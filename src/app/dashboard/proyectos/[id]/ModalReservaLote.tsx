@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -483,7 +483,7 @@ export default function ModalReservaLote({
                       size="sm"
                       onClick={() => {
                         if (pdfBytes) {
-                          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                          const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
                           const url = URL.createObjectURL(blob);
                           const a = document.createElement('a');
                           a.href = url;

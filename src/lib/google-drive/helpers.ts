@@ -1,5 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+type AnySupabaseClient = SupabaseClient<any, string, any, any>;
 import { GoogleDriveClient, getGoogleDriveClient } from "./client";
 
 interface GoogleDriveSyncConfig {
@@ -16,7 +18,7 @@ interface GoogleDriveSyncConfig {
  * Incluye refresh automático de tokens si es necesario
  */
 interface GetConfiguredClientOptions {
-  supabaseClient?: SupabaseClient<any>;
+  supabaseClient?: AnySupabaseClient | null;
 }
 
 export async function getConfiguredGoogleDriveClient({
@@ -26,7 +28,7 @@ export async function getConfiguredGoogleDriveClient({
   config: GoogleDriveSyncConfig;
 } | null> {
   try {
-    let supabase = supabaseClient as SupabaseClient<any> | null | undefined;
+    let supabase = supabaseClient as AnySupabaseClient | null | undefined;
 
     if (!supabase) {
       const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);

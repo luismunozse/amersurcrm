@@ -153,61 +153,74 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
     });
   });
 
-  setFieldText(fields, "terreno_proyecto_1", datos.terreno.proyecto) ||
+  if (!setFieldText(fields, "terreno_proyecto_1", datos.terreno.proyecto)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.proyecto), CELLS.terreno.proyecto, {
       verticalAlign: "center",
     });
-  setFieldText(fields, "terreno_lote_1", datos.terreno.lote) ||
+  }
+  if (!setFieldText(fields, "terreno_lote_1", datos.terreno.lote)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.lote), CELLS.terreno.lote, { verticalAlign: "center" });
-  setFieldText(fields, "terreno_etapa_1", datos.terreno.etapa) ||
+  }
+  if (!setFieldText(fields, "terreno_etapa_1", datos.terreno.etapa)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.etapa), CELLS.terreno.etapa, { verticalAlign: "center" });
-  setFieldText(fields, "terreno_area_1", datos.terreno.area) ||
+  }
+  if (!setFieldText(fields, "terreno_area_1", datos.terreno.area)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.terreno.area), CELLS.terreno.area, { verticalAlign: "center" });
+  }
 
   const terrenoPrecio = formatCurrencyValue(datos.terreno.precioLista ?? datos.precios.precioLista, proforma.moneda);
-  setFieldText(fields, "terreno_precio_lista", terrenoPrecio) ||
+  if (!setFieldText(fields, "terreno_precio_lista", terrenoPrecio)) {
     drawTextInBounds(page, regularFont, terrenoPrecio || textOrDash(null), CELLS.terreno.precioLista, {
       verticalAlign: "center",
     });
+  }
 
   const precioLista = formatCurrencyValue(datos.precios.precioLista, proforma.moneda);
-  setFieldText(fields, "precio_lista", precioLista) ||
+  if (!setFieldText(fields, "precio_lista", precioLista)) {
     drawTextInBounds(page, regularFont, precioLista || textOrDash(null), CELLS.precios.lista, { verticalAlign: "center" });
+  }
 
   const precioDesc = formatCurrencyValue(datos.precios.descuento, proforma.moneda);
-  setFieldText(fields, "precio_descuento", precioDesc) ||
+  if (!setFieldText(fields, "precio_descuento", precioDesc)) {
     drawTextInBounds(page, regularFont, precioDesc || textOrDash(null), CELLS.precios.descuento, {
       verticalAlign: "center",
     });
+  }
 
   const precioFinal = formatCurrencyValue(datos.precios.precioFinal ?? proforma.total, proforma.moneda);
-  setFieldText(fields, "precio_final", precioFinal) ||
+  if (!setFieldText(fields, "precio_final", precioFinal)) {
     drawTextInBounds(page, regularFont, precioFinal || textOrDash(null), CELLS.precios.final, { verticalAlign: "center" });
+  }
 
   const separacion = formatCurrencyValue(datos.formaPago.separacion, proforma.moneda);
-  setFieldText(fields, "forma_separacion", separacion) ||
+  if (!setFieldText(fields, "forma_separacion", separacion)) {
     drawTextInBounds(page, regularFont, separacion || textOrDash(null), CELLS.formaPago.separacion, {
       verticalAlign: "center",
     });
+  }
 
   const abono = formatCurrencyValue(datos.formaPago.abonoPrincipal, proforma.moneda);
-  setFieldText(fields, "forma_abono_principal", abono) ||
+  if (!setFieldText(fields, "forma_abono_principal", abono)) {
     drawTextInBounds(page, regularFont, abono || textOrDash(null), CELLS.formaPago.abonoPrincipal, {
       verticalAlign: "center",
     });
+  }
 
   const cuotas = datos.formaPago.numeroCuotas != null ? `${datos.formaPago.numeroCuotas}` : "";
-  setFieldText(fields, "forma_numero_cuotas", cuotas) ||
+  if (!setFieldText(fields, "forma_numero_cuotas", cuotas)) {
     drawTextInBounds(page, regularFont, textOrDash(cuotas), CELLS.formaPago.cuotas, { verticalAlign: "center" });
+  }
 
-  setFieldText(fields, "medios_soles", datos.mediosPago.soles) ||
+  if (!setFieldText(fields, "medios_soles", datos.mediosPago.soles)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.soles), CELLS.mediosPago.soles, {
       verticalAlign: "center",
     });
-  setFieldText(fields, "medios_dolares", datos.mediosPago.dolares) ||
+  }
+  if (!setFieldText(fields, "medios_dolares", datos.mediosPago.dolares)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.dolares), CELLS.mediosPago.dolares, {
       verticalAlign: "center",
     });
+  }
 
   // Extraer y configurar cuentas bancarias
   const cuentasBancarias = extraerCuentasBancarias(datos.cuentasEmpresa);
@@ -231,18 +244,20 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
     });
   }
 
-  setFieldText(fields, "firma_cliente", datos.cliente.nombre) ||
+  if (!setFieldText(fields, "firma_cliente", datos.cliente.nombre)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.cliente.nombre), CELLS.firmas.cliente, {
       fontSize: 9,
       paddingPx: 6,
       verticalAlign: "center",
     });
-  setFieldText(fields, "firma_asesor", datos.asesor.nombre) ||
+  }
+  if (!setFieldText(fields, "firma_asesor", datos.asesor.nombre)) {
     drawTextInBounds(page, regularFont, textOrDash(datos.asesor.nombre), CELLS.firmas.asesor, {
       fontSize: 9,
       paddingPx: 6,
       verticalAlign: "center",
     });
+  }
 
   const nota = `Oferta válida por ${datos.validezDias ?? 3} día(s) hábil(es) desde la fecha de emisión.`;
   drawText(page, regularFont, nota, px(103), pxY(1275), { fontSize: 8 });
