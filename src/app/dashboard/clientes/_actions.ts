@@ -548,12 +548,21 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
     throw new Error("Vendedor no encontrado o inactivo");
   }
 
+  // Actualizar ambos campos para mantener consistencia
+  const payload = {
+    vendedor_username: vendedorUsername,
+    vendedor_asignado: vendedorUsername,
+  };
+
   const { error } = await supabase
     .from("cliente")
-    .update({ vendedor_asignado: vendedorUsername })
+    .update(payload)
     .in("id", ids);
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('Error asignando vendedor masivo:', error);
+    throw new Error(error.message);
+  }
 
   revalidatePath("/dashboard/clientes");
   return { success: true, count: ids.length };

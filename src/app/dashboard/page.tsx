@@ -319,7 +319,7 @@ async function DashboardContent() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 sm:space-y-10 px-4 pb-10 pt-6 md:px-8 md:pt-8">
       {metrics.hasError && (
         <div className="rounded-2xl border border-crm-warning/40 bg-crm-warning/10 px-4 py-3 text-sm text-crm-warning">
           No pudimos cargar todas las métricas. Se muestran valores parciales; intenta refrescar en unos minutos.
@@ -347,12 +347,12 @@ async function DashboardContent() {
               </span>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
               {heroHighlights.map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="group block rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  className="group block min-w-[16rem] rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:min-w-0"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
@@ -429,36 +429,30 @@ async function DashboardContent() {
               Personalizar
             </Link>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2">
+          <div className="flex gap-4 overflow-x-auto pb-3 sm:grid sm:grid-cols-2 sm:gap-4 sm:pb-0">
             {quickActions.map((action) => (
               <Link
                 key={action.title}
                 href={action.href}
-                className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/50"
+                className="group min-w-[17rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/50 sm:min-w-0"
               >
-                <Card hover variant="elevated" className="h-full border border-crm-border/70">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                      <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneClasses[action.color]}`}>
-                        {action.icon}
-                      </span>
-                      <CardTitle className="text-base leading-snug">{action.title}</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-sm leading-relaxed">
-                      {action.description}
-                    </CardDescription>
-                  </CardContent>
-                  <CardContent className="pt-4">
-                    <span className="inline-flex items-center gap-2 text-sm font-medium text-crm-primary/90 transition group-hover:text-crm-primary">
-                      Ir ahora
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                <div className="rounded-2xl border border-crm-border/60 bg-white dark:bg-crm-card shadow-sm hover:shadow-crm transition-transform hover:-translate-y-1 h-full flex flex-col p-4">
+                  <div className="flex items-center gap-3">
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClasses[action.color]}`}>
+                      {action.icon}
                     </span>
-                  </CardContent>
-                </Card>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-crm-text-primary">{action.title}</p>
+                      <p className="mt-1 text-xs text-crm-text-muted leading-snug">{action.description}</p>
+                    </div>
+                  </div>
+                  <span className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-crm-primary/90 transition group-hover:text-crm-primary">
+                    Ir ahora
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
               </Link>
             ))}
           </div>

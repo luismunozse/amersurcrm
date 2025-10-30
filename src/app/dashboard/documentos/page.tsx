@@ -1,4 +1,4 @@
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
 import DocumentosClient from "./_DocumentosClient";
 
@@ -13,30 +13,38 @@ export default async function DocumentosPage() {
   // Obtener documentos sincronizados de Google Drive (solo para estadísticas iniciales)
   // Los archivos se cargarán dinámicamente desde Google Drive API según la carpeta
   const { data: documentos } = await supabase
+    .schema('crm')
     .from('documento')
     .select('id, tamano_bytes, created_at')
     .eq('storage_tipo', 'google_drive')
     .order('created_at', { ascending: false });
 
-  // Obtener configuración de Google Drive (si existe)
+  // Obtener configuración de Google Drive usando service role client (bypasses RLS)
+  // Los vendedores necesitan ver el estado de conexión para acceder a documentos desde móvil
   let googleDriveConfig: { access_token: string | null; ultima_sincronizacion_at: string | null } | null = null;
   let googleDriveConfigError: string | null = null;
 
   try {
-    const { data, error } = await supabase
+    const serviceRole = createServiceRoleClient();
+    console.log('[DEBUG] Service Role Key exists:', Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY));
+    console.log('[DEBUG] Service Role Key length:', process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
+
+    const { data, error } = await serviceRole
       .from('google_drive_sync_config')
       .select('access_token, ultima_sincronizacion_at')
       .eq('activo', true)
       .maybeSingle();
 
+    console.log('[DEBUG] Query result - data:', data);
+    console.log('[DEBUG] Query result - error:', error);
+
     if (error) {
-      console.error('Error consultando google_drive_sync_config:', error);
       googleDriveConfigError = error.message;
     } else {
       googleDriveConfig = data;
     }
   } catch (error) {
-    console.error('Excepción consultando google_drive_sync_config:', error);
+    console.log('[DEBUG] Exception caught:', error);
     googleDriveConfigError = error instanceof Error ? error.message : 'Error desconocido';
   }
 

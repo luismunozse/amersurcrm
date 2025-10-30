@@ -52,6 +52,7 @@ export default function DocumentosClient({
   const [orden, setOrden] = useState<'recientes' | 'antiguos' | 'nombre-asc' | 'nombre-desc' | 'tamano-desc' | 'tamano-asc'>('recientes');
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ id: string; name: string }>>([{ id: 'root', name: 'Mi Drive' }]);
   const [mostrarCarpetasMovil, setMostrarCarpetasMovil] = useState(false);
+  const [mostrarFiltrosMovil, setMostrarFiltrosMovil] = useState(false);
 
   // Cargar documentos de la carpeta actual desde Google Drive
   useEffect(() => {
@@ -247,7 +248,7 @@ export default function DocumentosClient({
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-6 px-4 py-6 md:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -275,8 +276,8 @@ export default function DocumentosClient({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="crm-card p-4 rounded-xl">
+      <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:gap-4 md:pb-0">
+        <div className="crm-card p-4 rounded-xl min-w-[14rem] md:min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-crm-text-muted">Total Documentos</p>
@@ -288,7 +289,7 @@ export default function DocumentosClient({
           </div>
         </div>
 
-        <div className="crm-card p-4 rounded-xl">
+        <div className="crm-card p-4 rounded-xl min-w-[14rem] md:min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-crm-text-muted">Google Drive</p>
@@ -300,7 +301,7 @@ export default function DocumentosClient({
           </div>
         </div>
 
-        <div className="crm-card p-4 rounded-xl">
+        <div className="crm-card p-4 rounded-xl min-w-[14rem] md:min-w-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-crm-text-muted">Última Sincronización</p>
@@ -348,7 +349,7 @@ export default function DocumentosClient({
         {/* Main - Documentos */}
         <div className="lg:col-span-9 space-y-4">
           {/* Toolbar */}
-          <div className="crm-card p-4 rounded-xl">
+          <div className="crm-card p-4 rounded-xl space-y-4">
             <div className="flex flex-col xl:flex-row xl:items-center gap-4">
               {/* Búsqueda */}
               <div className="flex-1 relative">
@@ -371,10 +372,17 @@ export default function DocumentosClient({
                   <Folder className="w-4 h-4" />
                   Carpetas
                 </button>
+                <button
+                  onClick={() => setMostrarFiltrosMovil(!mostrarFiltrosMovil)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-crm-border text-sm font-medium text-crm-text-primary bg-white hover:bg-crm-card-hover transition-colors dark:bg-crm-card dark:text-white"
+                >
+                  Filtros
+                  <span className="text-xs text-crm-text-muted">{mostrarFiltrosMovil ? '▲' : '▼'}</span>
+                </button>
               </div>
 
               {/* Filtros */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="hidden sm:flex sm:flex-row gap-3 sm:items-center">
                 <div className="flex items-center gap-2">
                   <label htmlFor="filtroTipo" className="text-sm text-crm-text-muted">Tipo</label>
                   <select
@@ -435,6 +443,44 @@ export default function DocumentosClient({
                 </button>
               </div>
             </div>
+
+            {mostrarFiltrosMovil && (
+              <div className="grid grid-cols-1 gap-3 sm:hidden">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="filtroTipoMovil" className="text-sm text-crm-text-muted">Tipo</label>
+                  <select
+                    id="filtroTipoMovil"
+                    value={filtroTipo}
+                    onChange={(event) => setFiltroTipo(event.target.value as typeof filtroTipo)}
+                    className="flex-1 px-3 py-2 border border-crm-border rounded-lg bg-white text-sm text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/20 dark:bg-crm-card dark:text-white dark:border-crm-border"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="carpetas">Carpetas</option>
+                    <option value="pdf">PDF</option>
+                    <option value="images">Imágenes</option>
+                    <option value="docs">Documentos</option>
+                    <option value="sheets">Hojas de cálculo</option>
+                    <option value="other">Otros</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="ordenMovil" className="text-sm text-crm-text-muted">Ordenar por</label>
+                  <select
+                    id="ordenMovil"
+                    value={orden}
+                    onChange={(event) => setOrden(event.target.value as typeof orden)}
+                    className="flex-1 px-3 py-2 border border-crm-border rounded-lg bg-white text-sm text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/20 dark:bg-crm-card dark:text-white dark:border-crm-border"
+                  >
+                    <option value="recientes">Más recientes</option>
+                    <option value="antiguos">Más antiguos</option>
+                    <option value="nombre-asc">Nombre A-Z</option>
+                    <option value="nombre-desc">Nombre Z-A</option>
+                    <option value="tamano-desc">Tamaño (mayor a menor)</option>
+                    <option value="tamano-asc">Tamaño (menor a mayor)</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Lista de Documentos */}

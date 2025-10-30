@@ -45,21 +45,29 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
     const totalPages = Math.ceil(total / 20);
 
     return (
-      <div className="w-full p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-crm-text-primary">Clientes</h1>
-            <p className="text-crm-text-muted mt-1">Gestiona tu base de datos de clientes</p>
+      <div className="w-full px-4 py-6 space-y-6 md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-display font-bold text-crm-text-primary md:text-3xl">Clientes</h1>
+            <p className="text-sm text-crm-text-muted md:text-base">Gestiona tu cartera desde el móvil o escritorio.</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <div className="text-sm text-crm-text-muted">
-              {total.toLocaleString()} {total === 1 ? 'cliente' : 'clientes'} total
-            </div>
+          <div className="text-sm text-crm-text-muted self-start md:self-auto">
+            {total.toLocaleString()} {total === 1 ? 'cliente' : 'clientes'} total
           </div>
         </div>
 
-        <NewClienteForm />
+        <div className="hidden lg:block">
+          <NewClienteForm />
+        </div>
+        <details className="lg:hidden crm-card rounded-xl border border-crm-border overflow-hidden">
+          <summary className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-crm-text-primary cursor-pointer select-none">
+            Registrar nuevo cliente
+            <span className="text-crm-text-muted text-xs">▼</span>
+          </summary>
+          <div className="px-4 pb-4">
+            <NewClienteForm />
+          </div>
+        </details>
 
         <ClientesTable
           clientes={clientes}

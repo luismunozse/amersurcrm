@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, memo, useMemo, useEffect } from "react";
+import { useState, useTransition, memo, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   eliminarCliente,
@@ -138,6 +138,18 @@ export default function ClientesTable({
         });
     }
   }, [isAdmin, loadingPermissions]);
+
+  // Búsqueda automática con debounce
+  useEffect(() => {
+    // Solo ejecutar si el valor local es diferente al prop
+    if (localSearchQuery === searchQuery) return;
+
+    const timer = setTimeout(() => {
+      handleSearch(localSearchQuery);
+    }, 500); // Espera 500ms después de que el usuario deja de escribir
+
+    return () => clearTimeout(timer);
+  }, [localSearchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortBy = initialSortBy as keyof Cliente;
   const sortOrder = initialSortOrder;
@@ -543,83 +555,162 @@ export default function ClientesTable({
 
       {/* Tabla */}
       <div className="crm-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="flex justify-between items-start px-4 py-3 border-b border-crm-border bg-crm-card-hover">
-            <div>
-              <h3 className="text-sm font-semibold text-crm-text-primary">Listado de clientes</h3>
-              <p className="text-xs text-crm-text-muted">
-                Mostrando {clientes.length} de {total} cliente{total === 1 ? '' : 's'}
-              </p>
-            </div>
+        <div className="flex justify-between items-start px-4 py-3 border-b border-crm-border bg-crm-card-hover">
+          <div>
+            <h3 className="text-sm font-semibold text-crm-text-primary">Listado de clientes</h3>
+            <p className="text-xs text-crm-text-muted">
+              Mostrando {clientes.length} de {total} cliente{total === 1 ? '' : 's'}
+            </p>
           </div>
-          <table className="w-full">
-            <thead className="bg-crm-card-hover border-b border-crm-border">
-              <tr>
-                {/* Checkbox de selección - Solo visible para administradores */}
-                {isAdmin && (
-                  <th className="px-4 py-3 w-12">
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      ref={(input) => {
-                        if (input) {
-                          input.indeterminate = isSomeSelected;
-                        }
-                      }}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
-                    />
+        </div>
+
+        {/* Vista mobile */}
+        <div className="sm:hidden px-4 py-4 space-y-4">
+          {clientes.map((cliente) => {
+            const estadoLabel = getEstadoClienteLabel(cliente.estado_cliente);
+            return (
+              <div
+                key={cliente.id}
+                className="rounded-2xl border border-crm-border bg-crm-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-base font-semibold text-crm-text-primary leading-tight">
+                      {cliente.nombre}
+                    </p>
+                    <p className="text-xs text-crm-text-muted mt-1">
+                      Código: {cliente.codigo_cliente || '—'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-crm-primary/10 px-3 py-1 text-xs font-semibold text-crm-primary">
+                    {estadoLabel}
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2 text-xs text-crm-text-secondary">
+                  <p>
+                    <strong className="text-crm-text-primary">Contacto:</strong>{' '}
+                    {cliente.telefono || cliente.email || 'Sin datos'}
+                  </p>
+                  <p>
+                    <strong className="text-crm-text-primary">Último contacto:</strong>{' '}
+                    {cliente.ultimo_contacto
+                      ? new Intl.DateTimeFormat('es-PE').format(new Date(cliente.ultimo_contacto))
+                      : 'No registrado'}
+                  </p>
+                  {cliente.vendedor_asignado && (
+                    <p>
+                      <strong className="text-crm-text-primary">Vendedor:</strong>{' '}
+                      {cliente.vendedor_asignado}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleShowDetail(cliente)}
+                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg bg-crm-primary px-3 py-2 text-xs font-semibold text-white"
+                  >
+                    Ver detalle
+                  </button>
+                  <Link
+                    href={`/dashboard/clientes/${cliente.id}`}
+                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg border border-crm-border px-3 py-2 text-xs font-semibold text-crm-text-primary"
+                  >
+                    Abrir ficha
+                  </Link>
+                  {isAdmin && (
+                    <button
+                      onClick={() => askDelete(cliente.id, cliente.nombre)}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-crm-danger px-3 py-2 text-xs font-semibold text-crm-danger"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {clientes.length === 0 && (
+            <p className="text-center text-sm text-crm-text-muted">
+              {searchQuery || estado || tipo || vendedor
+                ? "No se encontraron clientes con los filtros aplicados."
+                : "Aún no hay clientes registrados."}
+            </p>
+          )}
+        </div>
+
+        {/* Vista escritorio */}
+        <div className="hidden sm:block">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-crm-card-hover border-b border-crm-border">
+                <tr>
+                  {/* Checkbox de selección - Solo visible para administradores */}
+                  {isAdmin && (
+                    <th className="px-4 py-3 w-12">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        ref={(input) => {
+                          if (input) {
+                            input.indeterminate = isSomeSelected;
+                          }
+                        }}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
+                      />
+                    </th>
+                  )}
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
+                    onClick={() => handleSort('nombre')}
+                  >
+                    Cliente {getSortIcon('nombre')}
                   </th>
-                )}
-                <th
-                  className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
-                  onClick={() => handleSort('nombre')}
-                >
-                  Cliente {getSortIcon('nombre')}
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
-                  onClick={() => handleSort('estado_cliente')}
-                >
-                  Estado {getSortIcon('estado_cliente')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider">
-                  Contacto
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
-                  onClick={() => handleSort('origen_lead')}
-                >
-                  Origen del lead {getSortIcon('origen_lead')}
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
-                  onClick={() => handleSort('fecha_alta')}
-                >
-                  Fecha Alta {getSortIcon('fecha_alta')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-crm-border">
-              {clientes.map((cliente) => (
-                <ClienteRow
-                  key={cliente.id}
-                  cliente={cliente}
-                  onEdit={handleEdit}
-                  onDelete={askDelete}
-                  onShowDetail={handleShowDetail}
-                  onEstadoChange={handleEstadoChange}
-                  isPending={isPending}
-                  isSelected={selectedIds.has(cliente.id)}
-                  onToggleSelect={toggleSelectOne}
-                  isAdmin={isAdmin}
-                />
-              ))}
-            </tbody>
-          </table>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
+                    onClick={() => handleSort('estado_cliente')}
+                  >
+                    Estado {getSortIcon('estado_cliente')}
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider">
+                    Contacto
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
+                    onClick={() => handleSort('origen_lead')}
+                  >
+                    Origen del lead {getSortIcon('origen_lead')}
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
+                    onClick={() => handleSort('fecha_alta')}
+                  >
+                    Fecha Alta {getSortIcon('fecha_alta')}
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-crm-border">
+                {clientes.map((cliente) => (
+                  <ClienteRow
+                    key={cliente.id}
+                    cliente={cliente}
+                    onEdit={handleEdit}
+                    onDelete={askDelete}
+                    onShowDetail={handleShowDetail}
+                    onEstadoChange={handleEstadoChange}
+                    isPending={isPending}
+                    isSelected={selectedIds.has(cliente.id)}
+                    onToggleSelect={toggleSelectOne}
+                    isAdmin={isAdmin}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {clientes.length === 0 && (

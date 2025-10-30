@@ -1,233 +1,406 @@
-import { Book, FileQuestion, Mail, MessageCircle, Phone, Video, ExternalLink, Search } from "lucide-react";
+"use client";
+
+import { useMemo, useState, FormEvent } from "react";
 import Link from "next/link";
+import {
+  Book,
+  FileQuestion,
+  Mail,
+  MessageCircle,
+  Phone,
+  Video,
+  ExternalLink,
+  Search
+} from "lucide-react";
+
+type ResourceCard = {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  external?: boolean;
+};
+
+type FaqItem = {
+  question: string;
+  answer: string;
+};
+
+const documentationLinks: ResourceCard[] = [
+  {
+    id: "doc-drive",
+    title: "Sincronización con Google Drive",
+    description: "Configura la conexión y gestiona documentos directamente desde el CRM.",
+    href: "/dashboard/documentos",
+    icon: Book
+  },
+  {
+    id: "doc-config",
+    title: "Panel de Configuración",
+    description: "Actualiza datos de la empresa, credenciales y parámetros clave.",
+    href: "/dashboard/configuracion",
+    icon: Book
+  },
+  {
+    id: "doc-proyectos",
+    title: "Proyectos y Lotes",
+    description: "Aprende a crear proyectos, editar lotes y trabajar con mapas.",
+    href: "/dashboard/proyectos",
+    icon: Book
+  }
+];
+
+const videoResources: ResourceCard[] = [
+  {
+    id: "video-overview",
+    title: "Recorrido general del CRM",
+    description: "Video introductorio con las funciones más usadas para nuevos usuarios.",
+    href: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    icon: Video,
+    external: true
+  },
+  {
+    id: "video-documentos",
+    title: "Documentos y Google Drive",
+    description: "Tutorial para navegar carpetas, sincronizar y descargar archivos.",
+    href: "https://www.youtube.com/watch?v=EE-xtCF3T94",
+    icon: Video,
+    external: true
+  },
+  {
+    id: "video-lotes",
+    title: "Mapeo de Lotes",
+    description: "Guía visual para trazar polígonos, guardar coordenadas y duplicar lotes.",
+    href: "https://www.youtube.com/watch?v=oHg5SJYRHA0",
+    icon: Video,
+    external: true
+  }
+];
+
+const faqItems: FaqItem[] = [
+  {
+    question: "¿Cómo puedo cambiar mi contraseña?",
+    answer:
+      "Abre el menú de usuario (esquina superior derecha) y selecciona “Cambiar contraseña”. También puedes hacerlo desde /dashboard/perfil."
+  },
+  {
+    question: "¿Cómo agrego un nuevo cliente?",
+    answer:
+      "En la sección Clientes presiona el botón “Nuevo Cliente” (+), completa el formulario obligatorio y guarda los cambios."
+  },
+  {
+    question: "¿Puedo exportar mis datos?",
+    answer:
+      "Sí. Las tablas principales (Clientes, Proyectos, Documentos) incluyen un botón de exportación con formato XLSX o CSV."
+  },
+  {
+    question: "¿Qué hago si encuentro un error?",
+    answer:
+      "Utiliza la opción “Reportar problema” o visita /dashboard/reportar-problema. Describe el incidente y adjunta capturas si es posible."
+  },
+  {
+    question: "¿Cómo asigno coordenadas a un lote?",
+    answer:
+      "Ingresa al proyecto, abre el mapa de lotes y usa la herramienta de dibujo para marcar el polígono. Luego guarda los cambios."
+  }
+];
+
+const supportChannels = [
+  {
+    title: "Chat en vivo",
+    description: "Atención vía WhatsApp • Lun-Vie 9:00 - 18:00",
+    href: "https://wa.me/51987654321?text=Hola%2C+necesito+ayuda+con+el+CRM",
+    icon: MessageCircle,
+    cta: "Abrir chat ↗",
+    external: true
+  },
+  {
+    title: "Email",
+    description: "Responderemos en menos de 24 horas.",
+    href: "mailto:soporte@amersur.com",
+    icon: Mail,
+    cta: "Escribir correo ↗",
+    external: true
+  },
+  {
+    title: "Teléfono",
+    description: "Comunícate con soporte técnico.",
+    href: "tel:+51987654321",
+    icon: Phone,
+    cta: "+51 987 654 321",
+    external: false
+  }
+];
 
 export default function AyudaPage() {
+  const [query, setQuery] = useState("");
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const hasQuery = normalizedQuery.length > 0;
+
+  const filteredDocumentation = useMemo(() => {
+    if (!hasQuery) return documentationLinks;
+    return documentationLinks.filter((item) =>
+      [item.title, item.description].some((field) =>
+        field.toLowerCase().includes(normalizedQuery)
+      )
+    );
+  }, [hasQuery, normalizedQuery]);
+
+  const filteredVideos = useMemo(() => {
+    if (!hasQuery) return videoResources;
+    return videoResources.filter((item) =>
+      [item.title, item.description].some((field) =>
+        field.toLowerCase().includes(normalizedQuery)
+      )
+    );
+  }, [hasQuery, normalizedQuery]);
+
+  const filteredFaqs = useMemo(() => {
+    if (!hasQuery) return faqItems;
+    return faqItems.filter((item) =>
+      [item.question, item.answer].some((field) =>
+        field.toLowerCase().includes(normalizedQuery)
+      )
+    );
+  }, [hasQuery, normalizedQuery]);
+
+  const filteredSupport = useMemo(() => {
+    if (!hasQuery) return supportChannels;
+    return supportChannels.filter((item) =>
+      [item.title, item.description, item.cta].some((field) =>
+        field.toLowerCase().includes(normalizedQuery)
+      )
+    );
+  }, [hasQuery, normalizedQuery]);
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const targetId = filteredDocumentation[0]?.id || filteredVideos[0]?.id || "faq";
+    if (targetId) {
+      const element = document.getElementById(targetId);
+      element?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const noResults =
+    hasQuery &&
+    filteredDocumentation.length === 0 &&
+    filteredVideos.length === 0 &&
+    filteredFaqs.length === 0 &&
+    filteredSupport.length === 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-crm-text-primary">Ayuda y Soporte</h1>
           <p className="text-sm text-crm-text-muted mt-1">
-            Encuentra respuestas a tus preguntas o contacta con nuestro equipo de soporte
+            Encuentra respuestas, guías y canales de contacto oficiales.
           </p>
         </div>
       </div>
 
-      {/* Búsqueda rápida */}
       <div className="bg-crm-card rounded-xl p-6 border border-crm-border">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-crm-text-muted" />
+        <form className="relative" onSubmit={handleSearchSubmit}>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-crm-text-muted" />
           <input
-            type="text"
-            placeholder="Buscar en la documentación..."
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Busca términos como “drive”, “clientes”, “exportar”..."
             className="w-full pl-10 pr-4 py-3 bg-crm-bg-primary border border-crm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-crm-primary text-crm-text-primary"
+            aria-label="Buscar en la sección de ayuda"
           />
+        </form>
+        {hasQuery && (
+          <p className="text-xs text-crm-text-muted mt-2">
+            {noResults ? "No encontramos resultados. Intenta con otra palabra clave." : "Filtrando resultados según tu búsqueda."}
+          </p>
+        )}
+      </div>
+
+      <section id="documentacion" className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-crm-text-primary">Documentación destacada</h2>
+          <Link href="/docs" className="text-sm text-crm-primary hover:underline">
+            Ver toda la documentación
+          </Link>
         </div>
-      </div>
 
-      {/* Recursos principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Documentación */}
-        <Link
-          href="#documentacion"
-          className="bg-crm-card rounded-xl p-6 border border-crm-border hover:border-crm-primary transition-all group"
-        >
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-crm-primary/10 rounded-lg group-hover:bg-crm-primary/20 transition-colors">
-              <Book className="w-6 h-6 text-crm-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-crm-text-primary group-hover:text-crm-primary transition-colors">
-                Documentación
-              </h3>
-              <p className="text-sm text-crm-text-muted mt-1">
-                Guías completas para usar todas las funcionalidades del sistema
-              </p>
-            </div>
-            <ExternalLink className="w-5 h-5 text-crm-text-muted group-hover:text-crm-primary transition-colors" />
+        {filteredDocumentation.length === 0 ? (
+          <p className="text-sm text-crm-text-muted">No hay guías que coincidan con tu búsqueda.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDocumentation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.id}
+                  id={item.id}
+                  href={item.href}
+                  className="bg-crm-card rounded-xl p-6 border border-crm-border hover:border-crm-primary transition-all group"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-crm-primary/10 rounded-lg group-hover:bg-crm-primary/20 transition-colors">
+                      <Icon className="w-6 h-6 text-crm-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-crm-text-primary group-hover:text-crm-primary transition-colors">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm text-crm-text-muted mt-1">{item.description}</p>
+                    </div>
+                    <ExternalLink className="w-5 h-5 text-crm-text-muted group-hover:text-crm-primary transition-colors" />
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        </Link>
+        )}
+      </section>
 
-        {/* Preguntas Frecuentes */}
-        <Link
-          href="#faq"
-          className="bg-crm-card rounded-xl p-6 border border-crm-border hover:border-crm-primary transition-all group"
-        >
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-crm-secondary/10 rounded-lg group-hover:bg-crm-secondary/20 transition-colors">
-              <FileQuestion className="w-6 h-6 text-crm-secondary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-crm-text-primary group-hover:text-crm-primary transition-colors">
-                Preguntas Frecuentes
-              </h3>
-              <p className="text-sm text-crm-text-muted mt-1">
-                Respuestas a las preguntas más comunes de nuestros usuarios
-              </p>
-            </div>
-            <ExternalLink className="w-5 h-5 text-crm-text-muted group-hover:text-crm-primary transition-colors" />
+      <section id="videos" className="space-y-4">
+        <h2 className="text-xl font-semibold text-crm-text-primary">Tutoriales en video</h2>
+        {filteredVideos.length === 0 ? (
+          <p className="text-sm text-crm-text-muted">No encontramos videos relacionados con tu búsqueda.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredVideos.map((item) => {
+              const Icon = item.icon;
+              const content = (
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-crm-accent/10 rounded-lg group-hover:bg-crm-accent/20 transition-colors">
+                    <Icon className="w-6 h-6 text-crm-accent" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-crm-text-primary group-hover:text-crm-primary transition-colors">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-crm-text-muted mt-1">{item.description}</p>
+                  </div>
+                  <ExternalLink className="w-5 h-5 text-crm-text-muted group-hover:text-crm-primary transition-colors" />
+                </div>
+              );
+
+              return item.external ? (
+                <a
+                  key={item.id}
+                  id={item.id}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-crm-card rounded-xl p-6 border border-crm-border hover:border-crm-primary transition-all group"
+                >
+                  {content}
+                </a>
+              ) : (
+                <Link
+                  key={item.id}
+                  id={item.id}
+                  href={item.href}
+                  className="bg-crm-card rounded-xl p-6 border border-crm-border hover:border-crm-primary transition-all group"
+                >
+                  {content}
+                </Link>
+              );
+            })}
           </div>
-        </Link>
+        )}
+      </section>
 
-        {/* Tutoriales en Video */}
-        <Link
-          href="#videos"
-          className="bg-crm-card rounded-xl p-6 border border-crm-border hover:border-crm-primary transition-all group"
-        >
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-crm-accent/10 rounded-lg group-hover:bg-crm-accent/20 transition-colors">
-              <Video className="w-6 h-6 text-crm-accent" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-crm-text-primary group-hover:text-crm-primary transition-colors">
-                Tutoriales en Video
-              </h3>
-              <p className="text-sm text-crm-text-muted mt-1">
-                Aprende visualmente con nuestros video tutoriales paso a paso
-              </p>
-            </div>
-            <ExternalLink className="w-5 h-5 text-crm-text-muted group-hover:text-crm-primary transition-colors" />
-          </div>
-        </Link>
-      </div>
-
-      {/* Contacto con Soporte */}
-      <div className="bg-crm-card rounded-xl border border-crm-border overflow-hidden">
+      <section className="bg-crm-card rounded-xl border border-crm-border overflow-hidden">
         <div className="bg-gradient-to-r from-crm-primary to-crm-accent p-6">
           <h2 className="text-xl font-bold text-white">¿Necesitas ayuda personalizada?</h2>
           <p className="text-white/90 text-sm mt-1">
-            Nuestro equipo de soporte está disponible para ayudarte
+            Contacta al equipo de soporte por el canal que prefieras.
           </p>
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Chat en vivo */}
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-crm-info/10 rounded-lg">
-              <MessageCircle className="w-6 h-6 text-crm-info" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-crm-text-primary">Chat en vivo</h3>
-              <p className="text-sm text-crm-text-muted mt-1">Lun-Vie: 9am - 6pm</p>
-              <button className="text-sm text-crm-primary hover:underline mt-2">
-                Iniciar chat →
-              </button>
-            </div>
-          </div>
+          {filteredSupport.length === 0 ? (
+            <p className="text-sm text-crm-text-muted col-span-full">
+              No hay canales que coincidan con tu búsqueda.
+            </p>
+          ) : (
+            filteredSupport.map((channel) => {
+              const Icon = channel.icon;
+              const content = (
+                <>
+                  <div className="p-3 bg-crm-card-hover rounded-lg">
+                    <Icon className="w-6 h-6 text-crm-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-crm-text-primary">{channel.title}</h3>
+                    <p className="text-sm text-crm-text-muted mt-1">{channel.description}</p>
+                    <span className="text-sm text-crm-primary hover:underline mt-2 inline-block">
+                      {channel.cta}
+                    </span>
+                  </div>
+                </>
+              );
 
-          {/* Email */}
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-crm-secondary/10 rounded-lg">
-              <Mail className="w-6 h-6 text-crm-secondary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-crm-text-primary">Email</h3>
-              <p className="text-sm text-crm-text-muted mt-1">Respuesta en 24h</p>
-              <a
-                href="mailto:soporte@amersur.com"
-                className="text-sm text-crm-primary hover:underline mt-2 block"
-              >
-                soporte@amersur.com
-              </a>
-            </div>
-          </div>
-
-          {/* Teléfono */}
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-crm-success/10 rounded-lg">
-              <Phone className="w-6 h-6 text-crm-success" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-crm-text-primary">Teléfono</h3>
-              <p className="text-sm text-crm-text-muted mt-1">Lun-Vie: 9am - 6pm</p>
-              <a
-                href="tel:+51987654321"
-                className="text-sm text-crm-primary hover:underline mt-2 block"
-              >
-                +51 987 654 321
-              </a>
-            </div>
-          </div>
+              return channel.external ? (
+                <a
+                  key={channel.title}
+                  href={channel.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-4 hover:bg-crm-card-hover/80 transition-colors rounded-lg p-3"
+                >
+                  {content}
+                </a>
+              ) : (
+                <a
+                  key={channel.title}
+                  href={channel.href}
+                  className="flex items-start gap-4 hover:bg-crm-card-hover/80 transition-colors rounded-lg p-3"
+                >
+                  {content}
+                </a>
+              );
+            })
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* Preguntas Frecuentes */}
-      <div id="faq" className="bg-crm-card rounded-xl p-6 border border-crm-border">
-        <h2 className="text-xl font-bold text-crm-text-primary mb-4">Preguntas Frecuentes</h2>
+      <section id="faq" className="bg-crm-card rounded-xl p-6 border border-crm-border space-y-4">
+        <h2 className="text-xl font-bold text-crm-text-primary">Preguntas frecuentes</h2>
+        {filteredFaqs.length === 0 ? (
+          <p className="text-sm text-crm-text-muted">No hay preguntas que coincidan con tu búsqueda.</p>
+        ) : (
+          filteredFaqs.map((item) => (
+            <details key={item.question} className="group">
+              <summary className="flex items-center justify-between cursor-pointer p-4 bg-crm-bg-primary rounded-lg hover:bg-crm-card-hover transition-colors">
+                <span className="font-medium text-crm-text-primary">{item.question}</span>
+                <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="p-4 text-sm text-crm-text-muted leading-relaxed">{item.answer}</div>
+            </details>
+          ))
+        )}
+      </section>
 
-        <div className="space-y-4">
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer p-4 bg-crm-bg-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-              <span className="font-medium text-crm-text-primary">¿Cómo puedo cambiar mi contraseña?</span>
-              <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="p-4 text-sm text-crm-text-muted">
-              Puedes cambiar tu contraseña desde el menú de usuario (esquina superior derecha) → &apos;Cambiar Contraseña&apos;.
-              También puedes hacerlo desde tu perfil.
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer p-4 bg-crm-bg-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-              <span className="font-medium text-crm-text-primary">¿Cómo agrego un nuevo cliente?</span>
-              <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="p-4 text-sm text-crm-text-muted">
-              Ve a la sección &apos;Clientes&apos; en el menú lateral y haz clic en el botón &apos;Nuevo Cliente&apos; (+).
-              Completa el formulario con la información requerida y guarda.
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer p-4 bg-crm-bg-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-              <span className="font-medium text-crm-text-primary">¿Puedo exportar mis datos?</span>
-              <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="p-4 text-sm text-crm-text-muted">
-              Sí, la mayoría de las tablas tienen un botón de exportación en la esquina superior derecha.
-              Puedes exportar a Excel (XLSX) o CSV.
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer p-4 bg-crm-bg-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-              <span className="font-medium text-crm-text-primary">¿Cómo cambio mi foto de perfil?</span>
-              <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="p-4 text-sm text-crm-text-muted">
-              Ve a tu perfil desde el menú de usuario → &apos;Mi Perfil&apos;. Ahí encontrarás un botón para cambiar tu foto de perfil.
-              Las imágenes deben ser JPG, PNG o WebP y no superar los 2MB.
-            </div>
-          </details>
-
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer p-4 bg-crm-bg-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-              <span className="font-medium text-crm-text-primary">¿Qué hago si encuentro un error?</span>
-              <span className="text-crm-text-muted group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="p-4 text-sm text-crm-text-muted">
-              Si encuentras un error o bug, por favor repórtalo usando la opción &apos;Reportar Problema&apos; en el menú de usuario.
-              Nuestro equipo técnico lo revisará lo antes posible.
-            </div>
-          </details>
-        </div>
-      </div>
-
-      {/* Reportar problema */}
-      <div className="bg-crm-card rounded-xl p-6 border border-crm-border text-center">
+      <section className="bg-crm-card rounded-xl p-6 border border-crm-border text-center">
         <h3 className="font-semibold text-crm-text-primary mb-2">¿No encontraste lo que buscabas?</h3>
         <p className="text-sm text-crm-text-muted mb-4">
-          Reporta un problema o solicita una nueva funcionalidad
+          Reporta un problema o solicita una nueva funcionalidad desde nuestro formulario.
         </p>
         <Link
           href="/dashboard/reportar-problema"
           className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
         >
           <MessageCircle className="w-5 h-5" />
-          Reportar Problema
+          Reportar problema
         </Link>
-      </div>
+      </section>
+
+      {noResults && (
+        <div className="bg-crm-card rounded-xl p-6 border border-dashed border-crm-border text-center text-sm text-crm-text-muted">
+          No encontramos resultados para “{query}”. Si necesitas asistencia inmediata, contáctanos por chat o teléfono.
+        </div>
+      )}
     </div>
   );
 }

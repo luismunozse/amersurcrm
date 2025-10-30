@@ -110,16 +110,16 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
     return (
       <div className="w-full p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-crm-text-primary">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-crm-text-primary md:text-3xl">
               Proyectos Inmobiliarios
             </h1>
-            <p className="text-crm-text-secondary mt-2">
-              Gestiona y supervisa todos tus proyectos inmobiliarios
+            <p className="text-sm text-crm-text-secondary md:text-base">
+              Revisa tus proyectos y su avance en cualquier dispositivo.
             </p>
           </div>
-          <div className="crm-card px-4 py-2">
+          <div className="crm-card px-4 py-2 self-start md:self-auto">
             <div className="text-sm text-crm-text-muted">
               <span className="font-semibold text-crm-text-primary">{totalProyectos}</span>{" "}
               {totalProyectos === 1 ? "proyecto" : "proyectos"} total
@@ -164,11 +164,21 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* Form crear proyecto */}
-        <NewProyectoForm />
+        <div className="hidden lg:block">
+          <NewProyectoForm />
+        </div>
+        <details className="lg:hidden crm-card rounded-xl border border-crm-border overflow-hidden">
+          <summary className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-crm-text-primary cursor-pointer select-none">
+            Registrar nuevo proyecto
+            <span className="text-crm-text-muted text-xs">▼</span>
+          </summary>
+          <div className="px-4 pb-4">
+            <NewProyectoForm />
+          </div>
+        </details>
 
         {/* Grid de proyectos tipo "cards" */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-6 md:pb-0 md:overflow-visible">
           {proyectos.length === 0 && hasFilters && (
             <div className="col-span-full crm-card text-center py-16 rounded-2xl border-2 border-dashed border-crm-border">
               <div className="w-20 h-20 bg-gradient-to-br from-crm-primary/10 to-crm-primary/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -231,7 +241,7 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
             return (
               <div
                 key={p.id}
-                className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative flex flex-col"
+                className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative flex flex-col min-w-[18rem] snap-center md:min-w-0"
               >
                 {/* Imagen del proyecto con overlay */}
                 <div className="relative w-full h-56 overflow-hidden bg-gradient-to-br from-crm-primary/15 to-crm-primary/8">

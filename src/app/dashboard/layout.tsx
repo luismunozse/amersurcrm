@@ -16,9 +16,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!user) redirect("/auth/login");
 
   // Obtener el perfil del usuario para nombre, username, rol, avatar y verificar si requiere cambio de password
-  const { data: perfil } = await s
+  const { data: perfil, error: perfilError } = await s
+    .schema('crm')
     .from('usuario_perfil')
-    .select('nombre_completo, username, rol, avatar_url, requiere_cambio_password')
+    .select(`
+      nombre_completo,
+      username,
+      avatar_url,
+      requiere_cambio_password,
+      rol:rol!usuario_perfil_rol_fk (
+        nombre
+      )
+    `)
     .eq('id', user.id)
     .single();
 
@@ -55,12 +64,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           vapidPublicKey: null,
         };
 
+  // Extraer el nombre del rol, manejando el caso donde puede ser array u objeto
+  const rolNombre = perfil?.rol
+    ? (Array.isArray(perfil.rol) ? perfil.rol[0]?.nombre : (perfil.rol as any)?.nombre)
+    : undefined;
+
   return (
     <DashboardClient
       userEmail={user.email}
       userName={perfil?.nombre_completo}
       userUsername={perfil?.username}
-      userRole={perfil?.rol}
+      userRole={rolNombre}
       userAvatarUrl={perfil?.avatar_url}
       lastSignInAt={user.last_sign_in_at}
       notifications={notifications}

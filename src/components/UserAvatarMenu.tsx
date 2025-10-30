@@ -93,7 +93,7 @@ export default function UserAvatarMenu({
   const sanitizedUsername = useMemo(() => {
     const candidate = userUsername?.trim();
     if (!candidate) return undefined;
-    if (/^\d+$/.test(candidate)) return undefined;
+    // Permitir usernames que sean solo números (algunos vendedores usan DNI como username)
     return candidate;
   }, [userUsername]);
 
@@ -123,11 +123,22 @@ export default function UserAvatarMenu({
     ROL_VENDEDOR: "Vendedor",
   };
 
-  const displayName =
-    userName?.trim() ||
-    sanitizedUsername ||
-    userEmail?.split("@")[0] ||
-    "Usuario";
+  // Priorizar username sobre nombre_completo, especialmente si nombre_completo es solo números (DNI)
+  const displayName = (() => {
+    // Si tenemos username, usarlo siempre (es más identificativo)
+    if (sanitizedUsername) {
+      return sanitizedUsername;
+    }
+
+    // Si userName existe y NO es solo números, usarlo
+    const trimmedName = userName?.trim();
+    if (trimmedName && !/^\d+$/.test(trimmedName)) {
+      return trimmedName;
+    }
+
+    // Fallback al email o "Usuario"
+    return userEmail?.split("@")[0] || "Usuario";
+  })();
   const displayRoleLabel = userRole ? roleLabels[userRole] ?? userRole : "";
   const roleChipLabel = displayRoleLabel || "Usuario";
   const secondaryDetail =
@@ -136,9 +147,10 @@ export default function UserAvatarMenu({
       : !userName && userEmail
         ? userEmail
         : "";
+  // Usar la misma lógica que displayName para la inicial del avatar
   const avatarInitial =
-    userName?.charAt(0).toUpperCase() ||
     sanitizedUsername?.charAt(0).toUpperCase() ||
+    (userName && !/^\d+$/.test(userName.trim()) ? userName.charAt(0).toUpperCase() : null) ||
     userEmail?.charAt(0).toUpperCase() ||
     "U";
 
