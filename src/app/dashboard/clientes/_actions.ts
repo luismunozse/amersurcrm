@@ -491,14 +491,36 @@ export async function obtenerVendedores() {
   const { data: vendedores, error } = await supabase
     .schema('crm')
     .from('usuario_perfil')
-    .select('id, username, nombre_completo, email')
+    .select(`
+      id,
+      username,
+      nombre_completo,
+      email,
+      rol:rol!usuario_perfil_rol_fk (
+        nombre
+      )
+    `)
     .eq('activo', true)
-    .or('rol_id.eq.ROL_VENDEDOR,rol_id.eq.ROL_COORDINADOR_VENTAS')
     .order('nombre_completo', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('Error obteniendo vendedores:', error);
+    throw new Error(error.message);
+  }
 
-  return vendedores || [];
+  // Filtrar solo vendedores y coordinadores y mapear a la estructura esperada
+  const vendedoresFiltrados = (vendedores || [])
+    .filter((v: any) =>
+      v.rol?.nombre === 'ROL_VENDEDOR' || v.rol?.nombre === 'ROL_COORDINADOR_VENTAS'
+    )
+    .map((v: any) => ({
+      id: v.id,
+      username: v.username,
+      nombre_completo: v.nombre_completo,
+      email: v.email
+    }));
+
+  return vendedoresFiltrados;
 }
 
 // Asignar vendedor a múltiples clientes
