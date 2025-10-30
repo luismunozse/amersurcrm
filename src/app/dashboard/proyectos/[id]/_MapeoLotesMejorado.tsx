@@ -84,9 +84,7 @@ export default function MapeoLotesMejorado({
 
   // Debug: Log cuando cambia el centro del mapa
   useEffect(() => {
-    if (currentMapCenter) {
-      console.log('📍 Centro del mapa actualizado:', currentMapCenter);
-    }
+    // Centro actualizado
   }, [currentMapCenter]);
 
   // Estados de lotes
@@ -267,13 +265,11 @@ export default function MapeoLotesMejorado({
   };
 
   const handleProjectDrawingFinished = useCallback(() => {
-    console.log('🎯 Dibujo de área completado');
     setIsDrawingArea(false);
     toast.success('Área definida correctamente. Puedes ajustar los vértices arrastrándolos.');
   }, []);
 
   const handlePolygonChange = useCallback((vertices: { lat: number; lng: number }[]) => {
-    console.log('🔵 Polígono cambiado:', vertices.length, 'vértices');
     setAreaPolygon(vertices);
     setOverlayDirty(true);
 
@@ -285,14 +281,13 @@ export default function MapeoLotesMejorado({
         [Math.min(...lats), Math.min(...lngs)],
         [Math.max(...lats), Math.max(...lngs)]
       ];
-      console.log('🔵 Bounds calculados:', bounds);
       setOverlayBounds(bounds);
     }
   }, []);
 
   // Debug: Ver cuando cambia areaPolygon
   useEffect(() => {
-    console.log('📐 areaPolygon actualizado:', areaPolygon.length, 'vértices', areaPolygon);
+    // areaPolygon actualizado
   }, [areaPolygon]);
 
   const handleSaveArea = async () => {

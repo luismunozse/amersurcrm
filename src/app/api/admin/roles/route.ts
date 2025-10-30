@@ -30,7 +30,6 @@ export async function GET() {
       
       // Si las tablas no existen, devolver roles simulados
       if (error.code === 'PGRST205') {
-        console.log('Tabla roles no existe, devolviendo roles simulados');
         return NextResponse.json({ 
           success: true, 
           roles: [

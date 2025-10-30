@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceRoleClient();
 
-    console.log('Buscando usuario con username/email:', username.trim());
 
     // Buscar el email asociado al username (o email directamente para compatibilidad)
     const { data: usuario, error: usuarioError } = await supabase
@@ -41,7 +40,6 @@ export async function POST(request: NextRequest) {
       .or(`username.eq.${username.trim()},email.eq.${username.trim()}`)
       .single<UsuarioConRol>();
 
-    console.log('Resultado búsqueda:', { usuario, error: usuarioError });
 
     if (usuarioError || !usuario) {
       console.error('Error buscando usuario:', usuarioError);

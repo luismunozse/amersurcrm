@@ -174,8 +174,6 @@ export async function eliminarPropiedad(propiedadId: string) {
       
       if (recordatoriosError) {
         console.warn("Error eliminando recordatorios:", recordatoriosError);
-      } else {
-        console.log("Recordatorios eliminados correctamente");
       }
     } catch (error) {
       console.warn("No se pudieron eliminar recordatorios:", error);

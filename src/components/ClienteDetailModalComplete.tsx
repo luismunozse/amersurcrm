@@ -60,7 +60,6 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
   const router = useRouter();
 
   useEffect(() => {
-    console.log('Modal isOpen changed:', isOpen);
     if (isOpen) {
       setIsVisible(true);
     } else {
@@ -68,8 +67,6 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
-
-  console.log('Modal render - isOpen:', isOpen, 'cliente:', cliente?.nombre);
 
   if (!isOpen || !cliente) {
     return null;

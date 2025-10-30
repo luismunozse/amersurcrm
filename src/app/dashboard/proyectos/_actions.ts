@@ -359,8 +359,6 @@ export async function eliminarProyecto(proyectoId: string) {
 
         if (deleteError) {
           console.warn(`Error eliminando archivos del storage: ${deleteError.message}`);
-        } else {
-          console.log(`Eliminados ${archivosAEliminar.length} archivos del storage`);
         }
       } catch (storageError) {
         console.warn(`Error procesando archivos del storage: ${storageError}`);

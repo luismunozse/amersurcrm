@@ -132,9 +132,6 @@ export async function POST(request: NextRequest) {
 
     const variables = campana.variables_valores as Record<string, string>;
 
-    console.log(`[CAMPAÑA ${campana_id}] Destinatarios normalizados:`, telefonos);
-    console.log(`[CAMPAÑA ${campana_id}] Plantilla: ${template.nombre} (${template.idioma})`);
-    console.log(`[CAMPAÑA ${campana_id}] Variables:`, variables);
 
     // Crear cliente de WhatsApp
     const whatsappClient = new WhatsAppClient(
@@ -178,7 +175,6 @@ export async function POST(request: NextRequest) {
 
     for (const telefono of telefonos) {
       try {
-        console.log(`[CAMPAÑA ${campana_id}] Enviando mensaje a: ${telefono}`);
 
         // Enviar mensaje
         const waResponse = await whatsappClient.enviarMensajePlantilla(
@@ -188,7 +184,6 @@ export async function POST(request: NextRequest) {
           components.length > 0 ? components : undefined
         );
 
-        console.log(`[CAMPAÑA ${campana_id}] ✅ Mensaje enviado exitosamente a ${telefono}`, waResponse);
 
         // Guardar mensaje en la base de datos
         await supabase

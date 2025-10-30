@@ -38,13 +38,14 @@ function generarPasswordTemporal(): string {
  */
 export async function resetearPasswordUsuario(userId: string) {
   const supabase = await createServerActionClient();
+  const serviceRole = createServiceRoleClient();
 
   try {
     // Generar nueva contraseña temporal
     const passwordTemporal = generarPasswordTemporal();
 
-    // Actualizar contraseña en Supabase Auth
-    const { error: authError } = await supabase.auth.admin.updateUserById(
+    // Actualizar contraseña en Supabase Auth usando service role (requiere permisos admin)
+    const { error: authError } = await serviceRole.auth.admin.updateUserById(
       userId,
       { password: passwordTemporal }
     );

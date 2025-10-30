@@ -4,6 +4,7 @@ import { getCachedProyectos } from "@/lib/cache.server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewProyectoForm from "./_NewProyectoForm";
 import QuickActions from "./QuickActions";
+import ProyectosSearchBar from "./_ProyectosSearchBar";
 
 import {
   BuildingOffice2Icon,
@@ -18,9 +19,65 @@ type LoteRow = {
   estado: "disponible" | "reservado" | "vendido";
 };
 
-export default async function ProyectosPage() {
+interface PageProps {
+  searchParams: Promise<{
+    q?: string;
+    estado?: string;
+    tipo?: string;
+    sort?: string;
+  }>;
+}
+
+export default async function ProyectosPage({ searchParams }: PageProps) {
   try {
-    const proyectos = await getCachedProyectos();
+    // Extraer parámetros de búsqueda
+    const params = await searchParams;
+    const q = params.q?.trim() || '';
+    const estadoFilter = params.estado?.trim() || '';
+    const tipoFilter = params.tipo?.trim() || '';
+    const sort = params.sort || 'nombre-asc';
+
+    // Obtener proyectos (aplicar filtros si existen)
+    let proyectos = await getCachedProyectos();
+    const totalProyectos = proyectos.length;
+
+    // Aplicar filtros de búsqueda
+    if (q) {
+      const queryLower = q.toLowerCase();
+      proyectos = proyectos.filter(
+        (p) =>
+          p.nombre.toLowerCase().includes(queryLower) ||
+          p.ubicacion?.toLowerCase().includes(queryLower)
+      );
+    }
+
+    // Filtrar por estado
+    if (estadoFilter) {
+      proyectos = proyectos.filter((p) => p.estado === estadoFilter);
+    }
+
+    // Filtrar por tipo
+    if (tipoFilter) {
+      proyectos = proyectos.filter((p) => p.tipo === tipoFilter);
+    }
+
+    // Aplicar ordenamiento
+    const [sortField, sortOrder] = sort.split('-') as [string, 'asc' | 'desc'];
+    proyectos.sort((a, b) => {
+      let comparison = 0;
+
+      if (sortField === 'nombre') {
+        comparison = a.nombre.localeCompare(b.nombre);
+      } else if (sortField === 'ubicacion') {
+        comparison = (a.ubicacion || '').localeCompare(b.ubicacion || '');
+      } else if (sortField === 'created_at') {
+        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    const hasFilters = q || estadoFilter || tipoFilter;
 
     // --- Métricas de lotes por proyecto (1 sola consulta) ---
     const supabase = await createServerOnlyClient();
@@ -64,18 +121,89 @@ export default async function ProyectosPage() {
           </div>
           <div className="crm-card px-4 py-2">
             <div className="text-sm text-crm-text-muted">
-              <span className="font-semibold text-crm-text-primary">{proyectos.length}</span>{" "}
-              {proyectos.length === 1 ? "proyecto" : "proyectos"} total
+              <span className="font-semibold text-crm-text-primary">{totalProyectos}</span>{" "}
+              {totalProyectos === 1 ? "proyecto" : "proyectos"} total
             </div>
           </div>
         </div>
 
+        {/* Barra de búsqueda y filtros */}
+        <ProyectosSearchBar
+          totalProyectos={totalProyectos}
+        />
+
+        {/* Mensaje cuando hay filtros activos */}
+        {hasFilters && proyectos.length > 0 && (
+          <div className="crm-card p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-5 w-5 text-blue-600 dark:text-blue-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-sm text-blue-900 dark:text-blue-100 font-medium">
+                  Mostrando {proyectos.length} de {totalProyectos} proyectos
+                </span>
+              </div>
+              <Link
+                href="/dashboard/proyectos"
+                className="text-sm text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 underline"
+              >
+                Limpiar filtros
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Form crear proyecto */}
         <NewProyectoForm />
 
-        {/* Grid de proyectos tipo “cards” */}
+        {/* Grid de proyectos tipo "cards" */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {proyectos.length === 0 && (
+          {proyectos.length === 0 && hasFilters && (
+            <div className="col-span-full crm-card text-center py-16 rounded-2xl border-2 border-dashed border-crm-border">
+              <div className="w-20 h-20 bg-gradient-to-br from-crm-primary/10 to-crm-primary/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <svg
+                  className="w-10 h-10 text-crm-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <h4 className="text-xl font-bold text-crm-text-primary mb-3">
+                No se encontraron proyectos
+              </h4>
+              <p className="text-crm-text-secondary max-w-md mx-auto mb-4">
+                No hay proyectos que coincidan con{' '}
+                {q && <span className="font-semibold">&quot;{q}&quot;</span>}
+                {' '}y los filtros seleccionados.
+              </p>
+              <Link
+                href="/dashboard/proyectos"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary/90 transition-colors"
+              >
+                Ver todos los proyectos
+              </Link>
+            </div>
+          )}
+
+          {proyectos.length === 0 && !hasFilters && (
             <div className="col-span-full crm-card text-center py-16 rounded-2xl border-2 border-dashed border-crm-border">
               <div className="w-20 h-20 bg-gradient-to-br from-crm-primary/10 to-crm-primary/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <BuildingOffice2Icon className="w-10 h-10 text-crm-primary" />

@@ -35,12 +35,6 @@ export default function ReportarProblemaPage() {
       // Simulación de envío
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      console.log("Reporte enviado:", {
-        ...formData,
-        usuario_id: user.id,
-        fecha: new Date().toISOString(),
-      });
-
       setSubmitted(true);
       toast.success("Reporte enviado exitosamente");
 

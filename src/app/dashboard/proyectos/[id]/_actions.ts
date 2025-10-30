@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import type { LoteCoordenadas } from "@/types/proyectos";
 
 export async function subirPlanos(proyectoId: string, fd: FormData) {
   const planosFile = fd.get("planos") as File | null;
@@ -185,7 +186,7 @@ export async function crearLote(fd: FormData) {
   revalidatePath("/dashboard/propiedades");
   revalidatePath("/dashboard");
 
-  return { success: true, lote };
+  return { success: true, lote, message: `Lote "${codigo}" creado correctamente` };
 }
 
 export async function actualizarLote(loteId: string, fd: FormData) {
@@ -303,7 +304,19 @@ export async function actualizarLote(loteId: string, fd: FormData) {
 
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/dashboard/proyectos/${fd.get("proyecto_id")}`);
+  const { data: loteActualizado } = await supabase
+    .from("lote")
+    .select("*")
+    .eq("id", loteId)
+    .maybeSingle();
+
+  const proyectoId = (fd.get("proyecto_id") as string) || loteActualizado?.proyecto_id || null;
+  if (proyectoId) {
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  }
+  revalidatePath("/dashboard/propiedades");
+
+  return { success: true, lote: loteActualizado ?? null };
 }
 
 export async function guardarPoligonoProyecto(
@@ -430,6 +443,8 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  revalidatePath("/dashboard/propiedades");
+  return { success: true, message: "Lote eliminado correctamente" };
 }
 
 // Duplicar un lote manteniendo sus datos. Genera un código único con sufijo -copy, -copy-2, ...
@@ -504,7 +519,7 @@ export async function duplicarLote(loteId: string, proyectoId: string) {
 // Funciones para manejo de coordenadas de lotes
 // =========================================
 
-export async function guardarCoordenadasLote(loteId: string, lat: number, lng: number) {
+export async function guardarCoordenadasLote(loteId: string, coordenadas: LoteCoordenadas) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -519,18 +534,26 @@ export async function guardarCoordenadasLote(loteId: string, lat: number, lng: n
     throw new Error("Error verificando permisos: " + (error as Error).message);
   }
 
+  const { data: loteInfo } = await supabase
+    .from("lote")
+    .select("proyecto_id")
+    .eq("id", loteId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("lote")
     .update({
-      coordenada_lat: lat,
-      coordenada_lng: lng,
+      plano_poligono: coordenadas.coordinates,
       updated_at: new Date().toISOString()
     })
     .eq("id", loteId);
 
   if (error) throw new Error(`Error guardando coordenadas: ${error.message}`);
 
-  revalidatePath(`/dashboard/proyectos/${loteId}`);
+  if (loteInfo?.proyecto_id) {
+    revalidatePath(`/dashboard/proyectos/${loteInfo.proyecto_id}`);
+  }
+  revalidatePath("/dashboard/propiedades");
   return { success: true };
 }
 

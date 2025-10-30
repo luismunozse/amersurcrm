@@ -82,7 +82,6 @@ class INEIUbigeoService {
   // Descargar archivo XLSX del INEI
   private async downloadXLSX(url: string): Promise<Buffer> {
     try {
-      console.log(`Descargando datos del INEI desde: ${url}`);
       
       const response = await fetch(url, {
         headers: {
@@ -211,7 +210,6 @@ class INEIUbigeoService {
   private async downloadAlternativeData(): Promise<ProcessedUbigeo> {
     for (const url of ALTERNATIVE_URLS) {
       try {
-        console.log(`Intentando descargar datos alternativos desde: ${url}`);
         
         const response = await fetch(url, {
           headers: {
@@ -254,7 +252,6 @@ class INEIUbigeoService {
       await writeFile(this.cachePath, JSON.stringify(processedData, null, 2));
       this.lastUpdate = new Date();
       
-      console.log('Datos del INEI actualizados exitosamente');
       return processedData;
     } catch (error) {
       console.warn('Error descargando del INEI, intentando fuentes alternativas...', error);
@@ -266,7 +263,6 @@ class INEIUbigeoService {
         await writeFile(this.cachePath, JSON.stringify(alternativeData, null, 2));
         this.lastUpdate = new Date();
         
-        console.log('Datos alternativos descargados exitosamente');
         return alternativeData;
       } catch (altError) {
         console.error('Error con todas las fuentes:', altError);
@@ -311,7 +307,6 @@ class INEIUbigeoService {
     // Por ahora, usar datos locales directamente
     // TODO: Implementar descarga del INEI cuando esté disponible
     try {
-      console.log('Usando datos locales de ubicaciones');
       return await this.loadLocalData();
     } catch (error) {
       console.error('Error cargando datos locales:', error);

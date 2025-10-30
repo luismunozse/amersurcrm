@@ -15,7 +15,6 @@ export default function SimpleModal({ isOpen, onClose, cliente }: SimpleModalPro
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    console.log('SimpleModal isOpen changed:', isOpen);
     if (isOpen) {
       setIsVisible(true);
     } else {
@@ -23,8 +22,6 @@ export default function SimpleModal({ isOpen, onClose, cliente }: SimpleModalPro
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
-
-  console.log('SimpleModal render - isOpen:', isOpen, 'cliente:', cliente?.nombre);
 
   if (!isOpen || !cliente) {
     return null;

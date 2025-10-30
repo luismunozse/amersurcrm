@@ -40,13 +40,9 @@ export async function POST(request: NextRequest) {
 
     const { client, config } = driveData;
 
-    console.log('[SYNC] Iniciando sincronización...');
-    console.log('[SYNC] FolderId:', folderId || 'root (todos)');
-    console.log('[SYNC] FullSync:', fullSync);
 
     // Si es sincronización completa, eliminar documentos existentes de Google Drive
     if (fullSync) {
-      console.log('[SYNC] Eliminando documentos existentes...');
       const { error: deleteError } = await serviceSupabase
         .from('documento')
         .delete()
@@ -58,14 +54,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Listar archivos de Google Drive
-    console.log('[SYNC] Listando archivos de Google Drive...');
     const files = await client.listFiles(folderId, 1000);
 
-    console.log(`[SYNC] Archivos encontrados en Google Drive: ${files.length}`);
 
     // Filtrar solo archivos (excluir carpetas)
     const archivos = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
-    console.log(`[SYNC] Archivos (sin carpetas): ${archivos.length}`);
 
     // Estadísticas de sincronización
     let inserted = 0;
@@ -76,7 +69,6 @@ export async function POST(request: NextRequest) {
     // Insertar/actualizar cada archivo en la base de datos
     for (const file of archivos) {
       try {
-        console.log(`[SYNC] Procesando: ${file.name} (${file.mimeType})`);
 
         // Verificar si el documento ya existe
         const { data: existing } = await serviceSupabase
@@ -107,7 +99,6 @@ export async function POST(request: NextRequest) {
 
         if (existing) {
           // Actualizar existente
-          console.log(`[SYNC] Actualizando: ${file.name}`);
           const { error: updateError } = await serviceSupabase
             .from('documento')
             .update({
@@ -125,7 +116,6 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // Insertar nuevo
-          console.log(`[SYNC] Insertando nuevo: ${file.name}`);
           const { error: insertError } = await serviceSupabase
             .from('documento')
             .insert(documentData);
@@ -145,8 +135,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('[SYNC] Sincronización completada');
-    console.log(`[SYNC] Inserted: ${inserted}, Updated: ${updated}, Errors: ${errors}`);
 
     // Actualizar timestamp de última sincronización en la configuración
     await serviceSupabase

@@ -88,22 +88,16 @@ export async function registrarInteraccion(data: {
   const supabase = await createServerActionClient();
 
   try {
-    console.log('📝 Registrando interacción:', data);
-
     // Obtener username usando helper
     const authResult = await obtenerUsernameActual(supabase);
     if (!authResult.success) {
-      console.error('❌ Error obteniendo username:', authResult);
       return authResult;
     }
-
-    console.log('👤 Usuario:', authResult.username);
 
     // Validar fecha de próxima acción si se proporciona
     if (data.fechaProximaAccion) {
       const validacionFecha = validarFechaFutura(data.fechaProximaAccion, 'Fecha de próxima acción');
       if (!validacionFecha.valid) {
-        console.error('❌ Error validando fecha:', validacionFecha.error);
         return { success: false, error: validacionFecha.error };
       }
     }
@@ -119,19 +113,14 @@ export async function registrarInteraccion(data: {
       fecha_proxima_accion: data.fechaProximaAccion,
     };
 
-    console.log('💾 Insertando en BD:', insertData);
-
     const { data: insertedData, error } = await supabase
       .from('cliente_interaccion')
       .insert(insertData)
       .select();
 
     if (error) {
-      console.error('❌ Error insertando:', error);
       throw error;
     }
-
-    console.log('✅ Interacción guardada exitosamente:', insertedData);
 
     revalidarCliente(data.clienteId);
     return { success: true, data: insertedData };
@@ -150,8 +139,6 @@ export async function obtenerInteracciones(
   try {
     const limit = options?.limit ?? 100;
 
-    console.log('🔍 Obteniendo interacciones para cliente:', clienteId);
-
     // Obtener interacciones sin el join problemático
     let { data, error } = await supabase
       .from('cliente_interaccion')
@@ -161,7 +148,6 @@ export async function obtenerInteracciones(
       .limit(limit);
 
     if (error) {
-      console.error('❌ Error obteniendo interacciones:', error);
       throw error;
     }
 
@@ -189,11 +175,8 @@ export async function obtenerInteracciones(
       }
     }
 
-    console.log(`✅ Interacciones obtenidas: ${data?.length || 0}`, data);
-
     return { success: true, data };
   } catch (error: any) {
-    console.error('❌ Error en obtenerInteracciones:', error);
     return { success: false, error: error.message };
   }
 }
@@ -210,7 +193,6 @@ export async function actualizarInteraccion(data: {
   const supabase = await createServerActionClient();
 
   try {
-    console.log('✏️ Actualizando interacción:', data);
 
     // Validar fecha de próxima acción si se proporciona
     if (data.fechaProximaAccion) {
@@ -237,11 +219,8 @@ export async function actualizarInteraccion(data: {
       .single();
 
     if (error) {
-      console.error('❌ Error actualizando:', error);
       throw error;
     }
-
-    console.log('✅ Interacción actualizada exitosamente:', updatedData);
 
     // Revalidar el cliente
     if (updatedData.cliente_id) {
@@ -250,7 +229,6 @@ export async function actualizarInteraccion(data: {
 
     return { success: true, data: updatedData };
   } catch (error: any) {
-    console.error('❌ Error en actualizarInteraccion:', error);
     return { success: false, error: error.message };
   }
 }
@@ -259,8 +237,6 @@ export async function eliminarInteraccion(interaccionId: string) {
   const supabase = await createServerActionClient();
 
   try {
-    console.log('🗑️ Eliminando interacción:', interaccionId);
-
     // Primero obtener la interacción para saber el cliente_id
     const { data: interaccion } = await supabase
       .from('cliente_interaccion')
@@ -274,11 +250,8 @@ export async function eliminarInteraccion(interaccionId: string) {
       .eq('id', interaccionId);
 
     if (error) {
-      console.error('❌ Error eliminando:', error);
       throw error;
     }
-
-    console.log('✅ Interacción eliminada exitosamente');
 
     // Revalidar el cliente
     if (interaccion?.cliente_id) {
@@ -287,7 +260,6 @@ export async function eliminarInteraccion(interaccionId: string) {
 
     return { success: true };
   } catch (error: any) {
-    console.error('❌ Error en eliminarInteraccion:', error);
     return { success: false, error: error.message };
   }
 }

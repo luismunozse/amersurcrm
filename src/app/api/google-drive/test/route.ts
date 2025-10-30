@@ -16,7 +16,6 @@ export async function GET() {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    console.log('[TEST] Usuario autenticado:', user.id);
 
     // Obtener cliente configurado de Google Drive
     const driveData = await getConfiguredGoogleDriveClient({ supabaseClient: supabase });
@@ -28,22 +27,12 @@ export async function GET() {
       }, { status: 503 });
     }
 
-    console.log('[TEST] Cliente de Google Drive obtenido');
 
     const { client, config } = driveData;
 
-    console.log('[TEST] Config:', {
-      id: config.id,
-      hasAccessToken: !!config.access_token,
-      hasRefreshToken: !!config.refresh_token,
-      tokenExpiresAt: config.token_expires_at
-    });
-
     // Intentar listar archivos
-    console.log('[TEST] Listando archivos...');
     const files = await client.listFiles(undefined, 10);
 
-    console.log(`[TEST] Archivos encontrados: ${files.length}`);
 
     return NextResponse.json({
       success: true,

@@ -26,7 +26,8 @@ export default function GoogleMapsDebug() {
     checkGoogleMaps();
   }, []);
 
-  if (!mounted) {
+  // Solo mostrar en desarrollo, NUNCA en producción
+  if (!mounted || process.env.NODE_ENV === 'production') {
     return null;
   }
 
@@ -48,7 +49,7 @@ export default function GoogleMapsDebug() {
         </div>
         <div>
           <strong>Status:</strong>
-          <span className="text-blue-400">Debug activo</span>
+          <span className="text-blue-400">Debug activo (development only)</span>
         </div>
       </div>
     </div>

@@ -565,10 +565,7 @@ export default function GoogleMap({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    console.log('🗺️ GoogleMap - projectPolygon:', projectPolygon?.length || 0, 'vértices');
-
     if (!projectPolygon || projectPolygon.length < 3) {
-      console.log('🗺️ Eliminando polígono (< 3 vértices)');
       cleanupProjectPolygonListeners();
       if (projectPolygonRef.current) {
         projectPolygonRef.current.setMap(null);
@@ -583,7 +580,6 @@ export default function GoogleMap({
     path.forEach((latLng) => bounds.extend(latLng));
 
     if (!projectPolygonRef.current) {
-      console.log('🟦 Creando nuevo polígono en el mapa');
       const polygon = new google.maps.Polygon({
         map,
         paths: path,
@@ -599,12 +595,10 @@ export default function GoogleMap({
       attachProjectPolygonListeners(polygon);
       if (!polygonFitRef.current && !planosUrl) {
         // Solo hacer fitBounds si no hay plano cargado (primera vez dibujando el polígono)
-        console.log('🟦 Ajustando vista del mapa al polígono (primera vez)');
         map.fitBounds(bounds);
         polygonFitRef.current = true;
       }
     } else {
-      console.log('🟦 Actualizando polígono existente');
       projectPolygonSilentUpdateRef.current = true;
       projectPolygonRef.current.setPath(path);
       projectPolygonSilentUpdateRef.current = false;
@@ -721,10 +715,7 @@ export default function GoogleMap({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    console.log('🗺️ GoogleMap - overlayEditable:', overlayEditable, 'overlayBounds:', overlayBounds);
-
     if (!overlayEditable || !overlayBounds) {
-      console.log('🗺️ No crear rectángulo - editable:', overlayEditable, 'bounds:', !!overlayBounds);
       overlayListenersRef.current.forEach((listener) => listener.remove());
       overlayListenersRef.current = [];
       if (overlayRectangleRef.current) {
@@ -741,7 +732,6 @@ export default function GoogleMap({
     );
 
     if (!overlayRectangleRef.current) {
-      console.log('🟦 Creando rectángulo en mapa:', bounds.toString());
       const rectangle = new google.maps.Rectangle({
         bounds,
         map,
@@ -754,11 +744,9 @@ export default function GoogleMap({
         strokeWeight: 3,
       });
       overlayRectangleRef.current = rectangle;
-      console.log('🟦 Rectángulo creado:', rectangle);
 
       // NO usar fitBounds - permitir que el usuario mantenga su nivel de zoom actual
       // map.fitBounds(bounds);
-      console.log('🟦 Rectángulo listo para edición');
 
       const notifyBounds = () => {
         if (overlaySilentRef.current) return;
@@ -838,9 +826,6 @@ export default function GoogleMap({
         const [rawLat, rawLng] = lote.plano_poligono[0];
         const [lat, lng] = denormalizePair([rawLat, rawLng], overlayBounds);
         const position = { lat, lng };
-        if (position.lat !== rawLat || position.lng !== rawLng) {
-          console.log('🔄 Desnormalizando lote', lote.codigo, ':', { rawLat, rawLng }, '→', position);
-        }
 
         // Crear o actualizar marcador
         if (!lotesLabelsRef.current.has(lote.id)) {
@@ -1043,7 +1028,6 @@ export default function GoogleMap({
         listeners.push(
           polygon.addListener('click', () => {
             // Aquí se puede agregar lógica para seleccionar el lote
-            console.log('Lote clickeado:', lote.codigo);
           })
         );
         lotesPolygonListenersRef.current.set(lote.id, listeners);

@@ -51,7 +51,6 @@ async function fetchSunatRate(currency: 'USD' | 'EUR'): Promise<ExchangeRate> {
   const cached = lastRates[currency];
   const now = Date.now();
   if (cached && now - cached.timestamp < CACHE_DURATION) {
-    console.log(`Using cached rate for ${currency}`);
     return cached.data;
   }
 

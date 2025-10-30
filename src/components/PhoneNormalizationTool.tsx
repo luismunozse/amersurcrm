@@ -66,27 +66,16 @@ export default function PhoneNormalizationTool({ clientes, onUpdate }: PhoneNorm
     setResults(null);
 
     try {
-      console.log('🔄 Iniciando normalización usando función completa...');
-
-      // Primero verificar si la función existe
-      console.log('🔍 Verificando si la función normalize_all_phone_numbers existe...');
-      
       // Usar la función segura que maneja duplicados
       const { data, error } = await supabase.rpc('normalize_all_phone_numbers_safe');
 
       if (error) {
-        console.error('❌ Error ejecutando normalización:');
-        console.error('Error completo:', error);
-        console.error('Código:', error.code);
-        console.error('Mensaje:', error.message);
-        console.error('Detalles:', error.details);
-        console.error('Hint:', error.hint);
+        console.error('❌ Error ejecutando normalización:', error);
         setResults({ processed: 0, updated: 0, errors: 1 });
         return;
       }
 
       if (!data || data.length === 0) {
-        console.log('ℹ️ No se encontraron clientes para normalizar');
         setResults({ processed: 0, updated: 0, errors: 0 });
         return;
       }
@@ -95,29 +84,6 @@ export default function PhoneNormalizationTool({ clientes, onUpdate }: PhoneNorm
       const processed = data.length;
       const updated = data.filter((row: any) => row.updated).length;
       const errors = 0; // La función de BD maneja errores internamente
-
-      console.log(`✅ Normalización completada:`, {
-        procesados: processed,
-        actualizados: updated,
-        errores: errors
-      });
-
-      // Mostrar detalles de cada cliente procesado
-      data.forEach((row: any) => {
-        if (row.error_message) {
-          console.warn(`⚠️ ${row.nombre}: ${row.error_message}`, {
-            telefono: `${row.telefono_original} → ${row.telefono_normalized}`,
-            whatsapp: `${row.telefono_whatsapp_original} → ${row.telefono_whatsapp_normalized}`
-          });
-        } else if (row.updated) {
-          console.log(`✅ ${row.nombre}:`, {
-            telefono: `${row.telefono_original} → ${row.telefono_normalized}`,
-            whatsapp: `${row.telefono_whatsapp_original} → ${row.telefono_whatsapp_normalized}`
-          });
-        } else {
-          console.log(`⏭️ ${row.nombre}: Sin cambios necesarios`);
-        }
-      });
 
       setResults({ processed, updated, errors });
       

@@ -71,7 +71,6 @@ export default function PhoneValidationAlert({ clientes }: PhoneValidationAlertP
               <button
                 onClick={() => {
                   // Aquí podrías abrir un modal o ejecutar el script de normalización
-                  console.log('Ejecutar normalización de números');
                 }}
                 className="bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-yellow-700 transition-colors"
               >

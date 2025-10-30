@@ -151,7 +151,6 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
   };
 
   const handleEstadoChange = async (clienteId: string, nuevoEstado: string) => {
-    console.log('Cambiando estado del cliente:', clienteId, 'a:', nuevoEstado);
     try {
       // Actualización optimista
       setClientesState(prevClientes =>

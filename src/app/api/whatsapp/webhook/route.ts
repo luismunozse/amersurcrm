@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (mode === 'subscribe' && token === credential?.webhook_verify_token) {
-    console.log('✅ Webhook verificado correctamente');
     return new NextResponse(challenge, { status: 200 });
   }
 

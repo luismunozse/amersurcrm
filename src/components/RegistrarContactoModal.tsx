@@ -44,15 +44,6 @@ export default function RegistrarContactoModal({
       return;
     }
 
-    console.log('📤 Enviando interacción desde modal:', {
-      clienteId,
-      tipo,
-      resultado,
-      notas: notas.trim(),
-      duracionMinutos,
-      proximaAccion
-    });
-
     startTransition(async () => {
       const result = await registrarInteraccion({
         clienteId,
@@ -63,8 +54,6 @@ export default function RegistrarContactoModal({
         proximaAccion: proximaAccion !== 'ninguna' ? proximaAccion : undefined,
         fechaProximaAccion: fechaProximaAccion || undefined,
       });
-
-      console.log('📥 Respuesta del servidor:', result);
 
       if (result.success) {
         toast.success('Interacción registrada exitosamente');

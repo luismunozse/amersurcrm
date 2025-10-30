@@ -39,7 +39,6 @@ export function useUbigeo() {
     const loadUbigeoData = async () => {
       try {
         setLoading(true);
-        console.log('Cargando datos de ubigeo...');
         
         // Cargar departamentos
         const departamentosResponse = await fetch('/api/ubigeo/departamentos');
@@ -47,7 +46,6 @@ export function useUbigeo() {
           throw new Error(`Error cargando departamentos: ${departamentosResponse.status}`);
         }
         const departamentos: Departamento[] = await departamentosResponse.json();
-        console.log('Departamentos cargados:', departamentos.length);
         
         // Cargar provincias
         const provinciasResponse = await fetch('/api/ubigeo/provincias');
@@ -55,7 +53,6 @@ export function useUbigeo() {
           throw new Error(`Error cargando provincias: ${provinciasResponse.status}`);
         }
         const provincias: Provincia[] = await provinciasResponse.json();
-        console.log('Provincias cargadas:', provincias.length);
         
         // Cargar distritos
         const distritosResponse = await fetch('/api/ubigeo/distritos');
@@ -63,7 +60,6 @@ export function useUbigeo() {
           throw new Error(`Error cargando distritos: ${distritosResponse.status}`);
         }
         const distritos: Distrito[] = await distritosResponse.json();
-        console.log('Distritos cargados:', distritos.length);
         
         const ubigeoData = {
           departamentos,
@@ -71,7 +67,6 @@ export function useUbigeo() {
           distritos
         };
         
-        console.log('Datos de ubigeo completos:', ubigeoData);
         setData(ubigeoData);
         
         setError(null);

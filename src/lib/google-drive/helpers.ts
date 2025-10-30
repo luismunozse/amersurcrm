@@ -61,12 +61,10 @@ export async function getConfiguredGoogleDriveClient({
     const config = configs?.[0] as GoogleDriveSyncConfig | undefined;
 
     if (!config) {
-      console.log('No hay configuración activa de Google Drive');
       return null;
     }
 
     if (!config.access_token) {
-      console.log('Configuración sin access_token');
       return null;
     }
 

@@ -49,7 +49,6 @@ export async function GET() {
       
       // Si las tablas no existen, devolver datos simulados
       if (error.code === 'PGRST205') {
-        console.log('Tablas no existen, devolviendo datos simulados');
         return NextResponse.json({ 
           success: true, 
           usuarios: [

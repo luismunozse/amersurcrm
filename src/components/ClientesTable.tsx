@@ -7,7 +7,8 @@ import {
   actualizarEstadoCliente,
   eliminarClientesMasivo,
   asignarVendedorMasivo,
-  cambiarEstadoMasivo
+  cambiarEstadoMasivo,
+  obtenerVendedores
 } from "@/app/dashboard/clientes/_actions";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -17,6 +18,7 @@ import { Pagination } from "@/components/Pagination";
 import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
+import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import {
   getEstadoClienteLabel,
   ESTADOS_CLIENTE_OPTIONS,
@@ -105,6 +107,13 @@ export default function ClientesTable({
   } | null>(null);
   const router = useRouter();
 
+  // Verificar permisos de administrador
+  const { isAdmin, loading: loadingPermissions } = useAdminPermissions();
+
+  // Estado para lista de vendedores
+  const [vendedores, setVendedores] = useState<Array<{ id: string; username: string; nombre_completo: string; email: string }>>([]);
+  const [loadingVendedores, setLoadingVendedores] = useState(false);
+
   // Estado local para búsqueda
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
@@ -112,6 +121,24 @@ export default function ClientesTable({
   useEffect(() => {
     setLocalSearchQuery(searchQuery);
   }, [searchQuery]);
+
+  // Cargar vendedores si es admin
+  useEffect(() => {
+    if (isAdmin && !loadingPermissions) {
+      setLoadingVendedores(true);
+      obtenerVendedores()
+        .then((data) => {
+          setVendedores(data);
+        })
+        .catch((error) => {
+          console.error('Error cargando vendedores:', error);
+        })
+        .finally(() => {
+          setLoadingVendedores(false);
+        });
+    }
+  }, [isAdmin, loadingPermissions]);
+
   const sortBy = initialSortBy as keyof Cliente;
   const sortOrder = initialSortOrder;
 
@@ -169,13 +196,13 @@ export default function ClientesTable({
             return;
           } else if (bulkAction === 'assignVendedor') {
             if (!bulkVendedor) {
-              toast.error('Debes ingresar el email del vendedor');
+              toast.error('Debes seleccionar un vendedor');
               setBulkAction(null);
               return;
             }
 
             await asignarVendedorMasivo(idsArray, bulkVendedor);
-            toast.success(`Vendedor asignado a ${idsArray.length} ${idsArray.length === 1 ? 'cliente' : 'clientes'}`);
+            toast.success(`${idsArray.length} ${idsArray.length === 1 ? 'cliente asignado' : 'clientes asignados'} exitosamente`);
             setSelectedIds(new Set());
             setBulkVendedor('');
             router.refresh();
@@ -345,23 +372,13 @@ export default function ClientesTable({
   const handleEstadoChange = async (cliente: Cliente, nuevoEstado: EstadoCliente) => {
     const estadoActual = (cliente.estado_cliente || 'por_contactar') as EstadoCliente;
 
-    console.log('🔍 Cambiando estado:', {
-      estadoActual,
-      nuevoEstado,
-      cliente: cliente.nombre,
-      debeAbrirModal: estadoActual === 'por_contactar' && nuevoEstado === 'contactado'
-    });
-
     // Si está cambiando de "por_contactar" a "contactado", mostrar modal para registrar la interacción
     if (estadoActual === 'por_contactar' && nuevoEstado === 'contactado') {
-      console.log('✅ Abriendo modal de contacto');
       setSelectedCliente(cliente);
       setPendingEstadoChange({ clienteId: cliente.id, nuevoEstado });
       setShowContactoModal(true);
       return;
     }
-
-    console.log('⏭️ Cambio directo sin modal');
 
     // Para otros cambios de estado, proceder normalmente
     try {
@@ -437,8 +454,8 @@ export default function ClientesTable({
         )}
       </div>
 
-      {/* Barra de acciones masivas */}
-      {selectedIds.size > 0 && (
+      {/* Barra de acciones masivas - Solo visible para administradores */}
+      {selectedIds.size > 0 && isAdmin && (
         <div className="crm-card p-4 bg-crm-card-hover border border-crm-border">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -479,18 +496,26 @@ export default function ClientesTable({
                 </button>
               </div>
 
-              {/* Asignar Vendedor */}
+              {/* Asignar Vendedor - Dropdown con lista de vendedores */}
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Email del vendedor"
+                <select
                   value={bulkVendedor}
                   onChange={(e) => setBulkVendedor(e.target.value)}
-                  className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary placeholder:text-crm-text-muted focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all w-48"
-                />
+                  disabled={loadingVendedores}
+                  className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all min-w-[200px]"
+                >
+                  <option value="">
+                    {loadingVendedores ? 'Cargando...' : 'Seleccionar vendedor'}
+                  </option>
+                  {vendedores.map((vendedor) => (
+                    <option key={vendedor.id} value={vendedor.username}>
+                      {vendedor.nombre_completo} (@{vendedor.username})
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => setBulkAction('assignVendedor')}
-                  disabled={isPending || !bulkVendedor}
+                  disabled={isPending || !bulkVendedor || loadingVendedores}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -530,19 +555,22 @@ export default function ClientesTable({
           <table className="w-full">
             <thead className="bg-crm-card-hover border-b border-crm-border">
               <tr>
-                <th className="px-4 py-3 w-12">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    ref={(input) => {
-                      if (input) {
-                        input.indeterminate = isSomeSelected;
-                      }
-                    }}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
-                  />
-                </th>
+                {/* Checkbox de selección - Solo visible para administradores */}
+                {isAdmin && (
+                  <th className="px-4 py-3 w-12">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = isSomeSelected;
+                        }
+                      }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th
                   className="px-4 py-3 text-left text-xs font-medium text-crm-text-muted uppercase tracking-wider cursor-pointer hover:bg-crm-border"
                   onClick={() => handleSort('nombre')}
@@ -587,6 +615,7 @@ export default function ClientesTable({
                   isPending={isPending}
                   isSelected={selectedIds.has(cliente.id)}
                   onToggleSelect={toggleSelectOne}
+                  isAdmin={isAdmin}
                 />
               ))}
             </tbody>
@@ -684,6 +713,7 @@ const ClienteRow = memo(function ClienteRow({
   isPending,
   isSelected,
   onToggleSelect,
+  isAdmin,
 }: {
   cliente: Cliente;
   onEdit: (id: string) => void;
@@ -693,6 +723,7 @@ const ClienteRow = memo(function ClienteRow({
   isPending: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
+  isAdmin: boolean;
 }) {
   const getOrigenLeadLabel = (origen?: string | null) => {
     switch (origen) {
@@ -770,15 +801,17 @@ const ClienteRow = memo(function ClienteRow({
 
   return (
     <tr className={`hover:bg-crm-card-hover transition-colors ${isSelected ? 'bg-crm-primary/5' : ''}`}>
-      {/* Checkbox */}
-      <td className="px-4 py-4">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onToggleSelect(cliente.id)}
-          className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
-        />
-      </td>
+      {/* Checkbox - Solo visible para administradores */}
+      {isAdmin && (
+        <td className="px-4 py-4">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(cliente.id)}
+            className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
+          />
+        </td>
+      )}
       {/* Cliente */}
       <td className="px-4 py-4">
         <Link

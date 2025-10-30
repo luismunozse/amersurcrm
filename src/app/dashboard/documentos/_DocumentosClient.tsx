@@ -9,7 +9,9 @@ import {
   Cloud,
   File,
   RefreshCw,
-  Clock
+  Clock,
+  Folder,
+  X
 } from "lucide-react";
 import GoogleDriveFolders from "./_GoogleDriveFolders";
 import DocumentosList, { GoogleDriveDocumento } from "./_DocumentosList";
@@ -49,6 +51,7 @@ export default function DocumentosClient({
   const [filtroTipo, setFiltroTipo] = useState<'all' | 'carpetas' | 'pdf' | 'images' | 'docs' | 'sheets' | 'other'>('all');
   const [orden, setOrden] = useState<'recientes' | 'antiguos' | 'nombre-asc' | 'nombre-desc' | 'tamano-desc' | 'tamano-asc'>('recientes');
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ id: string; name: string }>>([{ id: 'root', name: 'Mi Drive' }]);
+  const [mostrarCarpetasMovil, setMostrarCarpetasMovil] = useState(false);
 
   // Cargar documentos de la carpeta actual desde Google Drive
   useEffect(() => {
@@ -243,7 +246,8 @@ export default function DocumentosClient({
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -328,7 +332,7 @@ export default function DocumentosClient({
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Sidebar - Carpetas de Google Drive */}
-        <div className="lg:col-span-3">
+        <div className="hidden lg:block lg:col-span-3">
           <div className="crm-card p-4 rounded-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-crm-text-primary">Carpetas de Drive</h3>
@@ -354,8 +358,19 @@ export default function DocumentosClient({
                   placeholder="Buscar documentos..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-crm-border rounded-lg focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+                  className="w-full pl-10 pr-4 py-2 border border-crm-border rounded-lg bg-white text-crm-text-primary placeholder:text-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary/20 dark:bg-crm-card dark:text-white dark:placeholder:text-crm-text-muted dark:border-crm-border"
                 />
+              </div>
+
+              {/* Botón carpetas móvil */}
+              <div className="flex items-center gap-2 lg:hidden">
+                <button
+                  onClick={() => setMostrarCarpetasMovil(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-crm-border text-sm font-medium text-crm-text-primary bg-white hover:bg-crm-card-hover transition-colors dark:bg-crm-card dark:text-white"
+                >
+                  <Folder className="w-4 h-4" />
+                  Carpetas
+                </button>
               </div>
 
               {/* Filtros */}
@@ -366,7 +381,7 @@ export default function DocumentosClient({
                     id="filtroTipo"
                     value={filtroTipo}
                     onChange={(event) => setFiltroTipo(event.target.value as typeof filtroTipo)}
-                    className="px-3 py-2 border border-crm-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+                    className="px-3 py-2 border border-crm-border rounded-lg bg-white text-sm text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/20 dark:bg-crm-card dark:text-white dark:border-crm-border"
                   >
                     <option value="all">Todos</option>
                     <option value="carpetas">Carpetas</option>
@@ -384,7 +399,7 @@ export default function DocumentosClient({
                     id="orden"
                     value={orden}
                     onChange={(event) => setOrden(event.target.value as typeof orden)}
-                    className="px-3 py-2 border border-crm-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+                    className="px-3 py-2 border border-crm-border rounded-lg bg-white text-sm text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/20 dark:bg-crm-card dark:text-white dark:border-crm-border"
                   >
                     <option value="recientes">Más recientes</option>
                     <option value="antiguos">Más antiguos</option>
@@ -444,18 +459,55 @@ export default function DocumentosClient({
               </span>
             </div>
 
-          <DocumentosList
-            documentos={documentosFiltrados}
-            vista={vistaActual}
-            onOpenFolder={(doc) => {
-              if (doc.es_carpeta && doc.google_drive_file_id) {
-                setCarpetaSeleccionada(doc.google_drive_file_id);
-              }
-            }}
-          />
+            <DocumentosList
+              documentos={documentosFiltrados}
+              vista={vistaActual}
+              onOpenFolder={(doc) => {
+                if (doc.es_carpeta && doc.google_drive_file_id) {
+                  setCarpetaSeleccionada(doc.google_drive_file_id);
+                }
+              }}
+            />
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Panel de carpetas móvil */}
+      {mostrarCarpetasMovil && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMostrarCarpetasMovil(false)}
+            aria-hidden="true"
+          />
+          <div className="relative ml-auto h-full w-full max-w-sm bg-white dark:bg-crm-card shadow-xl flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-crm-border">
+              <div className="flex items-center gap-2 text-crm-text-primary dark:text-white">
+                <Folder className="w-5 h-5" />
+                <span className="font-semibold text-sm">Carpetas de Drive</span>
+              </div>
+              <button
+                onClick={() => setMostrarCarpetasMovil(false)}
+                className="p-2 rounded-full hover:bg-crm-card-hover transition-colors text-crm-text-muted"
+                aria-label="Cerrar panel de carpetas"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <GoogleDriveFolders
+                carpetaActual={carpetaSeleccionada}
+                onSelectCarpeta={(id) => {
+                  setCarpetaSeleccionada(id);
+                  setMostrarCarpetasMovil(false);
+                }}
+                googleDriveConectado={googleDriveConectado}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

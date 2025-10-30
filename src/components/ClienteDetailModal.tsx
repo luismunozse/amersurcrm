@@ -4,8 +4,6 @@ import { Fragment, useEffect, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, ChatBubbleLeftRightIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
-console.log('ClienteDetailModal component loaded');
-
 interface ClienteDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -40,7 +38,6 @@ export default function ClienteDetailModal({ isOpen, onClose, cliente }: Cliente
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    console.log('Modal isOpen changed:', isOpen);
     if (isOpen) {
       setIsVisible(true);
     } else {
@@ -49,10 +46,7 @@ export default function ClienteDetailModal({ isOpen, onClose, cliente }: Cliente
     }
   }, [isOpen]);
 
-  console.log('Modal render - isOpen:', isOpen, 'cliente:', cliente?.nombre);
-
   if (!cliente) {
-    console.log('No cliente, returning null');
     return null;
   }
 

@@ -23,8 +23,6 @@ export default function LoginForm() {
       
       if (loginType === 'admin') {
         // Login para administradores con username/contraseña
-        console.log("Intentando login admin con:", username);
-
         // Primero convertir el username a email
         const response = await fetch('/api/auth/login-username', {
           method: 'POST',
@@ -60,14 +58,12 @@ export default function LoginForm() {
           }
 
           if (data.user) {
-            console.log("Login admin exitoso, redirigiendo...");
             toast.success("¡Login exitoso!");
             router.replace("/dashboard");
           }
         }
       } else {
         // Login para vendedores con DNI/contraseña
-        console.log("Intentando login vendedor con DNI:", dni);
         
         const response = await fetch('/api/auth/login-dni', {
           method: 'POST',
@@ -101,7 +97,6 @@ export default function LoginForm() {
             return;
           }
 
-          console.log("Login vendedor exitoso, redirigiendo a dashboard vendedor...");
           toast.success("¡Login exitoso!");
           router.replace("/dashboard/vendedor");
         }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { getCachedClientes } from "@/lib/cache.server";
+import { esAdmin } from "@/lib/auth/roles";
 import {
   TipoCliente,
   TipoDocumento,
@@ -377,8 +378,6 @@ export async function eliminarCliente(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  console.log('🗑️ Intentando eliminar cliente:', id);
-
   // Primero verificar si el cliente existe
   const { data: clienteExiste } = await supabase
     .from("cliente")
@@ -389,8 +388,6 @@ export async function eliminarCliente(id: string) {
   if (!clienteExiste) {
     throw new Error("El cliente no existe");
   }
-
-  console.log('📋 Cliente encontrado:', clienteExiste.nombre);
 
   // Verificar relaciones que podrían impedir la eliminación
   const { data: reservas } = await supabase
@@ -429,8 +426,6 @@ export async function eliminarCliente(id: string) {
 
     throw new Error(error.message);
   }
-
-  console.log('✅ Cliente eliminado, registros afectados:', count);
 
   if (count === 0) {
     throw new Error("El cliente no pudo ser eliminado. Verifique los permisos.");
@@ -481,15 +476,59 @@ export async function eliminarClientesMasivo(ids: string[]) {
   return { success: true, count: ids.length };
 }
 
-// Asignar vendedor a múltiples clientes
-export async function asignarVendedorMasivo(ids: string[], vendedorEmail: string) {
+// Obtener lista de vendedores activos
+export async function obtenerVendedores() {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // Verificar que el usuario es administrador
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para ver la lista de vendedores");
+  }
+
+  const { data: vendedores, error } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('id, username, nombre_completo, email')
+    .eq('activo', true)
+    .or('rol_id.eq.ROL_VENDEDOR,rol_id.eq.ROL_COORDINADOR_VENTAS')
+    .order('nombre_completo', { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  return vendedores || [];
+}
+
+// Asignar vendedor a múltiples clientes
+export async function asignarVendedorMasivo(ids: string[], vendedorUsername: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Verificar que el usuario es administrador
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para asignar vendedores masivamente");
+  }
+
+  // Validar que el vendedor existe
+  const { data: vendedor, error: vendedorError } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('username, nombre_completo')
+    .eq('username', vendedorUsername)
+    .eq('activo', true)
+    .single();
+
+  if (vendedorError || !vendedor) {
+    throw new Error("Vendedor no encontrado o inactivo");
+  }
+
   const { error } = await supabase
     .from("cliente")
-    .update({ vendedor_asignado: vendedorEmail })
+    .update({ vendedor_asignado: vendedorUsername })
     .in("id", ids);
 
   if (error) throw new Error(error.message);
