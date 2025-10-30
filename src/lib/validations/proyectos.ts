@@ -153,7 +153,7 @@ export const loteFormSchema = z.object({
     .max(1000, 'La descripción no puede exceder 1000 caracteres')
     .optional()
     .nullable(),
-  caracteristicas: z.record(z.any()).optional().nullable(),
+  caracteristicas: z.record(z.string(), z.any()).optional().nullable(),
   coordenadas: coordenadasSchema.optional().nullable(),
 }).refine(
   (data) => {
@@ -452,8 +452,8 @@ export function validateWithSchema<T>(
  * @param error - Error de Zod
  * @returns Array de mensajes de error
  */
-export function getZodErrorMessages(error: z.ZodError): string[] {
-  return error.errors.map((err) => {
+export function getZodErrorMessages(error: z.ZodError<any>): string[] {
+  return error.issues.map((err) => {
     const path = err.path.join('.');
     return path ? `${path}: ${err.message}` : err.message;
   });
@@ -464,9 +464,9 @@ export function getZodErrorMessages(error: z.ZodError): string[] {
  * @param error - Error de Zod
  * @returns Objeto con campos como keys y mensajes como values
  */
-export function getZodFieldErrors(error: z.ZodError): Record<string, string> {
+export function getZodFieldErrors(error: z.ZodError<any>): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
-  error.errors.forEach((err) => {
+  error.issues.forEach((err) => {
     const field = err.path.join('.');
     if (field && !fieldErrors[field]) {
       fieldErrors[field] = err.message;

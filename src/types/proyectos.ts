@@ -96,14 +96,15 @@ export interface LoteConRelaciones extends Lote {
 
 export interface LoteFormData {
   numero_lote: string;
-  etapa?: string;
-  manzana?: string;
-  area?: number;
-  precio_lista?: number;
-  precio_venta?: number;
+  etapa?: string | null;
+  manzana?: string | null;
+  area?: number | null;
+  precio_lista?: number | null;
+  precio_venta?: number | null;
   estado?: LoteEstado;
-  descripcion?: string;
-  caracteristicas?: Record<string, any>;
+  descripcion?: string | null;
+  caracteristicas?: Record<string, any> | null;
+  coordenadas?: LoteCoordenadas | null;
 }
 
 // ============================================================================

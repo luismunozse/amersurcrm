@@ -293,8 +293,6 @@ export function startProyectosListTour(): void {
 
   // Dynamic import to avoid SSR issues
   import('driver.js').then(({ driver }) => {
-    import('driver.js/dist/driver.css');
-
     const driverObj = driver({
       showProgress: true,
       showButtons: ['next', 'previous', 'close'],
@@ -319,7 +317,6 @@ export function startProyectoDetailTour(): void {
   if (typeof window === 'undefined') return;
 
   import('driver.js').then(({ driver }) => {
-    import('driver.js/dist/driver.css');
 
     const driverObj = driver({
       showProgress: true,
@@ -343,7 +340,6 @@ export function startMapeoTour(): void {
   if (typeof window === 'undefined') return;
 
   import('driver.js').then(({ driver }) => {
-    import('driver.js/dist/driver.css');
 
     const driverObj = driver({
       showProgress: true,
@@ -367,7 +363,6 @@ export function startCreateLoteTour(): void {
   if (typeof window === 'undefined') return;
 
   import('driver.js').then(({ driver }) => {
-    import('driver.js/dist/driver.css');
 
     const driverObj = driver({
       showProgress: true,
@@ -388,7 +383,6 @@ export function startVentasReservasTour(): void {
   if (typeof window === 'undefined') return;
 
   import('driver.js').then(({ driver }) => {
-    import('driver.js/dist/driver.css');
 
     const driverObj = driver({
       showProgress: true,

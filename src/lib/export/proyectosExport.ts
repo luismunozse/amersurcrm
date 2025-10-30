@@ -364,7 +364,7 @@ export function parseImportFile(file: File): Promise<Array<Record<string, any>>>
         const worksheet = workbook.Sheets[sheetName];
 
         // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, any>>;
 
         resolve(jsonData);
       } catch (error) {

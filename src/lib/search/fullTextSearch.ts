@@ -28,7 +28,7 @@
  * ```
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createServerActionClient } from '@/lib/supabase.server-actions';
 
 /**
  * Opciones para búsqueda full-text
@@ -113,15 +113,13 @@ export async function searchProyectosFullText(
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createServerActionClient();
 
     // Usar la función almacenada de PostgreSQL (schema crm)
     const { data, error } = await supabase.rpc('search_proyectos', {
       search_query: query.trim(),
       limit_count: limit,
       offset_count: offset,
-    }, {
-      schema: 'crm'
     });
 
     if (error) {
@@ -195,7 +193,7 @@ export async function searchLotesFullText(
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createServerActionClient();
 
     // Usar la función almacenada de PostgreSQL (schema crm)
     const { data, error } = await supabase.rpc('search_lotes', {
@@ -203,8 +201,6 @@ export async function searchLotesFullText(
       search_query: query.trim(),
       limit_count: limit,
       offset_count: offset,
-    }, {
-      schema: 'crm'
     });
 
     if (error) {
@@ -280,7 +276,7 @@ async function searchWithILike(
   options: FullTextSearchOptions & { proyectoId?: string }
 ): Promise<any[]> {
   const { proyectoId, limit = 50 } = options;
-  const supabase = await createClient();
+  const supabase = await createServerActionClient();
 
   if (proyectoId) {
     // Buscar lotes con ILIKE (schema crm)
@@ -313,15 +309,13 @@ async function searchWithILike(
  */
 export async function isFullTextSearchAvailable(): Promise<boolean> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerActionClient();
 
     // Intentar ejecutar la función de búsqueda con un query vacío (schema crm)
     const { error } = await supabase.rpc('search_proyectos', {
       search_query: 'test',
       limit_count: 1,
       offset_count: 0,
-    }, {
-      schema: 'crm'
     });
 
     // Si no hay error, la función existe y está disponible
@@ -351,7 +345,7 @@ export async function getSearchSuggestions(
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createServerActionClient();
     const trimmedQuery = query.trim();
 
     if (type === 'proyecto') {

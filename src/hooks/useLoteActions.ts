@@ -257,7 +257,7 @@ export function useLoteActions(options: UseLoteActionsOptions): UseLoteActionsRe
             const result = await guardarCoordenadasLote(loteId, coordenadas);
 
             if (!result.success) {
-              const errorMsg = result.message || 'Error al guardar coordenadas';
+              const errorMsg = 'Error al guardar coordenadas';
               setError(errorMsg);
               toast.error(errorMsg);
               onError?.(errorMsg);
