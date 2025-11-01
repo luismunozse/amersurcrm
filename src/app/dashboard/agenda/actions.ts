@@ -133,12 +133,14 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
         color,
         created_by,
         created_at,
-        updated_at
+        updated_at,
+        cliente:cliente_id(id, nombre, telefono, email)
       `)
       .eq('vendedor_id', user.id)
       .gte('fecha_inicio', inicioRango.toISOString())
       .lte('fecha_inicio', finRango.toISOString())
-      .order('fecha_inicio', { ascending: true });
+      .order('fecha_inicio', { ascending: true })
+      .limit(1000);
 
     if (error) {
       throw error;
@@ -366,7 +368,7 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
   try {
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       throw new Error("No autorizado");
     }
@@ -374,7 +376,7 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
     // Verificar que el evento pertenece al usuario
     const { data: eventoExistente } = await supabase
       .from('evento')
-      .select('vendedor_id')
+      .select('vendedor_id, titulo')
       .eq('id', eventoId)
       .single();
 
@@ -392,14 +394,97 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
       throw new Error(`Error actualizando estado: ${error.message}`);
     }
 
+    // Crear notificación
+    if (nuevoEstado === 'completado') {
+      try {
+        await crearNotificacion(
+          user.id,
+          "sistema",
+          "Evento completado",
+          `Has completado el evento "${eventoExistente.titulo}".`,
+          { evento_id: eventoId }
+        );
+      } catch (notifyError) {
+        console.warn("No se pudo crear notificación:", notifyError);
+      }
+    }
+
     revalidatePath('/dashboard/agenda');
     return { success: true, message: "Estado actualizado exitosamente" };
 
   } catch (error) {
     console.error('Error actualizando estado:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : "Error desconocido" 
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Error desconocido"
+    };
+  }
+}
+
+export async function reprogramarEvento(
+  eventoId: string,
+  nuevaFechaInicio: string,
+  nuevaFechaFin?: string
+) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error("No autorizado");
+    }
+
+    // Verificar que el evento pertenece al usuario
+    const { data: eventoExistente } = await supabase
+      .from('evento')
+      .select('vendedor_id, titulo')
+      .eq('id', eventoId)
+      .single();
+
+    if (!eventoExistente || eventoExistente.vendedor_id !== user.id) {
+      throw new Error("No tienes permisos para modificar este evento");
+    }
+
+    // Actualizar fechas y marcar como reprogramado
+    const updateData: any = {
+      fecha_inicio: nuevaFechaInicio,
+      estado: 'reprogramado' as EstadoEvento,
+    };
+
+    if (nuevaFechaFin) {
+      updateData.fecha_fin = nuevaFechaFin;
+    }
+
+    const { error } = await supabase
+      .from('evento')
+      .update(updateData)
+      .eq('id', eventoId);
+
+    if (error) {
+      throw new Error(`Error reprogramando evento: ${error.message}`);
+    }
+
+    // Crear notificación
+    try {
+      await crearNotificacion(
+        user.id,
+        "sistema",
+        "Evento reprogramado",
+        `Has reprogramado el evento "${eventoExistente.titulo}" para ${new Date(nuevaFechaInicio).toLocaleString("es-PE")}.`,
+        { evento_id: eventoId }
+      );
+    } catch (notifyError) {
+      console.warn("No se pudo crear notificación:", notifyError);
+    }
+
+    revalidatePath('/dashboard/agenda');
+    return { success: true, message: "Evento reprogramado exitosamente" };
+
+  } catch (error) {
+    console.error('Error reprogramando evento:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Error desconocido"
     };
   }
 }

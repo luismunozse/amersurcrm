@@ -1,5 +1,5 @@
 export type TipoEvento = 'cita' | 'llamada' | 'email' | 'visita' | 'seguimiento' | 'recordatorio' | 'tarea';
-export type EstadoEvento = 'pendiente' | 'en_progreso' | 'completado' | 'cancelado';
+export type EstadoEvento = 'pendiente' | 'en_progreso' | 'vencida' | 'reprogramado' | 'completado' | 'cancelado';
 export type Prioridad = 'baja' | 'media' | 'alta' | 'urgente';
 export type TipoRecordatorio = 'seguimiento_cliente' | 'llamada_prospecto' | 'envio_documentos' | 'visita_propiedad' | 'reunion_equipo' | 'personalizado';
 export type EstadoRecordatorio = 'pendiente' | 'enviado' | 'leido' | 'completado' | 'cancelado';
@@ -53,7 +53,11 @@ export interface Recordatorio {
   notificar_push: boolean;
   notas?: string;
   etiquetas: string[];
-  estado: EstadoRecordatorio;
+  // La BD usa campos booleanos en lugar de un campo estado
+  completado: boolean;
+  leido: boolean;
+  enviado: boolean;
+  fecha_completado?: string;
   created_by: string;
   created_at: string;
   updated_at: string;

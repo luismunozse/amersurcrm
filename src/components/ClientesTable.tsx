@@ -567,7 +567,7 @@ export default function ClientesTable({
         {/* Vista mobile */}
         <div className="sm:hidden px-4 py-4 space-y-4">
           {clientes.map((cliente) => {
-            const estadoLabel = getEstadoClienteLabel(cliente.estado_cliente);
+            const estadoLabel = getEstadoClienteLabel(cliente.estado_cliente as EstadoCliente);
             return (
               <div
                 key={cliente.id}
@@ -619,7 +619,7 @@ export default function ClientesTable({
                   </Link>
                   {isAdmin && (
                     <button
-                      onClick={() => askDelete(cliente.id, cliente.nombre)}
+                      onClick={() => askDelete(cliente)}
                       className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-crm-danger px-3 py-2 text-xs font-semibold text-crm-danger"
                     >
                       Eliminar

@@ -13,23 +13,43 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const inicio = searchParams.get('inicio');
     const fin = searchParams.get('fin');
+    const clienteId = searchParams.get('cliente_id');
+    const limit = searchParams.get('limit');
 
-    if (!inicio || !fin) {
-      return NextResponse.json({ error: "Fechas de inicio y fin requeridas" }, { status: 400 });
-    }
-
-    // Obtener eventos del usuario en el rango de fechas
-    const { data: eventos, error } = await supabase
+    let query = supabase
       .from('evento')
       .select(`
-        *,
-        cliente:cliente_id(id, nombre, telefono, email),
-        propiedad:propiedad_id(id, identificacion_interna, tipo)
+        id,
+        titulo,
+        tipo,
+        estado,
+        fecha_inicio,
+        fecha_fin,
+        prioridad,
+        cliente:cliente_id(id, nombre),
+        propiedad:propiedad_id(id, identificacion_interna)
       `)
-      .eq('vendedor_id', user.id)
-      .gte('fecha_inicio', inicio)
-      .lte('fecha_inicio', fin)
-      .order('fecha_inicio', { ascending: true });
+      .eq('vendedor_id', user.id);
+
+    // Filtrar por cliente si se especifica (para timeline)
+    if (clienteId) {
+      query = query.eq('cliente_id', clienteId);
+    }
+
+    // Filtrar por rango de fechas si se especifica
+    if (inicio && fin) {
+      query = query.gte('fecha_inicio', inicio).lte('fecha_inicio', fin);
+    }
+
+    // Ordenar por fecha descendente (más recientes primero)
+    query = query.order('fecha_inicio', { ascending: false });
+
+    // Limitar resultados si se especifica
+    if (limit) {
+      query = query.limit(parseInt(limit));
+    }
+
+    const { data: eventos, error } = await query;
 
     if (error) {
       console.error('Error obteniendo eventos:', error);
