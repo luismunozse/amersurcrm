@@ -1,6 +1,7 @@
 import { getCachedClientes } from "@/lib/cache.server";
 import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
+import ExportButton from "@/components/export/ExportButton";
 
 type SP = Promise<{
   q?: string | string[];
@@ -44,6 +45,17 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
 
     const totalPages = Math.ceil(total / 20);
 
+    const exportFilters = {
+      q,
+      telefono,
+      dni,
+      estado,
+      tipo,
+      vendedor,
+      sortBy,
+      sortOrder,
+    };
+
     return (
       <div className="w-full px-4 py-6 space-y-6 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -51,8 +63,19 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
             <h1 className="text-2xl font-display font-bold text-crm-text-primary md:text-3xl">Clientes</h1>
             <p className="text-sm text-crm-text-muted md:text-base">Gestiona tu cartera desde el móvil o escritorio.</p>
           </div>
-          <div className="text-sm text-crm-text-muted self-start md:self-auto">
-            {total.toLocaleString()} {total === 1 ? 'cliente' : 'clientes'} total
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start md:self-auto">
+            <ExportButton
+              type="clientes"
+              data={clientes}
+              filters={exportFilters}
+              fileName="clientes"
+              label="Exportar"
+              size="sm"
+              variant="secondary"
+            />
+            <div className="text-sm text-crm-text-muted">
+              {total.toLocaleString()} {total === 1 ? 'cliente' : 'clientes'} total
+            </div>
           </div>
         </div>
 

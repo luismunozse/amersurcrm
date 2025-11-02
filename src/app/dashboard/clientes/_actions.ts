@@ -459,6 +459,30 @@ export async function obtenerClientesPaginados(params: {
   }
 }
 
+// Obtener todos los clientes con los filtros aplicados (sin paginación)
+export async function obtenerTodosLosClientes(params: {
+  searchTerm?: string;
+  searchTelefono?: string;
+  searchDni?: string;
+  estado?: string;
+  tipo?: string;
+  vendedor?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}) {
+  try {
+    const result = await getCachedClientes({
+      ...params,
+      page: 1,
+      pageSize: 1000,
+    });
+    return result;
+  } catch (error) {
+    console.error('Error obteniendo clientes para exportación:', error);
+    throw error;
+  }
+}
+
 // Eliminar múltiples clientes
 export async function eliminarClientesMasivo(ids: string[]) {
   const supabase = await createServerActionClient();

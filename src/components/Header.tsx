@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bars3Icon } from "@heroicons/react/24/outline";
 import ThemeToggle from "./ThemeToggle";
-import NotificationsDropdown from "./NotificationsDropdown";
+//import NotificationsDropdown from "./NotificationsDropdown";
+import NotificationsDropdown from "./NotificationsDropdownPolling";
 import UserAvatarMenu from "./UserAvatarMenu";
 import GlobalSearch from "./GlobalSearch";
 import type { NotificacionNoLeida } from "@/types/crm";
@@ -123,7 +124,6 @@ export default function Header({
               userEmail={userEmail}
               userRole={userRole}
               userAvatarUrl={effectiveAvatarUrl}
-              notificationsCount={notificationsCount}
               lastSignInAt={lastSignInAt}
             />
           </div>

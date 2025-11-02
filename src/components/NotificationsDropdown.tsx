@@ -4,7 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifications";
-import type { NotificacionNoLeida } from "@/types/crm";
+import type { Notificacion, NotificacionNoLeida } from "@/types/crm";
+import { createClient, createRealtimeClient } from "@/lib/supabase.client";
+import toast from "react-hot-toast";
+
+type NotificacionInsertPayload = {
+  new: NotificacionNoLeida & { usuario_id?: string | null };
+};
+
+type NotificacionUpdatePayload = {
+  new: Notificacion & { usuario_id?: string | null };
+};
 
 interface NotificationsDropdownProps {
   notificaciones: NotificacionNoLeida[];
@@ -13,7 +23,7 @@ interface NotificationsDropdownProps {
 
 const tipoIcons = {
   cliente: "👤",
-  proyecto: "🏢", 
+  proyecto: "🏢",
   lote: "🏠",
   sistema: "⚙️",
 };
@@ -21,7 +31,7 @@ const tipoIcons = {
 const tipoColors = {
   cliente: "text-blue-600",
   proyecto: "text-green-600",
-  lote: "text-orange-600", 
+  lote: "text-orange-600",
   sistema: "text-gray-600",
 };
 
@@ -31,11 +41,213 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState(notificaciones);
   const [unreadCount, setUnreadCount] = useState(count);
+  const [userId, setUserId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Obtener userId y configurar audio
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        console.log('👤 Usuario conectado:', user.id, '| Email:', user.email);
+        setUserId(user.id);
+      }
+    });
+
+    // Precargar sonido de notificación (desactivado temporalmente)
+    // TODO: Descargar un sonido desde https://notificationsounds.com/
+    // y guardarlo como /public/notification.mp3
+    // if (typeof window !== 'undefined') {
+    //   audioRef.current = new Audio('/notification.mp3');
+    //   audioRef.current.volume = 0.5;
+    // }
+  }, []);
 
   useEffect(() => {
     setItems(notificaciones);
     setUnreadCount(count);
   }, [notificaciones, count]);
+
+  // Realtime: Suscribirse a nuevas notificaciones
+  useEffect(() => {
+    if (!userId) return;
+
+    let channel: any = null;
+    let supabase: any = null;
+
+    // OBTENER SESIÓN Y CONFIGURAR REALTIME
+    const setupRealtime = async () => {
+      // OBTENER SESIÓN DEL CLIENTE SSR
+      const ssupabase = createClient();
+      const { data: { session } } = await ssupabase.auth.getSession();
+
+      if (!session) {
+        console.error('❌ No hay sesión activa');
+        return;
+      }
+
+      console.log('🔑 Sesión obtenida, token JWT presente:', !!session.access_token);
+
+      // CREAR CLIENTE REALTIME Y SINCRONIZAR SESIÓN
+      supabase = createRealtimeClient();
+
+      // IMPORTANTE: Establecer la sesión manualmente
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+
+      console.log('🔌 Conectando a notificaciones en tiempo real...');
+      console.log('🎯 Filtrando notificaciones para usuario_id:', userId);
+      console.log('⚠️ PRUEBA FINAL: Patrón recomendado por Supabase');
+
+      channel = supabase.channel(`notificaciones:${userId}`);
+      console.log('📝 Canal creado:', channel);
+
+      // IMPORTANTE: Registrar todos los listeners ANTES de suscribirse
+      console.log('📝 Registrando listener de broadcast...');
+      console.log('📝 Bindings ANTES de broadcast:', Object.keys(channel.bindings));
+
+      channel.on(
+        'broadcast',
+        { event: 'test' },
+        (payload: { payload: unknown }) => {
+          console.log('📻 [BROADCAST RECIBIDO]', payload);
+          toast.success('Broadcast funciona! ' + JSON.stringify(payload.payload));
+        }
+      );
+
+      console.log('📝 Bindings DESPUÉS de broadcast:', Object.keys(channel.bindings));
+      console.log('📝 Listener de broadcast registrado');
+
+      console.log('📝 Registrando listener de postgres_changes...');
+      console.log('📝 Bindings ANTES de postgres_changes:', Object.keys(channel.bindings));
+
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'crm',
+          table: 'notificacion',
+          filter: `usuario_id=eq.${userId}`
+        },
+        (payload: NotificacionInsertPayload) => {
+          console.log('🔔 [INSERT RECIBIDO]', payload.new);
+          console.log('📦 [PAYLOAD COMPLETO]', payload);
+
+          const newNotif = payload.new;
+
+          // Filtrar manualmente en el cliente
+          if (newNotif.usuario_id && newNotif.usuario_id !== userId) {
+            console.log('⏭️ Notificación ignorada - no es para este usuario');
+            return;
+          }
+
+          console.log('✅ Notificación es para este usuario - procesando...');
+
+          // Agregar a la lista (máximo 20)
+          setItems((prev) => [newNotif, ...prev].slice(0, 20));
+          setUnreadCount((prev) => prev + 1);
+
+          // Toast de notificación
+          toast.success(newNotif.titulo, {
+            icon: tipoIcons[newNotif.tipo as keyof typeof tipoIcons] || '🔔',
+            duration: 4000,
+          });
+
+          // Notificación del navegador
+          if (typeof window !== 'undefined' && 'Notification' in window) {
+            if (Notification.permission === 'granted') {
+              new Notification(newNotif.titulo, {
+                body: newNotif.mensaje,
+                icon: '/logo-amersur.png',
+                badge: '/logo-amersur.png',
+                tag: newNotif.id,
+              });
+            } else if (Notification.permission === 'default') {
+              Notification.requestPermission().then((permission) => {
+                if (permission === 'granted') {
+                  new Notification(newNotif.titulo, {
+                    body: newNotif.mensaje,
+                    icon: '/logo-amersur.png',
+                    badge: '/logo-amersur.png',
+                    tag: newNotif.id,
+                  });
+                }
+              });
+            }
+          }
+
+          // Reproducir sonido
+          if (audioRef.current) {
+            audioRef.current.play().catch((e) => {
+              console.log('No se pudo reproducir el sonido:', e);
+            });
+          }
+        }
+      );
+
+      console.log('📝 Bindings DESPUÉS de postgres_changes:', Object.keys(channel.bindings));
+      console.log('📝 Listener de INSERT registrado');
+
+      console.log('📝 Registrando listener de UPDATE...');
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'crm',
+          table: 'notificacion',
+          filter: `usuario_id=eq.${userId}`
+        },
+        (payload: NotificacionUpdatePayload) => {
+          const updatedNotif = payload.new;
+
+          // Si se marcó como leída, remover de la lista
+          if (updatedNotif.leida) {
+            setItems((prev) => prev.filter((n) => n.id !== updatedNotif.id));
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+          }
+        }
+      );
+
+      console.log('📝 Bindings DESPUÉS de UPDATE:', Object.keys(channel.bindings));
+      console.log('📝 Listener de UPDATE registrado');
+
+      console.log('📝 Suscribiendo al canal...');
+      console.log('📝 Bindings FINAL antes de subscribe:', Object.keys(channel.bindings));
+      channel.subscribe((status: string, err?: unknown) => {
+        console.log('📡 Estado de suscripción:', status);
+        if (err) {
+          console.error('❌ Error en suscripción:', err);
+        }
+
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Conectado a notificaciones en tiempo real');
+          console.log('📋 Estado del canal:', channel.state);
+
+          // Inspeccionar qué listeners están registrados
+          console.log('👂 Bindings del canal:', channel.bindings);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Error al conectar a notificaciones en tiempo real');
+        } else if (status === 'TIMED_OUT') {
+          console.warn('⏱️ Timeout al conectar a notificaciones');
+        } else if (status === 'CLOSED') {
+          console.log('🔌 Desconectado de notificaciones en tiempo real');
+        }
+      });
+    };
+
+    // Ejecutar setup
+    setupRealtime();
+
+    // Cleanup: desconectar cuando el componente se desmonte
+    return () => {
+      if (channel && supabase) {
+        console.log('🔌 Desconectando de notificaciones...');
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!isOpen) return;

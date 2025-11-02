@@ -55,6 +55,20 @@ export interface LoteExportFilters {
 }
 
 /**
+ * Filtros para exportación de clientes
+ */
+export interface ClienteExportFilters {
+  q?: string;
+  telefono?: string;
+  dni?: string;
+  estado?: string;
+  tipo?: string;
+  vendedor?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}
+
+/**
  * Tipo de formato de exportación
  */
 export type ExportFormat = 'excel' | 'csv' | 'pdf';
@@ -181,6 +195,39 @@ export async function exportFilteredLotes(
   }
 }
 
+/**
+ * Exportar clientes filtrados a Excel, CSV o PDF
+ */
+export async function exportFilteredClientes(
+  clientes: any[],
+  filters: ClienteExportFilters,
+  format: ExportFormat = 'excel',
+  options: ExportOptions = {}
+): Promise<void> {
+  const {
+    fileName = 'clientes-filtrados',
+    includeFiltersSheet = true,
+    includeTimestamp = true,
+    columns = getDefaultClienteColumns(),
+  } = options;
+
+  const finalFileName = buildFileName(fileName, format, includeTimestamp);
+  const transformedData = clientes.map((cliente) => transformRowData(cliente, columns));
+  const filterMetadata = buildFilterMetadata(filters);
+
+  switch (format) {
+    case 'excel':
+      exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
+      break;
+    case 'csv':
+      exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
+      break;
+    case 'pdf':
+      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
+      break;
+  }
+}
+
 // ============================================================================
 // FUNCIONES INTERNAS
 // ============================================================================
@@ -241,6 +288,51 @@ function getDefaultLoteColumns(): ExportColumn[] {
   ];
 }
 
+function getDefaultClienteColumns(): ExportColumn[] {
+  return [
+    { key: 'nombre', label: 'Nombre', width: 30 },
+    { key: 'codigo_cliente', label: 'Código', width: 18 },
+    { key: 'tipo_cliente', label: 'Tipo', width: 16 },
+    { key: 'estado_cliente', label: 'Estado', width: 16 },
+    { key: 'email', label: 'Email', width: 28, format: (value) => value || '-' },
+    { key: 'telefono', label: 'Teléfono', width: 18, format: (value) => value || '-' },
+    { key: 'telefono_whatsapp', label: 'WhatsApp', width: 18, format: (value) => value || '-' },
+    { key: 'documento_identidad', label: 'Documento', width: 18, format: (value) => value || '-' },
+    { key: 'vendedor_asignado', label: 'Vendedor', width: 20, format: (value) => value || '-' },
+    { key: 'origen_lead', label: 'Origen', width: 18, format: (value) => value || '-' },
+    {
+      key: 'fecha_alta',
+      label: 'Fecha Alta',
+      width: 18,
+      format: (value) => (value ? new Date(value).toLocaleDateString() : '-'),
+    },
+    {
+      key: 'ultimo_contacto',
+      label: 'Último Contacto',
+      width: 18,
+      format: (value) => (value ? new Date(value).toLocaleDateString() : '-'),
+    },
+    {
+      key: 'proxima_accion',
+      label: 'Próxima Acción',
+      width: 24,
+      format: (value) => value || '-',
+    },
+    {
+      key: 'interes_principal',
+      label: 'Interés Principal',
+      width: 24,
+      format: (value) => value || '-',
+    },
+    {
+      key: 'capacidad_compra_estimada',
+      label: 'Capacidad Compra',
+      width: 20,
+      format: (value) => (typeof value === 'number' ? `S/ ${value.toLocaleString()}` : '-'),
+    },
+  ];
+}
+
 /**
  * Transformar fila de datos según configuración de columnas
  */
@@ -286,6 +378,11 @@ function buildFilterMetadata(filters: any): Array<{ filtro: string; valor: strin
     estado: 'Estado',
     tipo: 'Tipo',
     sort: 'Ordenamiento',
+    sortBy: 'Ordenar por',
+    sortOrder: 'Dirección',
+    telefono: 'Teléfono',
+    dni: 'Documento',
+    vendedor: 'Vendedor',
     precio_min: 'Precio Mínimo',
     precio_max: 'Precio Máximo',
     area_min: 'Área Mínima',
@@ -463,6 +560,9 @@ export function formatFilterSummary(filters: Record<string, any>): string {
   if (filters.q) activeFilters.push(`Búsqueda: "${filters.q}"`);
   if (filters.estado) activeFilters.push(`Estado: ${filters.estado}`);
   if (filters.tipo) activeFilters.push(`Tipo: ${filters.tipo}`);
+  if (filters.telefono) activeFilters.push(`Teléfono: ${filters.telefono}`);
+  if (filters.dni) activeFilters.push(`Documento: ${filters.dni}`);
+  if (filters.vendedor) activeFilters.push(`Vendedor: ${filters.vendedor}`);
   if (filters.precio_min || filters.precio_max) {
     const range = [
       filters.precio_min ? `$${filters.precio_min}` : 'Min',

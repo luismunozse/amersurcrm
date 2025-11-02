@@ -10,18 +10,21 @@ import type { MapPoint } from '@/types/proyectos';
 const mockGoogle = {
   maps: {
     LatLng: class {
-      constructor(public lat: number, public lng: number) {}
+      constructor(private _lat: number, private _lng: number) {}
       lat() {
-        return this.lat;
+        return this._lat;
       }
       lng() {
-        return this.lng;
+        return this._lng;
       }
     },
     LatLngBounds: class {
       private bounds: Array<{ lat: number; lng: number }> = [];
       extend(point: any) {
-        this.bounds.push(point);
+        this.bounds.push({
+          lat: typeof point.lat === "function" ? point.lat() : point.lat,
+          lng: typeof point.lng === "function" ? point.lng() : point.lng,
+        });
       }
       getCenter() {
         if (this.bounds.length === 0) return new mockGoogle.maps.LatLng(0, 0);
@@ -212,8 +215,8 @@ describe('Google Maps Utilities', () => {
       expect(convertedPaths.length).toBe(originalPaths.length + 1);
 
       for (let i = 0; i < originalPaths.length; i++) {
-        expect(convertedPaths[i].lat).toBeCloseTo(originalPaths[i].lat, 6);
-        expect(convertedPaths[i].lng).toBeCloseTo(originalPaths[i].lng, 6);
+        expect(convertedPaths[i].lat).toBeCloseTo(originalPaths[i].lat(), 6);
+        expect(convertedPaths[i].lng).toBeCloseTo(originalPaths[i].lng(), 6);
       }
     });
   });

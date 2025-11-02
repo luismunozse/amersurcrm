@@ -172,3 +172,19 @@
 /* === Sidebar responsive width === */
 :root { --sidebar-w: 18rem; }        /* w-72 por defecto */
 .sidebar-collapsed { --sidebar-w: 5rem; } /* w-20 al colapsar */
+
+/* === Animaciones === */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}

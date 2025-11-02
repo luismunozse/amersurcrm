@@ -5,9 +5,11 @@ import { Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-r
 import {
   exportFilteredProyectos,
   exportFilteredLotes,
+  exportFilteredClientes,
   type ExportFormat,
   type ProyectoExportFilters,
   type LoteExportFilters,
+  type ClienteExportFilters,
   formatFilterSummary,
   addCountToFilters,
 } from '@/lib/export/filteredExport';
@@ -17,11 +19,11 @@ import {
  */
 export interface ExportButtonProps {
   /** Tipo de datos a exportar */
-  type: 'proyectos' | 'lotes';
+  type: 'proyectos' | 'lotes' | 'clientes';
   /** Datos a exportar */
   data: any[];
   /** Filtros actuales aplicados */
-  filters: ProyectoExportFilters | LoteExportFilters;
+  filters: ProyectoExportFilters | LoteExportFilters | ClienteExportFilters;
   /** Nombre base del archivo */
   fileName?: string;
   /** Texto del botón */
@@ -93,13 +95,24 @@ export default function ExportButton({
             includeTimestamp: true,
           }
         );
-      } else {
+      } else if (type === 'lotes') {
         await exportFilteredLotes(
           data,
           filtersWithCount as LoteExportFilters,
           format,
           {
             fileName: fileName || 'lotes',
+            includeFiltersSheet,
+            includeTimestamp: true,
+          }
+        );
+      } else {
+        await exportFilteredClientes(
+          data,
+          filtersWithCount as ClienteExportFilters,
+          format,
+          {
+            fileName: fileName || 'clientes',
             includeFiltersSheet,
             includeTimestamp: true,
           }

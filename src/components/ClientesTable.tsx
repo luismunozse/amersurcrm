@@ -8,7 +8,8 @@ import {
   eliminarClientesMasivo,
   asignarVendedorMasivo,
   cambiarEstadoMasivo,
-  obtenerVendedores
+  obtenerVendedores,
+  obtenerTodosLosClientes
 } from "@/app/dashboard/clientes/_actions";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -18,6 +19,9 @@ import { Pagination } from "@/components/Pagination";
 import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
+import ExportButton from "@/components/export/ExportButton";
+import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
+import { Download, Loader2 } from "lucide-react";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import {
   getEstadoClienteLabel,
@@ -154,12 +158,25 @@ export default function ClientesTable({
   const sortBy = initialSortBy as keyof Cliente;
   const sortOrder = initialSortOrder;
 
+  const baseFilters: ClienteExportFilters = {
+    q: searchQuery || undefined,
+    telefono: searchTelefono || undefined,
+    dni: searchDni || undefined,
+    estado: estado || undefined,
+    tipo: tipo || undefined,
+    vendedor: vendedor || undefined,
+    sortBy: initialSortBy,
+    sortOrder: initialSortOrder,
+  };
+
   // Estado para selección múltiple
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'delete' | 'assignVendedor' | 'changeEstado' | null>(null);
   const [bulkVendedor, setBulkVendedor] = useState('');
   const [bulkEstado, setBulkEstado] = useState<EstadoCliente>('por_contactar');
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [exportingSelected, setExportingSelected] = useState(false);
+  const [exportingAll, setExportingAll] = useState(false);
 
   // Ya no necesitamos filtrar ni ordenar localmente, el servidor lo hace
   // Los clientes vienen ya filtrados, ordenados y paginados del servidor
@@ -561,6 +578,73 @@ export default function ClientesTable({
             <p className="text-xs text-crm-text-muted">
               Mostrando {clientes.length} de {total} cliente{total === 1 ? '' : 's'}
             </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={async () => {
+                if (selectedIds.size === 0) {
+                  toast.error('Selecciona al menos un cliente');
+                  return;
+                }
+                try {
+                  setExportingSelected(true);
+                  const selectedData = clientes.filter((c) => selectedIds.has(c.id));
+                  await exportFilteredClientes(selectedData, addCountToFilters(baseFilters, selectedData.length), 'excel', {
+                    fileName: 'clientes-seleccionados',
+                    includeFiltersSheet: true,
+                    includeTimestamp: true,
+                  });
+                  toast.success('Exportación de seleccionados completada');
+                } catch (error) {
+                  console.error(error);
+                  toast.error('Error exportando seleccionados');
+                } finally {
+                  setExportingSelected(false);
+                }
+              }}
+              disabled={exportingSelected || selectedIds.size === 0}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-crm-border text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50"
+            >
+              {exportingSelected ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {exportingSelected ? 'Exportando...' : 'Exportar seleccionados'}
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  setExportingAll(true);
+                  const full = await obtenerTodosLosClientes({
+                    searchTerm: searchQuery,
+                    searchTelefono,
+                    searchDni,
+                    estado,
+                    tipo,
+                    vendedor,
+                    sortBy: initialSortBy,
+                    sortOrder: initialSortOrder,
+                  });
+                  await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'excel', {
+                    fileName: 'clientes',
+                    includeFiltersSheet: true,
+                    includeTimestamp: true,
+                  });
+                  toast.success(`Exportación completada (${full.total} registros)`);
+                } catch (error) {
+                  console.error(error);
+                  toast.error('Error exportando clientes');
+                } finally {
+                  setExportingAll(false);
+                }
+              }}
+              disabled={exportingAll}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
+            >
+              {exportingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {exportingAll ? 'Exportando todo...' : 'Exportar todos'}
+            </button>
           </div>
         </div>
 

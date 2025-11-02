@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 import { generarUsername, generarUsernameConNumero, validarUsername } from "@/lib/utils/username-generator";
+import { crearNotificacion } from "@/app/_actionsNotifications";
 
 // GET - Obtener lista de usuarios
 export async function GET() {
@@ -331,6 +332,45 @@ export async function POST(request: NextRequest) {
       // Intentar eliminar el usuario de auth si falla la creación del perfil
       await srv.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ error: "Error creando perfil de usuario" }, { status: 500 });
+    }
+
+    // Notificar a todos los administradores sobre el nuevo usuario
+    try {
+      // Obtener todos los usuarios con rol de administrador
+      const { data: admins, error: adminsError } = await supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('id, rol:rol!usuario_perfil_rol_fk(nombre)')
+        .eq('activo', true);
+
+      if (!adminsError && admins) {
+        const adminIds = admins
+          .map((u: { id: string; rol: { nombre: string | null } | { nombre: string | null }[] }) => {
+            const rol = Array.isArray(u.rol) ? u.rol[0]?.nombre : u.rol?.nombre;
+            return rol === 'ROL_ADMIN' ? u.id : null;
+          })
+          .filter((id): id is string => Boolean(id));
+
+        // Notificar a cada administrador
+        for (const adminId of adminIds) {
+          await crearNotificacion(
+            adminId,
+            "sistema",
+            "👥 Nuevo usuario registrado",
+            `Se ha registrado un nuevo usuario: ${nombre_completo || username} (@${username}) con rol ${rol.nombre}`,
+            {
+              usuario_id: authData.user.id,
+              username,
+              rol: rol.nombre,
+              email: emailFinal,
+              url: `/dashboard/admin/usuarios`
+            }
+          );
+        }
+      }
+    } catch (notifError) {
+      console.error("Error enviando notificaciones a admins:", notifError);
+      // No fallar la creación del usuario si falla la notificación
     }
 
     return NextResponse.json({

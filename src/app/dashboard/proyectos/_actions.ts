@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
+import { crearNotificacion } from "@/app/_actionsNotifications";
 
 function buildStoragePathFromUrl(url: string | null, proyectoId: string): string | null {
   if (!url) return null;
@@ -153,6 +154,27 @@ export async function crearProyecto(formData: FormData) {
 
     revalidatePath("/dashboard/proyectos");
     revalidatePath("/dashboard");
+
+    // Crear notificación sobre el nuevo proyecto
+    try {
+      await crearNotificacion(
+        user.id,
+        "proyecto",
+        "🏢 Nuevo proyecto creado",
+        `Has creado el proyecto "${proyectoFinal.nombre}" en ${proyectoFinal.ubicacion || 'ubicación no especificada'}`,
+        {
+          proyecto_id: proyectoFinal.id,
+          nombre: proyectoFinal.nombre,
+          tipo: proyectoFinal.tipo,
+          estado: proyectoFinal.estado,
+          ubicacion: proyectoFinal.ubicacion,
+          url: `/dashboard/proyectos/${proyectoFinal.id}`
+        }
+      );
+    } catch (notifError) {
+      console.error("Error creando notificación:", notifError);
+      // No fallar la operación principal si la notificación falla
+    }
 
     return { success: true, proyecto: proyectoFinal };
   } catch (error) {

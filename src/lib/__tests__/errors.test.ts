@@ -142,8 +142,10 @@ describe('handleError', () => {
       handleError(error, context);
     } catch (thrownError) {
       expect(thrownError).toBeInstanceOf(AppError);
-      expect(thrownError.message).toBe('Test error');
-      expect(thrownError.context).toEqual(context);
+      if (thrownError instanceof AppError) {
+        expect(thrownError.message).toBe('Test error');
+        expect(thrownError.context).toEqual(context);
+      }
     }
   });
 });

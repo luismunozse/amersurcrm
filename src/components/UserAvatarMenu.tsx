@@ -17,7 +17,6 @@ interface Props {
   userEmail?: string;
   userRole?: string;
   userAvatarUrl?: string | null;
-  notificationsCount?: number;
   lastSignInAt?: string;
 }
 
@@ -46,7 +45,6 @@ export default function UserAvatarMenu({
   userEmail,
   userRole,
   userAvatarUrl,
-  notificationsCount = 0,
   lastSignInAt,
 }: Props) {
   const router = useRouter();
@@ -187,14 +185,6 @@ export default function UserAvatarMenu({
               </span>
             )}
           </div>
-          {/* Badge de notificaciones */}
-          {notificationsCount > 0 && (
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-crm-danger rounded-full flex items-center justify-center shadow-lg animate-bounce">
-              <span className="text-[10px] font-bold text-white">
-                {notificationsCount > 9 ? '9+' : notificationsCount}
-              </span>
-            </div>
-          )}
           {/* Indicador online con animación pulse */}
           <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-crm-success border-2 border-crm-card rounded-full animate-pulse" />
         </div>

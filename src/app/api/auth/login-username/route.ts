@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
+import { extractRequestMetadata } from "@/lib/api/requestContext";
+import { notifyAdminsOfSecurityEvent } from "@/lib/security/adminNotifications";
+
+type AuditStage = "lookup" | "authentication" | "recovery" | "security";
+
+const RATE_LIMIT_WINDOW_MINUTES = 5;
+const RATE_LIMIT_MAX_IDENTIFIER_ATTEMPTS = 5;
+const RATE_LIMIT_MAX_IP_ATTEMPTS = 15;
 
 interface RolRelacion {
   nombre: string | null;
@@ -19,30 +27,131 @@ interface UsuarioConRol {
  * Convierte el username a email para que Supabase Auth pueda autenticar
  */
 export async function POST(request: NextRequest) {
+  const supabase = createServiceRoleClient();
+  let identifier = "";
+
   try {
     const body = await request.json();
     const { username, password } = body;
 
-    if (!username || !password) {
+    const { ipAddress, userAgent } = extractRequestMetadata(request);
+    identifier = typeof username === "string" ? username.trim() : "";
+
+    const logAttempt = async (
+      success: boolean,
+      errorMessage?: string | null,
+      stage: AuditStage = "lookup",
+      metadata?: Record<string, unknown>
+    ) => {
+      try {
+        await supabase.from("login_audit").insert({
+          username: identifier || null,
+          login_type: "admin",
+          stage,
+          success,
+          error_message: errorMessage ?? null,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          metadata: metadata ?? null,
+        });
+      } catch (logError) {
+        console.error("No se pudo registrar el intento de login (admin):", logError);
+      }
+    };
+
+    if (!identifier || !password) {
+      await logAttempt(false, "missing_credentials");
       return NextResponse.json(
         { error: "Username y contraseña son requeridos" },
         { status: 400 }
       );
     }
 
-    const supabase = createServiceRoleClient();
+    const windowStartIso = new Date(
+      Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
+    ).toISOString();
 
+    const [identifierFailureCount, ipFailureCount] = await Promise.all([
+      identifier
+        ? supabase
+            .from("login_audit")
+            .select("id", { count: "exact", head: true })
+            .eq("username", identifier)
+            .eq("success", false)
+            .in("stage", ["lookup", "authentication", "security"])
+            .gte("created_at", windowStartIso)
+            .then((result) => result.count ?? 0)
+        : Promise.resolve(0),
+      ipAddress
+        ? supabase
+            .from("login_audit")
+            .select("id", { count: "exact", head: true })
+            .eq("ip_address", ipAddress)
+            .eq("success", false)
+            .in("stage", ["lookup", "authentication", "security"])
+            .gte("created_at", windowStartIso)
+            .then((result) => result.count ?? 0)
+        : Promise.resolve(0),
+    ]);
+
+    const rateLimitExceeded =
+      identifierFailureCount >= RATE_LIMIT_MAX_IDENTIFIER_ATTEMPTS ||
+      ipFailureCount >= RATE_LIMIT_MAX_IP_ATTEMPTS;
+
+    if (rateLimitExceeded) {
+      const metadata = {
+        reason: "rate_limit_exceeded",
+        identifier,
+        ipAddress,
+        windowMinutes: RATE_LIMIT_WINDOW_MINUTES,
+        counts: {
+          identifier: identifierFailureCount,
+          ip: ipFailureCount,
+        },
+      };
+
+      await logAttempt(false, "rate_limit_exceeded", "security", metadata);
+
+      const reachedIdentifierThreshold =
+        identifierFailureCount === RATE_LIMIT_MAX_IDENTIFIER_ATTEMPTS;
+      const reachedIpThreshold =
+        ipAddress !== null && ipFailureCount === RATE_LIMIT_MAX_IP_ATTEMPTS;
+
+      if (reachedIdentifierThreshold || reachedIpThreshold) {
+        const mensaje = identifier
+          ? `Se bloquearon intentos de acceso para el usuario ${identifier} (IP ${ipAddress ?? "desconocida"}).`
+          : `Se detectaron múltiples intentos fallidos desde la IP ${ipAddress ?? "desconocida"}.`;
+
+        await notifyAdminsOfSecurityEvent(
+          supabase,
+          "Alerta de seguridad: intentos de login",
+          mensaje,
+          metadata
+        );
+      }
+
+      return NextResponse.json(
+        { error: "Demasiados intentos fallidos. Intenta nuevamente más tarde." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(RATE_LIMIT_WINDOW_MINUTES * 60),
+          },
+        }
+      );
+    }
 
     // Buscar el email asociado al username (o email directamente para compatibilidad)
     const { data: usuario, error: usuarioError } = await supabase
       .from('usuario_perfil')
       .select('email, activo, username, rol:rol!usuario_perfil_rol_fk(nombre)')
-      .or(`username.eq.${username.trim()},email.eq.${username.trim()}`)
+      .or(`username.eq.${identifier},email.eq.${identifier}`)
       .single<UsuarioConRol>();
 
 
     if (usuarioError || !usuario) {
       console.error('Error buscando usuario:', usuarioError);
+      await logAttempt(false, usuarioError?.message ?? "usuario_no_encontrado");
       return NextResponse.json(
         { error: "Usuario no encontrado", debug: usuarioError?.message },
         { status: 404 }
@@ -51,9 +160,18 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el usuario esté activo
     if (!usuario.activo) {
+      await logAttempt(false, "usuario_inactivo");
       return NextResponse.json(
         { error: "Usuario inactivo. Contacta al administrador." },
         { status: 403 }
+      );
+    }
+
+    if (!usuario.email) {
+      await logAttempt(false, "usuario_sin_email");
+      return NextResponse.json(
+        { error: "El usuario no tiene un email configurado. Contacta al administrador." },
+        { status: 409 }
       );
     }
 
@@ -69,6 +187,20 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error en login-username:", error);
+    try {
+      const { ipAddress, userAgent } = extractRequestMetadata(request);
+      await supabase.from("login_audit").insert({
+        username: identifier || null,
+        login_type: "admin",
+        stage: "lookup",
+        success: false,
+        error_message: error instanceof Error ? error.message : "error_desconocido",
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      });
+    } catch (logError) {
+      console.error("No se pudo registrar el error de login (admin):", logError);
+    }
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }

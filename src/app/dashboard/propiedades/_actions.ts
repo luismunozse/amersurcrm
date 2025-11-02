@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { crearNotificacion } from "@/app/_actionsNotifications";
 
 export async function crearPropiedad(formData: FormData) {
   const supabase = await createServerActionClient();
@@ -111,9 +112,21 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
   }
 
   try {
+    // Obtener información de la propiedad antes de actualizar
+    const { data: propiedad, error: propiedadError } = await supabase
+      .from("propiedad")
+      .select("id, codigo, identificacion_interna, tipo, precio, moneda")
+      .eq("id", propiedadId)
+      .single();
+
+    if (propiedadError || !propiedad) {
+      throw new Error("Propiedad no encontrada");
+    }
+
+    // Actualizar el estado
     const { error } = await supabase
       .from("propiedad")
-      .update({ 
+      .update({
         estado_comercial: nuevoEstado,
         updated_at: new Date().toISOString()
       })
@@ -121,6 +134,42 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
 
     if (error) {
       throw new Error(`Error actualizando estado: ${error.message}`);
+    }
+
+    // Crear notificación para estados importantes
+    if (nuevoEstado === 'reservado' || nuevoEstado === 'vendido') {
+      try {
+        const precioFormateado = propiedad.precio
+          ? `${propiedad.moneda} ${propiedad.precio.toLocaleString()}`
+          : 'Sin precio';
+
+        const titulo = nuevoEstado === 'reservado'
+          ? `🏠 Lote reservado`
+          : `🎉 Lote vendido`;
+
+        const mensaje = nuevoEstado === 'reservado'
+          ? `Has reservado el lote "${propiedad.identificacion_interna}" (${propiedad.codigo}) por ${precioFormateado}`
+          : `Has vendido el lote "${propiedad.identificacion_interna}" (${propiedad.codigo}) por ${precioFormateado}`;
+
+        await crearNotificacion(
+          user.id,
+          "lote",
+          titulo,
+          mensaje,
+          {
+            propiedad_id: propiedadId,
+            codigo: propiedad.codigo,
+            tipo: propiedad.tipo,
+            estado: nuevoEstado,
+            precio: propiedad.precio,
+            moneda: propiedad.moneda,
+            url: `/dashboard/propiedades/${propiedadId}`
+          }
+        );
+      } catch (notifError) {
+        console.error("Error creando notificación:", notifError);
+        // No fallar la operación principal si la notificación falla
+      }
     }
 
     revalidatePath("/dashboard/propiedades");
