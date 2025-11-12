@@ -196,21 +196,19 @@ export default function UbicacionSelector({
   };
 
   useEffect(() => {
-    if (onUbicacionChange && departamentoSeleccionado && provinciaSeleccionada && distritoSeleccionado) {
-      const departamento = departamentos.find(d => d.code === departamentoSeleccionado);
-      const provincia = provincias.find(p => p.code === provinciaSeleccionada);
-      const distrito = distritos.find(d => d.code === distritoSeleccionado);
-      if (departamento && provincia && distrito) {
-        onUbicacionChange({
-          departamento: departamento.name,
-          provincia: provincia.name,
-          distrito: distrito.name,
-          codigoDepartamento: departamentoSeleccionado,
-          codigoProvincia: provinciaSeleccionada,
-          codigoDistrito: distritoSeleccionado,
-        });
-      }
-    }
+    if (!onUbicacionChange) return;
+    const departamento = departamentos.find(d => d.code === departamentoSeleccionado);
+    const provincia = provincias.find(p => p.code === provinciaSeleccionada);
+    const distrito = distritos.find(d => d.code === distritoSeleccionado);
+
+    onUbicacionChange({
+      departamento: departamento?.name ?? "",
+      provincia: provincia?.name ?? "",
+      distrito: distrito?.name ?? "",
+      codigoDepartamento: departamentoSeleccionado,
+      codigoProvincia: provinciaSeleccionada,
+      codigoDistrito: distritoSeleccionado,
+    });
   }, [departamentoSeleccionado, provinciaSeleccionada, distritoSeleccionado, onUbicacionChange, departamentos, provincias, distritos]);
 
   const provinciasFiltradas = departamentoSeleccionado

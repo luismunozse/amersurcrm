@@ -5,6 +5,8 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewProyectoForm from "./_NewProyectoForm";
 import QuickActions from "./QuickActions";
 import ProyectosSearchBar from "./_ProyectosSearchBar";
+import ExportButton from "@/components/export/ExportButton";
+import type { ProyectoMediaItem } from "@/types/proyectos";
 
 import {
   BuildingOffice2Icon,
@@ -12,11 +14,22 @@ import {
   ChartBarIcon,
   PresentationChartLineIcon,
   ArrowRightIcon,
+  PhotoIcon,
 } from "@heroicons/react/24/outline";
 
 type LoteRow = {
   proyecto_id: string;
   estado: "disponible" | "reservado" | "vendido";
+};
+
+const parseGaleria = (value: unknown): ProyectoMediaItem[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is ProyectoMediaItem =>
+      !!item &&
+      typeof item === "object" &&
+      typeof (item as ProyectoMediaItem).url === "string",
+  );
 };
 
 interface PageProps {
@@ -78,6 +91,12 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
     });
 
     const hasFilters = q || estadoFilter || tipoFilter;
+    const exportFilters = {
+      q,
+      estado: estadoFilter,
+      tipo: tipoFilter,
+      sort,
+    };
 
     // --- Métricas de lotes por proyecto (1 sola consulta) ---
     const supabase = await createServerOnlyClient();
@@ -119,10 +138,20 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
               Revisa tus proyectos y su avance en cualquier dispositivo.
             </p>
           </div>
-          <div className="crm-card px-4 py-2 self-start md:self-auto">
-            <div className="text-sm text-crm-text-muted">
-              <span className="font-semibold text-crm-text-primary">{totalProyectos}</span>{" "}
-              {totalProyectos === 1 ? "proyecto" : "proyectos"} total
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start md:self-auto">
+            <ExportButton
+              type="proyectos"
+              data={proyectos}
+              filters={exportFilters}
+              fileName="proyectos"
+              label="Exportar"
+              size="sm"
+            />
+            <div className="crm-card px-4 py-2">
+              <div className="text-sm text-crm-text-muted">
+                <span className="font-semibold text-crm-text-primary">{totalProyectos}</span>{" "}
+                {totalProyectos === 1 ? "proyecto" : "proyectos"} total
+              </div>
             </div>
           </div>
         </div>
@@ -237,6 +266,8 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
               stats.total > 0 ? Math.round((stats.vendidos / stats.total) * 100) : 0;
             const dispPct =
               stats.total > 0 ? Math.round((stats.disponibles / stats.total) * 100) : 0;
+            const galeriaItems = parseGaleria((p as { galeria_imagenes?: unknown }).galeria_imagenes);
+            const galeriaCount = galeriaItems.length;
 
             return (
               <div
@@ -254,6 +285,23 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
                   ) : (
                     <div className="h-full w-full grid place-items-center">
                       <BuildingOffice2Icon className="h-20 w-20 text-crm-primary/40" />
+                    </div>
+                  )}
+
+                  {p.logo_url && (
+                    <div className="absolute bottom-4 left-4 rounded-2xl bg-white/85 dark:bg-black/60 px-4 py-2 shadow-lg border border-white/60 backdrop-blur">
+                      <img
+                        src={p.logo_url}
+                        alt={`Logo ${p.nombre}`}
+                        className="h-10 w-auto object-contain"
+                      />
+                    </div>
+                  )}
+
+                  {galeriaCount > 0 && (
+                    <div className="absolute bottom-4 right-4 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs font-semibold px-3 py-1 backdrop-blur">
+                      <PhotoIcon className="w-4 h-4" />
+                      <span>{galeriaCount} {galeriaCount === 1 ? "foto" : "fotos"}</span>
                     </div>
                   )}
 
@@ -339,7 +387,9 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
                         estado: p.estado,
                         ubicacion: p.ubicacion,
                         descripcion: p.descripcion,
-                        imagen_url: p.imagen_url
+                        imagen_url: p.imagen_url,
+                        logo_url: p.logo_url,
+                        galeria_imagenes: galeriaItems,
                       }}
                     />
                     <Link

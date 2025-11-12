@@ -122,10 +122,10 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
           <div className="flex items-center justify-between p-6 border-b border-crm-border">
             <div>
               <h3 className="text-xl font-semibold text-crm-text-primary">
-                Agregar Plantilla de WhatsApp
+                Crear Plantilla de Mensaje
               </h3>
               <p className="text-sm text-crm-text-secondary mt-1">
-                Registra una plantilla que ya fue aprobada en Meta Business Suite
+                Crea plantillas de WhatsApp o SMS para tus campañas con Twilio
               </p>
             </div>
             <button
@@ -162,18 +162,17 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
 
                 <div>
                   <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Código de WhatsApp *
+                    Código Interno
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.whatsapp_template_id}
                     onChange={(e) => setFormData({ ...formData, whatsapp_template_id: e.target.value })}
                     className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    placeholder="ej: bienvenida_amersur"
+                    placeholder="ej: bienvenida_amersur (opcional)"
                   />
                   <p className="text-xs text-crm-text-muted mt-1">
-                    Nombre exacto de la plantilla en Meta (minúsculas, sin espacios)
+                    Código para identificar fácilmente esta plantilla (opcional)
                   </p>
                 </div>
               </div>
@@ -219,11 +218,12 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                     onChange={(e) => setFormData({ ...formData, estado_aprobacion: e.target.value as EstadoAprobacion })}
                     className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
                   >
-                    <option value="APPROVED">Aprobada</option>
-                    <option value="PENDING">Pendiente</option>
-                    <option value="REJECTED">Rechazada</option>
+                    <option value="APPROVED">Activa (lista para usar)</option>
                     <option value="DRAFT">Borrador</option>
                   </select>
+                  <p className="text-xs text-crm-text-muted mt-1">
+                    Con Twilio no necesitas aprobación previa
+                  </p>
                 </div>
               </div>
             </div>
@@ -242,10 +242,10 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                   onChange={(e) => setFormData({ ...formData, body_texto: e.target.value })}
                   rows={5}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  placeholder="Hola {{1}}, bienvenido a AMERSUR Inmobiliaria..."
+                  placeholder="Hola {{nombre}}, bienvenido a AMERSUR Inmobiliaria. Tu vendedor {{vendedor}} te atenderá..."
                 />
                 <p className="text-xs text-crm-text-muted mt-1">
-                  Usa {`{{1}}`}, {`{{2}}`} para variables
+                  Usa {`{{nombre_variable}}`} para insertar variables personalizadas
                 </p>
               </div>
 

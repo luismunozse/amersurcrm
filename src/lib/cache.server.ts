@@ -178,7 +178,7 @@ export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
   const { data, error } = await supabase
     .schema('crm')
     .from("proyecto")
-    .select("id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,created_at")
+    .select("id,nombre,estado,tipo,ubicacion,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,created_at")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

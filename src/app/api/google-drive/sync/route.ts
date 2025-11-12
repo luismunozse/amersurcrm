@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
+import type { GoogleDriveFile } from "@/lib/google-drive/client";
 
 /**
  * POST /api/google-drive/sync
@@ -39,6 +40,91 @@ export async function POST(request: NextRequest) {
     }
 
     const { client, config } = driveData;
+
+    const folderCache = new Map<string, { id: string }>();
+
+    const ensureFolder = async (folderGoogleId?: string | null): Promise<string | null> => {
+      if (!folderGoogleId || folderGoogleId === "root" || folderGoogleId === config.root_folder_id) {
+        return null;
+      }
+
+      if (folderCache.has(folderGoogleId)) {
+        return folderCache.get(folderGoogleId)!.id;
+      }
+
+      const { data: existing, error: existingError } = await serviceSupabase
+        .from("carpeta_documento")
+        .select("id, nombre, carpeta_padre_id, google_drive_folder_id")
+        .eq("google_drive_folder_id", folderGoogleId)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error("[SYNC] Error consultando carpeta_documento:", existingError);
+      }
+
+      let metadata: GoogleDriveFile | null = null;
+      try {
+        metadata = await client.getFileMetadata(folderGoogleId);
+      } catch (error) {
+        console.error(`[SYNC] No se pudo obtener metadata de la carpeta ${folderGoogleId}:`, error);
+      }
+
+      if (existing && !metadata) {
+        folderCache.set(folderGoogleId, { id: existing.id });
+        return existing.id;
+      }
+
+      if (!metadata || metadata.mimeType !== "application/vnd.google-apps.folder") {
+        return existing ? existing.id : null;
+      }
+
+      const parentGoogleId = metadata.parents?.[0] ?? null;
+      const parentId = await ensureFolder(parentGoogleId);
+
+      if (existing) {
+        const updates: Record<string, unknown> = {};
+        if (existing.nombre !== metadata.name) {
+          updates.nombre = metadata.name;
+        }
+        if ((existing.carpeta_padre_id ?? null) !== parentId) {
+          updates.carpeta_padre_id = parentId;
+        }
+        if (Object.keys(updates).length > 0) {
+          updates.updated_at = new Date().toISOString();
+          const { error: updateError } = await serviceSupabase
+            .from("carpeta_documento")
+            .update(updates)
+            .eq("id", existing.id);
+          if (updateError) {
+            console.error(`[SYNC] Error actualizando datos de carpeta ${folderGoogleId}:`, updateError);
+          }
+        }
+        folderCache.set(folderGoogleId, { id: existing.id });
+        return existing.id;
+      }
+
+      const insertPayload = {
+        nombre: metadata.name || "Carpeta sin nombre",
+        google_drive_folder_id: metadata.id,
+        carpeta_padre_id: parentId,
+        created_at: metadata.createdTime ? new Date(metadata.createdTime).toISOString() : new Date().toISOString(),
+        updated_at: metadata.modifiedTime ? new Date(metadata.modifiedTime).toISOString() : new Date().toISOString(),
+      };
+
+      const { data: inserted, error: insertError } = await serviceSupabase
+        .from("carpeta_documento")
+        .insert(insertPayload)
+        .select("id")
+        .single();
+
+      if (insertError) {
+        console.error(`[SYNC] Error creando carpeta ${folderGoogleId}:`, insertError);
+        return null;
+      }
+
+      folderCache.set(folderGoogleId, { id: inserted.id });
+      return inserted.id;
+    };
 
 
     // Si es sincronización completa, eliminar documentos existentes de Google Drive
@@ -82,6 +168,9 @@ export async function POST(request: NextRequest) {
           ? file.name.split('.').pop()!.toLowerCase()
           : null;
 
+        const parentGoogleId = file.parents?.[0] ?? null;
+        const carpetaId = await ensureFolder(parentGoogleId);
+
         const documentData = {
           nombre: file.name,
           storage_tipo: 'google_drive' as const,
@@ -95,6 +184,8 @@ export async function POST(request: NextRequest) {
           ultima_sincronizacion_at: new Date().toISOString(),
           created_by: user.id,
           updated_by: user.id,
+          carpeta_id: carpetaId,
+          updated_at: new Date().toISOString(),
         };
 
         if (existing) {
@@ -103,7 +194,6 @@ export async function POST(request: NextRequest) {
             .from('documento')
             .update({
               ...documentData,
-              updated_at: new Date().toISOString(),
             })
             .eq('id', existing.id);
 

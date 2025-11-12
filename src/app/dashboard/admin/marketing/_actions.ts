@@ -15,7 +15,7 @@ import type {
 } from "@/types/whatsapp-marketing";
 
 // =====================================================
-// CREDENCIALES
+// CREDENCIALES TWILIO
 // =====================================================
 
 export async function verificarCredencialesWhatsApp() {
@@ -27,29 +27,41 @@ export async function verificarCredencialesWhatsApp() {
       return { tieneCredenciales: false, error: "No autorizado" };
     }
 
-    const { data, error } = await supabase
-      .schema('crm')
-      .from('marketing_channel_credential')
-      .select('id, phone_number_id, access_token, activo')
-      .eq('canal_tipo', 'whatsapp')
-      .eq('activo', true)
-      .single();
+    // Debug: ver qué variables tenemos
+    const accountSid = process.env.TWILIO_ACCOUNT_SID ?? "";
+    const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
+    const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM ?? "";
 
-    if (error || !data) {
-      return { tieneCredenciales: false };
+    console.log('🔍 Verificando credenciales de Twilio...');
+    console.log('TWILIO_ACCOUNT_SID:', accountSid ? 'Sí ✓' : 'No ✗');
+    console.log('TWILIO_AUTH_TOKEN:', authToken ? 'Sí ✓' : 'No ✗');
+    console.log('TWILIO_WHATSAPP_FROM:', whatsappFrom ? 'Sí ✓' : 'No ✗');
+
+    // Verificar credenciales de Twilio desde variables de entorno
+    const tieneCredenciales =
+      accountSid.length > 10 &&
+      authToken.length > 10 &&
+      Boolean(whatsappFrom);
+
+    console.log('✅ Resultado:', tieneCredenciales ? 'CONFIGURADO' : 'NO CONFIGURADO');
+
+    if (!tieneCredenciales) {
+      return {
+        tieneCredenciales: false,
+        error: "Credenciales de Twilio no configuradas en variables de entorno"
+      };
     }
 
-    // Verificar que tenga los campos requeridos
-    const tieneCredenciales = !!(
-      data.phone_number_id &&
-      data.access_token &&
-      data.phone_number_id.length > 0 &&
-      data.access_token.length > 10
-    );
-
-    return { tieneCredenciales, credentialId: data.id };
+    return {
+      tieneCredenciales: true,
+      proveedor: 'twilio',
+      detalles: {
+        accountSid: `${accountSid.substring(0, 10)}...`,
+        whatsappFrom,
+      }
+    };
   } catch (error) {
-    console.error('Error verificando credenciales:', error);
+    console.error('❌ Error verificando credenciales de Twilio:', error);
     return { tieneCredenciales: false, error: 'Error desconocido' };
   }
 }

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useMemo, useState, type ComponentType, type SVGProps } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -16,14 +16,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { eliminarProyecto } from "./_actions";
 import EditProjectModal from "./_EditProjectModal";
+import type { ProyectoMediaItem } from "@/types/proyectos";
 
-export default function QuickActions({
-  id,
-  nombre,
-  ubicacion,
-  lotesCount = 0,
-  proyecto,
-}: {
+type QuickActionsProps = {
   id: string;
   nombre: string;
   ubicacion?: string | null;
@@ -35,12 +30,32 @@ export default function QuickActions({
     ubicacion?: string | null;
     descripcion?: string | null;
     imagen_url?: string | null;
+    logo_url?: string | null;
+    galeria_imagenes?: ProyectoMediaItem[] | null;
   };
-}) {
+};
+
+type ActionConfig = {
+  key: string;
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  onClick: () => void;
+  tone?: "default" | "danger";
+};
+
+export default function QuickActions({
+  id,
+  nombre,
+  ubicacion,
+  lotesCount = 0,
+  proyecto,
+}: QuickActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const router = useRouter();
+
   const copyLink = async () => {
     try {
       const url = `${window.location.origin}/dashboard/proyectos/${id}`;
@@ -71,18 +86,17 @@ export default function QuickActions({
     }
 
     setIsDeleting(true);
-    
+
     try {
       const result = await eliminarProyecto(id);
-      
+
       if (result.success) {
         toast.success(result.message);
-        // Recargar la página para actualizar la lista
         router.refresh();
       }
     } catch (error) {
-      console.error('Error eliminando proyecto:', error);
-      toast.error(error instanceof Error ? error.message : 'Error eliminando proyecto');
+      console.error("Error eliminando proyecto:", error);
+      toast.error(error instanceof Error ? error.message : "Error eliminando proyecto");
       setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
@@ -101,23 +115,68 @@ export default function QuickActions({
     setShowEditModal(false);
   };
 
+  const actionItems = useMemo<ActionConfig[]>(() => {
+    return [
+      {
+        key: "unidades",
+        label: "Ver unidades",
+        icon: BuildingOffice2Icon,
+        onClick: () => router.push(`/dashboard/proyectos/${id}`),
+      },
+      {
+        key: "maps",
+        label: "Abrir en Maps",
+        icon: MapPinIcon,
+        onClick: openMaps,
+      },
+      {
+        key: "reportes",
+        label: "Reportes",
+        icon: ChartBarIcon,
+        onClick: handleReports,
+      },
+      {
+        key: "editar",
+        label: "Editar",
+        icon: PencilSquareIcon,
+        onClick: handleEdit,
+      },
+      {
+        key: "eliminar",
+        label: showDeleteConfirm ? "Confirmar eliminación" : "Eliminar",
+        icon: TrashIcon,
+        onClick: handleDelete,
+        tone: "danger",
+      },
+      {
+        key: "compartir",
+        label: "Compartir",
+        icon: ShareIcon,
+        onClick: copyLink,
+      },
+      {
+        key: "nueva-pestana",
+        label: "Abrir nueva pestaña",
+        icon: ArrowTopRightOnSquareIcon,
+        onClick: () => window.open(`/dashboard/proyectos/${id}`, "_blank"),
+      },
+    ];
+  }, [copyLink, handleDelete, handleEdit, handleReports, id, openMaps, router, showDeleteConfirm]);
+
   if (showDeleteConfirm) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-3">
         <div className="flex items-start gap-2">
           <ExclamationTriangleIcon className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-red-800">
-              ¿Eliminar &quot;{nombre}&quot;?
-            </p>
-            <p className="text-xs text-red-600 mt-1">
-              {lotesCount} lote(s) se eliminarán
-            </p>
+            <p className="text-xs font-medium text-red-800">¿Eliminar &quot;{nombre}&quot;?</p>
+            <p className="text-xs text-red-600 mt-1">{lotesCount} lote(s) se eliminarán</p>
             <div className="flex gap-1 mt-2">
               <button
                 onClick={handleCancelDelete}
                 className="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-100 transition-colors"
                 disabled={isDeleting}
+                type="button"
               >
                 Cancelar
               </button>
@@ -125,8 +184,9 @@ export default function QuickActions({
                 onClick={handleDelete}
                 className="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-100 transition-colors"
                 disabled={isDeleting}
+                type="button"
               >
-                {isDeleting ? 'Eliminando...' : 'Sí'}
+                {isDeleting ? "Eliminando..." : "Sí"}
               </button>
             </div>
           </div>
@@ -139,7 +199,9 @@ export default function QuickActions({
     <>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-crm-text-muted">Acciones rápidas</span>
-        <div className="flex items-center gap-2">
+
+        {/* Desktop buttons */}
+        <div className="hidden sm:flex items-center gap-2">
           <Link
             href={`/dashboard/proyectos/${id}`}
             className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
@@ -204,18 +266,47 @@ export default function QuickActions({
             <ArrowTopRightOnSquareIcon className="w-4 h-4" />
           </Link>
         </div>
+
+        {/* Mobile toggle */}
+        <button
+          type="button"
+          onClick={() => setMobileActionsOpen((open) => !open)}
+          className="sm:hidden inline-flex items-center gap-2 text-xs font-medium text-crm-primary border border-crm-primary/40 rounded-lg px-3 py-1 transition-colors"
+          aria-expanded={mobileActionsOpen}
+        >
+          {mobileActionsOpen ? "Ocultar" : "Ver acciones"}
+        </button>
       </div>
 
-      {/* Modal de edición */}
+      {mobileActionsOpen && (
+        <div className="sm:hidden mt-3 grid grid-cols-2 gap-2">
+          {actionItems.map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.key}
+                onClick={() => {
+                  action.onClick();
+                  setMobileActionsOpen(false);
+                }}
+                type="button"
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium transition-colors ${
+                  action.tone === "danger"
+                    ? "border border-red-200 text-red-600 hover:bg-red-50"
+                    : "border border-crm-border text-crm-text-secondary hover:bg-crm-card-hover"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="flex-1 line-clamp-2">{action.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {proyecto && (
-        <EditProjectModal
-          proyecto={proyecto}
-          isOpen={showEditModal}
-          onClose={handleCloseEdit}
-        />
+        <EditProjectModal proyecto={proyecto} isOpen={showEditModal} onClose={handleCloseEdit} />
       )}
     </>
   );
 }
-
-

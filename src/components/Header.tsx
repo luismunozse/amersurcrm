@@ -65,17 +65,15 @@ export default function Header({
               className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} flex items-center space-x-3 rounded-lg px-1 py-1 transition-colors hover:bg-crm-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40`}
               aria-label="Ir al inicio"
             >
-              <span className="relative flex">
+              <span className="relative flex items-center">
                 <Image
-                  src="/logo-amersur.png"
+                  src="/logo-amersur-horizontal.png"
                   alt="AMERSUR"
-                  width={48}
-                  height={48}
-                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
+                  width={160}
+                  height={40}
+                  className="h-6 w-auto sm:h-8 transition-all duration-200 object-contain"
                   priority
                 />
-                {/* Efecto de resplandor sutil */}
-                <span className="absolute inset-0 bg-crm-primary/15 rounded-full blur-md -z-10"></span>
               </span>
               <span className="hidden sm:block text-xl font-bold text-crm-text-primary">
                 AMERSUR CRM

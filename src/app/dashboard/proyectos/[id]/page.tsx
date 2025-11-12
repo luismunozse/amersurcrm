@@ -10,6 +10,9 @@ import DeleteProjectButton from "./_DeleteProjectButton";
 import GoogleMapsDebug from "@/components/GoogleMapsDebug";
 import { PaginationClient } from "./_PaginationClient";
 import ProjectTabs from "./_ProjectTabs";
+import ProyectoGaleria from "./_ProyectoGaleria";
+import type { ProyectoMediaItem } from "@/types/proyectos";
+import { BuildingOffice2Icon } from "@heroicons/react/24/outline";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,6 +20,16 @@ export const revalidate = 0;
 // Tipos para Next 15: params/searchParams como Promises
 type ParamsP = Promise<{ id: string }>;
 type SPP = Promise<{ q?: string | string[]; page?: string | string[]; estado?: string | string[] }>;
+
+const parseGaleria = (value: unknown): ProyectoMediaItem[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is ProyectoMediaItem =>
+      !!item &&
+      typeof item === "object" &&
+      typeof (item as ProyectoMediaItem).url === "string",
+  );
+};
 
 export default async function ProyLotesPage({
   params,
@@ -54,7 +67,7 @@ export default async function ProyLotesPage({
   const isAdmin = user ? await esAdmin() : false;
 
   // Proyecto (para título/404)
-  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";
   const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
     .select(`${proyectoSelectBase},poligono`)
@@ -214,6 +227,8 @@ export default async function ProyLotesPage({
       ? Number(overlayOpacityRaw)
       : null;
 
+  const galeriaItems = parseGaleria((proyecto as { galeria_imagenes?: unknown } | null)?.galeria_imagenes);
+
   const lotesForMapeo = (lotesConProyecto || []).map((lote) => {
     const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
     const planoPoligono = isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : undefined;
@@ -317,6 +332,13 @@ export default async function ProyLotesPage({
         </div>
       </div>
 
+      <ProyectoGaleria
+        nombre={proyecto.nombre}
+        imagenUrl={proyecto.imagen_url}
+        logoUrl={proyecto.logo_url}
+        galeriaItems={galeriaItems}
+      />
+
       {/* Tabs Navigation */}
       <ProjectTabs
         lotesSection={
@@ -363,6 +385,7 @@ export default async function ProyLotesPage({
               key="new-lote-form"
               proyectoId={proyecto.id}
               proyectos={todosLosProyectos || []}
+              lotes={lotesConProyecto || []}
             />
 
             <LotesList key="lotes-list" proyectoId={proyecto.id} lotes={lotesConProyecto} />

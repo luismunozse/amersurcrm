@@ -16,7 +16,7 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
   const [loading, setLoading] = useState(false);
   const [plantillas, setPlantillas] = useState<MarketingTemplate[]>([]);
   const [loadingPlantillas, setLoadingPlantillas] = useState(true);
-  const [credentialId, setCredentialId] = useState<string | null>(null);
+  const [tieneCredenciales, setTieneCredenciales] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -50,11 +50,9 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
       setPlantillas(plantillasAprobadas);
     }
 
-    // Verificar credenciales
+    // Verificar credenciales de Twilio
     const resultCred = await verificarCredencialesWhatsApp();
-    if (resultCred.credentialId) {
-      setCredentialId(resultCred.credentialId);
-    }
+    setTieneCredenciales(resultCred.tieneCredenciales);
 
     setLoadingPlantillas(false);
   };
@@ -75,8 +73,8 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!credentialId) {
-      toast.error("No hay credenciales de WhatsApp configuradas");
+    if (!tieneCredenciales) {
+      toast.error("No hay credenciales de Twilio configuradas. Verifica tu archivo .env.local");
       return;
     }
 
@@ -108,12 +106,12 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
     setLoading(true);
 
     try {
-      // Crear campaña sin audiencia_tipo (ese campo no existe en la tabla)
+      // Crear campaña con Twilio (sin credential_id porque usamos variables de entorno)
       const campanaData = {
         nombre: formData.nombre,
         descripcion: formData.descripcion,
         template_id: formData.template_id,
-        credential_id: credentialId,
+        credential_id: undefined, // Con Twilio no necesitamos credential_id (credenciales en .env.local)
         variables_valores: variables,
         enviar_inmediatamente: formData.enviar_inmediatamente,
         fecha_inicio: formData.fecha_inicio || undefined,
@@ -130,14 +128,15 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
       } else {
         toast.success("Campaña creada exitosamente");
 
-        // Si se debe enviar inmediatamente, ejecutar la campaña
+        // Si se debe enviar inmediatamente, ejecutar la campaña con Twilio
         if (formData.enviar_inmediatamente && result.data?.id) {
           try {
-            const ejecutarResponse = await fetch('/api/whatsapp/campanas/ejecutar', {
+            const ejecutarResponse = await fetch('/api/twilio/campanas/ejecutar', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 campana_id: result.data.id,
+                canal: 'whatsapp',
                 destinatarios_config: destinatarios
               })
             });

@@ -85,19 +85,26 @@ export default function DocumentosClient({
     cargarBreadcrumbs(carpetaSeleccionada);
   }, [carpetaSeleccionada, googleDriveConectado]);
 
-  const cargarDocumentosDeCarpeta = async (folderId: string | null) => {
+  const cargarDocumentosDeCarpeta = async (folderId: string | null, source: "cache" | "drive" = "cache") => {
     setCargandoDocumentos(true);
     try {
       const params = new URLSearchParams();
       if (folderId) {
         params.set('folderId', folderId);
       }
+      params.set('pageSize', '200');
+      params.set('source', source);
 
       const response = await fetch(`/api/google-drive/files?${params}`);
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Error al cargar archivos');
+      }
+
+      if (data.source === 'cache' && !data.cacheHit && googleDriveConectado && source !== 'drive') {
+        await cargarDocumentosDeCarpeta(folderId, 'drive');
+        return;
       }
 
       // Convertir formato de Google Drive a formato de documento
@@ -119,6 +126,9 @@ export default function DocumentosClient({
           updated_at: file.modifiedTime,
           es_carpeta: esCarpeta,
           modificado_at: file.modifiedTime,
+          carpeta: file.folderName
+            ? { nombre: file.folderName as string, color: '', id: file.parents?.[0] }
+            : undefined,
         };
       });
 

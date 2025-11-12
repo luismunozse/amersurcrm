@@ -5,23 +5,28 @@ import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import UbicacionSelector from "@/components/UbicacionSelector";
+import { compressImage, compressImages, formatFileSize } from "@/lib/imageCompression";
 
 export default function NewProyectoForm() {
   const [pending, start] = useTransition();
   const { isAdmin, loading } = useAdminPermissions();
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState<string>("");
 
   // Estado para ubigeo
   const [ubigeoData, setUbigeoData] = useState({
     departamento: "",
     provincia: "",
-    distrito: ""
+    distrito: "",
+    codigoDepartamento: "",
+    codigoProvincia: "",
+    codigoDistrito: "",
   });
 
-  // Manejar cambios de ubigeo
-  const handleUbigeoChange = (departamento: string, provincia: string, distrito: string) => {
-    setUbigeoData({ departamento, provincia, distrito });
+  const handleUbicacionChange = (ubicacion: typeof ubigeoData) => {
+    setUbigeoData(ubicacion);
   };
 
   // No mostrar el formulario si no es admin
@@ -77,19 +82,78 @@ export default function NewProyectoForm() {
 
       {isExpanded && (
         <form
-          action={(fd) => start(async () => {
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const originalFormData = new FormData(form);
+
             try {
-              const result = await crearProyecto(fd);
-              if (result.success) {
-                toast.success("Proyecto creado correctamente");
-                setIsExpanded(false);
-                router.push(`/dashboard/proyectos/${result.proyecto.id}`);
+              setIsCompressing(true);
+
+              // Obtener archivos originales
+              const imagenFile = originalFormData.get("imagen") as File | null;
+              const logoFile = originalFormData.get("logo") as File | null;
+              const galeriaFiles = originalFormData.getAll("galeria").filter((f): f is File => f instanceof File && f.size > 0);
+
+              // Comprimir imagen principal si existe
+              if (imagenFile && imagenFile.size > 0) {
+                setCompressionProgress("Comprimiendo imagen principal...");
+                const compressed = await compressImage(imagenFile, 'portada');
+                originalFormData.set("imagen", compressed);
+                console.log(`Imagen comprimida: ${formatFileSize(imagenFile.size)} → ${formatFileSize(compressed.size)}`);
               }
-            } catch (error) {
-              console.error("Error creando proyecto:", error);
-              toast.error("Error al crear el proyecto");
+
+              // Comprimir logo si existe
+              if (logoFile && logoFile.size > 0) {
+                setCompressionProgress("Comprimiendo logo...");
+                const compressed = await compressImage(logoFile, 'logo');
+                originalFormData.set("logo", compressed);
+                console.log(`Logo comprimido: ${formatFileSize(logoFile.size)} → ${formatFileSize(compressed.size)}`);
+              }
+
+              // Comprimir galería si existe
+              if (galeriaFiles.length > 0) {
+                setCompressionProgress(`Comprimiendo galería (${galeriaFiles.length} imágenes)...`);
+                const compressedGaleria = await compressImages(galeriaFiles, 'galeria');
+
+                // Remover archivos originales de galería
+                originalFormData.delete("galeria");
+
+                // Agregar archivos comprimidos
+                compressedGaleria.forEach(file => {
+                  originalFormData.append("galeria", file);
+                });
+
+                galeriaFiles.forEach((original, i) => {
+                  console.log(`Galería [${i + 1}]: ${formatFileSize(original.size)} → ${formatFileSize(compressedGaleria[i].size)}`);
+                });
+              }
+
+              setIsCompressing(false);
+              setCompressionProgress("");
+
+              // Enviar formulario con imágenes comprimidas
+              start(async () => {
+                try {
+                  const result = await crearProyecto(originalFormData);
+                  if (result.success) {
+                    toast.success("Proyecto creado correctamente");
+                    setIsExpanded(false);
+                    form.reset();
+                    router.push(`/dashboard/proyectos/${result.proyecto.id}`);
+                  }
+                } catch (error) {
+                  console.error("Error creando proyecto:", error);
+                  toast.error(error instanceof Error ? error.message : "Error al crear el proyecto");
+                }
+              });
+            } catch (compressionError) {
+              setIsCompressing(false);
+              setCompressionProgress("");
+              console.error("Error comprimiendo imágenes:", compressionError);
+              toast.error("Error al comprimir las imágenes. Intenta con imágenes más pequeñas.");
             }
-          })}
+          }}
           className="mt-6 space-y-4"
         >
 
@@ -145,10 +209,10 @@ export default function NewProyectoForm() {
             Ubicación (Ubigeo) <span className="text-red-500">*</span>
           </label>
           <UbicacionSelector
-            departamento={ubigeoData.departamento}
-            provincia={ubigeoData.provincia}
-            distrito={ubigeoData.distrito}
-            onUbigeoChange={handleUbigeoChange}
+            departamento={ubigeoData.codigoDepartamento}
+            provincia={ubigeoData.codigoProvincia}
+            distrito={ubigeoData.codigoDistrito}
+            onUbicacionChange={handleUbicacionChange}
             className="w-full"
           />
 
@@ -156,6 +220,9 @@ export default function NewProyectoForm() {
           <input type="hidden" name="departamento" value={ubigeoData.departamento} />
           <input type="hidden" name="provincia" value={ubigeoData.provincia} />
           <input type="hidden" name="distrito" value={ubigeoData.distrito} />
+          <input type="hidden" name="departamento_code" value={ubigeoData.codigoDepartamento} />
+          <input type="hidden" name="provincia_code" value={ubigeoData.codigoProvincia} />
+          <input type="hidden" name="distrito_code" value={ubigeoData.codigoDistrito} />
         </div>
 
         {/* Imagen del Proyecto */}
@@ -168,7 +235,40 @@ export default function NewProyectoForm() {
             className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20"
             disabled={pending}
           />
-          <p className="text-[10px] text-crm-text-muted">Formatos: JPG, PNG, WEBP. Máx: 5MB</p>
+          <p className="text-[10px] text-crm-text-muted">
+            Formatos: JPG, PNG, WEBP. Las imágenes se comprimen automáticamente.
+          </p>
+        </div>
+
+        {/* Logo del Proyecto */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-crm-text-primary">Logo del Proyecto</label>
+          <input
+            type="file"
+            name="logo"
+            accept="image/png,image/jpeg,image/webp"
+            className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20"
+            disabled={pending || isCompressing}
+          />
+          <p className="text-[10px] text-crm-text-muted">
+            PNG recomendado. Se comprime automáticamente a 500KB.
+          </p>
+        </div>
+
+        {/* Galería de Imágenes */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-crm-text-primary">Galería de imágenes adicionales</label>
+          <input
+            type="file"
+            name="galeria"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20"
+            disabled={pending || isCompressing}
+          />
+          <p className="text-[10px] text-crm-text-muted">
+            Hasta 6 imágenes. Se comprimen automáticamente para optimizar la carga.
+          </p>
         </div>
 
           {/* Botones de acción */}
@@ -184,9 +284,17 @@ export default function NewProyectoForm() {
             <button
               type="submit"
               className="crm-button-primary px-6 py-2 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-              disabled={pending}
+              disabled={pending || isCompressing}
             >
-              {pending ? (
+              {isCompressing ? (
+                <>
+                  <svg className="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{compressionProgress || "Comprimiendo..."}</span>
+                </>
+              ) : pending ? (
                 <>
                   <svg className="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

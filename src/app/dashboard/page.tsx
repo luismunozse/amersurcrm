@@ -7,6 +7,7 @@ import { LazyDashboardStats } from "@/components/LazyDashboardStats";
 import { RecentActivities } from "@/components/RecentActivities";
 import { RecentProjects } from "@/components/RecentProjects";
 import { getCachedClientes, getCachedProyectos, getCachedNotificacionesNoLeidas } from "@/lib/cache.server";
+import SecondaryPanelDrawer from "@/components/dashboard/SecondaryPanelDrawer";
 
 type ClienteLite = {
   ultimo_contacto?: string | null;
@@ -391,7 +392,7 @@ async function DashboardContent() {
           </div>
         </Card>
 
-        <Card variant="elevated" className="h-full">
+        <Card variant="elevated" className="hidden h-full xl:block">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center justify-between text-lg font-semibold text-crm-text-primary">
               Estado del día
@@ -421,7 +422,7 @@ async function DashboardContent() {
 
       <LazyDashboardStats />
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
+      <section className="grid gap-6">
         <div>
           <div className="flex items-center justify-between gap-4 pb-4">
             <h2 className="text-xl font-semibold text-crm-text-primary">Acciones rápidas</h2>
@@ -429,12 +430,12 @@ async function DashboardContent() {
               Personalizar
             </Link>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-3 sm:grid sm:grid-cols-2 sm:gap-4 sm:pb-0">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {quickActions.map((action) => (
               <Link
                 key={action.title}
                 href={action.href}
-                className="group min-w-[17rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/50 sm:min-w-0"
+                className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/50"
               >
                 <div className="rounded-2xl border border-crm-border/60 bg-white dark:bg-crm-card shadow-sm hover:shadow-crm transition-transform hover:-translate-y-1 h-full flex flex-col p-4">
                   <div className="flex items-center gap-3">
@@ -457,7 +458,9 @@ async function DashboardContent() {
             ))}
           </div>
         </div>
+      </section>
 
+      <section className="hidden xl:block">
         <Card variant="elevated" className="h-full">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-crm-text-primary">Prioridades del equipo</CardTitle>
@@ -481,7 +484,55 @@ async function DashboardContent() {
         </Card>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
+      <SecondaryPanelDrawer pulseItems={pulseItems} focusAreas={focusAreas}>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-crm-text-muted">
+              Actividad reciente
+            </h3>
+            <Suspense
+              fallback={
+                <div className="mt-4 space-y-4 rounded-2xl border border-crm-border/60 bg-crm-card p-4 animate-pulse">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="h-8 w-8 rounded-full bg-crm-border" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-3/4 rounded bg-crm-border" />
+                        <div className="h-3 w-1/2 rounded bg-crm-border" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <RecentActivities />
+            </Suspense>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-crm-text-muted">
+              Proyectos recientes
+            </h3>
+            <Suspense
+              fallback={
+                <div className="mt-4 grid gap-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="rounded-2xl border border-crm-border/60 bg-crm-card p-4 animate-pulse space-y-3">
+                      <div className="h-4 w-2/3 rounded bg-crm-border" />
+                      <div className="h-3 w-1/3 rounded bg-crm-border" />
+                      <div className="h-3 w-full rounded bg-crm-border" />
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <RecentProjects />
+            </Suspense>
+          </div>
+        </div>
+      </SecondaryPanelDrawer>
+
+      <section className="hidden gap-6 xl:grid xl:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
         <Suspense fallback={
           <div>
             <h2 className="text-xl font-semibold text-crm-text-primary mb-4">Actividad reciente</h2>
@@ -490,10 +541,10 @@ async function DashboardContent() {
                 <div className="space-y-4">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="flex items-start space-x-3 animate-pulse">
-                      <div className="h-8 w-8 rounded-full bg-crm-border"></div>
+                      <div className="h-8 w-8 rounded-full bg-crm-border" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-4 w-3/4 rounded bg-crm-border"></div>
-                        <div className="h-3 w-1/2 rounded bg-crm-border"></div>
+                        <div className="h-4 w-3/4 rounded bg-crm-border" />
+                        <div className="h-3 w-1/2 rounded bg-crm-border" />
                       </div>
                     </div>
                   ))}
@@ -512,9 +563,9 @@ async function DashboardContent() {
               {[...Array(3)].map((_, i) => (
                 <Card key={i} className="animate-pulse">
                   <CardContent className="p-4 space-y-3">
-                    <div className="h-4 w-2/3 rounded bg-crm-border"></div>
-                    <div className="h-3 w-1/3 rounded bg-crm-border"></div>
-                    <div className="h-3 w-full rounded bg-crm-border"></div>
+                    <div className="h-4 w-2/3 rounded bg-crm-border" />
+                    <div className="h-3 w-1/3 rounded bg-crm-border" />
+                    <div className="h-3 w-full rounded bg-crm-border" />
                   </CardContent>
                 </Card>
               ))}
@@ -524,6 +575,7 @@ async function DashboardContent() {
           <RecentProjects />
         </Suspense>
       </section>
+
     </div>
   );
 }

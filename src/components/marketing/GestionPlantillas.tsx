@@ -46,10 +46,8 @@ export default function GestionPlantillas() {
     switch (estado) {
       case 'APPROVED':
         return <CheckCircle className="w-4 h-4 text-crm-success" />;
-      case 'REJECTED':
-        return <XCircle className="w-4 h-4 text-crm-danger" />;
-      case 'PENDING':
-        return <Clock className="w-4 h-4 text-crm-warning" />;
+      case 'DRAFT':
+        return <Clock className="w-4 h-4 text-crm-text-muted" />;
       default:
         return <Clock className="w-4 h-4 text-crm-text-muted" />;
     }
@@ -59,10 +57,6 @@ export default function GestionPlantillas() {
     switch (estado) {
       case 'APPROVED':
         return 'bg-crm-success/10 text-crm-success border-crm-success/30';
-      case 'REJECTED':
-        return 'bg-crm-danger/10 text-crm-danger border-crm-danger/30';
-      case 'PENDING':
-        return 'bg-crm-warning/10 text-crm-warning border-crm-warning/30';
       case 'DRAFT':
         return 'bg-crm-text-muted/10 text-crm-text-secondary border-crm-border';
       default:
@@ -105,9 +99,9 @@ export default function GestionPlantillas() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-crm-text-primary">Plantillas de WhatsApp</h2>
+            <h2 className="text-xl font-semibold text-crm-text-primary">Plantillas de Mensajes</h2>
             <p className="text-sm text-crm-text-secondary mt-1">
-              Gestiona tus plantillas aprobadas por WhatsApp
+              Gestiona tus plantillas de WhatsApp y SMS con Twilio
             </p>
           </div>
           <button
@@ -129,7 +123,7 @@ export default function GestionPlantillas() {
             No hay plantillas creadas
           </h3>
           <p className="text-sm text-crm-text-secondary mb-6">
-            Crea tu primera plantilla de WhatsApp para comenzar a enviar mensajes
+            Crea tu primera plantilla de mensajes para comenzar a enviar campañas con Twilio
           </p>
           <button
             onClick={() => setModalCrear(true)}

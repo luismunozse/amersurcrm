@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { InfoDialog } from "@/components/ui/InfoDialog";
+import { useRouter } from "next/navigation";
 import LoteWizard from "@/components/LoteWizard";
+import ImportarLotesModal from "@/components/ImportarLotesModal";
+import EliminarLotesMasivoModal from "@/components/EliminarLotesMasivoModal";
 
 interface Proyecto {
   id: string;
@@ -11,27 +13,53 @@ interface Proyecto {
   estado: string;
 }
 
-export default function NewLoteForm({ 
-  proyectoId, 
-  proyectos 
-}: { 
+interface Lote {
+  id: string;
+  codigo: string;
+  sup_m2: number | null;
+  precio: number | null;
+  estado: string;
+}
+
+export default function NewLoteForm({
+  proyectoId,
+  proyectos,
+  lotes = []
+}: {
   proyectoId: string;
   proyectos: Proyecto[];
+  lotes?: Lote[];
 }) {
   const [showWizard, setShowWizard] = useState(false);
-  const [showImportInfo, setShowImportInfo] = useState(false);
-  
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const router = useRouter();
+
   // Encontrar el proyecto actual
   const proyectoActual = proyectos.find(p => p.id === proyectoId);
+
+  const handleSuccess = () => {
+    setShowImportModal(false);
+    setShowDeleteModal(false);
+    router.refresh();
+  };
 
   return (
     <>
       <div className="flex justify-end gap-3 mb-4">
+        {lotes.length > 0 && (
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg text-sm font-medium flex items-center space-x-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Eliminar Masivamente</span>
+          </button>
+        )}
         <button
-          onClick={() => {
-            // TODO: Implementar importación masiva
-            setShowImportInfo(true);
-          }}
+          onClick={() => setShowImportModal(true)}
           className="crm-button-secondary px-6 py-3 rounded-lg text-sm font-medium flex items-center space-x-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -60,13 +88,24 @@ export default function NewLoteForm({
         />
       )}
 
-      <InfoDialog
-        open={showImportInfo}
-        onClose={() => setShowImportInfo(false)}
-        tone="info"
-        title="Importación masiva en desarrollo"
-        description="Estamos trabajando en esta funcionalidad. Mientras tanto, puedes crear lotes manualmente con el asistente."
-      />
+      {showImportModal && proyectoActual && (
+        <ImportarLotesModal
+          proyectoId={proyectoId}
+          proyectoNombre={proyectoActual.nombre}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={handleSuccess}
+        />
+      )}
+
+      {showDeleteModal && proyectoActual && (
+        <EliminarLotesMasivoModal
+          proyectoId={proyectoId}
+          proyectoNombre={proyectoActual.nombre}
+          lotes={lotes}
+          onClose={() => setShowDeleteModal(false)}
+          onSuccess={handleSuccess}
+        />
+      )}
     </>
   );
 }

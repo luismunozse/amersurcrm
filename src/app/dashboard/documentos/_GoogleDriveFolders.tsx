@@ -48,12 +48,25 @@ export default function GoogleDriveFolders({
       if (parentFolderId && parentFolderId !== 'root') {
         params.set('parentFolderId', parentFolderId);
       }
+      params.set('source', 'cache');
 
       const response = await fetch(`/api/google-drive/folders?${params}`);
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Error al cargar carpetas');
+      }
+
+      if (data.source === 'cache' && !data.cacheHit) {
+        if (googleDriveConectado) {
+          params.set('source', 'drive');
+          const driveResp = await fetch(`/api/google-drive/folders?${params}`);
+          const driveData = await driveResp.json();
+          if (driveResp.ok && driveData.success) {
+            setCarpetas(driveData.folders || []);
+            return;
+          }
+        }
       }
 
       setCarpetas(data.folders || []);
@@ -78,6 +91,12 @@ export default function GoogleDriveFolders({
 
       if (response.ok && data.success) {
         setBreadcrumbs(data.path);
+      } else if (data?.cacheHit === false && googleDriveConectado) {
+        const driveResp = await fetch(`/api/google-drive/folders/${folderId}/path?source=drive`);
+        const driveData = await driveResp.json();
+        if (driveResp.ok && driveData.success) {
+          setBreadcrumbs(driveData.path);
+        }
       }
     } catch (error) {
       console.error('Error cargando breadcrumbs:', error);

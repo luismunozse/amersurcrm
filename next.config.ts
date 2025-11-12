@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['@supabase/supabase-js', 'react-hot-toast'],
     serverActions: {
-      bodySizeLimit: '10mb', // Aumentar límite para subida de imágenes
+      bodySizeLimit: '50mb', // Límite aumentado para subida de múltiples imágenes (logo + galería)
     },
   },
   

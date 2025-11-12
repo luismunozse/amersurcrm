@@ -14,6 +14,13 @@ export type TipoTerreno = 'residencial' | 'comercial' | 'industrial' | 'agricola
 // PROYECTO INTERFACES
 // ============================================================================
 
+export interface ProyectoMediaItem {
+  url: string;
+  path?: string | null;
+  nombre?: string | null;
+  created_at?: string | null;
+}
+
 export interface Proyecto {
   id: string;
   nombre: string;
@@ -27,6 +34,8 @@ export interface Proyecto {
   precio_hasta: number | null;
   estado: ProyectoEstado;
   imagen_url: string | null;
+  logo_url: string | null;
+  galeria_imagenes: ProyectoMediaItem[] | null;
   overlay_image_url: string | null;
   overlay_bounds: OverlayBounds | null;
   overlay_rotation: number | null;

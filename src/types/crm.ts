@@ -1,3 +1,5 @@
+import type { ProyectoMediaItem } from "./proyectos";
+
 // Tipos que pueden usarse desde cliente o servidor
 export type ClienteCached = {
     id: string;
@@ -34,6 +36,8 @@ export type ClienteCached = {
     ubicacion: string | null;
     descripcion: string | null;
     imagen_url: string | null;
+    logo_url: string | null;
+    galeria_imagenes: ProyectoMediaItem[] | null;
     planos_url: string | null;
     created_at: string;
     tipo?: string | null;

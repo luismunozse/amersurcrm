@@ -10,7 +10,7 @@ import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
  * Ejemplo: [{ id: 'root', name: 'Mi Drive' }, { id: 'xxx', name: 'Documentos' }, { id: 'yyy', name: 'Contratos' }]
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ folderId: string }> }
 ) {
   try {
@@ -23,6 +23,7 @@ export async function GET(
     }
 
     const { folderId } = await params;
+    const sourceParam = request.nextUrl.searchParams.get("source") as ("cache" | "drive" | null);
 
     // Si es root, retornar solo root
     if (folderId === 'root' || !folderId) {
@@ -30,7 +31,86 @@ export async function GET(
         success: true,
         path: [
           { id: 'root', name: 'Mi Drive' }
-        ]
+        ],
+        source: sourceParam ?? "cache",
+        cacheHit: true,
+      });
+    }
+
+    type FolderRecord = {
+      id: string;
+      nombre: string;
+      google_drive_folder_id: string | null;
+      carpeta_padre_id: string | null;
+    };
+
+    const buildPathFromCache = async (): Promise<
+      | { path: Array<{ id: string; name: string }>; cacheHit: boolean }
+      | null
+    > => {
+      const path: Array<{ id: string; name: string }> = [];
+      let currentGoogleId: string | null = folderId;
+      let guard = 20;
+
+      while (currentGoogleId && guard > 0) {
+        const { data: recordData, error } = await supabase
+          .from("carpeta_documento")
+          .select("id, nombre, google_drive_folder_id, carpeta_padre_id")
+          .eq("google_drive_folder_id", currentGoogleId)
+          .maybeSingle<FolderRecord>();
+
+        if (error) {
+          console.error("Error consultando carpeta_documento:", error);
+          return null;
+        }
+
+        const record = recordData as FolderRecord | null;
+
+        if (!record) {
+          return { path, cacheHit: false };
+        }
+
+        path.unshift({
+          id: record.google_drive_folder_id ?? currentGoogleId,
+          name: record.nombre,
+        });
+
+        if (!record.carpeta_padre_id) {
+          currentGoogleId = null;
+        } else {
+          const { data: parentRecordData, error: parentError } = await supabase
+            .from("carpeta_documento")
+            .select("google_drive_folder_id")
+            .eq("id", record.carpeta_padre_id)
+            .maybeSingle<{ google_drive_folder_id: string | null }>();
+
+          if (parentError) {
+            console.error("Error consultando carpeta padre:", parentError);
+            return null;
+          }
+
+          const parentRecord = parentRecordData as { google_drive_folder_id: string | null } | null;
+          currentGoogleId = parentRecord?.google_drive_folder_id ?? null;
+        }
+
+        guard--;
+      }
+
+      if (path.length > 0 && path[0].id !== "root") {
+        path.unshift({ id: "root", name: "Mi Drive" });
+      }
+
+      return { path, cacheHit: true };
+    };
+
+    const cached = await buildPathFromCache();
+
+    if (sourceParam !== "drive" && cached && cached.cacheHit) {
+      return NextResponse.json({
+        success: true,
+        path: cached.path,
+        source: "cache",
+        cacheHit: true,
       });
     }
 
@@ -84,7 +164,9 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      path
+      path,
+      source: "drive",
+      cacheHit: false,
     });
 
   } catch (error) {

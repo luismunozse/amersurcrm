@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { MessageSquare, Users, Zap, BarChart3, Send } from "lucide-react";
+import { MessageSquare, Users, Zap, BarChart3, Send, TestTube2 } from "lucide-react";
 import DashboardMetricas from "@/components/marketing/DashboardMetricas";
 import GestionPlantillas from "@/components/marketing/GestionPlantillas";
 import GestionCampanas from "@/components/marketing/GestionCampanas";
@@ -164,12 +165,21 @@ export default function MarketingPage() {
             <div className="p-2 bg-crm-primary rounded-xl">
               <MessageSquare aria-hidden="true" className="w-6 h-6 text-white" />
             </div>
-            Marketing WhatsApp
+            Marketing con Twilio
           </h1>
           <p className="text-crm-text-secondary mt-1">
-            Gestiona campañas, conversaciones y automatizaciones de WhatsApp
+            Gestiona campañas de WhatsApp y SMS, conversaciones y automatizaciones con Twilio
           </p>
         </div>
+
+        {/* Botón de prueba Twilio */}
+        <Link
+          href="/dashboard/admin/marketing/twilio-test"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+        >
+          <TestTube2 className="w-4 h-4" />
+          Probar Twilio
+        </Link>
       </div>
 
       {verificandoCredenciales ? (
@@ -234,8 +244,8 @@ export default function MarketingPage() {
             <div>
               <h4 className="text-sm font-medium text-crm-warning mb-1">Configuración Requerida</h4>
               <p className="text-xs text-crm-text-secondary">
-                Para usar WhatsApp Business API, necesitas configurar tus credenciales en la sección de Configuración.
-                Requieres: App ID, Phone Number ID, Access Token y Webhook Verify Token de Meta Business.
+                Para usar WhatsApp con Twilio, necesitas configurar tus credenciales en el archivo .env.local.
+                Requieres: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_WHATSAPP_FROM.
               </p>
             </div>
           </div>
@@ -252,9 +262,9 @@ export default function MarketingPage() {
               </span>
             </div>
             <div>
-              <h4 className="text-sm font-medium text-crm-success mb-1">WhatsApp Configurado</h4>
+              <h4 className="text-sm font-medium text-crm-success mb-1">Twilio Configurado</h4>
               <p className="text-xs text-crm-text-secondary">
-                Las credenciales de WhatsApp Business API están configuradas correctamente. Ya puedes enviar mensajes y crear campañas.
+                Las credenciales de Twilio están configuradas correctamente. Ya puedes enviar mensajes de WhatsApp y SMS, y crear campañas.
               </p>
             </div>
           </div>

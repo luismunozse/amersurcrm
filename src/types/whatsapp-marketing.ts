@@ -4,7 +4,8 @@ export type CanalTipo = 'whatsapp' | 'facebook' | 'instagram' | 'email';
 
 export type CategoriaTemplate = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
 
-export type EstadoAprobacion = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED';
+// Con Twilio no necesitamos PENDING ni REJECTED (no hay proceso de aprobación)
+export type EstadoAprobacion = 'DRAFT' | 'APPROVED';
 
 export type EstadoCampana = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 
@@ -28,7 +29,13 @@ export type JsonValue =
 
 export type JsonObject = { [key: string]: JsonValue };
 
-// Credenciales de WhatsApp Cloud API
+/**
+ * @deprecated Con Twilio ya no usamos credenciales en la base de datos.
+ * Las credenciales están en variables de entorno (.env.local):
+ * - TWILIO_ACCOUNT_SID
+ * - TWILIO_AUTH_TOKEN
+ * - TWILIO_WHATSAPP_FROM
+ */
 export interface MarketingChannelCredential {
   id: string;
   canal_tipo: CanalTipo;
@@ -106,7 +113,7 @@ export interface MarketingCampana {
   descripcion?: string;
   template_id: string;
   audiencia_id: string;
-  credential_id: string;
+  credential_id: string | null; // Nullable porque con Twilio no se usa (credenciales en .env)
   variables_valores: Record<string, string>;
   objetivo?: string;
   utm_source?: string;
@@ -183,8 +190,9 @@ export interface MarketingMensaje {
   template_id?: string;
   template_variables?: Record<string, string>;
   campana_id?: string;
-  wa_message_id?: string;
-  wa_conversation_id?: string;
+  wa_message_id?: string; // Usado con Meta WhatsApp Business API
+  wa_conversation_id?: string; // Usado con Meta WhatsApp Business API
+  tw_message_sid?: string; // Usado con Twilio (ej: SMxxxxxxx)
   estado: EstadoMensaje;
   error_code?: string;
   error_message?: string;
