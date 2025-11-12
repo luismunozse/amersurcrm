@@ -249,8 +249,8 @@ Las credenciales están en `.env.local`:
 ```bash
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_PHONE_NUMBER=+17629943984
-TWILIO_WHATSAPP_FROM=whatsapp:+18312154070  # ✅ WhatsApp Business ACTIVADO
+TWILIO_PHONE_NUMBER=+1XXXXXXXXXX
+TWILIO_WHATSAPP_FROM=whatsapp:+1XXXXXXXXXX  # ✅ WhatsApp Business ACTIVADO
 ```
 
 ---
