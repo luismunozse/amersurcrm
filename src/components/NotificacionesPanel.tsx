@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
@@ -47,6 +48,7 @@ const PRIORIDADES: Record<Prioridad, { label: string; color: string; bg: string 
 };
 
 export default function NotificacionesPanel() {
+  const router = useRouter();
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [filtro, setFiltro] = useState<"todas" | "no_leidas" | "hoy" | "sistema">("todas");
@@ -191,6 +193,18 @@ export default function NotificacionesPanel() {
     }
   };
 
+  const handleNotificationClick = async (notificacion: Notificacion) => {
+    // Si no está leída, marcarla como leída
+    if (!notificacion.leida) {
+      await marcarComoLeida(notificacion.id);
+    }
+
+    // Navegar a la URL si existe
+    if (notificacion.data?.url) {
+      router.push(notificacion.data.url as string);
+    }
+  };
+
   const obtenerFechaRelativa = (fechaIso: string) => {
     const fecha = new Date(fechaIso);
 
@@ -323,7 +337,10 @@ export default function NotificacionesPanel() {
                 }`}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => handleNotificationClick(notificacion)}
+                  >
                     <div className="flex items-center space-x-3 mb-2">
                       <span className="text-lg">{tipoInfo.icon}</span>
                       <h3
@@ -368,7 +385,10 @@ export default function NotificacionesPanel() {
                   <div className="flex items-center space-x-2 ml-4">
                     {!notificacion.leida && (
                       <button
-                        onClick={() => marcarComoLeida(notificacion.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          marcarComoLeida(notificacion.id);
+                        }}
                         disabled={accionEnProgreso === notificacion.id}
                         className="p-2 text-crm-text-muted hover:text-crm-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Marcar como leída"
@@ -380,7 +400,10 @@ export default function NotificacionesPanel() {
                       </button>
                     )}
                     <button
-                      onClick={() => eliminarNotificacion(notificacion.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        eliminarNotificacion(notificacion.id);
+                      }}
                       disabled={accionEnProgreso === notificacion.id}
                       className="p-2 text-crm-text-muted hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Eliminar notificación"

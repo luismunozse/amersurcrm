@@ -275,6 +275,19 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
     }
   };
 
+  const handleNotificationClick = async (notificacion: NotificacionNoLeida) => {
+    // Marcar como leída
+    await handleMarkAsRead(notificacion.id);
+
+    // Cerrar el dropdown
+    setIsOpen(false);
+
+    // Navegar a la URL si existe
+    if (notificacion.data?.url) {
+      router.push(notificacion.data.url as string);
+    }
+  };
+
   const handleMarkAllAsRead = async () => {
     try {
       await marcarTodasLeidas();
@@ -342,7 +355,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
                     <div
                       key={notificacion.id}
                       className="p-4 hover:bg-crm-card-hover transition-colors cursor-pointer"
-                      onClick={() => handleMarkAsRead(notificacion.id)}
+                      onClick={() => handleNotificationClick(notificacion)}
                     >
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0">
