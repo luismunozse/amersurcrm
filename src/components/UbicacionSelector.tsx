@@ -286,18 +286,18 @@ export default function UbicacionSelector({
   }
 
   const triggerInputClass =
-    "w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-white text-crm-text-primary disabled:opacity-50 disabled:bg-crm-card-hover transition-all pr-8";
+    "w-full px-3 py-2 border border-crm-border dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-white dark:bg-gray-700 text-crm-text-primary dark:text-white disabled:opacity-50 disabled:bg-crm-card-hover transition-all pr-8";
   const listClass =
-    "absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-lg border border-crm-border shadow-xl bg-white ubigeo-menu backdrop-blur-sm";
+    "absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-lg border border-crm-border dark:border-gray-600 shadow-xl bg-white dark:bg-gray-800 ubigeo-menu backdrop-blur-sm";
   const itemClass =
-    "w-full px-3 py-2 text-left cursor-pointer transition-all duration-200 border-b border-crm-border last:border-b-0 hover:bg-crm-primary/5 hover:text-crm-primary text-xs ubigeo-item flex items-center justify-between group";
+    "w-full px-3 py-2 text-left cursor-pointer transition-all duration-200 border-b border-crm-border dark:border-gray-700 last:border-b-0 hover:bg-crm-primary/5 dark:hover:bg-crm-primary/10 hover:text-crm-primary dark:text-gray-200 text-xs ubigeo-item flex items-center justify-between group";
 
   return (
     <div className={`space-y-3 w-full ${className}`}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
       {/* Departamento */}
       <div className="space-y-1.5" ref={depRef}>
-        <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary">
+        <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary dark:text-gray-200">
           <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
@@ -364,7 +364,7 @@ export default function UbicacionSelector({
                   </div>
                 ))
               ) : (
-                <div className="px-3 py-2 text-xs text-crm-text-muted">Sin resultados</div>
+                <div className="px-3 py-2 text-xs text-crm-text-muted dark:text-gray-400">Sin resultados</div>
               )}
             </div>
           )}
@@ -373,7 +373,7 @@ export default function UbicacionSelector({
 
       {/* Provincia */}
       <div className="space-y-1.5" ref={provRef}>
-        <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary">
+        <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary dark:text-gray-200">
           <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -410,7 +410,7 @@ export default function UbicacionSelector({
             aria-controls={`${idBase}-provincias`}
           />
           <svg
-            className={`w-3 h-3 text-crm-text-muted absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${provinciaAbierta ? "rotate-180" : ""}`}
+            className={`w-3 h-3 text-crm-text-muted dark:text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${provinciaAbierta ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -427,7 +427,7 @@ export default function UbicacionSelector({
                     aria-selected={p.code === provinciaSeleccionada}
                     key={p.code}
                     onClick={() => handleProvinciaChange(p.code)}
-                    className={`${itemClass} ${p.code === provinciaSeleccionada ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
+                    className={`${itemClass} ${p.code === provinciaSeleccionada ? 'bg-crm-primary/10 dark:bg-crm-primary/20 text-crm-primary font-medium' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
@@ -441,7 +441,7 @@ export default function UbicacionSelector({
                   </div>
                 ))
               ) : (
-                <div className="px-3 py-2 text-xs text-crm-text-muted">Sin resultados</div>
+                <div className="px-3 py-2 text-xs text-crm-text-muted dark:text-gray-400">Sin resultados</div>
               )}
             </div>
           )}
@@ -450,7 +450,7 @@ export default function UbicacionSelector({
 
       {/* Distrito */}
       <div className="space-y-1.5" ref={distRef}>
-        <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary">
+        <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary dark:text-gray-200">
           <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
@@ -487,7 +487,7 @@ export default function UbicacionSelector({
             aria-controls={`${idBase}-distritos`}
           />
           <svg
-            className={`w-3 h-3 text-crm-text-muted absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${distritoAbierto ? "rotate-180" : ""}`}
+            className={`w-3 h-3 text-crm-text-muted dark:text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${distritoAbierto ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -504,7 +504,7 @@ export default function UbicacionSelector({
                     aria-selected={d.code === distritoSeleccionado}
                     key={d.code}
                     onClick={() => handleDistritoChange(d.code)}
-                    className={`${itemClass} ${d.code === distritoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
+                    className={`${itemClass} ${d.code === distritoSeleccionado ? 'bg-crm-primary/10 dark:bg-crm-primary/20 text-crm-primary font-medium' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
@@ -518,7 +518,7 @@ export default function UbicacionSelector({
                   </div>
                 ))
               ) : (
-                <div className="px-3 py-2 text-xs text-crm-text-muted">Sin resultados</div>
+                <div className="px-3 py-2 text-xs text-crm-text-muted dark:text-gray-400">Sin resultados</div>
               )}
             </div>
           )}

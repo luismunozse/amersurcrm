@@ -27,23 +27,15 @@ export async function verificarCredencialesWhatsApp() {
       return { tieneCredenciales: false, error: "No autorizado" };
     }
 
-    // Debug: ver qué variables tenemos
     const accountSid = process.env.TWILIO_ACCOUNT_SID ?? "";
     const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
     const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM ?? "";
-
-    console.log('🔍 Verificando credenciales de Twilio...');
-    console.log('TWILIO_ACCOUNT_SID:', accountSid ? 'Sí ✓' : 'No ✗');
-    console.log('TWILIO_AUTH_TOKEN:', authToken ? 'Sí ✓' : 'No ✗');
-    console.log('TWILIO_WHATSAPP_FROM:', whatsappFrom ? 'Sí ✓' : 'No ✗');
 
     // Verificar credenciales de Twilio desde variables de entorno
     const tieneCredenciales =
       accountSid.length > 10 &&
       authToken.length > 10 &&
       Boolean(whatsappFrom);
-
-    console.log('✅ Resultado:', tieneCredenciales ? 'CONFIGURADO' : 'NO CONFIGURADO');
 
     if (!tieneCredenciales) {
       return {
@@ -54,14 +46,10 @@ export async function verificarCredencialesWhatsApp() {
 
     return {
       tieneCredenciales: true,
-      proveedor: 'twilio',
-      detalles: {
-        accountSid: `${accountSid.substring(0, 10)}...`,
-        whatsappFrom,
-      }
+      proveedor: 'twilio'
     };
   } catch (error) {
-    console.error('❌ Error verificando credenciales de Twilio:', error);
+    console.error('Error verificando credenciales de Twilio:', error);
     return { tieneCredenciales: false, error: 'Error desconocido' };
   }
 }

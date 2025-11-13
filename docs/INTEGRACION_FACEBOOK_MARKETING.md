@@ -122,6 +122,11 @@ FACEBOOK_APP_SECRET=tu_app_secret_aqui
 FACEBOOK_PAGE_ID=tu_page_id
 FACEBOOK_ACCESS_TOKEN=token_de_larga_duracion
 
+# Lead Ads Webhook
+META_PAGE_ACCESS_TOKEN=token_largo_de_pagina
+META_LEAD_VERIFY_TOKEN=tu_token_unico
+CRM_AUTOMATION_USER_ID=uuid_usuario_sistema
+
 # Opcional: Business Manager
 FACEBOOK_BUSINESS_ID=tu_business_id
 FACEBOOK_AD_ACCOUNT_ID=act_123456789
@@ -154,6 +159,16 @@ FACEBOOK_AD_ACCOUNT_ID=act_123456789
 **Método 2: OAuth (Producción - Recomendado)**
 
 Implementaremos un flujo OAuth en el CRM donde los usuarios autorizarán la app y el sistema obtendrá tokens automáticamente.
+
+### 3.5 Configurar Webhook de Lead Ads
+
+1. En la app de Meta, ve a **Webhooks → Add Callback URL**.<br/>
+2. URL de callback: `https://{TU_DOMINIO}/api/meta/webhook`.<br/>
+3. Verify Token: usa el valor definido en `META_LEAD_VERIFY_TOKEN`.<br/>
+4. Suscribe el objeto **`leadgen`** de la página donde corren los formularios.<br/>
+5. Una vez verificado, cada envío de formulario invocará automáticamente el endpoint del CRM.
+
+> ⚠️ En producción asegúrate de usar el dominio público (ej. `crm.amersursac.com`). En entornos locales puedes usar un túnel (ngrok) solo para pruebas.
 
 ---
 
@@ -189,7 +204,12 @@ Implementaremos un flujo OAuth en el CRM donde los usuarios autorizarán la app 
 - ✅ Asignar leads a vendedores
 - ✅ Crear tareas de seguimiento automáticas
 
-**API Endpoint:** `/api/facebook/webhook/leads`
+**API Endpoint:** `/api/meta/webhook` (Meta Lead Ads Webhook)
+
+Cada lead se:
+- Recupera vía Graph API (`leadgen_id`).
+- Inserta automáticamente en la tabla `cliente` con origen `facebook_ads`.
+- Asigna a un vendedor activo (round-robin). Si no hay vendedores disponibles, usa el usuario definido en `CRM_AUTOMATION_USER_ID`.
 
 ---
 
@@ -314,4 +334,3 @@ npm install @types/facebook-nodejs-business-sdk --save-dev
 
 **Última actualización:** 3 de Noviembre de 2025
 **Estado:** Paso 1 - Configuración de Facebook App
-
