@@ -114,13 +114,6 @@ export default function UbicacionSelector({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Removed automatic opening of department dropdown
-  // useEffect(() => {
-  //   if (!disabled && departamentos.length > 0 && !departamentoSeleccionado) {
-  //     setDepartamentoAbierto(true);
-  //   }
-  // }, [disabled, departamentos.length, departamentoSeleccionado]);
-
   useEffect(() => {
     const loadAllData = async () => {
       try {
@@ -161,6 +154,24 @@ export default function UbicacionSelector({
     };
     loadAllData();
   }, []);
+
+  useEffect(() => {
+    if (!departamentoAbierto) {
+      setDepartamentoSearch("");
+    }
+  }, [departamentoAbierto]);
+
+  useEffect(() => {
+    if (!provinciaAbierta) {
+      setProvinciaSearch("");
+    }
+  }, [provinciaAbierta]);
+
+  useEffect(() => {
+    if (!distritoAbierto) {
+      setDistritoSearch("");
+    }
+  }, [distritoAbierto]);
 
   const handleDepartamentoChange = (code: string) => {
     setDepartamentoSeleccionado(code);
@@ -274,8 +285,8 @@ export default function UbicacionSelector({
     return <div className={`text-red-600 text-sm ${className}`}>Error: {error}</div>;
   }
 
-  const triggerClass =
-    "w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-white text-crm-text-primary disabled:opacity-50 disabled:bg-crm-card-hover transition-all text-left flex justify-between items-center hover:border-crm-primary/50";
+  const triggerInputClass =
+    "w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-white text-crm-text-primary disabled:opacity-50 disabled:bg-crm-card-hover transition-all pr-8";
   const listClass =
     "absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-lg border border-crm-border shadow-xl bg-white ubigeo-menu backdrop-blur-sm";
   const itemClass =
@@ -293,34 +304,45 @@ export default function UbicacionSelector({
           Departamento <span className="text-red-500">*</span>
         </label>
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => setDepartamentoAbierto(a => !a)}
+          <input
+            type="text"
+            value={departamentoAbierto ? departamentoSearch : depNombre}
+            onFocus={(e) => {
+              if (disabled) return;
+              setDepartamentoAbierto(true);
+              setDepartamentoSearch(depNombre);
+              requestAnimationFrame(() => e.target.select());
+            }}
+            onChange={(e) => {
+              if (disabled) return;
+              setDepartamentoSearch(e.target.value);
+              if (!departamentoAbierto) setDepartamentoAbierto(true);
+            }}
+            onClick={() => {
+              if (disabled) return;
+              if (!departamentoAbierto) {
+                setDepartamentoAbierto(true);
+                setDepartamentoSearch(depNombre);
+              }
+            }}
+            placeholder="Selecciona"
             disabled={disabled}
-            className={triggerClass}
+            className={triggerInputClass}
             aria-haspopup="listbox"
             aria-expanded={departamentoAbierto}
             aria-controls={`${idBase}-departamentos`}
+          />
+          <svg
+            className={`w-3 h-3 text-crm-text-muted absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${departamentoAbierto ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <span className={depNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
-              {depNombre || "Selecciona"}
-            </span>
-            <svg className={`w-3 h-3 transition-transform ${departamentoAbierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
 
           {departamentoAbierto && (
             <div className={listClass} role="listbox" id={`${idBase}-departamentos`}>
-              <div className="p-2 border-b border-crm-border bg-crm-card">
-                <input
-                  type="text"
-                  placeholder="Buscar departamento"
-                  value={departamentoSearch}
-                  onChange={(e) => setDepartamentoSearch(e.target.value)}
-                  className="w-full text-xs px-2 py-1.5 border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                />
-              </div>
               {departamentosFiltrados.length > 0 ? (
                 departamentosFiltrados.map((d) => (
                   <div
@@ -359,34 +381,45 @@ export default function UbicacionSelector({
           Provincia <span className="text-red-500">*</span>
         </label>
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => setProvinciaAbierta(a => !a)}
-            disabled={disabled || !departamentoSeleccionado || provinciasFiltradas.length === 0}
-            className={triggerClass}
+          <input
+            type="text"
+            value={provinciaAbierta ? provinciaSearch : provNombre}
+            onFocus={(e) => {
+              if (disabled || !departamentoSeleccionado || provinciasPorDepartamento.length === 0) return;
+              setProvinciaAbierta(true);
+              setProvinciaSearch(provNombre);
+              requestAnimationFrame(() => e.target.select());
+            }}
+            onChange={(e) => {
+              if (disabled || !departamentoSeleccionado || provinciasPorDepartamento.length === 0) return;
+              setProvinciaSearch(e.target.value);
+              if (!provinciaAbierta) setProvinciaAbierta(true);
+            }}
+            onClick={() => {
+              if (disabled || !departamentoSeleccionado || provinciasPorDepartamento.length === 0) return;
+              if (!provinciaAbierta) {
+                setProvinciaAbierta(true);
+                setProvinciaSearch(provNombre);
+              }
+            }}
+            placeholder={departamentoSeleccionado ? "Selecciona" : "Selecciona dpto."}
+            disabled={disabled || !departamentoSeleccionado || provinciasPorDepartamento.length === 0}
+            className={triggerInputClass}
             aria-haspopup="listbox"
             aria-expanded={provinciaAbierta}
             aria-controls={`${idBase}-provincias`}
+          />
+          <svg
+            className={`w-3 h-3 text-crm-text-muted absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${provinciaAbierta ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <span className={provNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
-              {provNombre || (departamentoSeleccionado ? "Selecciona" : "Selecciona dpto.")}
-            </span>
-            <svg className={`w-3 h-3 transition-transform ${provinciaAbierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
 
           {provinciaAbierta && (
             <div className={listClass} role="listbox" id={`${idBase}-provincias`}>
-              <div className="p-2 border-b border-crm-border bg-crm-card">
-                <input
-                  type="text"
-                  placeholder="Buscar provincia"
-                  value={provinciaSearch}
-                  onChange={(e) => setProvinciaSearch(e.target.value)}
-                  className="w-full text-xs px-2 py-1.5 border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                />
-              </div>
               {provinciasFiltradas.length > 0 ? (
                 provinciasFiltradas.map((p) => (
                   <div
@@ -425,34 +458,45 @@ export default function UbicacionSelector({
           Distrito <span className="text-red-500">*</span>
         </label>
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => setDistritoAbierto(a => !a)}
-            disabled={disabled || !provinciaSeleccionada || distritosFiltrados.length === 0}
-            className={triggerClass}
+          <input
+            type="text"
+            value={distritoAbierto ? distritoSearch : distNombre}
+            onFocus={(e) => {
+              if (disabled || !provinciaSeleccionada || distritosPorProvincia.length === 0) return;
+              setDistritoAbierto(true);
+              setDistritoSearch(distNombre);
+              requestAnimationFrame(() => e.target.select());
+            }}
+            onChange={(e) => {
+              if (disabled || !provinciaSeleccionada || distritosPorProvincia.length === 0) return;
+              setDistritoSearch(e.target.value);
+              if (!distritoAbierto) setDistritoAbierto(true);
+            }}
+            onClick={() => {
+              if (disabled || !provinciaSeleccionada || distritosPorProvincia.length === 0) return;
+              if (!distritoAbierto) {
+                setDistritoAbierto(true);
+                setDistritoSearch(distNombre);
+              }
+            }}
+            placeholder={provinciaSeleccionada ? "Selecciona" : "Selecciona prov."}
+            disabled={disabled || !provinciaSeleccionada || distritosPorProvincia.length === 0}
+            className={triggerInputClass}
             aria-haspopup="listbox"
             aria-expanded={distritoAbierto}
             aria-controls={`${idBase}-distritos`}
+          />
+          <svg
+            className={`w-3 h-3 text-crm-text-muted absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${distritoAbierto ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <span className={distNombre ? "text-crm-text-primary" : "text-crm-text-muted"}>
-              {distNombre || (provinciaSeleccionada ? "Selecciona" : "Selecciona prov.")}
-            </span>
-            <svg className={`w-3 h-3 transition-transform ${distritoAbierto ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
 
           {distritoAbierto && (
             <div className={listClass} role="listbox" id={`${idBase}-distritos`}>
-              <div className="p-2 border-b border-crm-border bg-crm-card">
-                <input
-                  type="text"
-                  placeholder="Buscar distrito"
-                  value={distritoSearch}
-                  onChange={(e) => setDistritoSearch(e.target.value)}
-                  className="w-full text-xs px-2 py-1.5 border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                />
-              </div>
               {distritosFiltrados.length > 0 ? (
                 distritosFiltrados.map((d) => (
                   <div
