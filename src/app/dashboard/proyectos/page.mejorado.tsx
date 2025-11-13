@@ -11,6 +11,7 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewProyectoForm from "./_NewProyectoForm";
 import QuickActions from "./QuickActions";
 import ProyectosSearchBar from "./_ProyectosSearchBar";
+import type { ProyectoMediaItem } from "@/types/proyectos";
 
 import {
   BuildingOffice2Icon,
@@ -25,6 +26,16 @@ type LoteRow = {
 
 type ProyectoEstado = 'activo' | 'pausado' | 'completado' | 'cancelado';
 type ProyectoTipo = 'propio' | 'corretaje';
+
+const parseGaleria = (value: unknown): ProyectoMediaItem[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is ProyectoMediaItem =>
+      !!item &&
+      typeof item === "object" &&
+      typeof (item as ProyectoMediaItem).url === "string",
+  );
+};
 
 // Tipos para Next 15: searchParams como Promise
 type SPP = Promise<{
@@ -314,7 +325,7 @@ export default async function ProyectosPage({
                       proyecto={{
                         id: p.id,
                         nombre: p.nombre,
-                        tipo: p.tipo,
+                        tipo: p.tipo || 'propio',
                         estado: p.estado,
                         ubicacion: p.ubicacion,
                         latitud: p.latitud,

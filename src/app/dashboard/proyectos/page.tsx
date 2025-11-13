@@ -384,7 +384,7 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
                       proyecto={{
                         id: p.id,
                         nombre: p.nombre,
-                        tipo: p.tipo,
+                        tipo: p.tipo || 'propio',
                         estado: p.estado,
                         ubicacion: p.ubicacion,
                         latitud: p.latitud,
