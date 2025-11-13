@@ -240,6 +240,14 @@ export default async function ProyLotesPage({
     ? (proyecto as { poligono: { lat: number; lng: number }[] }).poligono
     : undefined;
 
+  // Lotes para mapeo (sin paginación)
+  const { data: lotesParaMapeo, error: eLotesMap } = await supabase
+    .from("lote")
+    .select("id,codigo,estado,data,plano_poligono")
+    .eq("proyecto_id", id)
+    .order("codigo", { ascending: true });
+  if (eLotesMap) throw eLotesMap;
+
   const toLatLngTuple = (value: unknown): [number, number] | undefined => {
     if (
       Array.isArray(value) &&
@@ -312,7 +320,7 @@ export default async function ProyLotesPage({
       ? Number(overlayOpacityRaw)
       : null;
 
-  const lotesForMapeo = (lotesConProyecto || []).map((lote) => {
+  const lotesForMapeo = (lotesParaMapeo || []).map((lote) => {
     const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
     const planoPoligono = isLatLngTupleArray(planoPoligonoRaw)
       ? planoPoligonoRaw
@@ -524,6 +532,7 @@ export default async function ProyLotesPage({
                 key="lotes-list"
                 proyectoId={proyecto.id}
                 lotes={lotesConProyecto}
+                totalLotes={total}
               />
             )}
 

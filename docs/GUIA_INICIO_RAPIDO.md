@@ -1,181 +1,114 @@
-# 🚀 Primeros Pasos en AMERSUR CRM
-## Todo lo que necesitas saber para empezar a vender
+# 🚀 Guía Rápida para Nuevos Vendedores
+**Tiempo estimado:** 10 minutos · **Perfil:** Vendedores que inician en AMERSUR CRM
 
-**Tiempo:** 10 minutos
-**Para:** Vendedores nuevos
-
----
-
-## 📱 Paso 1: Entra al sistema (1 minuto)
-
-Es muy fácil:
-
-1. Abre Google Chrome o Firefox en tu computadora
-2. Escribe en la barra de arriba: **crm.amersursac.com**
-3. Pon tu usuario y contraseña (tu jefe te los dio)
-4. Dale click a "Iniciar Sesión"
-
-💡 **Primera vez:** Te va a pedir que cambies tu contraseña. Pon una que te acuerdes.
+| Qué verás | Para qué sirve | Cuándo usarlo |
+| --- | --- | --- |
+| Tablero principal | Resumen de metas, agenda y avisos | Cada mañana |
+| Clientes | Guardar y consultar contactos | Después de cada conversación |
+| Agenda | Programar llamadas/visitas | Apenas acuerdes una acción |
+| Proyectos | Información de lotes y precios | Antes de hablar con un cliente |
 
 ---
 
-## 🏠 Paso 2: Tu pantalla principal (2 minutos)
+## 1. Inicia sesión
+1. Abre Chrome o Firefox y entra a **crm.amersursac.com**.
+2. Escribe tu DNI y contraseña.
+3. Haz clic en `Iniciar Sesión`.
 
-Cuando entres vas a ver:
-
-### Arriba
-- **Tus números:** Cuántos clientes tienes, cuánto has vendido este mes, etc.
-- Así puedes ver cómo vas con tus metas
-
-### Al medio
-- **Tu calendario del día:** Las llamadas y reuniones que tienes agendadas para hoy
-- Como tu agenda del celular pero para el trabajo
-
-### Abajo
-- **Últimas novedades:** Lo nuevo que pasó (un cliente respondió, te asignaron alguien, etc.)
-
-💡 **Tip:** Empieza cada mañana aquí. Es como tu "escritorio" del trabajo.
+> 💡 La primera vez te pedirá cambiar la contraseña. Usa una que recuerdes y no compartas.
 
 ---
 
-## 👤 Paso 3: Agrega tu primer cliente (3 minutos)
+## 2. Conoce tu tablero
+Al ingresar verás tres zonas:
+- **Resumen superior:** clientes asignados, ventas del mes y metas.
+- **Agenda del día:** llamadas/reuniones programadas para hoy.
+- **Notificaciones recientes:** cambios importantes (nuevos clientes, respuestas, alertas).
 
-Es como guardar un contacto en tu celular, pero con más información:
-
-1. **Menú izquierdo → Clientes**
-2. **Botón verde que dice "+ Nuevo Cliente"**
-3. **Llena estos datos:**
-   - Nombre completo (ej: Juan Pérez)
-   - Celular (ej: 987654321)
-   - DNI (ej: 12345678)
-   - ¿De dónde vino? (Facebook, referido, web, etc.)
-
-4. **Dale "Guardar"**
-
-¡Listo! Ya tienes tu primer cliente guardado.
-
-💡 **¿Para qué?** Para no perder la información y poder hacerle seguimiento después.
+👉 Empieza el día revisando este tablero; es tu “escritorio” digital.
 
 ---
 
-## 📞 Paso 4: Agenda una llamada (2 minutos)
+## 3. Registra tu primer cliente
+1. Menú izquierdo → `Clientes`.
+2. Botón verde `+ Nuevo Cliente`.
+3. Completa nombre, celular, DNI y canal (Facebook, referido, etc.).
+4. Presiona `Guardar`.
 
-Para no olvidarte de llamar a tus clientes:
-
-1. **Menú izquierdo → Agenda**
-2. **Botón "+ Nuevo Evento"**
-3. **Completa:**
-   - ¿Qué vas a hacer? (ej: "Llamar a Juan")
-   - ¿Es llamada, reunión o visita?
-   - ¿Qué día y a qué hora?
-   - ¿Con qué cliente?
-
-4. **Dale "Guardar"**
-
-💡 **¿Para qué?** El sistema te va a recordar antes que se te pase la hora.
+> 🎯 Guardar clientes te permite hacer seguimiento y compartir información con el equipo.
 
 ---
 
-## 🏢 Paso 5: Mira los proyectos disponibles (1 minuto)
+## 4. Agenda tu próxima llamada
+1. Menú izquierdo → `Agenda`.
+2. Botón `+ Nuevo Evento`.
+3. Indica el tipo (llamada, reunión o visita), fecha, hora y cliente.
+4. Guarda el evento.
 
-Necesitas conocer qué tienes para ofrecer:
-
-1. **Menú izquierdo → Proyectos**
-2. **Mira la lista de proyectos**
-3. **Dale click a cualquiera para ver:**
-   - Dónde queda
-   - Qué lotes hay disponibles
-   - Los precios
-   - Fotos y planos
-
-💡 **¿Para qué?** Para saber qué mostrarle a cada cliente según lo que busca.
+> 🔔 El CRM te recordará antes de la hora, así no se te pasa ninguna oportunidad.
 
 ---
 
-## 🔔 Paso 6: Activa las alertas (30 segundos)
+## 5. Revisa los proyectos disponibles
+1. Menú izquierdo → `Proyectos`.
+2. Abre un proyecto para ver ubicación, lotes disponibles, precios, fotos y planos.
 
-Cuando el navegador te pregunte "¿Quieres recibir notificaciones?":
-
-**Dale "Permitir"**
-
-💡 **¿Para qué?** Te va a avisar en tu pantalla cuando pase algo importante (un cliente responde, se te vence una reserva, etc.)
+> 💬 Con esta información puedes ofrecer la opción correcta según el interés del cliente.
 
 ---
 
-## ✅ ¡Ya estás listo!
+## 6. Activa las notificaciones
+Cuando el navegador pregunte “¿Permitir notificaciones?”, elige **Permitir**.
 
-Ahora ya sabes lo básico. Úsalo todos los días:
-
-### Cada mañana (10 min):
-- Entra al sistema
-- Mira tus números
-- Revisa tu agenda del día
-- Lee las notificaciones nuevas
-
-### Durante el día:
-- Cuando hables con un cliente → **Anota la conversación**
-- Cuando te diga "llámame la otra semana" → **Agéndalo**
-- Cuando te pregunte por un lote → **Búscalo en Proyectos**
-
-### Cada noche (5 min):
-- Marca las llamadas que ya hiciste
-- Agenda las del día siguiente
+> 📣 Así sabrás al instante si un cliente responde, si vence una reserva o si asignan un nuevo contacto.
 
 ---
 
-## 🤔 ¿Dudas comunes?
+## Checklist Diario
+**Mañana**
+- [ ] Inicia sesión y revisa tu tablero.
+- [ ] Lee las notificaciones nuevas.
+- [ ] Confirma tu agenda del día.
 
-**"¿Y si me equivoco?"**
-No pasa nada, puedes editar o borrar. Mejor anotar algo mal que no anotar nada.
+**Durante el día**
+- [ ] Registra cada cliente nuevo.
+- [ ] Anota lo que conversaste.
+- [ ] Agenda las tareas que salgan de la conversación.
+- [ ] Consulta Proyectos antes de enviar información.
 
-**"¿Puedo usar mi celular?"**
-Sí, entra desde el navegador de tu celular a crm.amersursac.com
-
-**"¿Qué pasa si se me olvida la contraseña?"**
-En el login hay un link "¿Olvidaste tu contraseña?". O pregúntale a tu jefe.
-
-**"¿Necesito instalar algo?"**
-No, solo necesitas internet y un navegador. Ya.
-
----
-
-## 📚 Siguiente paso
-
-Ahora que ya sabes lo básico, lee:
-
-- **Manual Completo:** Todo lo que puedes hacer en detalle
-- **Preguntas Frecuentes:** Respuestas a más dudas
-
-O pregúntale a tu coordinador o compañeros vendedores.
+**Cierre**
+- [ ] Marca las llamadas realizadas.
+- [ ] Programa lo pendiente para mañana.
 
 ---
 
-## 🆘 ¿Necesitas ayuda?
-
-**Problemas técnicos:**
-- Email: soporteamersur@gmail.com
-- Horario: Lunes a Viernes 9am a 6pm
-
-**Dudas de ventas:**
-- Pregúntale a tu coordinador
+## Preguntas frecuentes
+- **¿Qué pasa si me equivoco?** Edita o borra el registro. Mejor corregir que perder la información.
+- **¿Puedo usar el celular?** Sí, entra desde el navegador del móvil a crm.amersursac.com.
+- **Olvidé mi contraseña.** Usa “¿Olvidaste tu contraseña?” en el login o avisa a tu coordinador.
+- **¿Debo instalar algo?** No. Solo necesitas internet y un navegador actualizado.
 
 ---
 
-## 💡 Consejo de oro
-
-> **"Si no lo anotas en el CRM, no existe"**
->
-> Cada llamada, cada mensaje, cada interés de un cliente...
-> Si no lo guardas aquí, después se te va a olvidar.
->
-> El CRM es tu memoria externa. Úsalo.
+## Próximos pasos
+- Lee el **Manual Completo** para dominar todas las funciones.
+- Revisa las **Preguntas Frecuentes** detalladas.
+- Consulta a tu coordinador si necesitas acompañamiento.
 
 ---
 
-**¡Bienvenido al equipo!** 🎉
-
-Ya tienes todo para empezar a vender más y mejor organizado.
+## Soporte
+- **Problemas técnicos:** soporteamersur@gmail.com · L-V 9:00 a 18:00
+- **Dudas de ventas:** coordinador o equipo comercial.
 
 ---
 
-*Última actualización: Noviembre 2025*
+## Consejo de oro
+> **“Si no lo registras en el CRM, no existe.”**  
+> Cualquier llamada, mensaje o interés debe quedar en el sistema para que tú (y el equipo) puedan actuar después.
+
+---
+
+**¡Bienvenido al equipo!** Trabaja ordenado, registra todo y vende con confianza.
+
+_Última actualización: Noviembre 2025_

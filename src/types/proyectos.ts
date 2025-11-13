@@ -8,6 +8,7 @@
 
 export type LoteEstado = 'disponible' | 'reservado' | 'vendido';
 export type ProyectoEstado = 'activo' | 'pausado' | 'completado' | 'cancelado';
+export type TipoProyecto = 'propio' | 'corretaje';
 export type TipoTerreno = 'residencial' | 'comercial' | 'industrial' | 'agricola' | 'mixto';
 
 // ============================================================================
@@ -24,6 +25,7 @@ export interface ProyectoMediaItem {
 export interface Proyecto {
   id: string;
   nombre: string;
+  tipo: TipoProyecto;
   descripcion: string | null;
   ubicacion: string | null;
   latitud: number | null;
@@ -56,6 +58,7 @@ export interface ProyectoConEstadisticas extends Proyecto {
 
 export interface ProyectoFormData {
   nombre: string;
+  tipo?: TipoProyecto;
   descripcion?: string;
   ubicacion?: string;
   latitud?: number;

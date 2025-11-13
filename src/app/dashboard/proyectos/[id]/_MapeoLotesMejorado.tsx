@@ -36,6 +36,8 @@ interface MapeoLotesMejoradoProps {
   proyectoId: string;
   planosUrl: string | null;
   proyectoNombre: string;
+  proyectoLatitud?: number | null;
+  proyectoLongitud?: number | null;
   initialBounds?: [[number, number], [number, number]] | null;
   initialRotation?: number | null;
   initialOpacity?: number | null;
@@ -51,6 +53,8 @@ export default function MapeoLotesMejorado({
   proyectoId,
   planosUrl,
   proyectoNombre,
+  proyectoLatitud,
+  proyectoLongitud,
   initialBounds,
   initialRotation,
   initialOpacity,
@@ -98,7 +102,13 @@ export default function MapeoLotesMejorado({
   const [focusRequest, setFocusRequest] = useState<{ id: string; ts: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'located'>('pending');
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const toggleDrawer = useCallback(() => setDrawerOpen((prev) => !prev), []);
+  const toggleDrawer = useCallback(() => {
+    // No permitir cerrar el drawer en los Pasos 1 y 2
+    if (currentStep === 1 || currentStep === 2) {
+      return;
+    }
+    setDrawerOpen((prev) => !prev);
+  }, [currentStep]);
 
   useEffect(() => {
     if (currentStep !== 3) {
@@ -106,68 +116,9 @@ export default function MapeoLotesMejorado({
     }
   }, [currentStep]);
 
-  const convertLegacyPoint = useCallback(
-    (point: [number, number]): [number, number] => {
-      if (!overlayBounds) return point;
-      const [lat, lng] = point;
-      const isNormalized =
-        lat >= -0.0001 && lat <= 1.0001 && lng >= -0.0001 && lng <= 1.0001;
-      if (!isNormalized) return point;
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-      const actualLat = swLat + lat * (neLat - swLat);
-      const actualLng = swLng + lng * (neLng - swLng);
-      return [actualLat, actualLng];
-    },
-    [overlayBounds]
-  );
-
-  const denormalizeLote = useCallback(
-    (lote: LoteState): LoteState => {
-      if (!overlayBounds) return lote;
-
-      let changed = false;
-      let finalPlano = lote.plano_poligono;
-
-      if (lote.plano_poligono && lote.plano_poligono.length > 0) {
-        const convertedPlano = lote.plano_poligono.map((pair) => convertLegacyPoint(pair));
-        const planoChanged = convertedPlano.some((pair, index) => {
-          const original = lote.plano_poligono![index];
-          return pair[0] !== original[0] || pair[1] !== original[1];
-        });
-        if (planoChanged) {
-          changed = true;
-          finalPlano = convertedPlano;
-        }
-      }
-
-      let finalUbicacion = lote.ubicacion;
-      if (lote.ubicacion) {
-        const converted = convertLegacyPoint([lote.ubicacion.lat, lote.ubicacion.lng]);
-        if (converted[0] !== lote.ubicacion.lat || converted[1] !== lote.ubicacion.lng) {
-          changed = true;
-          finalUbicacion = { lat: converted[0], lng: converted[1] };
-        }
-      }
-
-      if (!changed) return lote;
-
-      return {
-        ...lote,
-        plano_poligono: finalPlano,
-        ubicacion: finalUbicacion,
-      };
-    },
-    [convertLegacyPoint, overlayBounds]
-  );
-
   useEffect(() => {
-    setLotesState(lotes.map((lote) => denormalizeLote(lote)));
-  }, [lotes, denormalizeLote]);
-
-  useEffect(() => {
-    if (!overlayBounds) return;
-    setLotesState((prev) => prev.map((lote) => denormalizeLote(lote)));
-  }, [denormalizeLote, overlayBounds]);
+    setLotesState(lotes);
+  }, [lotes]);
 
   useEffect(() => {
     setPlanUrl(planosUrl);
@@ -236,12 +187,20 @@ export default function MapeoLotesMejorado({
   }, [selectedLote]);
 
   const mapCenter = useMemo(() => {
+    // 1. Si hay bounds del overlay, usar el centro de esos bounds
     if (overlayBounds) {
       const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
       return [(swLat + neLat) / 2, (swLng + neLng) / 2] as [number, number];
     }
+
+    // 2. Si no hay bounds pero hay coordenadas del proyecto, usar esas
+    if (proyectoLatitud != null && proyectoLongitud != null) {
+      return [proyectoLatitud, proyectoLongitud] as [number, number];
+    }
+
+    // 3. Fallback a las coordenadas por defecto (Lima)
     return DEFAULT_CENTER;
-  }, [overlayBounds]);
+  }, [overlayBounds, proyectoLatitud, proyectoLongitud]);
 
   const mapZoom = useMemo(() => {
     if (overlayBounds) {
@@ -997,7 +956,8 @@ export default function MapeoLotesMejorado({
                 </div>
               </CardContent>
             </Card>
-            {!isFullScreen && (
+            {/* Solo mostrar botón de toggle en Paso 3 */}
+            {!isFullScreen && currentStep === 3 && (
               <button
                 type="button"
                 onClick={toggleDrawer}
@@ -1066,6 +1026,39 @@ export default function MapeoLotesMejorado({
                     ✓ Guardar ubicación y continuar
                   </button>
 
+                  {/* Botón para saltar al Paso 2 */}
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="bg-white px-2 text-gray-500">o</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      // Si hay coordenadas del proyecto pero no hay bounds, crear bounds aproximados
+                      if (proyectoLatitud != null && proyectoLongitud != null && !overlayBounds) {
+                        // Crear un área aproximada de 500m alrededor de las coordenadas
+                        const offset = 0.0045; // Aproximadamente 500m
+                        const bounds: [[number, number], [number, number]] = [
+                          [proyectoLatitud - offset, proyectoLongitud - offset],
+                          [proyectoLatitud + offset, proyectoLongitud + offset]
+                        ];
+                        setOverlayBounds(bounds);
+                      }
+                      setCurrentStep(2);
+                    }}
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    🗺️ Saltar al Paso 2 (Cargar Plano)
+                  </button>
+
+                  <p className="text-xs text-gray-500 text-center">
+                    Si prefieres, ve directo a cargar el plano sin dibujar el área del proyecto
+                  </p>
+
                   {overlayDirty && areaPolygon.length >= 3 && (
                     <p className="text-xs text-orange-600 text-center">Área definida • Guarda para continuar</p>
                   )}
@@ -1103,6 +1096,13 @@ export default function MapeoLotesMejorado({
 
                   {planUrl && (
                     <>
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+                        <p className="text-green-800 font-medium mb-1">✓ Plano cargado</p>
+                        <p className="text-xs text-green-700">
+                          💡 Arrastra las <strong>esquinas verdes</strong> del plano para ajustar su tamaño y posición
+                        </p>
+                      </div>
+
                       <div className="space-y-3">
                         <div>
                           <label className="text-xs font-medium text-crm-text-primary mb-2 block">Opacidad del plano</label>
@@ -1179,7 +1179,7 @@ export default function MapeoLotesMejorado({
                     overlayBounds={overlayBounds}
                     overlayOpacity={overlayOpacity}
                     rotationDeg={overlayRotation}
-                    overlayEditable={false}
+                    overlayEditable={currentStep === 2}
                     onOverlayBoundsChange={handleOverlayBoundsChange}
                     onMapCenterChange={setCurrentMapCenter}
                     onCreateDefaultBounds={() => {

@@ -10,8 +10,11 @@ interface EditProjectModalProps {
   proyecto: {
     id: string;
     nombre: string;
+    tipo: string;
     estado: string;
     ubicacion?: string | null;
+    latitud?: number | null;
+    longitud?: number | null;
     descripcion?: string | null;
     imagen_url?: string | null;
     logo_url?: string | null;
@@ -48,8 +51,11 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
   const [isPending, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     nombre: proyecto.nombre,
+    tipo: proyecto.tipo,
     estado: proyecto.estado,
     ubicacion: proyecto.ubicacion || '',
+    latitud: proyecto.latitud?.toString() || '',
+    longitud: proyecto.longitud?.toString() || '',
     descripcion: proyecto.descripcion || '',
   });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
@@ -75,8 +81,11 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
   const resetToProjectValues = () => {
     setFormData({
       nombre: proyecto.nombre,
+      tipo: proyecto.tipo,
       estado: proyecto.estado,
       ubicacion: proyecto.ubicacion || "",
+      latitud: proyecto.latitud?.toString() || '',
+      longitud: proyecto.longitud?.toString() || '',
       descripcion: proyecto.descripcion || "",
     });
     setImagenFile(null);
@@ -202,8 +211,11 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
       try {
         const fd = new FormData();
         fd.append('nombre', formData.nombre);
+        fd.append('tipo', formData.tipo);
         fd.append('estado', formData.estado);
         fd.append('ubicacion', formData.ubicacion);
+        fd.append('latitud', formData.latitud);
+        fd.append('longitud', formData.longitud);
         fd.append('descripcion', formData.descripcion);
         fd.append('eliminar_imagen', eliminarImagen.toString());
         fd.append('eliminar_logo', eliminarLogo.toString());
@@ -279,6 +291,27 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
             />
           </div>
 
+          {/* Tipo de Proyecto */}
+          <div>
+            <label htmlFor="tipo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tipo de Proyecto *
+            </label>
+            <select
+              id="tipo"
+              name="tipo"
+              value={formData.tipo}
+              onChange={handleInputChange}
+              disabled={isPending}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              <option value="propio">Propio (Desarrollo propio)</option>
+              <option value="corretaje">Corretaje (Proyecto de terceros)</option>
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Selecciona si es un proyecto de desarrollo propio o corretaje
+            </p>
+          </div>
+
           {/* Estado */}
           <div>
             <label htmlFor="estado" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -313,6 +346,60 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="Ingrese la ubicación del proyecto"
             />
+          </div>
+
+          {/* Coordenadas GPS */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                📍 Coordenadas del Proyecto (Opcional)
+              </label>
+              <a
+                href="https://www.google.com/maps"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+              >
+                Buscar en Google Maps →
+              </a>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              Las coordenadas permiten centrar el mapa automáticamente al ver el proyecto
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="latitud" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Latitud (ej: -11.498265)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  id="latitud"
+                  name="latitud"
+                  value={formData.latitud}
+                  onChange={handleInputChange}
+                  disabled={isPending}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+                  placeholder="-11.498265"
+                />
+              </div>
+              <div>
+                <label htmlFor="longitud" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Longitud (ej: -77.226632)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  id="longitud"
+                  name="longitud"
+                  value={formData.longitud}
+                  onChange={handleInputChange}
+                  disabled={isPending}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+                  placeholder="-77.226632"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Descripción */}

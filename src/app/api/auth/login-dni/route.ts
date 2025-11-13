@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { extractRequestMetadata } from "@/lib/api/requestContext";
 import { notifyAdminsOfSecurityEvent } from "@/lib/security/adminNotifications";
+import { logLoginAudit, resolveLoginAuditCount } from "@/lib/loginAudit";
 
 const DNI_REGEX = /^\d{6,12}$/;
 
@@ -62,8 +63,9 @@ export async function POST(request: NextRequest) {
       stage: AuditStage = "lookup",
       metadata?: Record<string, unknown>
     ) => {
-      try {
-        await supabase.from("login_audit").insert({
+      await logLoginAudit(
+        supabase,
+        {
           dni: dniSanitized || null,
           login_type: "vendedor",
           stage,
@@ -72,10 +74,9 @@ export async function POST(request: NextRequest) {
           ip_address: ipAddress,
           user_agent: userAgent,
           metadata: metadata ?? null,
-        });
-      } catch (logError) {
-        console.error("No se pudo registrar el intento de login (DNI):", logError);
-      }
+        },
+        `login-dni:${stage}`
+      );
     };
 
     if (!dniSanitized || !password) {
@@ -90,15 +91,14 @@ export async function POST(request: NextRequest) {
       Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
     ).toISOString();
 
-    const [identifierFailureCount, ipFailureCount] = await Promise.all([
+    const [dniResult, ipResult] = await Promise.all([
       supabase
         .from("login_audit")
         .select("id", { count: "exact", head: true })
         .eq("dni", dniSanitized)
         .eq("success", false)
         .in("stage", ["lookup", "authentication", "security"])
-        .gte("created_at", windowStartIso)
-        .then((result) => result.count ?? 0),
+        .gte("created_at", windowStartIso),
       ipAddress
         ? supabase
             .from("login_audit")
@@ -107,9 +107,22 @@ export async function POST(request: NextRequest) {
             .eq("success", false)
             .in("stage", ["lookup", "authentication", "security"])
             .gte("created_at", windowStartIso)
-            .then((result) => result.count ?? 0)
-        : Promise.resolve(0),
+        : Promise.resolve({ count: 0, error: null }),
     ]);
+
+    const identifierFailureCount = resolveLoginAuditCount(
+      dniResult.count ?? null,
+      dniResult.error ?? null,
+      "login-dni:rate-limit-dni"
+    );
+
+    const ipFailureCount = ipAddress
+      ? resolveLoginAuditCount(
+          ipResult.count ?? null,
+          ipResult.error ?? null,
+          "login-dni:rate-limit-ip"
+        )
+      : 0;
 
     const rateLimitExceeded =
       identifierFailureCount >= RATE_LIMIT_MAX_IDENTIFIER_ATTEMPTS ||
@@ -196,9 +209,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error en login con DNI:", error);
-    try {
-      const { ipAddress, userAgent } = extractRequestMetadata(request);
-      await supabase.from("login_audit").insert({
+    const { ipAddress, userAgent } = extractRequestMetadata(request);
+    await logLoginAudit(
+      supabase,
+      {
         dni: dniSanitized || null,
         login_type: "vendedor",
         stage: "lookup",
@@ -206,10 +220,9 @@ export async function POST(request: NextRequest) {
         error_message: error instanceof Error ? error.message : "error_desconocido",
         ip_address: ipAddress,
         user_agent: userAgent,
-      });
-    } catch (logError) {
-      console.error("No se pudo registrar el error de login (DNI):", logError);
-    }
+      },
+      "login-dni:error"
+    );
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }

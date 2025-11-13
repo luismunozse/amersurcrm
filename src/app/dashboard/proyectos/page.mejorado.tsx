@@ -314,10 +314,15 @@ export default async function ProyectosPage({
                       proyecto={{
                         id: p.id,
                         nombre: p.nombre,
+                        tipo: p.tipo,
                         estado: p.estado,
                         ubicacion: p.ubicacion,
+                        latitud: p.latitud,
+                        longitud: p.longitud,
                         descripcion: p.descripcion,
                         imagen_url: p.imagen_url,
+                        logo_url: p.logo_url,
+                        galeria_imagenes: parseGaleria(p.galeria_imagenes),
                       }}
                     />
                     <Link

@@ -1,540 +1,264 @@
-# 📘 Manual de Usuario - AMERSUR CRM
-## Guía para Vendedores
+# 📘 Manual de Usuario – AMERSUR CRM
+## Referencia Completa para Vendedores
 
-**Versión:** 1.0
-**Fecha:** Noviembre 2025
-**Dirigido a:** Vendedores y Coordinadores de Ventas
-
----
-
-## 📋 Índice
-
-1. [Introducción](#introducción)
-2. [Inicio de Sesión](#inicio-de-sesión)
-3. [Navegación Principal](#navegación-principal)
-4. [Gestión de Clientes](#gestión-de-clientes)
-5. [Agenda y Seguimiento](#agenda-y-seguimiento)
-6. [Proyectos y Propiedades](#proyectos-y-propiedades)
-7. [Proceso de Venta](#proceso-de-venta)
-8. [Notificaciones](#notificaciones)
-9. [Mi Perfil](#mi-perfil)
-10. [Preguntas Frecuentes](#preguntas-frecuentes)
+**Versión:** 1.1  
+**Actualizado:** Noviembre 2025  
+**Dirigido a:** Vendedores y coordinadores comerciales
 
 ---
 
-## 🎯 Introducción
+## 📋 Índice rápido
 
-### ¿Qué es AMERSUR CRM?
-
-AMERSUR CRM es tu herramienta de trabajo diario para gestionar clientes, hacer seguimiento de oportunidades y cerrar ventas de manera eficiente.
-
-### ¿Qué puedes hacer como vendedor?
-
-✅ Gestionar tu cartera de clientes
-✅ Agendar y dar seguimiento a reuniones
-✅ Consultar disponibilidad de lotes
-✅ Crear proformas y cotizaciones
-✅ Gestionar reservas
-✅ Ver tus métricas de ventas
-✅ Recibir notificaciones en tiempo real
-
----
-
-## 🔐 Inicio de Sesión
-
-### Acceso al Sistema
-
-1. **Abrir el navegador**
-   - Recomendado: Google Chrome, Firefox o Edge
-   - Ingresa a: `https://crm.amersursac.com` 
-2. **Ingresar credenciales**
-   ```
-   Usuario: tu_nombre_usuario
-   Contraseña: ••••••••
-   ```
-
-3. **Primer inicio de sesión**
-   - Si es tu primera vez, el sistema te pedirá cambiar tu contraseña
-   - Elige una contraseña segura (mínimo 6 caracteres)
-   - Guárdala en un lugar seguro
-
-### ¿Olvidaste tu contraseña?
-
-1. Haz clic en **"¿Olvidaste tu contraseña?"**
-2. Ingresa tu correo electrónico
-3. Recibirás un enlace para resetearla
-4. Sigue las instrucciones del correo
+1. [Visión general](#vision-general)  
+2. [Inicio de sesión y seguridad](#inicio-de-sesion)  
+3. [Mapa de navegación](#mapa-de-navegacion)  
+4. [Clientes](#clientes)  
+5. [Agenda y recordatorios](#agenda-recordatorios)  
+6. [Proyectos, lotes y reservas](#proyectos-lotes-reservas)  
+7. [Proceso comercial sugerido](#proceso-comercial)  
+8. [Notificaciones](#notificaciones)  
+9. [Mi perfil y métricas](#perfil-metricas)  
+10. [Preguntas frecuentes](#faqs)  
+11. [Soporte y recursos](#soporte-recursos)  
+12. [Notas de versión](#notas-version)
 
 ---
 
-## 🧭 Navegación Principal
+<a id="vision-general"></a>
+## 🎯 Visión general
 
-### Menú Lateral (Sidebar)
+| Puedes… | ¿Para qué? |
+| --- | --- |
+| Registrar clientes y sus interacciones | Mantener tu cartera ordenada y compartida |
+| Programar tareas y recordatorios | No olvidar seguimientos ni visitas |
+| Consultar proyectos y lotes | Responder rápidamente a cada consulta |
+| Generar proformas y reservas | Formalizar ofertas y bloquear unidades |
+| Recibir notificaciones en tiempo real | Actuar apenas algo importante ocurra |
 
-El menú lateral te permite navegar por todas las secciones:
+> Consejo general: registra toda interacción. Si no está en el CRM, no existe.
 
+---
+
+<a id="inicio-de-sesion"></a>
+## 🔐 Inicio de sesión y seguridad
+
+1. Navega a `https://crm.amersursac.com` (Chrome/Firefox recomendados).  
+2. Ingresa tu usuario (DNI o correo) y contraseña.  
+3. En el primer acceso deberás cambiar la contraseña. Usa una combinación fácil de recordar pero segura.
+
+### Recuperar contraseña
+1. Haz clic en **¿Olvidaste tu contraseña?**.  
+2. Ingresa tu correo corporativo.  
+3. Revisa tu bandeja y sigue el enlace para restablecerla.
+
+### Buenas prácticas
+- No compartas tus credenciales.  
+- Cierra sesión si trabajas en equipos compartidos.  
+- Actualiza la contraseña cada cierto tiempo desde `Avatar → Cambiar contraseña`.
+
+---
+
+<a id="mapa-de-navegacion"></a>
+## 🧭 Mapa de navegación
+
+**Menú lateral**  
 ```
-🏠 Dashboard          → Resumen de tus métricas
-👥 Clientes          → Tu cartera de clientes
-📅 Agenda            → Eventos y seguimientos
-🏢 Proyectos         → Proyectos disponibles
-🏠 Propiedades       → Lotes disponibles
-📄 Documentos        → Contratos y archivos
+🏠 Dashboard     → indicadores y pendientes
+👥 Clientes      → cartera y detalle de cada contacto
+📅 Agenda        → eventos, recordatorios y timeline
+🏢 Proyectos     → proyectos y lotes disponibles
+🏠 Propiedades   → buscador transversal de lotes
+📄 Documentos    → archivos y plantillas
 ```
 
-### Barra Superior (Header)
-
-En la parte superior encontrarás:
-
-- **🔔 Campana de Notificaciones**
-  - Click para ver notificaciones nuevas
-  - Badge rojo indica notificaciones sin leer
-
-- **👤 Avatar / Menú de Usuario**
-  - Mi Perfil
-  - Cambiar Contraseña
-  - Configuración
-  - Cerrar Sesión
+**Barra superior**  
+- 🔔 Notificaciones: muestra eventos recientes (reservas, clientes nuevos, recordatorios).  
+- 🔍 Buscador global: encuentra clientes, lotes o proyectos por nombre/código.  
+- 👤 Avatar: perfil, configuración, soporte y cerrar sesión.
 
 ---
 
-## 👥 Gestión de Clientes
+<a id="clientes"></a>
+## 👥 Clientes
 
-### Ver Todos tus Clientes
+### Crear o importar
+1. `Clientes → + Nuevo Cliente`.  
+2. Completa datos básicos (nombre, DNI, teléfono, email) y datos CRM (origen, estado, presupuesto).  
+3. Guarda. El cliente aparece en tu lista y queda asignado a ti.
 
-1. Click en **"Clientes"** en el menú lateral
-2. Verás una lista con todos tus clientes asignados
+> Para cargas masivas utiliza la opción **Importar** desde el listado (archivo CSV con el formato provisto).
 
-### Filtrar Clientes
+### Detalle del cliente
+El perfil tiene pestañas:
+- **Resumen:** datos personales, presupuesto y notas clave.  
+- **Timeline:** historial de llamadas, correos, WhatsApp, visitas.  
+- **Propiedades de interés:** lotes guardados para ese cliente.  
+- **Proformas / Reservas / Ventas:** documentos emitidos y su estado.
 
-Usa los filtros en la parte superior:
+### Registrar interacciones
+1. Abre la pestaña **Timeline**.  
+2. `+ Nueva interacción`. Indica tipo (llamada, email, visita), resultado y próxima acción.  
+3. Guarda. La interacción queda disponible para ti y tu coordinador.
 
-- **Por estado:** Prospecto, Cliente, Inactivo
-- **Por origen:** Referido, Web, Llamada, etc.
-- **Por búsqueda:** Busca por nombre, DNI, teléfono
-
-### Crear un Nuevo Cliente
-
-1. Click en el botón **"+ Nuevo Cliente"**
-2. Completa la información:
-
-   **Datos Básicos:**
-   - Nombre completo *
-   - DNI *
-   - Teléfono *
-   - Email (opcional)
-   - Dirección
-
-   **Datos CRM:**
-   - Origen del cliente (¿Cómo llegó?)
-   - Estado (Prospecto por defecto)
-   - Presupuesto estimado
-   - Interés en (tipo de propiedad)
-
-3. Click en **"Guardar"**
-4. ✅ El cliente aparecerá en tu lista
-
-### Ver Detalle de un Cliente
-
-Click en cualquier cliente para ver:
-
-#### **📋 Pestaña: Información Básica**
-- Datos personales completos
-- Presupuesto y preferencias
-- Notas importantes
-
-#### **📅 Pestaña: Timeline**
-- Historia completa de interacciones
-- Todas las actividades registradas
-- Cambios de estado
-
-#### **🏠 Pestaña: Propiedades de Interés**
-- Lotes que le interesan al cliente
-- Agregar nuevas propiedades
-- Ver detalles de cada lote
-
-#### **📄 Pestaña: Proformas**
-- Cotizaciones generadas
-- Crear nueva proforma
-- Descargar PDFs
-
-#### **📝 Pestaña: Reservas**
-- Reservas activas del cliente
-- Estado de cada reserva
-- Fechas importantes
-
-#### **💰 Pestaña: Ventas**
-- Ventas completadas
-- Monto total
-- Estado de pagos
-
-### Editar un Cliente
-
-1. Abre el detalle del cliente
-2. Click en el botón **"✏️ Editar"**
-3. Modifica los campos necesarios
-4. Click en **"Guardar Cambios"**
-
-### Agregar Interacción
-
-Registra cada contacto con el cliente:
-
-1. En el detalle del cliente, pestaña **"Timeline"**
-2. Click en **"+ Nueva Interacción"**
-3. Completa:
-   - Tipo: Llamada, Email, WhatsApp, Visita, etc.
-   - Descripción
-   - Resultado
-   - Próxima acción (opcional)
-4. Click en **"Guardar"**
-
-💡 **Tip:** Registra TODAS las interacciones, así no pierdes el seguimiento
+### Actualizar estado
+Selecciona un cliente, haz clic en **Editar** y ajusta:  
+- Estado (Prospecto, En negociación, Cliente, Inactivo).  
+- Presupuesto, interés principal, canal de origen.  
+- Datos de contacto.
 
 ---
 
-## 📅 Agenda y Seguimiento
+<a id="agenda-recordatorios"></a>
+## 📅 Agenda y recordatorios
 
-### Ver tu Agenda
+### Vista general
+`Agenda` muestra tus actividades en modo calendario o lista. Filtros rápidos: pendientes hoy, próximos 7 días, vencidos.
 
-1. Click en **"Agenda"** en el menú lateral
-2. Verás tus eventos en formato calendario o lista
+### Crear un evento
+1. `Agenda → + Nuevo Evento`.  
+2. Completa título, tipo, fecha/hora, cliente y descripción.  
+3. Guarda. Puedes adjuntar un lote o proyecto si la reunión trata de uno específico.
 
-### Crear un Evento
+### Recordatorios rápidos
+Si solo necesitas recordar una llamada o envío de info, usa `+ Recordatorio`. Recibirás una notificación en la hora fijada.
 
-1. Click en **"+ Nuevo Evento"**
-2. Completa:
-   - **Título** * (ej: "Visita a terreno con Juan Pérez")
-   - **Tipo:** Reunión, Llamada, Visita, etc.
-   - **Fecha y Hora** *
-   - **Cliente relacionado** (opcional)
-   - **Propiedad relacionada** (opcional)
-   - **Prioridad:** Alta, Media, Baja
-   - **Descripción**
-3. Click en **"Guardar"**
-
-### Crear un Recordatorio
-
-1. Click en **"+ Nuevo Recordatorio"**
-2. Similar a evento, pero para recordar acciones
-3. Recibirás una notificación a la hora indicada
-
-### Completar un Evento
-
-1. Abre el evento desde tu agenda
-2. Click en **"Marcar como Completado"**
-3. Opcionalmente agrega notas de seguimiento
-
-### Reprogramar un Evento
-
-1. Abre el evento
-2. Click en **"Reprogramar"**
-3. Selecciona nueva fecha/hora
-4. Click en **"Guardar"**
-
-💡 **Tip:** Programa eventos de seguimiento inmediatamente después de cada reunión
+### Seguimiento
+- Marca eventos como **Completados** cuando finalicen.  
+- Usa **Reprogramar** para mover una actividad sin perder el historial.  
+- Convierte eventos relevantes en interacciones desde el timeline del cliente para dejar constancia.
 
 ---
 
-## 🏢 Proyectos y Propiedades
+<a id="proyectos-lotes-reservas"></a>
+## 🏢 Proyectos, lotes y reservas
 
-### Ver Proyectos Disponibles
+### Consultar proyectos
+1. `Proyectos` lista todos los desarrollos.  
+2. Al ingresar verás ubicación, tipo, descripción, galería y tabs: Lotes, Mapeo, Documentos.
 
-1. Click en **"Proyectos"** en el menú lateral
-2. Verás todos los proyectos de AMERSUR
+### Buscar lotes disponibles
+Dentro del proyecto o en `Propiedades` filtra por:
+- Estado: disponible, reservado, vendido.  
+- Superficie, precio, manzana o código.  
+- Etiquetas específicas (ej. etapa, tipo de unidad).
 
-### Ver Detalle de un Proyecto
+### Detalle del lote
+Incluye superficie, precio, estado, fotos, planos y ubicación en el mapa. Desde aquí puedes:
+- Guardarlo como favorito para un cliente.  
+- Generar proforma.  
+- Iniciar una reserva (si tienes permisos).
 
-Click en cualquier proyecto para ver:
+### Proformas
+1. Desde el cliente (`Proformas → + Nueva`).  
+2. Selecciona lote, condiciones de pago y observaciones.  
+3. Genera el PDF y descárgalo para compartirlo. Se almacena en el historial del cliente.
 
-- **Información general**
-  - Ubicación
-  - Tipo de proyecto
-  - Descripción
+### Reservas y ventas
+1. Desde el lote disponible presiona **Reservar**.  
+2. Completa cliente, monto, fecha límite y notas.  
+3. El estado del lote cambia a reservado y el sistema envía notificaciones.  
+4. Para cancelar o convertir en venta, ingresa a la reserva y selecciona la acción correspondiente (puede requerir aprobación).
 
-- **Mapa del proyecto**
-  - Vista satelital
-  - Ubicación de lotes
-
-- **Lista de lotes**
-  - Lotes disponibles
-  - Lotes reservados
-  - Lotes vendidos
-
-### Buscar Lotes Disponibles
-
-1. En la sección **"Propiedades"** o dentro de un proyecto
-2. Usa los filtros:
-   - **Estado:** Disponible, Reservado, Vendido
-   - **Precio:** Rango mínimo y máximo
-   - **Superficie:** Área del terreno
-   - **Proyecto:** Filtrar por proyecto específico
-
-### Ver Detalle de un Lote
-
-Click en cualquier lote para ver:
-
-- Código del lote
-- Superficie total
-- Precio
-- Estado comercial
-- Ubicación en el mapa
-- Fotos (si disponibles)
-
-💡 **Tip:** Guarda los lotes que más te interesen para mostrarlos a tus clientes
+> Mantén actualizadas las reservas para liberar lotes vencidos y evitar conflictos.
 
 ---
 
-## 💼 Proceso de Venta
+<a id="proceso-comercial"></a>
+## 🔁 Proceso comercial sugerido
 
-### 1. Crear una Proforma (Cotización)
+| Paso | Acción | Resultado |
+| --- | --- | --- |
+| 1 | Registrar cliente y canal de origen | Cartera actualizada |
+| 2 | Registrar la primera interacción | Timeline activo |
+| 3 | Programar seguimiento en Agenda | Recordatorio automático |
+| 4 | Consultar proyectos y lotes | Oferta personalizada |
+| 5 | Generar proforma | Cotización formal |
+| 6 | Reservar y dar seguimiento | Bloqueo temporal del lote |
+| 7 | Registrar venta / liberar lote | Control de inventario |
 
-1. **Desde el detalle del cliente:**
-   - Pestaña **"Proformas"**
-   - Click en **"+ Nueva Proforma"**
-
-2. **Completa la información:**
-   - Selecciona el **lote** que quiere el cliente
-   - Precio (se pre-llena automáticamente)
-   - Condiciones de pago:
-     - Inicial
-     - Número de cuotas
-     - Monto de cuota
-   - Observaciones
-
-3. **Vista previa y descarga:**
-   - Click en **"Generar Proforma"**
-   - Se genera un PDF profesional
-   - Descarga para enviarlo al cliente
-
-### 2. Reservar un Lote
-
-⚠️ **Importante:** Solo puedes reservar lotes **disponibles**
-
-1. **Desde el detalle del lote:**
-   - Click en **"Reservar"**
-
-2. **Completa el formulario:**
-   - Cliente
-   - Monto de separación
-   - Fecha de vencimiento de reserva
-   - Observaciones
-
-3. **Confirmar:**
-   - Click en **"Confirmar Reserva"**
-   - ✅ Recibirás una notificación de confirmación
-   - 📧 El sistema puede enviar documentación automática
-
-### 3. Gestionar Reservas
-
-**Ver tus reservas activas:**
-1. Dashboard → Sección "Mis Reservas"
-2. O en el detalle del cliente → Pestaña "Reservas"
-
-**Cancelar una reserva:**
-1. Abre la reserva
-2. Click en **"Cancelar Reserva"**
-3. Ingresa el motivo (obligatorio)
-4. Confirma
-
-### 4. Confirmar una Venta
-
-⚠️ **Nota:** Esta acción puede requerir aprobación de coordinador
-
-1. Reserva debe estar activa y pagada
-2. Click en **"Confirmar Venta"**
-3. Completa documentación requerida
-4. ✅ Recibirás notificación cuando se apruebe
-
-💡 **Tip:** Mantén actualizado el estado de tus reservas para evitar confusiones
+Complementa cada paso con notas claras en el CRM para que tu coordinador pueda ayudarte si lo requieres.
 
 ---
 
+<a id="notificaciones"></a>
 ## 🔔 Notificaciones
 
-### ¿Qué notificaciones recibirás?
+- **Tipos:** nuevos clientes asignados, recordatorios, reservas/ventas, actualizaciones de tareas, respuestas desde WhatsApp/portal.  
+- **Dónde verlas:** campana del header; clic para desplegar y marcar como leídas.  
+- **Notificaciones push:** al ingresar, permite las notificaciones del navegador para recibir alertas aunque el CRM esté en segundo plano.
 
-- 🏠 **Lote reservado** - Cuando reservas un lote
-- 🎉 **Lote vendido** - Cuando se confirma una venta
-- 👤 **Nuevo cliente asignado** - Te asignan un cliente
-- 📅 **Recordatorio de evento** - Eventos próximos
-- 📝 **Proforma creada** - Confirmación de proforma generada
-
-### Ver tus Notificaciones
-
-1. Click en la **campana 🔔** en la barra superior
-2. Verás lista de notificaciones recientes
-3. Badge rojo indica cuántas sin leer
-
-### Marcar como Leída
-
-- Click en cualquier notificación para marcarla como leída
-- O click en **"Marcar todas como leídas"**
-
-### Notificaciones del Navegador
-
-El sistema puede enviarte notificaciones incluso cuando no estés en la pestaña:
-
-1. Primera vez que uses el sistema, te pedirá permiso
-2. Click en **"Permitir"**
-3. Ahora recibirás notificaciones en tiempo real
-
-💡 **Tip:** Activa las notificaciones para no perderte nada importante
+> El panel también muestra un resumen de notificaciones críticas (reservas por vencer, eventos atrasados). Revísalo al iniciar y cerrar tu jornada.
 
 ---
 
-## 👤 Mi Perfil
+<a id="perfil-metricas"></a>
+## 👤 Mi perfil y métricas
 
-### Editar tu Perfil
+### Perfil
+- `Avatar → Mi Perfil`: edita foto, teléfono y datos básicos.  
+- Cambia contraseña desde la misma sección.
 
-1. Click en tu **avatar** (esquina superior derecha)
-2. Click en **"Mi Perfil"**
-3. Puedes editar:
-   - Foto de perfil
-   - Nombre completo
-   - Teléfono
-   - Otros datos personales
+### Métricas personales
+En `Mi rendimiento` (o dashboard principal) verás:
+- Ventas del mes y metas.  
+- Conversión de clientes (prospectos vs ventas).  
+- Ranking (si el coordinador lo habilita).  
+- Reservas activas y por vencer.
 
-### Cambiar Contraseña
-
-1. Avatar → **"Cambiar Contraseña"**
-2. Ingresa:
-   - Contraseña actual
-   - Nueva contraseña
-   - Confirmar nueva contraseña
-3. Click en **"Cambiar"**
-
-### Ver tu Rendimiento
-
-1. Click en **"Mi Rendimiento"** en el menú lateral
-2. Verás:
-   - 📊 Ventas del mes
-   - 🎯 Meta vs Real
-   - 📈 Tendencia
-   - 🏆 Ranking (si aplica)
+Revisa estos indicadores semanalmente para detectar oportunidades y enfocarte en los clientes con mayor probabilidad de compra.
 
 ---
 
-## ❓ Preguntas Frecuentes
+<a id="faqs"></a>
+## ❓ Preguntas frecuentes
 
-### ¿Cómo sé si un lote está disponible?
+**¿Cómo sé si un lote puede reservarse?**  
+El estado aparece en color: 🟢 disponible, 🟡 reservado, 🔴 vendido. Solo los lotes en verde aceptan nuevas reservas.
 
-En la lista de lotes o en el detalle, verás el **estado comercial**:
-- 🟢 **Disponible** - Puedes reservarlo
-- 🟡 **Reservado** - Ya tiene reserva activa
-- 🔴 **Vendido** - Ya fue vendido
-- ⚫ **Bloqueado** - No disponible temporalmente
+**¿Puedo ver clientes de otros vendedores?**  
+No. Cada vendedor ve únicamente su cartera asignada. Si necesitas colaborar, pide a tu coordinador que comparta el cliente.
 
-### ¿Puedo ver clientes de otros vendedores?
+**¿Se puede editar una proforma?**  
+Si aún no fue enviada o aprobada, puedes editarla; de lo contrario crea una nueva versión para mantener historial.
 
-No. Solo verás los clientes **asignados a ti**. Esto protege la información y tu cartera.
+**¿No me llegan notificaciones?**  
+Revisa que el navegador tenga permisos habilitados. En Chrome: 🔒 → Notificaciones → Permitir.
 
-### ¿Qué pasa si pierdo mi contraseña?
+**¿Puedo trabajar desde el celular?**  
+Sí. El CRM es responsive: ingresa desde el navegador móvil y tendrás las mismas funciones principales.
 
-Usa la opción **"¿Olvidaste tu contraseña?"** en la pantalla de login. Recibirás un correo para resetearla.
-
-### ¿Cómo descargo una proforma en PDF?
-
-1. Ve al detalle del cliente
-2. Pestaña **"Proformas"**
-3. Click en la proforma que quieres
-4. Click en **"Descargar PDF"** o **"📥"**
-
-### ¿Puedo editar una proforma después de crearla?
-
-Depende de la configuración del sistema. Algunas proformas pueden editarse, otras requieren crear una nueva versión.
-
-### ¿Cada cuánto se actualizan las notificaciones?
-
-Actualmente cada **15 segundos** (modo Polling). Pronto serán instantáneas cuando actualicemos el plan.
-
-### ¿Qué hago si un cliente me pide cancelar una reserva?
-
-1. Ve a la reserva
-2. Click en **"Cancelar"**
-3. **Importante:** Escribe el motivo detallado
-4. Confirma la cancelación
-
-### ¿Puedo acceder desde mi celular?
-
-Sí, el sistema es **responsive** (se adapta a móviles). Usa el navegador de tu celular para acceder.
+**¿Qué hago si un cliente pide cancelar?**  
+Cancela la reserva desde el módulo correspondiente y registra el motivo. Esto libera el lote y deja trazabilidad.
 
 ---
 
-## 💡 Consejos y Mejores Prácticas
+<a id="soporte-recursos"></a>
+## 📞 Soporte y recursos
 
-### Para tener éxito con el CRM:
+| Tipo de ayuda | Contacto | Horario |
+| --- | --- | --- |
+| Soporte técnico | soporteamersur@gmail.com | L-V 9:00–18:00 |
+| Dudas comerciales | Tu coordinador / equipo de ventas | Según tu equipo |
+| Reportar bug | `Avatar → Reportar problema` (adjunta captura) | 24/7 |
 
-1. **📝 Registra TODO**
-   - Cada llamada
-   - Cada email
-   - Cada WhatsApp
-   - Cada visita
-
-2. **📅 Agenda Seguimientos**
-   - Nunca dejes un cliente sin próxima acción
-   - Programa recordatorios
-
-3. **🔔 Revisa Notificaciones**
-   - Al iniciar tu día
-   - Al finalizar tu día
-   - Cuando recibes una nueva
-
-4. **📊 Revisa tus Métricas**
-   - Semanalmente revisa tu rendimiento
-   - Identifica oportunidades
-   - Ajusta tu estrategia
-
-5. **🎯 Mantén Datos Actualizados**
-   - Presupuesto del cliente
-   - Estado de prospecto
-   - Información de contacto
-
-6. **💬 Comunícate con tu Coordinador**
-   - Reporta problemas
-   - Pide ayuda cuando la necesites
-   - Comparte éxitos
+**Documentos relacionados**  
+- [Guía de Inicio Rápido](GUIA_INICIO_RAPIDO.md)  
+- Preguntas frecuentes extendidas (próximamente)  
+- Tutoriales en video (en preparación)
 
 ---
 
-## 📞 Soporte
+<a id="notas-version"></a>
+## 📝 Notas de versión
 
-### ¿Necesitas ayuda?
+**v1.1 – Noviembre 2025**
+- Añadido checklist de proceso comercial.  
+- Documentadas reservas y proformas con mayor detalle.  
+- Sección de soporte y FAQs alineada con la guía rápida.
 
-**Soporte Técnico:**
-- Email: soporteamersur@gmail.com
-- Horario: Lunes a Viernes 9am - 6pm
-
-**Capacitación:**
-- Contacta a tu coordinador
-- Se programarán sesiones grupales regularmente
-
-**Reportar un Problema:**
-1. Avatar → **"Reportar Problema"**
-2. Describe el problema
-3. Adjunta captura de pantalla si es posible
-4. Envía
+Versiones anteriores:
+- **v1.0 – Noviembre 2025:** lanzamiento inicial del CRM con clientes, agenda, proformas y reservas.
 
 ---
 
-## 📚 Recursos Adicionales
-
-- **[Guía de Inicio Rápido](GUIA_INICIO_RAPIDO.md)** - Primeros pasos en 10 minutos
-- **[Videos Tutorial](videos/)** - Tutoriales en video (próximamente)
-- **[FAQ Completo](FAQ_VENDEDORES.md)** - Más preguntas frecuentes
-
----
-
-## 📝 Notas de Versión
-
-**v1.0 - Noviembre 2025**
-- ✅ Sistema de notificaciones en tiempo real
-- ✅ Gestión completa de clientes
-- ✅ Agenda y seguimiento
-- ✅ Proformas automatizadas
-- ✅ Gestión de reservas
-
----
-
-**¡Éxito en tus ventas! 🚀**
-
-*Este manual se actualiza constantemente. Última actualización: Noviembre 2025*
+**¡Éxitos en tus ventas!** Mantén el CRM actualizado y tendrás siempre la información que necesitas para cerrar más oportunidades. 😊

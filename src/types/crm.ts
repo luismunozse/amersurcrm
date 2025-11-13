@@ -34,6 +34,8 @@ export type ClienteCached = {
     nombre: string;
     estado: "activo" | "pausado" | "cerrado";
     ubicacion: string | null;
+    latitud?: number | null;
+    longitud?: number | null;
     descripcion: string | null;
     imagen_url: string | null;
     logo_url: string | null;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { extractRequestMetadata } from "@/lib/api/requestContext";
 import { notifyAdminsOfSecurityEvent } from "@/lib/security/adminNotifications";
+import { logLoginAudit, resolveLoginAuditCount } from "@/lib/loginAudit";
 
 type AuditStage = "lookup" | "authentication" | "recovery" | "security";
 
@@ -43,8 +44,9 @@ export async function POST(request: NextRequest) {
       stage: AuditStage = "lookup",
       metadata?: Record<string, unknown>
     ) => {
-      try {
-        await supabase.from("login_audit").insert({
+      await logLoginAudit(
+        supabase,
+        {
           username: identifier || null,
           login_type: "admin",
           stage,
@@ -53,10 +55,9 @@ export async function POST(request: NextRequest) {
           ip_address: ipAddress,
           user_agent: userAgent,
           metadata: metadata ?? null,
-        });
-      } catch (logError) {
-        console.error("No se pudo registrar el intento de login (admin):", logError);
-      }
+        },
+        `login-username:${stage}`
+      );
     };
 
     if (!identifier || !password) {
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
       Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
     ).toISOString();
 
-    const [identifierFailureCount, ipFailureCount] = await Promise.all([
+    const [identifierResult, ipResult] = await Promise.all([
       identifier
         ? supabase
             .from("login_audit")
@@ -80,8 +81,7 @@ export async function POST(request: NextRequest) {
             .eq("success", false)
             .in("stage", ["lookup", "authentication", "security"])
             .gte("created_at", windowStartIso)
-            .then((result) => result.count ?? 0)
-        : Promise.resolve(0),
+        : Promise.resolve({ count: 0, error: null }),
       ipAddress
         ? supabase
             .from("login_audit")
@@ -90,9 +90,24 @@ export async function POST(request: NextRequest) {
             .eq("success", false)
             .in("stage", ["lookup", "authentication", "security"])
             .gte("created_at", windowStartIso)
-            .then((result) => result.count ?? 0)
-        : Promise.resolve(0),
+        : Promise.resolve({ count: 0, error: null }),
     ]);
+
+    const identifierFailureCount = identifier
+      ? resolveLoginAuditCount(
+          identifierResult.count ?? null,
+          identifierResult.error ?? null,
+          "login-username:rate-limit-identifier"
+        )
+      : 0;
+
+    const ipFailureCount = ipAddress
+      ? resolveLoginAuditCount(
+          ipResult.count ?? null,
+          ipResult.error ?? null,
+          "login-username:rate-limit-ip"
+        )
+      : 0;
 
     const rateLimitExceeded =
       identifierFailureCount >= RATE_LIMIT_MAX_IDENTIFIER_ATTEMPTS ||
@@ -187,9 +202,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error en login-username:", error);
-    try {
-      const { ipAddress, userAgent } = extractRequestMetadata(request);
-      await supabase.from("login_audit").insert({
+    const { ipAddress, userAgent } = extractRequestMetadata(request);
+    await logLoginAudit(
+      supabase,
+      {
         username: identifier || null,
         login_type: "admin",
         stage: "lookup",
@@ -197,10 +213,9 @@ export async function POST(request: NextRequest) {
         error_message: error instanceof Error ? error.message : "error_desconocido",
         ip_address: ipAddress,
         user_agent: userAgent,
-      });
-    } catch (logError) {
-      console.error("No se pudo registrar el error de login (admin):", logError);
-    }
+      },
+      "login-username:error"
+    );
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }

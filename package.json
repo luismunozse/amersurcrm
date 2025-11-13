@@ -18,7 +18,10 @@
     "type-check": "tsc --noEmit",
     "update-ubigeo": "tsx src/scripts/update-ubigeo.ts",
     "ubigeo:stats": "curl -s http://localhost:3000/api/ubicaciones/update | jq",
-    "ubigeo:force-update": "curl -X POST http://localhost:3000/api/ubicaciones/update | jq"
+    "ubigeo:force-update": "curl -X POST http://localhost:3000/api/ubicaciones/update | jq",
+    "audit:coordinates": "tsx scripts/audit-lotes-coordinates.ts",
+    "migrate:coordinates": "tsx scripts/migrate-coordinates.ts",
+    "migrate:coordinates:dry": "tsx scripts/migrate-coordinates.ts --dry-run"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.8",

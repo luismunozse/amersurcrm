@@ -9,6 +9,7 @@ import { actualizarLote, eliminarLote, duplicarLote, eliminarTodosLosLotes } fro
 import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
 import ModalReservaLote from "./ModalReservaLote";
+import DeleteAllLotesModal from "./_DeleteAllLotesModal";
 
 type Lote = {
   id: string;
@@ -53,6 +54,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
   // Sincronizar el estado cuando cambien los lotes
   useEffect(() => {
@@ -163,20 +165,12 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     }
   };
 
-  const handleDeleteAll = async () => {
+  const handleDeleteAll = () => {
+    setShowDeleteAllModal(true);
+  };
+
+  const handleConfirmDeleteAll = async () => {
     const totalCount = totalLotes || lotesAMostrar.length;
-
-    // Confirmación doble para evitar eliminaciones accidentales
-    if (!confirm(`⚠️ ATENCIÓN: Estás a punto de eliminar TODOS los ${totalCount} lotes de este proyecto.\n\n¿Estás completamente seguro? Esta acción NO se puede deshacer.`)) {
-      return;
-    }
-
-    // Segunda confirmación
-    const confirmText = prompt(`Para confirmar, escribe "ELIMINAR" (en mayúsculas):`);
-    if (confirmText !== 'ELIMINAR') {
-      toast.error('Eliminación cancelada');
-      return;
-    }
 
     try {
       // Mostrar loading toast
@@ -772,6 +766,12 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
         }}
       />
     )}
+    <DeleteAllLotesModal
+      isOpen={showDeleteAllModal}
+      onClose={() => setShowDeleteAllModal(false)}
+      onConfirm={handleConfirmDeleteAll}
+      lotesCount={totalLotes || lotesAMostrar.length}
+    />
     </>
   );
 }

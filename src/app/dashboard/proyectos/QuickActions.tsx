@@ -26,8 +26,11 @@ type QuickActionsProps = {
   proyecto?: {
     id: string;
     nombre: string;
+    tipo: string;
     estado: string;
     ubicacion?: string | null;
+    latitud?: number | null;
+    longitud?: number | null;
     descripcion?: string | null;
     imagen_url?: string | null;
     logo_url?: string | null;

@@ -25,6 +25,12 @@ export default function NewProyectoForm() {
     codigoDistrito: "",
   });
 
+  // Estado para coordenadas GPS
+  const [coordenadas, setCoordenadas] = useState({
+    latitud: "",
+    longitud: "",
+  });
+
   const handleUbicacionChange = useCallback((ubicacion: typeof ubigeoData) => {
     setUbigeoData(ubicacion);
   }, [setUbigeoData]);
@@ -223,6 +229,59 @@ export default function NewProyectoForm() {
           <input type="hidden" name="departamento_code" value={ubigeoData.codigoDepartamento} />
           <input type="hidden" name="provincia_code" value={ubigeoData.codigoProvincia} />
           <input type="hidden" name="distrito_code" value={ubigeoData.codigoDistrito} />
+        </div>
+
+        {/* Coordenadas GPS del Proyecto */}
+        <div className="space-y-2 bg-crm-card-hover p-3 rounded-lg border border-crm-border">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-medium text-crm-text-primary">
+              📍 Coordenadas del Proyecto (Opcional)
+            </label>
+            <a
+              href="https://www.google.com/maps"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-crm-primary hover:underline"
+            >
+              Buscar en Google Maps →
+            </a>
+          </div>
+          <p className="text-[10px] text-crm-text-muted mb-2">
+            Ingresa las coordenadas para que el mapa se centre automáticamente al entrar al proyecto.
+            En Google Maps, haz clic derecho en el mapa y copia las coordenadas.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-medium text-crm-text-secondary mb-1">
+                Latitud (Ej: -11.498265)
+              </label>
+              <input
+                type="number"
+                step="any"
+                name="latitud"
+                value={coordenadas.latitud}
+                onChange={(e) => setCoordenadas({ ...coordenadas, latitud: e.target.value })}
+                placeholder="-12.0464"
+                className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50"
+                disabled={pending}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-crm-text-secondary mb-1">
+                Longitud (Ej: -77.226632)
+              </label>
+              <input
+                type="number"
+                step="any"
+                name="longitud"
+                value={coordenadas.longitud}
+                onChange={(e) => setCoordenadas({ ...coordenadas, longitud: e.target.value })}
+                placeholder="-77.0428"
+                className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50"
+                disabled={pending}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Imagen del Proyecto */}

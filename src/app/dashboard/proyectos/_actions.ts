@@ -132,6 +132,12 @@ export async function crearProyecto(formData: FormData) {
     const provincia = String(formData.get("provincia") || "").trim();
     const distrito = String(formData.get("distrito") || "").trim();
 
+    // Coordenadas GPS (opcional)
+    const latitudStr = String(formData.get("latitud") || "").trim();
+    const longitudStr = String(formData.get("longitud") || "").trim();
+    const latitud = latitudStr ? parseFloat(latitudStr) : null;
+    const longitud = longitudStr ? parseFloat(longitudStr) : null;
+
     // Validaciones
     if (!nombre) {
       throw new Error("El nombre del proyecto es requerido");
@@ -167,6 +173,8 @@ export async function crearProyecto(formData: FormData) {
         estado: estado as "activo" | "pausado" | "cerrado",
         ubicacion: ubicacionFinal,
         descripcion: descripcion || null,
+        latitud,
+        longitud,
         imagen_url: null,
         created_by: user.id,
       })
@@ -290,8 +298,13 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
 
   try {
     const nombre = String(formData.get("nombre") || "").trim();
+    const tipo = String(formData.get("tipo") || "propio");
     const estado = String(formData.get("estado") || "activo");
     const ubicacion = String(formData.get("ubicacion") || "").trim();
+    const latitudStr = String(formData.get("latitud") || "").trim();
+    const longitudStr = String(formData.get("longitud") || "").trim();
+    const latitud = latitudStr ? parseFloat(latitudStr) : null;
+    const longitud = longitudStr ? parseFloat(longitudStr) : null;
     const descripcion = String(formData.get("descripcion") || "").trim();
     const imagenFile = formData.get("imagen") as File | null;
     const eliminarImagen = formData.get("eliminar_imagen") === "true";
@@ -420,8 +433,11 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       .from("proyecto")
       .update({
         nombre,
+        tipo: tipo as "propio" | "corretaje",
         estado: estado as "activo" | "pausado" | "cerrado",
         ubicacion: ubicacion || null,
+        latitud,
+        longitud,
         descripcion: descripcion || null,
         imagen_url: imagenUrl,
         logo_url: logoUrl,

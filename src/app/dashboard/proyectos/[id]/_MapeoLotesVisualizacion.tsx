@@ -20,6 +20,8 @@ interface LoteState {
 interface MapeoLotesVisualizacionProps {
   proyectoNombre: string;
   planosUrl: string | null;
+  proyectoLatitud?: number | null;
+  proyectoLongitud?: number | null;
   overlayBounds?: [[number, number], [number, number]] | null;
   overlayRotation?: number | null;
   lotes?: LoteState[];
@@ -33,6 +35,8 @@ const DEFAULT_ZOOM = 17;
 export default function MapeoLotesVisualizacion({
   proyectoNombre,
   planosUrl,
+  proyectoLatitud,
+  proyectoLongitud,
   overlayBounds,
   overlayRotation,
   lotes = [],
@@ -73,12 +77,20 @@ export default function MapeoLotesVisualizacion({
   );
 
   const mapCenter = useMemo(() => {
+    // 1. Si hay bounds del overlay, usar el centro de esos bounds
     if (overlayBounds) {
       const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
       return [(swLat + neLat) / 2, (swLng + neLng) / 2] as [number, number];
     }
+
+    // 2. Si no hay bounds pero hay coordenadas del proyecto, usar esas
+    if (proyectoLatitud != null && proyectoLongitud != null) {
+      return [proyectoLatitud, proyectoLongitud] as [number, number];
+    }
+
+    // 3. Fallback a las coordenadas por defecto (Lima)
     return DEFAULT_CENTER;
-  }, [overlayBounds]);
+  }, [overlayBounds, proyectoLatitud, proyectoLongitud]);
 
   const mapZoom = useMemo(() => {
     if (overlayBounds) {

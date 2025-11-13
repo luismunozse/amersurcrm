@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { extractRequestMetadata } from "@/lib/api/requestContext";
+import { logLoginAudit } from "@/lib/loginAudit";
 
 const DNI_REGEX = /^\d{6,12}$/;
 
@@ -152,17 +153,21 @@ export async function POST(request: NextRequest) {
     const loginType =
       perfil?.rol?.nombre === "ROL_VENDEDOR" ? "vendedor" : "admin";
 
-    await supabase.from("login_audit").insert({
-      dni: dniSanitized,
-      username: perfil?.username ?? null,
-      login_type: loginType,
-      stage: "recovery",
-      success: true,
-      error_message: null,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      metadata,
-    });
+    await logLoginAudit(
+      supabase,
+      {
+        dni: dniSanitized,
+        username: perfil?.username ?? null,
+        login_type: loginType,
+        stage: "recovery",
+        success: true,
+        error_message: null,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        metadata,
+      },
+      "reset-request:recovery"
+    );
 
     return NextResponse.json({
       success: true,

@@ -65,43 +65,6 @@ const ESTADO_TEXTOS: Record<string, string> = {
   desconocido: 'Sin estado',
 };
 
-const NORMALIZED_MIN = -0.0001;
-const NORMALIZED_MAX = 1.0001;
-
-function isNormalizedPair([lat, lng]: [number, number]) {
-  return (
-    lat >= NORMALIZED_MIN && lat <= NORMALIZED_MAX &&
-    lng >= NORMALIZED_MIN && lng <= NORMALIZED_MAX
-  );
-}
-
-function denormalizePair(
-  pair: [number, number],
-  bounds?: [[number, number], [number, number]]
-): [number, number] {
-  if (!bounds || !isNormalizedPair(pair)) {
-    return pair;
-  }
-  const [[swLat, swLng], [neLat, neLng]] = bounds;
-  const lat = swLat + pair[0] * (neLat - swLat);
-  const lng = swLng + pair[1] * (neLng - swLng);
-  return [lat, lng];
-}
-
-function denormalizePolygon(
-  points: [number, number][],
-  bounds?: [[number, number], [number, number]]
-): [number, number][] {
-  if (!points || points.length === 0) return points;
-  if (!bounds) return points;
-  const converted = points.map((point) => denormalizePair(point, bounds));
-  const changed = converted.some((point, index) => {
-    const original = points[index];
-    return point[0] !== original[0] || point[1] !== original[1];
-  });
-  return changed ? converted : points;
-}
-
 // Función factory para crear la clase de overlay (se ejecuta cuando google está disponible)
 function createGroundOverlayClass() {
   return class GroundOverlayWithRotation extends google.maps.OverlayView {
@@ -185,6 +148,11 @@ function createGroundOverlayClass() {
       if (this.image) {
         this.image.style.opacity = `${this.opacity}`;
       }
+    }
+
+    updateBounds(bounds: google.maps.LatLngBounds) {
+      this.bounds = bounds;
+      this.draw();
     }
 
     onRemove() {
@@ -652,10 +620,10 @@ export default function GoogleMap({
     };
   }, [loteDrawingActive, onLotePolygonComplete, onLoteDrawingFinished, isLoaded]);
 
-  // Gestionar overlay del plano
+  // Gestionar overlay del plano - crear solo cuando cambia la URL o se carga el mapa
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map || !isLoaded) return;
 
     if (!planosUrl || !overlayBounds) {
       if (overlayRef.current) {
@@ -665,16 +633,16 @@ export default function GoogleMap({
       return;
     }
 
+    // Eliminar overlay anterior si existe
+    if (overlayRef.current) {
+      overlayRef.current.setMap(null);
+    }
+
     const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
     const bounds = new google.maps.LatLngBounds(
       new google.maps.LatLng(swLat, swLng),
       new google.maps.LatLng(neLat, neLng)
     );
-
-    // Eliminar overlay anterior si existe
-    if (overlayRef.current) {
-      overlayRef.current.setMap(null);
-    }
 
     // Crear la clase cuando google esté disponible
     const GroundOverlayWithRotation = createGroundOverlayClass();
@@ -682,16 +650,13 @@ export default function GoogleMap({
     overlay.setMap(map);
     overlayRef.current = overlay;
 
-    // NO usar fitBounds - dejar que el usuario controle el zoom
-    // Si quieres centrar en el plano, el usuario puede hacerlo manualmente
-
     return () => {
       overlay.setMap(null);
       if (overlayRef.current === overlay) {
         overlayRef.current = null;
       }
     };
-  }, [planosUrl, overlayBounds, isLoaded]);
+  }, [planosUrl, isLoaded]);
 
   // Actualizar rotación sin recrear el overlay
   useEffect(() => {
@@ -709,6 +674,18 @@ export default function GoogleMap({
     }
   }, [overlayOpacity]);
 
+  // Actualizar bounds sin recrear el overlay
+  useEffect(() => {
+    const overlay = overlayRef.current as any;
+    if (overlay && typeof overlay.updateBounds === 'function' && overlayBounds) {
+      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+      const bounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(swLat, swLng),
+        new google.maps.LatLng(neLat, neLng)
+      );
+      overlay.updateBounds(bounds);
+    }
+  }, [overlayBounds]);
 
   // Permitir edición del rectángulo del overlay
   useEffect(() => {
@@ -823,8 +800,7 @@ export default function GoogleMap({
           lotesPolygonsRef.current.delete(lote.id);
         }
 
-        const [rawLat, rawLng] = lote.plano_poligono[0];
-        const [lat, lng] = denormalizePair([rawLat, rawLng], overlayBounds);
+        const [lat, lng] = lote.plano_poligono[0];
         const position = { lat, lng };
 
         // Crear o actualizar marcador
@@ -942,8 +918,7 @@ export default function GoogleMap({
 
       // Si tiene 3+ puntos, renderizar como polígono
       if (lote.plano_poligono.length >= 3) {
-        const denormalizedPairs = denormalizePolygon(lote.plano_poligono, overlayBounds);
-        const path = denormalizedPairs.map(([lat, lng]) => ({ lat, lng }));
+        const path = lote.plano_poligono.map(([lat, lng]) => ({ lat, lng }));
 
         // Crear o actualizar polígono
         if (!lotesPolygonsRef.current.has(lote.id)) {
@@ -973,7 +948,7 @@ export default function GoogleMap({
         }
 
         // Calcular centro del polígono para la etiqueta
-        const [latSum, lngSum] = denormalizedPairs.reduce(
+        const [latSum, lngSum] = lote.plano_poligono.reduce(
           (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
           [0, 0]
         );
@@ -1124,9 +1099,8 @@ export default function GoogleMap({
     let focused = false;
 
     if (lote.plano_poligono && lote.plano_poligono.length >= 3) {
-      const polygonPoints = denormalizePolygon(lote.plano_poligono, overlayBounds);
       const bounds = new google.maps.LatLngBounds();
-      polygonPoints.forEach(([lat, lng]) => bounds.extend(new google.maps.LatLng(lat, lng)));
+      lote.plano_poligono.forEach(([lat, lng]) => bounds.extend(new google.maps.LatLng(lat, lng)));
       if (!bounds.isEmpty()) {
         map.fitBounds(bounds);
         focused = true;
@@ -1136,9 +1110,9 @@ export default function GoogleMap({
     if (!focused) {
       let point: [number, number] | null = null;
       if (lote.plano_poligono && lote.plano_poligono.length >= 1) {
-        point = denormalizePair(lote.plano_poligono[0], overlayBounds);
+        point = lote.plano_poligono[0];
       } else if (lote.ubicacion) {
-        point = denormalizePair([lote.ubicacion.lat, lote.ubicacion.lng], overlayBounds);
+        point = [lote.ubicacion.lat, lote.ubicacion.lng];
       }
 
       if (point) {

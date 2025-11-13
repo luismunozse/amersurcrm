@@ -7,12 +7,10 @@ import LotesList from "./_LotesList";
 import MapeoLotesMejorado from "./_MapeoLotesMejorado";
 import MapeoLotesVisualizacion from "./_MapeoLotesVisualizacion";
 import DeleteProjectButton from "./_DeleteProjectButton";
-import GoogleMapsDebug from "@/components/GoogleMapsDebug";
 import { PaginationClient } from "./_PaginationClient";
 import ProjectTabs from "./_ProjectTabs";
 import ProyectoGaleria from "./_ProyectoGaleria";
 import type { ProyectoMediaItem } from "@/types/proyectos";
-import { BuildingOffice2Icon } from "@heroicons/react/24/outline";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -67,7 +65,7 @@ export default async function ProyLotesPage({
   const isAdmin = user ? await esAdmin() : false;
 
   // Proyecto (para título/404)
-  const proyectoSelectBase = "id,nombre,estado,ubicacion,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";
   const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
     .select(`${proyectoSelectBase},poligono`)
@@ -140,6 +138,14 @@ export default async function ProyLotesPage({
 
   const { count, error: eCount } = await countQuery;
   if (eCount) throw eCount;
+
+  // Lotes para mapeo (todos)
+  const { data: lotesParaMapeo, error: eLotesMap } = await supabase
+    .from("lote")
+    .select("id,codigo,estado,data,plano_poligono")
+    .eq("proyecto_id", id)
+    .order("codigo", { ascending: true });
+  if (eLotesMap) throw eLotesMap;
 
   const total = count ?? 0;
   const lastPage = Math.max(1, Math.ceil(total / perPage));
@@ -229,7 +235,8 @@ export default async function ProyLotesPage({
 
   const galeriaItems = parseGaleria((proyecto as { galeria_imagenes?: unknown } | null)?.galeria_imagenes);
 
-  const lotesForMapeo = (lotesConProyecto || []).map((lote) => {
+  const lotesMapeoSource = lotesParaMapeo ?? [];
+  const lotesForMapeo = lotesMapeoSource.map((lote) => {
     const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
     const planoPoligono = isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : undefined;
 
@@ -326,7 +333,7 @@ export default async function ProyLotesPage({
             <DeleteProjectButton
               proyectoId={proyecto.id}
               proyectoNombre={proyecto.nombre}
-              lotesCount={lotesConProyecto?.length || 0}
+              lotesCount={total}
             />
           </div>
         </div>
@@ -388,7 +395,12 @@ export default async function ProyLotesPage({
               lotes={lotesConProyecto || []}
             />
 
-            <LotesList key="lotes-list" proyectoId={proyecto.id} lotes={lotesConProyecto} />
+            <LotesList
+              key="lotes-list"
+              proyectoId={proyecto.id}
+              lotes={lotesConProyecto}
+              totalLotes={total}
+            />
 
             {/* Paginación mejorada */}
             {total > perPage && (
@@ -410,6 +422,8 @@ export default async function ProyLotesPage({
               proyectoId={proyecto.id}
               planosUrl={proyecto.planos_url}
               proyectoNombre={proyecto.nombre}
+              proyectoLatitud={proyecto.latitud}
+              proyectoLongitud={proyecto.longitud}
               initialBounds={overlayBoundsValue}
               initialRotation={overlayRotationValue}
               initialOpacity={overlayOpacityValue}
@@ -420,6 +434,8 @@ export default async function ProyLotesPage({
               key="mapeo-visualizacion"
               proyectoNombre={proyecto.nombre}
               planosUrl={proyecto.planos_url}
+              proyectoLatitud={proyecto.latitud}
+              proyectoLongitud={proyecto.longitud}
               overlayBounds={overlayBoundsValue}
               overlayRotation={overlayRotationValue}
               lotes={lotesForMapeo}
@@ -427,9 +443,6 @@ export default async function ProyLotesPage({
           )
         }
       />
-      
-      {/* Debug component */}
-      <GoogleMapsDebug />
     </div>
   );
 }

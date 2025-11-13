@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { extractRequestMetadata } from "@/lib/api/requestContext";
+import { handleLoginAuditError } from "@/lib/loginAudit";
 
 type LoginType = "admin" | "vendedor";
 type Stage = "lookup" | "authentication" | "recovery";
@@ -75,9 +76,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { error } = await supabase.from("login_audit").insert(payload);
-
+    if (handleLoginAuditError(error, "login-audit:insert")) {
+      return NextResponse.json({ success: true });
+    }
     if (error) {
-      console.error("Error insertando login audit:", error);
       return NextResponse.json(
         { error: "No se pudo registrar el intento" },
         { status: 500 }
