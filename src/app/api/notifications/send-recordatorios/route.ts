@@ -105,7 +105,6 @@ export async function POST(req: NextRequest) {
           url: "/dashboard/agenda?tab=recordatorios",
         },
         {
-          emailEnabled: false,
           pushEnabled: true,
           recordatoriosEnabled: true,
         },

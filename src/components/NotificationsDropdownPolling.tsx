@@ -30,11 +30,23 @@ const tipoColors = {
 // Intervalo de polling en milisegundos (15 segundos)
 const POLLING_INTERVAL = 15000;
 
+const dedupeNotifications = (notifs: NotificacionNoLeida[]) => {
+  const seen = new Set<string>();
+  return notifs.filter((notif) => {
+    const key = notif.id ?? `${notif.tipo}-${notif.created_at}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
 export default function NotificationsDropdownPolling({ notificaciones, count }: NotificationsDropdownProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState(notificaciones);
+  const [items, setItems] = useState(() => dedupeNotifications(notificaciones));
   const [unreadCount, setUnreadCount] = useState(count);
   const [userId, setUserId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -53,7 +65,7 @@ export default function NotificationsDropdownPolling({ notificaciones, count }: 
   }, []);
 
   useEffect(() => {
-    setItems(notificaciones);
+    setItems(dedupeNotifications(notificaciones));
     setUnreadCount(count);
   }, [notificaciones, count]);
 
@@ -80,7 +92,7 @@ export default function NotificationsDropdownPolling({ notificaciones, count }: 
 
     if (data && data.length > 0) {
       // Agregar nuevas notificaciones al inicio de la lista
-      setItems((prev) => [...data, ...prev].slice(0, 20));
+      setItems((prev) => dedupeNotifications([...data, ...prev]).slice(0, 20));
       setUnreadCount((prev) => prev + data.length);
 
       // Mostrar toast solo para la más reciente

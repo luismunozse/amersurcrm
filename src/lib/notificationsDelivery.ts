@@ -21,7 +21,6 @@ export interface NotificationDeliveryPayload {
 }
 
 export interface NotificationPreferences {
-  emailEnabled: boolean;
   pushEnabled: boolean;
   recordatoriosEnabled: boolean;
 }
@@ -44,26 +43,9 @@ export async function dispatchNotificationChannels(
   const isRecordatorio = Boolean((payload.data as Record<string, unknown> | undefined)?.recordatorio_id);
   const allowRecordatorio = !isRecordatorio || prefs.recordatoriosEnabled;
 
-  if (prefs.emailEnabled && allowRecordatorio) {
-    await sendEmailNotification(payload);
-  }
-
   if (prefs.pushEnabled && allowRecordatorio && config?.push) {
     await sendPushNotification(payload, config.push, context);
   }
-}
-
-async function sendEmailNotification(payload: NotificationDeliveryPayload) {
-  if (!payload.email) {
-    console.info("Notificación por email omitida: usuario sin correo", { userId: payload.userId });
-    return;
-  }
-
-  console.info(`Stub email notification -> ${payload.email}: ${payload.titulo}`, {
-    message: payload.mensaje,
-    type: payload.tipo,
-    data: payload.data ?? null,
-  });
 }
 
 async function sendPushNotification(

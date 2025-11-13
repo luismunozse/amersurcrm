@@ -76,7 +76,6 @@ export async function crearNotificacion(
 
   const config = configResult?.data;
   const prefs = {
-    emailEnabled: config?.notificaciones_email ?? true,
     pushEnabled: config?.notificaciones_push ?? true,
     recordatoriosEnabled: config?.notificaciones_recordatorios ?? true,
   };

@@ -84,6 +84,10 @@ export default function UbicacionSelector({
   const [distritoSeleccionado, setDistritoSeleccionado] = useState(propDistrito);
   const idBase = useId();
 
+  const [departamentoSearch, setDepartamentoSearch] = useState("");
+  const [provinciaSearch, setProvinciaSearch] = useState("");
+  const [distritoSearch, setDistritoSearch] = useState("");
+
   // Solo sincronizar en la inicialización, no en cada cambio
   useEffect(() => {
     setDepartamentoSeleccionado(propDepartamento);
@@ -163,6 +167,9 @@ export default function UbicacionSelector({
     setProvinciaSeleccionada("");
     setDistritoSeleccionado("");
     setDepartamentoAbierto(false);
+    setDepartamentoSearch("");
+    setProvinciaSearch("");
+    setDistritoSearch("");
     
     // Llamar a onUbigeoChange si está disponible
     if (onUbigeoChange) {
@@ -174,6 +181,8 @@ export default function UbicacionSelector({
     setProvinciaSeleccionada(code);
     setDistritoSeleccionado("");
     setProvinciaAbierta(false);
+    setProvinciaSearch("");
+    setDistritoSearch("");
     
     // Llamar a onUbigeoChange si está disponible
     if (onUbigeoChange) {
@@ -185,6 +194,7 @@ export default function UbicacionSelector({
   const handleDistritoChange = (code: string) => {
     setDistritoSeleccionado(code);
     setDistritoAbierto(false);
+    setDistritoSearch("");
     
     // Llamar a onUbigeoChange si está disponible
     if (onUbigeoChange) {
@@ -211,12 +221,22 @@ export default function UbicacionSelector({
     });
   }, [departamentoSeleccionado, provinciaSeleccionada, distritoSeleccionado, onUbicacionChange, departamentos, provincias, distritos]);
 
-  const provinciasFiltradas = departamentoSeleccionado
+  const normalizar = (valor: string) => valor.toLowerCase();
+  const filtrarPorBusqueda = <T extends { name: string }>(lista: T[], termino: string) => {
+    if (!termino.trim()) return lista;
+    const busca = normalizar(termino);
+    return lista.filter(item => normalizar(item.name).includes(busca));
+  };
+
+  const departamentosFiltrados = filtrarPorBusqueda(departamentos, departamentoSearch);
+  const provinciasPorDepartamento = departamentoSeleccionado
     ? provincias.filter(p => p.departamento_code === departamentoSeleccionado)
     : [];
-  const distritosFiltrados = provinciaSeleccionada
+  const provinciasFiltradas = filtrarPorBusqueda(provinciasPorDepartamento, provinciaSearch);
+  const distritosPorProvincia = provinciaSeleccionada
     ? distritos.filter(d => d.provincia_code === provinciaSeleccionada)
     : [];
+  const distritosFiltrados = filtrarPorBusqueda(distritosPorProvincia, distritoSearch);
 
   const depNombre = departamentos.find(d => d.code === departamentoSeleccionado)?.name ?? "";
   const provNombre = provincias.find(p => p.code === provinciaSeleccionada)?.name ?? "";
@@ -292,25 +312,38 @@ export default function UbicacionSelector({
 
           {departamentoAbierto && (
             <div className={listClass} role="listbox" id={`${idBase}-departamentos`}>
-              {departamentos.map((d) => (
-                <div
-                  role="option"
-                  aria-selected={d.code === departamentoSeleccionado}
-                  key={d.code}
-                  onClick={() => handleDepartamentoChange(d.code)}
-                  className={`${itemClass} ${d.code === departamentoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
-                    <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+              <div className="p-2 border-b border-crm-border bg-crm-card">
+                <input
+                  type="text"
+                  placeholder="Buscar departamento"
+                  value={departamentoSearch}
+                  onChange={(e) => setDepartamentoSearch(e.target.value)}
+                  className="w-full text-xs px-2 py-1.5 border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                />
+              </div>
+              {departamentosFiltrados.length > 0 ? (
+                departamentosFiltrados.map((d) => (
+                  <div
+                    role="option"
+                    aria-selected={d.code === departamentoSeleccionado}
+                    key={d.code}
+                    onClick={() => handleDepartamentoChange(d.code)}
+                    className={`${itemClass} ${d.code === departamentoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
+                      <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+                    </div>
+                    {d.code === departamentoSeleccionado && (
+                      <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  {d.code === departamentoSeleccionado && (
-                    <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="px-3 py-2 text-xs text-crm-text-muted">Sin resultados</div>
+              )}
             </div>
           )}
         </div>
@@ -343,27 +376,40 @@ export default function UbicacionSelector({
             </svg>
           </button>
 
-          {provinciaAbierta && provinciasFiltradas.length > 0 && (
+          {provinciaAbierta && (
             <div className={listClass} role="listbox" id={`${idBase}-provincias`}>
-              {provinciasFiltradas.map((p) => (
-                <div
-                  role="option"
-                  aria-selected={p.code === provinciaSeleccionada}
-                  key={p.code}
-                  onClick={() => handleProvinciaChange(p.code)}
-                  className={`${itemClass} ${p.code === provinciaSeleccionada ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
-                    <span className="ubigeo-item-text">{p.name || '(sin nombre)'}</span>
+              <div className="p-2 border-b border-crm-border bg-crm-card">
+                <input
+                  type="text"
+                  placeholder="Buscar provincia"
+                  value={provinciaSearch}
+                  onChange={(e) => setProvinciaSearch(e.target.value)}
+                  className="w-full text-xs px-2 py-1.5 border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                />
+              </div>
+              {provinciasFiltradas.length > 0 ? (
+                provinciasFiltradas.map((p) => (
+                  <div
+                    role="option"
+                    aria-selected={p.code === provinciaSeleccionada}
+                    key={p.code}
+                    onClick={() => handleProvinciaChange(p.code)}
+                    className={`${itemClass} ${p.code === provinciaSeleccionada ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
+                      <span className="ubigeo-item-text">{p.name || '(sin nombre)'}</span>
+                    </div>
+                    {p.code === provinciaSeleccionada && (
+                      <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  {p.code === provinciaSeleccionada && (
-                    <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="px-3 py-2 text-xs text-crm-text-muted">Sin resultados</div>
+              )}
             </div>
           )}
         </div>
@@ -396,27 +442,40 @@ export default function UbicacionSelector({
             </svg>
           </button>
 
-          {distritoAbierto && distritosFiltrados.length > 0 && (
+          {distritoAbierto && (
             <div className={listClass} role="listbox" id={`${idBase}-distritos`}>
-              {distritosFiltrados.map((d) => (
-                <div
-                  role="option"
-                  aria-selected={d.code === distritoSeleccionado}
-                  key={d.code}
-                  onClick={() => handleDistritoChange(d.code)}
-                  className={`${itemClass} ${d.code === distritoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
-                    <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+              <div className="p-2 border-b border-crm-border bg-crm-card">
+                <input
+                  type="text"
+                  placeholder="Buscar distrito"
+                  value={distritoSearch}
+                  onChange={(e) => setDistritoSearch(e.target.value)}
+                  className="w-full text-xs px-2 py-1.5 border border-crm-border rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                />
+              </div>
+              {distritosFiltrados.length > 0 ? (
+                distritosFiltrados.map((d) => (
+                  <div
+                    role="option"
+                    aria-selected={d.code === distritoSeleccionado}
+                    key={d.code}
+                    onClick={() => handleDistritoChange(d.code)}
+                    className={`${itemClass} ${d.code === distritoSeleccionado ? 'bg-crm-primary/10 text-crm-primary font-medium' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-crm-primary/20 group-hover:bg-crm-primary/40 transition-colors"></div>
+                      <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
+                    </div>
+                    {d.code === distritoSeleccionado && (
+                      <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  {d.code === distritoSeleccionado && (
-                    <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="px-3 py-2 text-xs text-crm-text-muted">Sin resultados</div>
+              )}
             </div>
           )}
         </div>

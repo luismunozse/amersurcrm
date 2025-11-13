@@ -36,6 +36,8 @@ type Lote = {
     condiciones?: string;
     descuento?: number;
     nombre?: string;
+    tipo_unidad?: string;
+    precio_m2?: number;
   };
 };
 
@@ -325,7 +327,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
               {/* Header de la tabla */}
               <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-crm-card-hover rounded-lg text-sm font-medium text-crm-text-muted">
                 <div className="col-span-2">Código</div>
-                <div className="col-span-2">Nombre</div>
+                <div className="col-span-2">Tipo de Unidad</div>
                 <div className="col-span-2">Proyecto</div>
                 <div className="col-span-1">Estado</div>
                 <div className="col-span-1">Superficie</div>
@@ -354,14 +356,20 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
                       </div>
                     </div>
 
-                    {/* Nombre */}
+                    {/* Tipo de Unidad */}
                     <div className="col-span-2 flex items-center">
                       <div className="flex-1 min-w-0">
-                        <div className="text-crm-text-primary truncate">{lote.codigo}</div>
                         {(() => {
                           const dataObj = parseData(lote.data);
-                          return dataObj?.manzana && (
-                            <div className="text-xs text-crm-text-muted">Mz. {dataObj.manzana}</div>
+                          return (
+                            <>
+                              <div className="text-crm-text-primary truncate">
+                                {dataObj?.tipo_unidad || 'Lote'}
+                              </div>
+                              {dataObj?.manzana && (
+                                <div className="text-xs text-crm-text-muted">Mz. {dataObj.manzana}</div>
+                              )}
+                            </>
                           );
                         })()}
                       </div>
@@ -523,8 +531,13 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
                           <div className="font-semibold text-crm-text-primary">{lote.codigo}</div>
                           {(() => {
                             const dataObj = parseData(lote.data);
-                            return dataObj?.manzana && (
-                              <div className="text-xs text-crm-text-muted">Mz. {dataObj.manzana}</div>
+                            return (
+                              <>
+                                <div className="text-xs text-crm-text-muted">
+                                  {dataObj?.tipo_unidad || 'Lote'}
+                                  {dataObj?.manzana && ` - Mz. ${dataObj.manzana}`}
+                                </div>
+                              </>
                             );
                           })()}
                         </div>

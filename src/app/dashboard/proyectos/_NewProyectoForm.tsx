@@ -1,5 +1,5 @@
 "use client";
-import { useTransition, useState } from "react";
+import { useTransition, useState, useCallback } from "react";
 import { crearProyecto } from "./_actions";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import toast from "react-hot-toast";
@@ -25,9 +25,9 @@ export default function NewProyectoForm() {
     codigoDistrito: "",
   });
 
-  const handleUbicacionChange = (ubicacion: typeof ubigeoData) => {
+  const handleUbicacionChange = useCallback((ubicacion: typeof ubigeoData) => {
     setUbigeoData(ubicacion);
-  };
+  }, [setUbigeoData]);
 
   // No mostrar el formulario si no es admin
   if (loading) {
