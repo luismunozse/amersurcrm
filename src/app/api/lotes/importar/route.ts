@@ -185,6 +185,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Función para normalizar nombres de columnas
+    // Elimina acentos, espacios, convierte a minúsculas
+    const normalizeColumnName = (name: string): string => {
+      return name
+        .toLowerCase()
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Eliminar acentos
+        .replace(/\s+/g, "_"); // Reemplazar espacios por guiones bajos
+    };
+
+    // Mapeo de variaciones comunes de nombres de columna a nombres estándar
+    const columnMapping: Record<string, string> = {
+      "codigo": "codigo",
+      "code": "codigo",
+      "cod": "codigo",
+      "lote": "codigo",
+      "tipo_unidad": "tipo_unidad",
+      "tipounidad": "tipo_unidad",
+      "tipo_de_unidad": "tipo_unidad",
+      "tipo": "tipo_unidad",
+      "unidad": "tipo_unidad",
+      "sup_m2": "sup_m2",
+      "superficie": "sup_m2",
+      "area": "sup_m2",
+      "m2": "sup_m2",
+      "metros": "sup_m2",
+      "precio": "precio",
+      "price": "precio",
+      "valor": "precio",
+      "precio_m2": "precio_m2",
+      "preciom2": "precio_m2",
+      "precio_por_m2": "precio_m2",
+      "moneda": "moneda",
+      "currency": "moneda",
+      "estado": "estado",
+      "status": "estado",
+      "estatus": "estado",
+    };
+
+    // Normalizar las columnas de cada fila
+    const normalizedData = rawData.map((row: any, index: number) => {
+      const normalized: any = {};
+
+      Object.keys(row).forEach(key => {
+        const normalizedKey = normalizeColumnName(key);
+        const standardKey = columnMapping[normalizedKey] || normalizedKey;
+        normalized[standardKey] = row[key];
+      });
+
+      // Log para debugging (solo la primera fila)
+      if (index === 0) {
+        console.log("🔍 Columnas detectadas en Excel:", Object.keys(row));
+        console.log("🔄 Columnas normalizadas:", Object.keys(normalized));
+      }
+
+      return normalized;
+    });
+
     // Obtener códigos existentes en el proyecto
     const { data: lotesExistentes } = await supabase
       .from("lote")
@@ -197,15 +256,15 @@ export async function POST(request: NextRequest) {
 
     const result: ImportResult = {
       success: true,
-      total: rawData.length,
+      total: normalizedData.length,
       imported: 0,
       errors: [],
       duplicados: [],
     };
 
     // Procesar cada fila
-    for (let i = 0; i < rawData.length; i++) {
-      const row = rawData[i];
+    for (let i = 0; i < normalizedData.length; i++) {
+      const row = normalizedData[i];
       const rowNumber = i + 2; // +2 porque Excel empieza en 1 y hay 1 fila de encabezado
 
       try {
