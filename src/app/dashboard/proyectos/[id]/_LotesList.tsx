@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Edit, Trash2, Eye, MapPin, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
-import { actualizarLote, eliminarLote, duplicarLote } from "./_actions";
+import { actualizarLote, eliminarLote, duplicarLote, eliminarTodosLosLotes } from "./_actions";
 import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
 import ModalReservaLote from "./ModalReservaLote";
@@ -41,7 +41,13 @@ type Lote = {
   };
 };
 
-export default function LotesList({ proyectoId, lotes }: { proyectoId: string; lotes: Lote[] }) {
+interface LotesListProps {
+  proyectoId: string;
+  lotes: Lote[];
+  totalLotes?: number;
+}
+
+export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListProps) {
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -88,6 +94,7 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
 
   // Usar solo los lotes reales
   const lotesAMostrar = lotesState;
+  const totalListado = typeof totalLotes === "number" ? totalLotes : lotesAMostrar.length;
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -153,6 +160,42 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
       // Revertir cambios en caso de error
       setLotesState(lotes);
       toast.error(`Error eliminando lote: ${(error as Error).message}`);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    const totalCount = totalLotes || lotesAMostrar.length;
+
+    // Confirmación doble para evitar eliminaciones accidentales
+    if (!confirm(`⚠️ ATENCIÓN: Estás a punto de eliminar TODOS los ${totalCount} lotes de este proyecto.\n\n¿Estás completamente seguro? Esta acción NO se puede deshacer.`)) {
+      return;
+    }
+
+    // Segunda confirmación
+    const confirmText = prompt(`Para confirmar, escribe "ELIMINAR" (en mayúsculas):`);
+    if (confirmText !== 'ELIMINAR') {
+      toast.error('Eliminación cancelada');
+      return;
+    }
+
+    try {
+      // Mostrar loading toast
+      const loadingToast = toast.loading(`Eliminando ${totalCount} lotes...`);
+
+      // Actualización optimista
+      setLotesState([]);
+
+      const result = await eliminarTodosLosLotes(proyectoId);
+
+      toast.dismiss(loadingToast);
+      toast.success(result.message || `${result.deletedCount} lotes eliminados exitosamente`);
+
+      // Refrescar la página para mostrar el estado actualizado
+      window.location.reload();
+    } catch (error) {
+      // Revertir cambios en caso de error
+      setLotesState(lotes);
+      toast.error(`Error eliminando lotes: ${(error as Error).message}`);
     }
   };
 
@@ -289,17 +332,33 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-              </svg>
-            </div>
-            Lotes del Proyecto
-            <span className="text-sm font-normal text-crm-text-muted">
-              ({lotesAMostrar.length} {lotesAMostrar.length === 1 ? 'lote' : 'lotes'})
-            </span>
-          </CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+              </div>
+              Lotes del Proyecto
+              <span className="text-sm font-normal text-crm-text-muted">
+                ({totalListado} {totalListado === 1 ? 'lote' : 'lotes'})
+              </span>
+            </CardTitle>
+
+            {/* Botón eliminar todos los lotes */}
+            {totalListado > 0 && (
+              <Button
+                onClick={handleDeleteAll}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-crm-danger border-crm-danger hover:bg-crm-danger hover:text-white transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Eliminar todos los lotes</span>
+                <span className="sm:hidden">Eliminar todos</span>
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {lotesAMostrar.length === 0 ? (
@@ -716,4 +775,3 @@ export default function LotesList({ proyectoId, lotes }: { proyectoId: string; l
     </>
   );
 }
-

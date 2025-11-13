@@ -447,6 +447,47 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
   return { success: true, message: "Lote eliminado correctamente" };
 }
 
+// Eliminar TODOS los lotes de un proyecto
+export async function eliminarTodosLosLotes(proyectoId: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Verificar permisos de administrador
+  try {
+    const perfil = await obtenerPerfilUsuario();
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para eliminar lotes. Solo los administradores pueden realizar esta acción.");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  // Primero obtener la cantidad de lotes que se van a eliminar
+  const { count, error: countError } = await supabase
+    .from("lote")
+    .select("*", { count: 'exact', head: true })
+    .eq("proyecto_id", proyectoId);
+
+  if (countError) throw new Error(countError.message);
+
+  // Eliminar todos los lotes del proyecto
+  const { error } = await supabase
+    .from("lote")
+    .delete()
+    .eq("proyecto_id", proyectoId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  revalidatePath("/dashboard/propiedades");
+  return {
+    success: true,
+    message: `${count || 0} lote(s) eliminado(s) correctamente`,
+    deletedCount: count || 0
+  };
+}
+
 // Duplicar un lote manteniendo sus datos. Genera un código único con sufijo -copy, -copy-2, ...
 export async function duplicarLote(loteId: string, proyectoId: string) {
   const supabase = await createServerActionClient();
