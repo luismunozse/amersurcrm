@@ -67,6 +67,50 @@ export default function LotesSearchBar({ proyectoId, totalLotes, lotesCount }: L
     });
   };
 
+  // Manejar cambio de estado inmediato
+  const handleEstadoChange = (estado: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Mantener otros filtros
+    if (currentQ) params.set('q', currentQ);
+    if (estado && estado !== 'all') {
+      params.set('estado', estado);
+    } else {
+      params.delete('estado');
+    }
+    if (currentPrecioMin) params.set('precio_min', currentPrecioMin);
+    if (currentPrecioMax) params.set('precio_max', currentPrecioMax);
+    if (currentAreaMin) params.set('area_min', currentAreaMin);
+    if (currentAreaMax) params.set('area_max', currentAreaMax);
+    if (currentSort && currentSort !== 'codigo-asc') params.set('sort', currentSort);
+
+    startTransition(() => {
+      router.push(`/dashboard/proyectos/${proyectoId}?${params.toString()}`);
+    });
+  };
+
+  // Manejar cambio de ordenamiento inmediato
+  const handleSortChange = (sort: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Mantener otros filtros
+    if (currentQ) params.set('q', currentQ);
+    if (currentEstado && currentEstado !== 'all') params.set('estado', currentEstado);
+    if (currentPrecioMin) params.set('precio_min', currentPrecioMin);
+    if (currentPrecioMax) params.set('precio_max', currentPrecioMax);
+    if (currentAreaMin) params.set('area_min', currentAreaMin);
+    if (currentAreaMax) params.set('area_max', currentAreaMax);
+    if (sort && sort !== 'codigo-asc') {
+      params.set('sort', sort);
+    } else {
+      params.delete('sort');
+    }
+
+    startTransition(() => {
+      router.push(`/dashboard/proyectos/${proyectoId}?${params.toString()}`);
+    });
+  };
+
   const hasActiveFilters =
     currentQ ||
     (currentEstado && currentEstado !== 'all') ||
@@ -99,7 +143,8 @@ export default function LotesSearchBar({ proyectoId, totalLotes, lotesCount }: L
           <div className="w-full sm:w-48">
             <select
               name="estado"
-              defaultValue={currentEstado || 'all'}
+              value={currentEstado || 'all'}
+              onChange={(e) => handleEstadoChange(e.target.value)}
               className="w-full px-3 py-2.5 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
             >
               <option value="all">Todos los estados</option>
@@ -112,7 +157,8 @@ export default function LotesSearchBar({ proyectoId, totalLotes, lotesCount }: L
           <div className="w-full sm:w-56">
             <select
               name="sort"
-              defaultValue={currentSort}
+              value={currentSort}
+              onChange={(e) => handleSortChange(e.target.value)}
               className="w-full px-3 py-2.5 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
             >
               <option value="codigo-asc">Código (A-Z)</option>
