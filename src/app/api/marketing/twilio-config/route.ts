@@ -6,11 +6,17 @@ import { esAdmin } from "@/lib/auth/roles";
 import { z } from "zod";
 import { invalidateTwilioClientCache } from "@/lib/services/twilio";
 
+const normalizeOptionalPhone = z.preprocess((val) => {
+  if (typeof val !== "string") return val;
+  const trimmed = val.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}, z.string().min(8, "Número SMS inválido").optional());
+
 const TwilioConfigSchema = z.object({
   accountSid: z.string().min(10, "Account SID inválido"),
   authToken: z.string().min(10, "Auth token inválido").optional(),
   whatsappFrom: z.string().min(8, "Número de WhatsApp inválido"),
-  smsFrom: z.string().min(8, "Número SMS inválido").optional(),
+  smsFrom: normalizeOptionalPhone,
   webhookVerifyToken: z.string().min(6, "Verify token muy corto"),
   esSandbox: z.boolean().optional(),
 });
