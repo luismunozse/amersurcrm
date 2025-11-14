@@ -7,6 +7,7 @@ import { promisify } from 'util';
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
 const exists = promisify(fs.exists);
+const LOCAL_XLSX_FALLBACK = path.join(process.cwd(), 'data', 'ubigeo-inei-completo.xlsx');
 
 // URLs oficiales del INEI
 const INEI_URLS = {
@@ -66,6 +67,7 @@ class INEIUbigeoService {
   private dataPath: string;
   private cachePath: string;
   private lastUpdate: Date | null = null;
+  private localXlsxResolvedPath: string | null = null;
 
   constructor() {
     this.dataPath = path.join(process.cwd(), 'data', 'ubigeo');
@@ -79,10 +81,15 @@ class INEIUbigeoService {
     }
   }
 
-  // Descargar archivo XLSX del INEI
+  // Descargar archivo XLSX del INEI o usar respaldo local
   private async downloadXLSX(url: string): Promise<Buffer> {
     try {
-      
+      const fallbackBuffer = await this.loadLocalBackup();
+      if (fallbackBuffer) {
+        console.log('[UBIGEO] Usando respaldo local de datos INEI:', this.localXlsxResolvedPath);
+        return fallbackBuffer;
+      }
+
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'AMERSUR-CRM/1.0 (https://amersur.com)',
@@ -97,9 +104,30 @@ class INEIUbigeoService {
       const arrayBuffer = await response.arrayBuffer();
       return Buffer.from(arrayBuffer);
     } catch (error) {
-      console.error('Error descargando XLSX del INEI:', error);
+      console.error('Error obteniendo XLSX del INEI:', error);
       throw error;
     }
+  }
+
+  private async loadLocalBackup(): Promise<Buffer | null> {
+    const candidates = [
+      process.env.UBIGEO_LOCAL_XLSX_PATH,
+      LOCAL_XLSX_FALLBACK,
+    ].filter((value): value is string => Boolean(value));
+
+    for (const candidate of candidates) {
+      try {
+        const available = await exists(candidate);
+        if (available) {
+          this.localXlsxResolvedPath = candidate;
+          return await readFile(candidate);
+        }
+      } catch (error) {
+        console.warn('No se pudo leer el respaldo local de ubigeo:', error);
+      }
+    }
+
+    return null;
   }
 
   // Procesar archivo XLSX y convertirlo a JSON estructurado

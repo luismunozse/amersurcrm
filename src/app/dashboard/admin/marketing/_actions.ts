@@ -27,11 +27,36 @@ export async function verificarCredencialesWhatsApp() {
       return { tieneCredenciales: false, error: "No autorizado" };
     }
 
+    const { data: credencialDb } = await supabase
+      .schema('crm')
+      .from('marketing_channel_credential')
+      .select('provider, account_sid, auth_token, access_token, whatsapp_from, es_sandbox, updated_at')
+      .eq('canal_tipo', 'whatsapp')
+      .eq('provider', 'twilio')
+      .eq('activo', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (
+      credencialDb &&
+      credencialDb.account_sid &&
+      (credencialDb.auth_token || credencialDb.access_token) &&
+      credencialDb.whatsapp_from
+    ) {
+      return {
+        tieneCredenciales: true,
+        proveedor: 'twilio',
+        origen: 'database',
+        sandbox: credencialDb.es_sandbox ?? true,
+        updatedAt: credencialDb.updated_at ?? null,
+      };
+    }
+
     const accountSid = process.env.TWILIO_ACCOUNT_SID ?? "";
     const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
     const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM ?? "";
 
-    // Verificar credenciales de Twilio desde variables de entorno
     const tieneCredenciales =
       accountSid.length > 10 &&
       authToken.length > 10 &&
@@ -40,13 +65,14 @@ export async function verificarCredencialesWhatsApp() {
     if (!tieneCredenciales) {
       return {
         tieneCredenciales: false,
-        error: "Credenciales de Twilio no configuradas en variables de entorno"
+        error: "No hay credenciales activas. Configúralas en la pestaña Configuración."
       };
     }
 
     return {
       tieneCredenciales: true,
-      proveedor: 'twilio'
+      proveedor: 'twilio',
+      origen: 'env'
     };
   } catch (error) {
     console.error('Error verificando credenciales de Twilio:', error);

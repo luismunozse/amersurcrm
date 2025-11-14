@@ -160,6 +160,10 @@ npm run test:coverage # Tests con coverage
 npm run test:e2e     # Tests E2E con Playwright
 ```
 
+### Datos de Ubigeo sin conexión
+
+El comando `npm run update-ubigeo` ahora intenta usar un respaldo local antes de descargar el XLSX del INEI. Coloca el archivo en `data/ubigeo-inei-completo.xlsx` o define la variable `UBIGEO_LOCAL_XLSX_PATH` con la ruta del XLSX para permitir que el script funcione en entornos sin acceso a internet.
+
 ## 🚀 Deployment
 
 ### Vercel (Recomendado)

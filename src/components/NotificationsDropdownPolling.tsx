@@ -7,6 +7,7 @@ import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifi
 import type { NotificacionNoLeida } from "@/types/crm";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import toast from "react-hot-toast";
+import { dedupeNotifications } from "@/lib/notifications/dedupe";
 
 interface NotificationsDropdownProps {
   notificaciones: NotificacionNoLeida[];
@@ -29,18 +30,6 @@ const tipoColors = {
 
 // Intervalo de polling en milisegundos (15 segundos)
 const POLLING_INTERVAL = 15000;
-
-const dedupeNotifications = (notifs: NotificacionNoLeida[]) => {
-  const seen = new Set<string>();
-  return notifs.filter((notif) => {
-    const key = notif.id ?? `${notif.tipo}-${notif.created_at}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-};
 
 export default function NotificationsDropdownPolling({ notificaciones, count }: NotificationsDropdownProps) {
   const router = useRouter();

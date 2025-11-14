@@ -1,43 +1,43 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Authentication', () => {
-  test('should redirect to login when not authenticated', async ({ page }) => {
+  test('redirects to login when user is not authenticated', async ({ page }) => {
     await page.goto('/dashboard');
-    
-    // Should redirect to login page
+
     await expect(page).toHaveURL('/auth/login');
-    await expect(page.locator('h1')).toContainText('Iniciar Sesión');
+    await expect(page.getByRole('heading', { name: 'Bienvenido' })).toBeVisible();
   });
 
-  test('should show login form', async ({ page }) => {
+  test('renders both admin and vendedor flows', async ({ page }) => {
     await page.goto('/auth/login');
-    
-    // Check form elements
-    await expect(page.locator('input[name="email"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.locator('button[type="submit"]')).toBeVisible();
+
+    await expect(page.getByRole('button', { name: 'Administrador' })).toBeVisible();
+    await expect(page.getByPlaceholder('Ingresa tu usuario')).toBeVisible();
+    await expect(page.getByPlaceholder('Ingresa tu contraseña')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Vendedor' }).click();
+    await expect(page.getByPlaceholder('Ingresa tu DNI')).toBeVisible();
+    await expect(page.getByPlaceholder('Ingresa tu contraseña')).toBeVisible();
   });
 
-  test('should show validation errors for empty form', async ({ page }) => {
+  test('shows validation errors for empty admin form', async ({ page }) => {
     await page.goto('/auth/login');
-    
-    // Submit empty form
-    await page.click('button[type="submit"]');
-    
-    // Check for validation errors
-    await expect(page.locator('input[name="email"]:invalid')).toBeVisible();
-    await expect(page.locator('input[name="password"]:invalid')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
+
+    await expect(page.getByText('Ingresa tu usuario')).toBeVisible();
+    await expect(page.getByText('Ingresa tu contraseña')).toBeVisible();
   });
 
-  test('should show error for invalid credentials', async ({ page }) => {
+  test('validates vendedor DNI and password length before hitting API', async ({ page }) => {
     await page.goto('/auth/login');
-    
-    // Fill form with invalid credentials
-    await page.fill('input[name="email"]', 'invalid@example.com');
-    await page.fill('input[name="password"]', 'wrongpassword');
-    await page.click('button[type="submit"]');
-    
-    // Should show error message
-    await expect(page.locator('text=Credenciales inválidas')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Vendedor' }).click();
+    await page.getByPlaceholder('Ingresa tu DNI').fill('1234');
+    await page.getByPlaceholder('Ingresa tu contraseña').fill('123');
+    await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
+
+    await expect(page.getByText('El DNI debe tener 8 dígitos numéricos')).toBeVisible();
+    await expect(page.getByText('Debe tener al menos 6 caracteres')).toBeVisible();
   });
 });

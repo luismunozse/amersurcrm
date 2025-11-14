@@ -29,21 +29,20 @@ export type JsonValue =
 
 export type JsonObject = { [key: string]: JsonValue };
 
-/**
- * @deprecated Con Twilio ya no usamos credenciales en la base de datos.
- * Las credenciales están en variables de entorno (.env.local):
- * - TWILIO_ACCOUNT_SID
- * - TWILIO_AUTH_TOKEN
- * - TWILIO_WHATSAPP_FROM
- */
 export interface MarketingChannelCredential {
   id: string;
+  provider?: 'meta' | 'twilio' | string;
   canal_tipo: CanalTipo;
   nombre: string;
   descripcion?: string;
-  app_id?: string;
-  phone_number_id: string;
-  access_token: string;
+  app_id?: string; // Para Meta
+  phone_number_id?: string; // Meta
+  access_token?: string; // Meta token
+  account_sid?: string; // Twilio
+  auth_token?: string; // Twilio
+  whatsapp_from?: string;
+  sms_from?: string | null;
+  messaging_service_sid?: string | null;
   token_expires_at?: string;
   webhook_verify_token: string;
   activo: boolean;
@@ -53,6 +52,7 @@ export interface MarketingChannelCredential {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  extras?: Record<string, unknown>;
 }
 
 // Plantilla de mensaje

@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { MessageSquare, Users, Zap, BarChart3, Send, TestTube2 } from "lucide-react";
+import { MessageSquare, Users, Zap, BarChart3, Send, TestTube2, Shield } from "lucide-react";
 import DashboardMetricas from "@/components/marketing/DashboardMetricas";
 import GestionPlantillas from "@/components/marketing/GestionPlantillas";
 import GestionCampanas from "@/components/marketing/GestionCampanas";
 import BandejaConversaciones from "@/components/marketing/BandejaConversaciones";
 import GestionAutomatizaciones from "@/components/marketing/GestionAutomatizaciones";
 import { verificarCredencialesWhatsApp } from "@/app/dashboard/admin/marketing/_actions";
+import ConfiguracionTwilio from "@/components/marketing/ConfiguracionTwilio";
 
 type MarketingTabConfig = {
   id: string;
@@ -33,6 +34,7 @@ const MARKETING_TABS: MarketingTabConfig[] = [
   { id: "plantillas", label: "Plantillas", icon: Send },
   { id: "campanas", label: "Campañas", icon: Users },
   { id: "automatizaciones", label: "Automatizaciones", icon: Zap },
+  { id: "configuracion", label: "Configuración", icon: Shield },
 ];
 
 const DASHBOARD_FEATURES: MarketingFeature[] = [
@@ -91,6 +93,7 @@ const TAB_CONTENT: Record<string, () => React.JSX.Element> = {
   plantillas: () => <GestionPlantillas />,
   campanas: () => <GestionCampanas />,
   automatizaciones: () => <GestionAutomatizaciones />,
+  configuracion: () => <ConfiguracionTwilio />,
 };
 
 function MarketingSkeleton() {
@@ -122,6 +125,7 @@ export default function MarketingPage() {
   const [tieneCredenciales, setTieneCredenciales] = useState(true);
   const [verificandoCredenciales, setVerificandoCredenciales] = useState(true);
   const [credencialesError, setCredencialesError] = useState<string | null>(null);
+  const [credencialesMeta, setCredencialesMeta] = useState<{ origen?: string | null; sandbox?: boolean | null; updatedAt?: string | null } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -131,11 +135,17 @@ export default function MarketingPage() {
         const result = await verificarCredencialesWhatsApp();
         if (!isMounted) return;
         setTieneCredenciales(result.tieneCredenciales);
+        setCredencialesMeta({
+          origen: 'origen' in result ? (result as any).origen : null,
+          sandbox: 'sandbox' in result ? (result as any).sandbox : null,
+          updatedAt: 'updatedAt' in result ? (result as any).updatedAt : null,
+        });
         setCredencialesError(null);
       } catch (error) {
         console.error("Error verificando credenciales de WhatsApp:", error);
         if (!isMounted) return;
         setTieneCredenciales(false);
+        setCredencialesMeta(null);
         setCredencialesError(
           "No pudimos confirmar las credenciales de WhatsApp. Reintenta más tarde."
         );
@@ -244,8 +254,7 @@ export default function MarketingPage() {
             <div>
               <h4 className="text-sm font-medium text-crm-warning mb-1">Configuración Requerida</h4>
               <p className="text-xs text-crm-text-secondary">
-                Para usar WhatsApp con Twilio, necesitas configurar tus credenciales en el archivo .env.local.
-                Requieres: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_WHATSAPP_FROM.
+                Para usar WhatsApp con Twilio, abre la pestaña <strong>Configuración</strong> y guarda tu Account SID, Auth Token y números remitentes.
               </p>
             </div>
           </div>
@@ -264,7 +273,11 @@ export default function MarketingPage() {
             <div>
               <h4 className="text-sm font-medium text-crm-success mb-1">Twilio Configurado</h4>
               <p className="text-xs text-crm-text-secondary">
-                Las credenciales de Twilio están configuradas correctamente. Ya puedes enviar mensajes de WhatsApp y SMS, y crear campañas.
+                {credencialesMeta?.origen === 'database'
+                  ? "Se están usando las credenciales guardadas en la pestaña Configuración."
+                  : "Se están usando las credenciales definidas en .env.local."}
+                {credencialesMeta?.sandbox ? " Modo sandbox activo." : ""}
+                {credencialesMeta?.updatedAt ? ` Última actualización: ${new Date(credencialesMeta.updatedAt).toLocaleString()}` : ""}
               </p>
             </div>
           </div>

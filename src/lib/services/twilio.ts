@@ -6,17 +6,125 @@
  */
 
 import twilio from 'twilio';
+import { createServiceRoleClient } from '@/lib/supabase.server';
 
-// Cliente de Twilio (se inicializa una vez)
-const getTwilioClient = () => {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
+type TwilioClientInstance = ReturnType<typeof twilio>;
 
-  if (!accountSid || !authToken) {
-    throw new Error('Credenciales de Twilio no configuradas. Revisa las variables de entorno.');
+type TwilioRuntimeConfig = {
+  accountSid: string;
+  authToken: string;
+  whatsappFrom?: string | null;
+  smsFrom?: string | null;
+};
+
+type TwilioFactoryResult = {
+  client: TwilioClientInstance;
+  config: TwilioRuntimeConfig;
+};
+
+let customTwilioClientFactory: (() => Promise<TwilioFactoryResult> | TwilioFactoryResult) | null = null;
+
+const CONFIG_TTL_MS = 5 * 60 * 1000;
+let credentialCache: { config: TwilioRuntimeConfig; expiresAt: number } | null = null;
+
+export function invalidateTwilioClientCache() {
+  credentialCache = null;
+}
+
+// Permite inyectar un cliente de pruebas (solo se usa en tests)
+export function __setTwilioClientFactory(factory: (() => Promise<TwilioFactoryResult> | TwilioFactoryResult) | null) {
+  customTwilioClientFactory = factory;
+}
+
+async function loadConfigFromDatabase(): Promise<TwilioRuntimeConfig | null> {
+  try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return null;
+    }
+
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_channel_credential')
+      .select('provider, account_sid, auth_token, access_token, whatsapp_from, sms_from, phone_number_id, activo')
+      .eq('canal_tipo', 'whatsapp')
+      .eq('activo', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[Twilio] No se pudo obtener credenciales desde BD:', error.message);
+      return null;
+    }
+
+    if (!data || (data.provider && data.provider !== 'twilio')) {
+      return null;
+    }
+
+    const accountSid = data.account_sid || process.env.TWILIO_ACCOUNT_SID;
+    const authToken = data.auth_token || data.access_token || process.env.TWILIO_AUTH_TOKEN;
+    const whatsappFrom = data.whatsapp_from || data.phone_number_id || process.env.TWILIO_WHATSAPP_FROM;
+    const smsFrom = data.sms_from || process.env.TWILIO_PHONE_NUMBER || null;
+
+    if (!accountSid || !authToken) {
+      return null;
+    }
+
+    return {
+      accountSid,
+      authToken,
+      whatsappFrom,
+      smsFrom
+    };
+  } catch (error) {
+    console.error('[Twilio] Error leyendo credenciales desde la base de datos:', error);
+    return null;
+  }
+}
+
+async function resolveRuntimeConfig(): Promise<TwilioRuntimeConfig | null> {
+  if (credentialCache && Date.now() < credentialCache.expiresAt) {
+    return credentialCache.config;
   }
 
-  return twilio(accountSid, authToken);
+  const dbConfig = await loadConfigFromDatabase();
+  if (dbConfig) {
+    credentialCache = { config: dbConfig, expiresAt: Date.now() + CONFIG_TTL_MS };
+    return dbConfig;
+  }
+
+  const envAccountSid = process.env.TWILIO_ACCOUNT_SID;
+  const envAuthToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (!envAccountSid || !envAuthToken) {
+    return null;
+  }
+
+  const fallbackConfig: TwilioRuntimeConfig = {
+    accountSid: envAccountSid,
+    authToken: envAuthToken,
+    whatsappFrom: process.env.TWILIO_WHATSAPP_FROM,
+    smsFrom: process.env.TWILIO_PHONE_NUMBER
+  };
+
+  credentialCache = { config: fallbackConfig, expiresAt: Date.now() + CONFIG_TTL_MS };
+  return fallbackConfig;
+}
+
+const getTwilioRuntime = async (): Promise<TwilioFactoryResult> => {
+  if (customTwilioClientFactory) {
+    return await customTwilioClientFactory();
+  }
+
+  const config = await resolveRuntimeConfig();
+
+  if (!config) {
+    throw new Error('Credenciales de Twilio no configuradas. Configura la integración en Marketing > Configuración.');
+  }
+
+  const client = twilio(config.accountSid, config.authToken);
+  return { client, config };
 };
 
 /**
@@ -48,11 +156,11 @@ export async function enviarWhatsApp(
   mediaUrl?: string
 ): Promise<TwilioMessageResponse> {
   try {
-    const client = getTwilioClient();
-    const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM;
+    const { client, config } = await getTwilioRuntime();
+    const whatsappFrom = config.whatsappFrom || process.env.TWILIO_WHATSAPP_FROM;
 
     if (!whatsappFrom) {
-      throw new Error('TWILIO_WHATSAPP_FROM no configurado en variables de entorno');
+      throw new Error('No hay un número remitente configurado para WhatsApp.');
     }
 
     // Asegurarse que el número tenga formato whatsapp:+51...
@@ -100,11 +208,11 @@ export async function enviarSMS(
   body: string
 ): Promise<TwilioMessageResponse> {
   try {
-    const client = getTwilioClient();
-    const phoneFrom = process.env.TWILIO_PHONE_NUMBER;
+    const { client, config } = await getTwilioRuntime();
+    const phoneFrom = config.smsFrom || process.env.TWILIO_PHONE_NUMBER;
 
     if (!phoneFrom) {
-      throw new Error('TWILIO_PHONE_NUMBER no configurado en variables de entorno');
+      throw new Error('No hay un número remitente configurado para SMS.');
     }
 
     const message = await client.messages.create({
@@ -211,7 +319,7 @@ export async function enviarSMSMasivo(
  */
 export async function obtenerEstadoMensaje(messageSid: string) {
   try {
-    const client = getTwilioClient();
+    const { client } = await getTwilioRuntime();
     const message = await client.messages(messageSid).fetch();
 
     return {
@@ -236,13 +344,9 @@ export async function obtenerEstadoMensaje(messageSid: string) {
  *
  * @returns true si las credenciales están configuradas
  */
-export function verificarCredencialesTwilio(): boolean {
-  return !!(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_PHONE_NUMBER &&
-    process.env.TWILIO_WHATSAPP_FROM
-  );
+export async function verificarCredencialesTwilio(): Promise<boolean> {
+  const config = await resolveRuntimeConfig();
+  return Boolean(config?.accountSid && config?.authToken && config?.whatsappFrom);
 }
 
 /**
@@ -252,8 +356,8 @@ export function verificarCredencialesTwilio(): boolean {
  */
 export async function obtenerInfoCuentaTwilio() {
   try {
-    const client = getTwilioClient();
-    const account = await client.api.accounts(process.env.TWILIO_ACCOUNT_SID!).fetch();
+    const { client, config } = await getTwilioRuntime();
+    const account = await client.api.accounts(config.accountSid).fetch();
 
     return {
       sid: account.sid,

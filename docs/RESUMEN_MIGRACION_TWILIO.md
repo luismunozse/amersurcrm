@@ -51,6 +51,18 @@
 - Agregados logs de debug para troubleshooting
 - Retorna información del proveedor: `proveedor: 'twilio'`
 
+### 6. Panel de Configuración de Twilio (NUEVO)
+**Archivos:** 
+- `/src/components/marketing/ConfiguracionTwilio.tsx`
+- `/src/app/api/marketing/twilio-config/route.ts`
+- `/supabase/migrations/20250315_marketing_channel_twilio_columns.sql`
+
+**Cambios realizados:**
+- Nuevo tab **Configuración** dentro de `/dashboard/admin/marketing` para que los administradores gestionen las credenciales sin tocar `.env`.
+- API segura (requiere rol admin) que persiste `account_sid`, `auth_token`, números remitentes y verify token en `crm.marketing_channel_credential`.
+- Cache de Twilio invalidado automáticamente al actualizar, garantizando que los envíos usen la credencial más reciente.
+- Recordatorio visual del webhook y botones para copiar URL/token.
+
 ## 🔧 Pendiente de Ejecutar
 
 ### 1. Migración SQL - Agregar columna `tw_message_sid`
@@ -132,9 +144,7 @@ Para recibir actualizaciones de estado de mensajes (entregado, leído, fallido):
 - Página de pruebas de Twilio
 
 ### ⚠️ Requiere Acción
-1. **Ejecutar migración SQL** para agregar columna `tw_message_sid`
-2. **Actualizar políticas RLS** para permitir inserts
-3. **Configurar webhook** en Twilio Console (opcional pero recomendado)
+1. **Configurar webhook** en Twilio Console (obligatorio para recibir estados y respuestas)
 
 ### 🎯 Siguiente Paso Sugerido
 

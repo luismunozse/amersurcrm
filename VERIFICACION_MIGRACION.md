@@ -160,20 +160,14 @@
 
 ### Completados ✅
 1. ✅ **Paso 1: Migración SQL** - COMPLETADO Y VERIFICADO
+3. ✅ **Paso 3: Configurar Credenciales WhatsApp Cloud API** - UI y API internas listas
+4. ✅ **Paso 4: Implementar Servicio de Envío de Mensajes** - Twilio en funcionamiento (WhatsApp + SMS)
 
 ### Pendientes
 2. ⏳ **Paso 2: Prueba de UI** - Verificar que `/dashboard/admin/marketing` funciona
-3. ⏳ **Paso 3: Configurar Credenciales WhatsApp Cloud API**
-   - Crear formulario de configuración
-   - Guardar credenciales en `marketing_channel_credential`
-4. ⏳ **Paso 4: Implementar Servicio de Envío de Mensajes**
-   - Crear servicio para WhatsApp Cloud API
-   - Implementar envío de mensajes de sesión
-   - Implementar envío de mensajes template
 5. ⏳ **Paso 5: Implementar Webhooks**
-   - Crear endpoint `/api/webhooks/whatsapp`
-   - Procesar mensajes entrantes
-   - Actualizar estados de mensajes
+   - Configurar el webhook en Twilio Console apuntando a `/api/twilio/webhook`
+   - Validar recepción de estados/mensajes entrantes
 6. ⏳ **Paso 6: Crear Modales de UI**
    - Modal crear/editar plantilla
    - Modal crear campaña

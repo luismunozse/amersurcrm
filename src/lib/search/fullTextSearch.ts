@@ -30,6 +30,21 @@
 
 import { createServerActionClient } from '@/lib/supabase.server-actions';
 
+type SupabaseSearchClient = Awaited<ReturnType<typeof createServerActionClient>>;
+
+let customSearchClientFactory: (() => Promise<SupabaseSearchClient>) | null = null;
+
+export function __setFullTextSearchClientFactory(factory: (() => Promise<SupabaseSearchClient>) | null) {
+  customSearchClientFactory = factory;
+}
+
+async function getSearchClient() {
+  if (customSearchClientFactory) {
+    return customSearchClientFactory();
+  }
+  return createServerActionClient();
+}
+
 /**
  * Opciones para búsqueda full-text
  */
@@ -113,7 +128,7 @@ export async function searchProyectosFullText(
   }
 
   try {
-    const supabase = await createServerActionClient();
+    const supabase = await getSearchClient();
 
     // Usar la función almacenada de PostgreSQL (schema crm)
     const { data, error } = await supabase.rpc('search_proyectos', {
@@ -193,7 +208,7 @@ export async function searchLotesFullText(
   }
 
   try {
-    const supabase = await createServerActionClient();
+    const supabase = await getSearchClient();
 
     // Usar la función almacenada de PostgreSQL (schema crm)
     const { data, error } = await supabase.rpc('search_lotes', {
