@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
   const { data: existente } = await supabase
     .schema('crm')
     .from('marketing_channel_credential')
-    .select('id')
+    .select('id, access_token')
     .eq('canal_tipo', 'whatsapp')
     .eq('provider', 'twilio')
     .limit(1)
@@ -104,8 +104,19 @@ export async function PUT(request: NextRequest) {
 
   const datosGuardar: Record<string, unknown> = { ...registroBase };
 
+  let accessTokenToPersist = existente?.access_token ?? null;
+
   if (payload.authToken && payload.authToken.trim().length > 0) {
-    datosGuardar.auth_token = payload.authToken.trim();
+    const normalized = payload.authToken.trim();
+    datosGuardar.auth_token = normalized;
+    datosGuardar.access_token = normalized;
+    accessTokenToPersist = normalized;
+  } else if (existente?.access_token) {
+    datosGuardar.access_token = existente.access_token;
+  }
+
+  if (!existente && !accessTokenToPersist) {
+    return NextResponse.json({ error: "Debes ingresar el Auth Token la primera vez." }, { status: 400 });
   }
 
   if (existente?.id) {
@@ -123,6 +134,7 @@ export async function PUT(request: NextRequest) {
     const insertar = {
       ...datosGuardar,
       auth_token: payload.authToken?.trim(),
+      access_token: accessTokenToPersist,
     };
 
     const { error: insertError } = await supabase

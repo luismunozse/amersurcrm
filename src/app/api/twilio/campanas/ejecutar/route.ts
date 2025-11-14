@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { enviarWhatsApp, enviarSMS } from "@/lib/services/twilio";
+import type { EstadoMensaje } from "@/types/whatsapp-marketing";
 
 /**
  * Normaliza un número de teléfono al formato internacional
@@ -31,6 +32,24 @@ function normalizarTelefono(telefono: string): string {
 
   return normalizado;
 }
+
+const mapTwilioStatus = (status?: string): EstadoMensaje => {
+  const normalized = (status || "").toLowerCase();
+  switch (normalized) {
+    case "sent":
+    case "sending":
+      return "SENT";
+    case "delivered":
+      return "DELIVERED";
+    case "read":
+      return "READ";
+    case "undelivered":
+    case "failed":
+      return "FAILED";
+    default:
+      return "PENDING";
+  }
+};
 
 /**
  * Ejecutar campaña con Twilio
@@ -205,7 +224,7 @@ export async function POST(request: NextRequest) {
             template_id: campana.template_id,
             template_variables: variables,
             tw_message_sid: respuesta.sid,
-            estado: respuesta.status.toUpperCase(),
+            estado: mapTwilioStatus(respuesta.status),
             sent_at: respuesta.dateCreated.toISOString()
           });
 

@@ -9,6 +9,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { enviarSMS, enviarSMSMasivo } from "@/lib/services/twilio";
+import type { EstadoMensaje } from "@/types/whatsapp-marketing";
+
+const mapTwilioStatus = (status?: string): EstadoMensaje => {
+  const normalized = (status || "").toLowerCase();
+  switch (normalized) {
+    case "sent":
+    case "sending":
+      return "SENT";
+    case "delivered":
+      return "DELIVERED";
+    case "read":
+      return "READ";
+    case "undelivered":
+    case "failed":
+      return "FAILED";
+    default:
+      return "PENDING";
+  }
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +79,7 @@ export async function POST(request: NextRequest) {
         contenido_tipo: 'TEXT',
         contenido_texto: contenido_texto,
         tw_message_sid: respuesta.sid,
-        estado: respuesta.status.toUpperCase(),
+        estado: mapTwilioStatus(respuesta.status),
         sent_at: respuesta.dateCreated.toISOString()
       }));
 
@@ -111,7 +130,7 @@ export async function POST(request: NextRequest) {
         contenido_tipo: 'TEXT',
         contenido_texto: contenido_texto,
         tw_message_sid: respuesta.sid,
-        estado: respuesta.status.toUpperCase(),
+            estado: mapTwilioStatus(respuesta.status),
         sent_at: respuesta.dateCreated.toISOString()
       })
       .select()
