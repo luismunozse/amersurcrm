@@ -85,11 +85,11 @@ export default function ProyectoGaleria({
 
             {/* Logo Overlay */}
             {logoUrl && (
-              <div className="absolute bottom-4 left-4 rounded-2xl bg-white/85 dark:bg-black/60 px-4 py-2 shadow-crm backdrop-blur">
+              <div className="absolute bottom-4 left-4 rounded-2xl bg-white/90 dark:bg-white px-4 py-2 shadow-crm border border-black/5 dark:border-black/10 backdrop-blur">
                 <img
                   src={logoUrl}
                   alt={`Logo de ${nombre}`}
-                  className="h-12 w-auto object-contain"
+                  className="h-12 w-auto object-contain dark:[filter:drop-shadow(0_0_6px_rgba(0,0,0,0.55))]"
                 />
               </div>
             )}

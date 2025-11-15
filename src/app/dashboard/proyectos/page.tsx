@@ -289,11 +289,11 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
                   )}
 
                   {p.logo_url && (
-                    <div className="absolute bottom-4 left-4 rounded-2xl bg-white/85 dark:bg-black/60 px-4 py-2 shadow-lg border border-white/60 backdrop-blur">
+                    <div className="absolute bottom-4 left-4 rounded-2xl bg-white/90 dark:bg-white px-4 py-2 shadow-lg border border-black/5 dark:border-black/10 backdrop-blur">
                       <img
                         src={p.logo_url}
                         alt={`Logo ${p.nombre}`}
-                        className="h-10 w-auto object-contain"
+                        className="h-10 w-auto object-contain dark:[filter:drop-shadow(0_0_6px_rgba(0,0,0,0.55))]"
                       />
                     </div>
                   )}

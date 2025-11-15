@@ -70,11 +70,21 @@ export default function QuickActions({
   };
 
   const openMaps = () => {
-    if (!ubicacion) {
+    const lat = proyecto?.latitud;
+    const lng = proyecto?.longitud;
+
+    if (typeof lat === "number" && typeof lng === "number" && Number.isFinite(lat) && Number.isFinite(lng)) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank");
+      return;
+    }
+
+    const destino = proyecto?.ubicacion || ubicacion;
+    if (!destino) {
       toast("Sin ubicación", { icon: "ℹ️" });
       return;
     }
-    const q = encodeURIComponent(ubicacion);
+
+    const q = encodeURIComponent(destino);
     window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank");
   };
 
