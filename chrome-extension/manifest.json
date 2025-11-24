@@ -10,7 +10,8 @@
   "host_permissions": [
     "https://web.whatsapp.com/*",
     "http://localhost:3000/*",
-    "https://*.vercel.app/*"
+    "https://*.vercel.app/*",
+    "https://crm.amersursac.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
