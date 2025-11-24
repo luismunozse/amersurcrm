@@ -92,10 +92,10 @@ export default function ExtensionPage() {
             <div className="flex-1">
               <h3 className="font-semibold text-lg mb-2 dark:text-gray-100">Cargar la extensión</h3>
               <p className="text-crm-text-muted dark:text-gray-400 mb-2">
-                Haz click en "Cargar extensión sin empaquetar" y selecciona la carpeta que descomprimiste.
+                Haz click en "Cargar extensión sin empaquetar" y selecciona la carpeta <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">AmersurChat</code> que descomprimiste.
               </p>
-              <p className="text-sm text-yellow-700 dark:text-yellow-200 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded px-3 py-2">
-                ⚠️ <strong>Importante:</strong> Selecciona la carpeta <code className="dark:bg-yellow-800/30 dark:text-yellow-100">dist/</code> dentro del archivo descomprimido.
+              <p className="text-sm text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded px-3 py-2">
+                💡 <strong>Tip:</strong> La carpeta debe contener el archivo <code className="dark:bg-blue-800/30 dark:text-blue-100">manifest.json</code> directamente.
               </p>
             </div>
           </li>
