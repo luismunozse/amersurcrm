@@ -1,0 +1,21 @@
+/* Estilos para el content script */
+
+#amersurchat-sidebar {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#amersurchat-toggle {
+  font-family: inherit;
+}
+
+#amersurchat-toggle:hover {
+  background: #20BA5A !important;
+}
+
+#amersurchat-toggle:active {
+  background: #1DA851 !important;
+}

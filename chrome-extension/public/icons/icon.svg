@@ -1,0 +1,7 @@
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo verde WhatsApp -->
+  <circle cx="64" cy="64" r="64" fill="#25D366"/>
+
+  <!-- Letra A en blanco -->
+  <text x="64" y="90" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="#FFFFFF" text-anchor="middle">A</text>
+</svg>
