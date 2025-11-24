@@ -6,7 +6,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onLogin }: LoginFormProps) {
-  const [crmUrl, setCrmUrl] = useState('http://localhost:3000');
+  const [crmUrl, setCrmUrl] = useState('https://crm.amersursac.com');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

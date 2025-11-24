@@ -181,7 +181,7 @@ export async function getCRMConfig(): Promise<{ url: string; token: string | nul
   return new Promise((resolve) => {
     chrome.storage.local.get(['crmUrl', 'authToken'], (result) => {
       resolve({
-        url: result.crmUrl || 'http://localhost:3000',
+        url: result.crmUrl || 'https://crm.amersursac.com',
         token: result.authToken || null,
       });
     });
