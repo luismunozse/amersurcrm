@@ -32,7 +32,7 @@ export default function ExtensionPage() {
             <div className="flex-1">
               <h3 className="font-semibold text-lg mb-2 dark:text-gray-100">Descargar la extensión</h3>
               <a
-                href="/extension/amersurchat-extension.zip"
+                href="/extension/AmersurChat.zip"
                 download
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
