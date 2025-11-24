@@ -78,6 +78,7 @@ interface ClientesTableProps {
   estado?: string;
   tipo?: string;
   vendedor?: string;
+  origen?: string;  // Filtro por origen del lead
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -93,6 +94,7 @@ export default function ClientesTable({
   estado = '',
   tipo = '',
   vendedor = '',
+  origen = '',
   sortBy: initialSortBy = 'fecha_alta',
   sortOrder: initialSortOrder = 'desc'
 }: ClientesTableProps) {
@@ -165,6 +167,7 @@ export default function ClientesTable({
     estado: estado || undefined,
     tipo: tipo || undefined,
     vendedor: vendedor || undefined,
+    origen: origen || undefined,
     sortBy: initialSortBy,
     sortOrder: initialSortOrder,
   };
@@ -716,7 +719,7 @@ export default function ClientesTable({
 
           {clientes.length === 0 && (
             <p className="text-center text-sm text-crm-text-muted">
-              {searchQuery || estado || tipo || vendedor
+              {searchQuery || estado || tipo || vendedor || origen
                 ? "No se encontraron clientes con los filtros aplicados."
                 : "Aún no hay clientes registrados."}
             </p>
@@ -914,6 +917,10 @@ const ClienteRow = memo(function ClienteRow({
         return 'Campaña Facebook';
       case 'campaña_tiktok':
         return 'Campaña TikTok';
+      case 'facebook_ads':
+        return 'Facebook Lead Ads';
+      case 'whatsapp_web':
+        return 'WhatsApp Web';
       case 'redes_sociales':
         return 'Redes sociales';
       case 'publicidad':

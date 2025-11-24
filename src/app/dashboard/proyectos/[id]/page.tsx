@@ -11,6 +11,7 @@ import { PaginationClient } from "./_PaginationClient";
 import ProjectTabs from "./_ProjectTabs";
 import ProyectoGaleria from "./_ProyectoGaleria";
 import type { ProyectoMediaItem } from "@/types/proyectos";
+import type { OverlayLayerConfig } from "@/types/overlay-layers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -65,7 +66,7 @@ export default async function ProyLotesPage({
   const isAdmin = user ? await esAdmin() : false;
 
   // Proyecto (para título/404)
-  const proyectoSelectBase = "id,nombre,estado,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,created_at,tipo";
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,overlay_layers,created_at,tipo";
   const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
     .select(`${proyectoSelectBase},poligono`)
@@ -187,7 +188,7 @@ export default async function ProyLotesPage({
     return undefined;
   };
 
-  const parseOverlayBounds = (value: unknown): [[number, number], [number, number]] | undefined => {
+  const parseOverlayBounds = (value: unknown): [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]] | undefined => {
     let candidate: unknown = value;
     if (typeof candidate === 'string') {
       try {
@@ -205,19 +206,58 @@ export default async function ProyLotesPage({
         candidate = [obj.sw, obj.ne];
       } else if ('southWest' in obj && 'northEast' in obj) {
         candidate = [obj.southWest, obj.northEast];
+      } else if ('0' in obj && '1' in obj && '2' in obj && '3' in obj) {
+        // Formato de 4 puntos (nuevo)
+        candidate = [obj['0'], obj['1'], obj['2'], obj['3']];
       } else if ('0' in obj && '1' in obj) {
+        // Formato de 2 puntos (antiguo)
         candidate = [obj['0'], obj['1']];
       }
     }
 
-    if (!Array.isArray(candidate) || candidate.length !== 2) return undefined;
-    const sw = toLatLngTuple(candidate[0]);
-    const ne = toLatLngTuple(candidate[1]);
-    if (!sw || !ne) return undefined;
-    return [sw, ne];
+    // Aceptar arrays de 2 puntos (formato antiguo) o 4 puntos (formato nuevo)
+    if (!Array.isArray(candidate)) return undefined;
+
+    if (candidate.length === 4) {
+      // Formato nuevo: 4 esquinas independientes [NW, NE, SE, SW]
+      const nw = toLatLngTuple(candidate[0]);
+      const ne = toLatLngTuple(candidate[1]);
+      const se = toLatLngTuple(candidate[2]);
+      const sw = toLatLngTuple(candidate[3]);
+      if (!nw || !ne || !se || !sw) return undefined;
+      return [nw, ne, se, sw];
+    } else if (candidate.length === 2) {
+      // Formato antiguo: 2 esquinas opuestas [SW, NE]
+      const sw = toLatLngTuple(candidate[0]);
+      const ne = toLatLngTuple(candidate[1]);
+      if (!sw || !ne) return undefined;
+      return [sw, ne];
+    }
+
+    return undefined;
   };
 
   const overlayBoundsValue = parseOverlayBounds((proyecto as { overlay_bounds?: unknown } | null)?.overlay_bounds);
+
+  // Normalizar bounds al formato de 2 puntos [[lat, lng], [lat, lng]]
+  const normalizeBoundsTo2Points = (
+    bounds: unknown
+  ): [[number, number], [number, number]] | null | undefined => {
+    if (!bounds) return bounds as null | undefined;
+    if (!Array.isArray(bounds)) return undefined;
+
+    // Si ya tiene 2 puntos, retornar tal cual
+    if (bounds.length === 2) {
+      return bounds as [[number, number], [number, number]];
+    }
+
+    // Si tiene 4 puntos, extraer SW (punto 0) y NE (punto 2)
+    if (bounds.length === 4) {
+      return [bounds[0], bounds[2]] as [[number, number], [number, number]];
+    }
+
+    return undefined;
+  };
 
   const overlayRotationRaw = (proyecto as { overlay_rotation?: unknown } | null)?.overlay_rotation;
   const overlayRotationValue = typeof overlayRotationRaw === 'number'
@@ -232,6 +272,56 @@ export default async function ProyLotesPage({
     : typeof overlayOpacityRaw === 'string'
       ? Number(overlayOpacityRaw)
       : null;
+
+  const parseOverlayLayers = (value: unknown): OverlayLayerConfig[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const parsed = value
+      .map((item, index) => {
+        if (!item || typeof item !== 'object') return null;
+        const candidate = item as Record<string, unknown>;
+        const url = typeof candidate.url === 'string' ? candidate.url : null;
+        if (!url) return null;
+        const boundsValue = 'bounds' in candidate ? candidate.bounds : undefined;
+        const bounds = parseOverlayBounds(boundsValue);
+        return {
+          id: typeof candidate.id === 'string' ? candidate.id : `layer-${index}`,
+          name: typeof candidate.name === 'string' ? candidate.name : `Capa ${index + 1}`,
+          url,
+          bounds,
+          opacity: typeof candidate.opacity === 'number' ? candidate.opacity : null,
+          visible: typeof candidate.visible === 'boolean' ? candidate.visible : true,
+          isPrimary: typeof candidate.isPrimary === 'boolean' ? candidate.isPrimary : index === 0,
+          order: typeof candidate.order === 'number' ? candidate.order : index,
+        } as OverlayLayerConfig;
+      })
+      .filter((layer): layer is OverlayLayerConfig => Boolean(layer));
+    return parsed.length ? parsed : undefined;
+  };
+
+  const rawOverlayLayers = parseOverlayLayers(
+    (proyecto as { overlay_layers?: unknown } | null)?.overlay_layers
+  );
+  const planosUrl = (proyecto as { planos_url?: string | null } | null)?.planos_url ?? null;
+  const overlayLayers: OverlayLayerConfig[] =
+    rawOverlayLayers && rawOverlayLayers.length
+      ? rawOverlayLayers
+      : planosUrl
+        ? [
+            {
+              id: 'layer-default',
+              name: 'Plano principal',
+              url: planosUrl,
+              bounds: overlayBoundsValue,
+              opacity: overlayOpacityValue ?? 0.7,
+              visible: true,
+              isPrimary: true,
+              order: 0,
+            },
+          ]
+        : [];
+  const primaryOverlayLayer =
+    overlayLayers.find((layer) => layer.isPrimary) ?? overlayLayers[0] ?? null;
+  const primaryOverlayBounds = primaryOverlayLayer?.bounds ?? overlayBoundsValue;
 
   const galeriaItems = parseGaleria((proyecto as { galeria_imagenes?: unknown } | null)?.galeria_imagenes);
 
@@ -276,8 +366,8 @@ export default async function ProyLotesPage({
     <div className="w-full p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header mejorado */}
       <div className="crm-card p-4 md:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 flex-1">
             <Link
               href="/dashboard/proyectos"
               className="flex-shrink-0 flex items-center justify-center w-10 h-10 text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-colors"
@@ -288,7 +378,7 @@ export default async function ProyLotesPage({
               </svg>
             </Link>
 
-            <div className="flex-1">
+            <div className="flex-1 space-y-3">
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <h1 className="text-xl md:text-2xl font-bold text-crm-text-primary">{proyecto.nombre}</h1>
 
@@ -317,7 +407,7 @@ export default async function ProyLotesPage({
               </div>
 
               {proyecto.ubicacion && (
-                <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
+                <div className="flex items-center gap-2 text-sm text-crm-text-secondary flex-wrap">
                   <svg className="w-4 h-4 text-crm-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -329,13 +419,12 @@ export default async function ProyLotesPage({
           </div>
 
           {/* Botón de eliminar proyecto */}
-          <div className="flex-shrink-0">
-            <DeleteProjectButton
-              proyectoId={proyecto.id}
-              proyectoNombre={proyecto.nombre}
-              lotesCount={total}
-            />
-          </div>
+          <DeleteProjectButton
+            className="w-full sm:w-auto"
+            proyectoId={proyecto.id}
+            proyectoNombre={proyecto.nombre}
+            lotesCount={total}
+          />
         </div>
       </div>
 
@@ -420,24 +509,26 @@ export default async function ProyLotesPage({
             <MapeoLotesMejorado
               key="mapeo-mejorado"
               proyectoId={proyecto.id}
-              planosUrl={proyecto.planos_url}
+              planosUrl={primaryOverlayLayer?.url ?? planosUrl}
               proyectoNombre={proyecto.nombre}
               proyectoLatitud={proyecto.latitud}
               proyectoLongitud={proyecto.longitud}
-              initialBounds={overlayBoundsValue}
+              initialBounds={normalizeBoundsTo2Points(primaryOverlayBounds ?? overlayBoundsValue)}
               initialRotation={overlayRotationValue}
-              initialOpacity={overlayOpacityValue}
+              initialOpacity={primaryOverlayLayer?.opacity ?? overlayOpacityValue}
+              initialOverlayLayers={overlayLayers}
               lotes={lotesForMapeo}
             />
           ) : (
             <MapeoLotesVisualizacion
               key="mapeo-visualizacion"
               proyectoNombre={proyecto.nombre}
-              planosUrl={proyecto.planos_url}
+              planosUrl={primaryOverlayLayer?.url ?? planosUrl}
               proyectoLatitud={proyecto.latitud}
               proyectoLongitud={proyecto.longitud}
-              overlayBounds={overlayBoundsValue}
+              overlayBounds={primaryOverlayBounds ?? overlayBoundsValue}
               overlayRotation={overlayRotationValue}
+              overlayLayers={overlayLayers}
               lotes={lotesForMapeo}
             />
           )

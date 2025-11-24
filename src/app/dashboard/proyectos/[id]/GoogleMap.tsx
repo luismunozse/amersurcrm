@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { OverlayLayerConfig } from '@/types/overlay-layers';
 
 interface LatLngLiteral {
   lat: number;
@@ -19,17 +20,29 @@ interface LoteOverlay {
   } | null;
 }
 
+interface MapOverlayLayer extends OverlayLayerConfig {
+  id: string;
+  url: string | null;
+  bounds?: [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]] | null;
+  opacity?: number | null;
+  visible?: boolean | null;
+}
+
 interface GoogleMapProps {
   defaultCenter: [number, number];
   defaultZoom: number;
   planosUrl?: string | null;
-  overlayBounds?: [[number, number], [number, number]];
+  overlayBounds?: [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]];
   overlayOpacity?: number;
-  rotationDeg?: number;
+  overlayLayers?: MapOverlayLayer[] | null;
+  activeOverlayId?: string | null;
   overlayEditable?: boolean;
-  onOverlayBoundsChange?: (bounds: [[number, number], [number, number]]) => void;
+  dropAreaBounds?: [[number, number], [number, number]] | null;
+  onOverlayBoundsChange?: (
+    overlayId: string,
+    bounds: [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]]
+  ) => void;
   onMapCenterChange?: (center: [number, number]) => void;
-  onCreateDefaultBounds?: () => void;
   onGetMapCenter?: () => [number, number] | null;
   projectPolygon?: LatLngLiteral[];
   onProjectPolygonChange?: (vertices: LatLngLiteral[]) => void;
@@ -37,9 +50,6 @@ interface GoogleMapProps {
   onProjectDrawingFinished?: () => void;
   lotes?: LoteOverlay[];
   highlightLoteId?: string | null;
-  loteDrawingActive?: boolean;
-  onLoteDrawingFinished?: () => void;
-  onLotePolygonComplete?: (vertices: [number, number][]) => void;
   fullScreenActive?: boolean;
   onToggleFull?: () => void;
   draggingLoteId?: string | null;
@@ -65,21 +75,42 @@ const ESTADO_TEXTOS: Record<string, string> = {
   desconocido: 'Sin estado',
 };
 
-// Función factory para crear la clase de overlay (se ejecuta cuando google está disponible)
+type BoundsTuple =
+  | [[number, number], [number, number]]
+  | [[number, number], [number, number], [number, number], [number, number]];
+
+const normalizeOpacity = (value?: number | null) => (typeof value === 'number' ? value : 0.7);
+
+const toBoundingBox = (bounds?: BoundsTuple | null): [[number, number], [number, number]] | null => {
+  if (!bounds) return null;
+  if (bounds.length === 2) return bounds as [[number, number], [number, number]];
+  const lats = bounds.map(point => point[0]);
+  const lngs = bounds.map(point => point[1]);
+  const sw: [number, number] = [Math.min(...lats), Math.min(...lngs)];
+  const ne: [number, number] = [Math.max(...lats), Math.max(...lngs)];
+  return [sw, ne];
+};
+
+// Función factory para crear la clase de overlay con perspectiva (4 puntos deformables)
 function createGroundOverlayClass() {
-  return class GroundOverlayWithRotation extends google.maps.OverlayView {
+  return class GroundOverlayWithPerspective extends google.maps.OverlayView {
     private url: string;
-    private bounds: google.maps.LatLngBounds;
-    private rotation: number;
+    private corners: [google.maps.LatLng, google.maps.LatLng, google.maps.LatLng, google.maps.LatLng]; // NW, NE, SE, SW
     private opacity: number;
     private container?: HTMLDivElement;
-    private image?: HTMLImageElement;
+    private canvas?: HTMLCanvasElement;
+    private ctx?: CanvasRenderingContext2D;
+    private img?: HTMLImageElement;
+    private imageLoaded = false;
 
-    constructor(url: string, bounds: google.maps.LatLngBounds, rotation = 0, opacity = 0.7) {
+    constructor(
+      url: string,
+      corners: [google.maps.LatLng, google.maps.LatLng, google.maps.LatLng, google.maps.LatLng],
+      opacity = 0.7
+    ) {
       super();
       this.url = url;
-      this.bounds = bounds;
-      this.rotation = rotation;
+      this.corners = corners;
       this.opacity = opacity;
     }
 
@@ -87,21 +118,27 @@ function createGroundOverlayClass() {
       const div = document.createElement('div');
       div.style.position = 'absolute';
       div.style.overflow = 'visible';
-      div.style.pointerEvents = 'none'; // Permitir clicks a través del contenedor
+      div.style.pointerEvents = 'none';
 
-      const img = document.createElement('img');
-      img.src = this.url;
-      img.style.position = 'absolute';
-      img.style.top = '50%';
-      img.style.left = '50%';
-      img.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
-      img.style.transformOrigin = 'center center';
-      img.style.opacity = `${this.opacity}`;
-      img.style.pointerEvents = 'none';
+      const canvas = document.createElement('canvas');
+      canvas.style.position = 'absolute';
+      canvas.style.pointerEvents = 'none';
+      canvas.style.opacity = `${this.opacity}`;
 
-      div.appendChild(img);
+      div.appendChild(canvas);
       this.container = div;
-      this.image = img;
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d') || undefined;
+
+      // Cargar imagen
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        this.imageLoaded = true;
+        this.draw();
+      };
+      img.src = this.url;
+      this.img = img;
 
       const panes = this.getPanes();
       if (!panes || !panes.overlayLayer) {
@@ -112,46 +149,141 @@ function createGroundOverlayClass() {
     }
 
     draw() {
-      if (!this.container) return;
+      if (!this.container || !this.canvas || !this.ctx || !this.imageLoaded || !this.img) return;
       const projection = this.getProjection();
       if (!projection) return;
 
-      const sw = projection.fromLatLngToDivPixel(this.bounds.getSouthWest());
-      const ne = projection.fromLatLngToDivPixel(this.bounds.getNorthEast());
-      if (!sw || !ne) return;
+      // Convertir esquinas lat/lng a píxeles
+      const corners = this.corners.map(corner => projection.fromLatLngToDivPixel(corner));
+      if (corners.some(c => !c)) return;
 
-      const width = ne.x - sw.x;
-      const height = sw.y - ne.y;
+      const [nw, ne, se, sw] = corners as google.maps.Point[];
 
-      this.container.style.left = `${sw.x}px`;
-      this.container.style.top = `${ne.y}px`;
+      // Calcular bounding box
+      const minX = Math.min(nw.x, ne.x, se.x, sw.x);
+      const maxX = Math.max(nw.x, ne.x, se.x, sw.x);
+      const minY = Math.min(nw.y, ne.y, se.y, sw.y);
+      const maxY = Math.max(nw.y, ne.y, se.y, sw.y);
+
+      const width = maxX - minX;
+      const height = maxY - minY;
+
+      // Posicionar contenedor
+      this.container.style.left = `${minX}px`;
+      this.container.style.top = `${minY}px`;
       this.container.style.width = `${width}px`;
       this.container.style.height = `${height}px`;
 
-      if (this.image) {
-        this.image.style.width = `${width}px`;
-        this.image.style.height = `${height}px`;
-        this.image.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
-        this.image.style.opacity = `${this.opacity}`;
-      }
+      // Configurar canvas
+      this.canvas.width = width;
+      this.canvas.height = height;
+
+      // Puntos relativos al canvas
+      const p0 = { x: nw.x - minX, y: nw.y - minY }; // NW
+      const p1 = { x: ne.x - minX, y: ne.y - minY }; // NE
+      const p2 = { x: se.x - minX, y: se.y - minY }; // SE
+      const p3 = { x: sw.x - minX, y: sw.y - minY }; // SW
+
+      // Dibujar imagen con transformación de perspectiva
+      this.ctx.clearRect(0, 0, width, height);
+      this.ctx.save();
+
+      // Aplicar transformación de perspectiva usando 4 puntos
+      this.perspectiveTransform(
+        this.ctx,
+        this.img,
+        [p0, p1, p2, p3]
+      );
+
+      this.ctx.restore();
     }
 
-    updateRotation(rotation: number) {
-      this.rotation = rotation;
-      if (this.image) {
-        this.image.style.transform = `translate(-50%, -50%) rotate(${this.rotation}deg)`;
-      }
+    // Transformación de perspectiva simplificada usando triangulación
+    perspectiveTransform(
+      ctx: CanvasRenderingContext2D,
+      img: HTMLImageElement,
+      corners: Array<{x: number, y: number}>
+    ) {
+      const [p0, p1, p2, p3] = corners;
+
+      // Dividir en dos triángulos y renderizar
+      // Triángulo 1: p0, p1, p2
+      this.drawTriangle(ctx, img,
+        0, 0,
+        img.width, 0,
+        img.width, img.height,
+        p0.x, p0.y,
+        p1.x, p1.y,
+        p2.x, p2.y
+      );
+
+      // Triángulo 2: p0, p2, p3
+      this.drawTriangle(ctx, img,
+        0, 0,
+        img.width, img.height,
+        0, img.height,
+        p0.x, p0.y,
+        p2.x, p2.y,
+        p3.x, p3.y
+      );
+    }
+
+    drawTriangle(
+      ctx: CanvasRenderingContext2D,
+      img: HTMLImageElement,
+      x0: number, y0: number,
+      x1: number, y1: number,
+      x2: number, y2: number,
+      dx0: number, dy0: number,
+      dx1: number, dy1: number,
+      dx2: number, dy2: number
+    ) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(dx0, dy0);
+      ctx.lineTo(dx1, dy1);
+      ctx.lineTo(dx2, dy2);
+      ctx.closePath();
+      ctx.clip();
+
+      // Calcular matriz de transformación afín
+      const m = this.calculateAffineMatrix(
+        x0, y0, x1, y1, x2, y2,
+        dx0, dy0, dx1, dy1, dx2, dy2
+      );
+
+      ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+    }
+
+    calculateAffineMatrix(
+      x0: number, y0: number,
+      x1: number, y1: number,
+      x2: number, y2: number,
+      dx0: number, dy0: number,
+      dx1: number, dy1: number,
+      dx2: number, dy2: number
+    ) {
+      const d = (x0 - x2) * (y1 - y2) - (x1 - x2) * (y0 - y2);
+      const a = ((dx0 - dx2) * (y1 - y2) - (dx1 - dx2) * (y0 - y2)) / d;
+      const b = ((x0 - x2) * (dx1 - dx2) - (x1 - x2) * (dx0 - dx2)) / d;
+      const c = ((dy0 - dy2) * (y1 - y2) - (dy1 - dy2) * (y0 - y2)) / d;
+      const dd = ((x0 - x2) * (dy1 - dy2) - (x1 - x2) * (dy0 - dy2)) / d;
+      const e = dx2 - a * x2 - b * y2;
+      const f = dy2 - c * x2 - dd * y2;
+      return { a, b, c, d: dd, e, f };
     }
 
     updateOpacity(opacity: number) {
       this.opacity = opacity;
-      if (this.image) {
-        this.image.style.opacity = `${this.opacity}`;
+      if (this.canvas) {
+        this.canvas.style.opacity = `${this.opacity}`;
       }
     }
 
-    updateBounds(bounds: google.maps.LatLngBounds) {
-      this.bounds = bounds;
+    updateCorners(corners: [google.maps.LatLng, google.maps.LatLng, google.maps.LatLng, google.maps.LatLng]) {
+      this.corners = corners;
       this.draw();
     }
 
@@ -160,7 +292,9 @@ function createGroundOverlayClass() {
         this.container.parentNode.removeChild(this.container);
       }
       this.container = undefined;
-      this.image = undefined;
+      this.canvas = undefined;
+      this.ctx = undefined;
+      this.img = undefined;
     }
   };
 }
@@ -171,11 +305,12 @@ export default function GoogleMap({
   planosUrl,
   overlayBounds,
   overlayOpacity = 0.7,
-  rotationDeg = 0,
+  overlayLayers = null,
+  activeOverlayId,
   overlayEditable = false,
+  dropAreaBounds = null,
   onOverlayBoundsChange,
   onMapCenterChange,
-  onCreateDefaultBounds,
   onGetMapCenter,
   projectPolygon = [],
   onProjectPolygonChange,
@@ -183,9 +318,6 @@ export default function GoogleMap({
   onProjectDrawingFinished,
   lotes = [],
   highlightLoteId,
-  loteDrawingActive = false,
-  onLoteDrawingFinished,
-  onLotePolygonComplete,
   fullScreenActive = false,
   onToggleFull,
   draggingLoteId = null,
@@ -201,22 +333,78 @@ export default function GoogleMap({
   const projectPolygonRef = useRef<google.maps.Polygon | null>(null);
   const projectPolygonListenersRef = useRef<google.maps.MapsEventListener[]>([]);
   const projectPolygonSilentUpdateRef = useRef(false);
-  const overlayRef = useRef<google.maps.OverlayView | null>(null);
-  const overlayRectangleRef = useRef<google.maps.Rectangle | null>(null);
-  const overlayListenersRef = useRef<google.maps.MapsEventListener[]>([]);
-  const overlaySilentRef = useRef(false);
+  const overlayInstancesRef = useRef<Map<string, google.maps.OverlayView>>(new Map());
+  const overlayPolygonRef = useRef<google.maps.Polygon | null>(null);
+  const overlayPolygonListenersRef = useRef<google.maps.MapsEventListener[]>([]);
+  const overlayPolygonSilentUpdateRef = useRef(false);
+  const overlayPolygonLastValidPathRef = useRef<LatLngLiteral[]>([]);
   const lotesPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
   const lotesPolygonListenersRef = useRef<Map<string, google.maps.MapsEventListener[]>>(new Map());
   const lotesLabelsRef = useRef<Map<string, google.maps.Marker>>(new Map());
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const drawingContextRef = useRef<'project' | 'lote' | null>(null);
-  const overlayFitRef = useRef(false);
   const polygonFitRef = useRef(false);
   const dropOverlayRef = useRef<HTMLDivElement | null>(null);
   const projectionOverlayRef = useRef<google.maps.OverlayView | null>(null);
   const dropZoneRectangleRef = useRef<google.maps.Rectangle | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
+  const overlayLayersForMap = useMemo(
+    () => {
+      if (overlayLayers && overlayLayers.length) {
+        return overlayLayers
+          .filter((layer) => layer.url)
+          .map((layer) => ({
+            id: layer.id,
+            url: layer.url,
+            bounds: layer.bounds ?? null,
+            opacity: normalizeOpacity(layer.opacity),
+            visible: layer.visible !== false,
+          }));
+      }
+      if (planosUrl && overlayBounds) {
+        return [
+          {
+            id: 'legacy-overlay',
+            url: planosUrl,
+            bounds: overlayBounds,
+            opacity: normalizeOpacity(overlayOpacity),
+            visible: true,
+          },
+        ];
+      }
+      return [];
+    },
+    [overlayLayers, planosUrl, overlayBounds, overlayOpacity]
+  );
+
+  const resolvedActiveOverlayId = useMemo(() => {
+    if (overlayLayers && overlayLayers.length) {
+      return activeOverlayId ?? overlayLayers[0].id;
+    }
+    return overlayLayersForMap[0]?.id ?? null;
+  }, [overlayLayers, activeOverlayId, overlayLayersForMap]);
+
+  const resolvedActiveOverlayBounds = useMemo(() => {
+    if (overlayLayers && overlayLayers.length) {
+      const current = overlayLayers.find((layer) => layer.id === resolvedActiveOverlayId);
+      return current?.bounds ?? null;
+    }
+    return overlayBounds ?? null;
+  }, [overlayLayers, resolvedActiveOverlayId, overlayBounds]);
+
+  const dropBounds = useMemo(() => {
+    if (dropAreaBounds) return dropAreaBounds;
+    if (overlayLayers && overlayLayers.length) {
+      const primary = overlayLayers.find((layer) => layer.isPrimary) ?? overlayLayers[0];
+      return toBoundingBox(primary?.bounds ?? null);
+    }
+    return toBoundingBox(overlayBounds ?? null);
+  }, [dropAreaBounds, overlayLayers, overlayBounds]);
+
+  const activeOverlayIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeOverlayIdRef.current = resolvedActiveOverlayId ?? null;
+  }, [resolvedActiveOverlayId]);
 
   useEffect(() => {
     setIsDragActive(Boolean(draggingLoteId));
@@ -227,9 +415,8 @@ export default function GoogleMap({
     const map = mapInstanceRef.current;
     if (!map || !isLoaded) return;
 
-    if (isDragActive && overlayBounds) {
-      // Crear rectángulo visible del área del plano
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+    if (isDragActive && dropBounds) {
+      const [[swLat, swLng], [neLat, neLng]] = dropBounds;
       const bounds = new google.maps.LatLngBounds(
         new google.maps.LatLng(swLat, swLng),
         new google.maps.LatLng(neLat, neLng)
@@ -254,7 +441,6 @@ export default function GoogleMap({
         dropZoneRectangleRef.current.setMap(map);
       }
     } else {
-      // Ocultar zona de drop
       if (dropZoneRectangleRef.current) {
         dropZoneRectangleRef.current.setMap(null);
       }
@@ -265,7 +451,7 @@ export default function GoogleMap({
         dropZoneRectangleRef.current.setMap(null);
       }
     };
-  }, [isDragActive, overlayBounds, isLoaded]);
+  }, [isDragActive, dropBounds, isLoaded]);
 
   // Exponer función para obtener el centro actual del mapa
   useEffect(() => {
@@ -334,15 +520,15 @@ export default function GoogleMap({
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: defaultCenter[0], lng: defaultCenter[1] },
       zoom: defaultZoom,
-      mapTypeId: google.maps.MapTypeId.TERRAIN,
+      mapTypeId: google.maps.MapTypeId.SATELLITE, // Modo satelital por defecto
       mapTypeControl: true,
       mapTypeControlOptions: {
         position: google.maps.ControlPosition.LEFT_TOP,
         mapTypeIds: [
-          google.maps.MapTypeId.TERRAIN,
-          google.maps.MapTypeId.ROADMAP,
           google.maps.MapTypeId.SATELLITE,
           google.maps.MapTypeId.HYBRID,
+          google.maps.MapTypeId.TERRAIN,
+          google.maps.MapTypeId.ROADMAP,
         ],
       },
       streetViewControl: true,
@@ -420,34 +606,23 @@ export default function GoogleMap({
     map.setZoom(defaultZoom);
   }, [defaultZoom]);
 
-  // Configurar Autocomplete para búsqueda de ubicaciones
-  useEffect(() => {
-    if (!isLoaded || !mapInstanceRef.current || !searchInputRef.current) return;
-
-    const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
-      fields: ['geometry', 'name'],
-      componentRestrictions: { country: ['pe'] },
-    });
-    autocomplete.bindTo('bounds', mapInstanceRef.current);
-
-    const listener = autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (!place || !place.geometry) return;
-
-      if (place.geometry.viewport) {
-        mapInstanceRef.current?.fitBounds(place.geometry.viewport);
-      } else if (place.geometry.location) {
-        mapInstanceRef.current?.panTo(place.geometry.location);
-      }
-    });
-
-    return () => listener.remove();
-  }, [isLoaded]);
-
   const cleanupProjectPolygonListeners = useCallback(() => {
     projectPolygonListenersRef.current.forEach((listener) => listener.remove());
     projectPolygonListenersRef.current = [];
   }, []);
+
+  const cleanupOverlayPolygonListeners = useCallback(() => {
+    overlayPolygonListenersRef.current.forEach((listener) => listener.remove());
+    overlayPolygonListenersRef.current = [];
+  }, []);
+
+  const cleanupOverlayPolygon = useCallback(() => {
+    cleanupOverlayPolygonListeners();
+    if (overlayPolygonRef.current) {
+      overlayPolygonRef.current.setMap(null);
+      overlayPolygonRef.current = null;
+    }
+  }, [cleanupOverlayPolygonListeners]);
 
   const attachProjectPolygonListeners = useCallback(
     (polygon: google.maps.Polygon) => {
@@ -475,7 +650,6 @@ export default function GoogleMap({
     const map = mapInstanceRef.current;
     const drawingManager = drawingManagerRef.current;
     if (!map || !drawingManager) return;
-    if (loteDrawingActive) return;
 
     if (!projectDrawingActive) {
       if (drawingContextRef.current === 'project') {
@@ -526,7 +700,7 @@ export default function GoogleMap({
       }
       overlayCompleteListener.remove();
     };
-  }, [projectDrawingActive, onProjectPolygonChange, onProjectDrawingFinished, attachProjectPolygonListeners, loteDrawingActive, isLoaded]);
+  }, [projectDrawingActive, onProjectPolygonChange, onProjectDrawingFinished, attachProjectPolygonListeners, isLoaded]);
 
   // Sincronizar polígono del proyecto recibido por props
   useEffect(() => {
@@ -561,7 +735,7 @@ export default function GoogleMap({
       });
       projectPolygonRef.current = polygon;
       attachProjectPolygonListeners(polygon);
-      if (!polygonFitRef.current && !planosUrl) {
+      if (!polygonFitRef.current && overlayLayersForMap.length === 0) {
         // Solo hacer fitBounds si no hay plano cargado (primera vez dibujando el polígono)
         map.fitBounds(bounds);
         polygonFitRef.current = true;
@@ -572,187 +746,206 @@ export default function GoogleMap({
       projectPolygonSilentUpdateRef.current = false;
       // No hacer fitBounds al actualizar - respetar el zoom del usuario
     }
-  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners, isLoaded, planosUrl]);
+  }, [projectPolygon, attachProjectPolygonListeners, cleanupProjectPolygonListeners, isLoaded, overlayLayersForMap]);
 
-  // Dibujo manual de lotes
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    const drawingManager = drawingManagerRef.current;
-    if (!map || !drawingManager) return;
-
-    if (!loteDrawingActive) {
-      if (drawingContextRef.current === 'lote') {
-        drawingManager.setDrawingMode(null);
-        drawingContextRef.current = null;
-      }
-      return;
-    }
-
-    drawingContextRef.current = 'lote';
-    drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-
-    const listener = google.maps.event.addListener(
-      drawingManager,
-      'overlaycomplete',
-      (event: google.maps.drawing.OverlayCompleteEvent) => {
-        if (event.type !== google.maps.drawing.OverlayType.POLYGON) return;
-
-        const polygon = event.overlay as google.maps.Polygon;
-        const vertices = polygon
-          .getPath()
-          .getArray()
-          .map((latLng) => [latLng.lat(), latLng.lng()] as [number, number]);
-
-        polygon.setMap(null);
-        drawingManager.setDrawingMode(null);
-        drawingContextRef.current = null;
-        onLotePolygonComplete?.(vertices);
-        onLoteDrawingFinished?.();
-      }
-    );
-
-    return () => {
-      listener.remove();
-      if (drawingContextRef.current === 'lote') {
-        drawingManager.setDrawingMode(null);
-        drawingContextRef.current = null;
-      }
-    };
-  }, [loteDrawingActive, onLotePolygonComplete, onLoteDrawingFinished, isLoaded]);
-
-  // Gestionar overlay del plano - crear solo cuando cambia la URL o se carga el mapa
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !isLoaded) return;
-
-    if (!planosUrl || !overlayBounds) {
-      if (overlayRef.current) {
-        overlayRef.current.setMap(null);
-        overlayRef.current = null;
-      }
-      return;
-    }
-
-    // Eliminar overlay anterior si existe
-    if (overlayRef.current) {
-      overlayRef.current.setMap(null);
-    }
-
-    const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-    const bounds = new google.maps.LatLngBounds(
-      new google.maps.LatLng(swLat, swLng),
-      new google.maps.LatLng(neLat, neLng)
-    );
-
-    // Crear la clase cuando google esté disponible
-    const GroundOverlayWithRotation = createGroundOverlayClass();
-    const overlay = new GroundOverlayWithRotation(planosUrl, bounds, rotationDeg, overlayOpacity);
-    overlay.setMap(map);
-    overlayRef.current = overlay;
-
-    return () => {
-      overlay.setMap(null);
-      if (overlayRef.current === overlay) {
-        overlayRef.current = null;
-      }
-    };
-  }, [planosUrl, isLoaded]);
-
-  // Actualizar rotación sin recrear el overlay
-  useEffect(() => {
-    const overlay = overlayRef.current as any;
-    if (overlay && typeof overlay.updateRotation === 'function') {
-      overlay.updateRotation(rotationDeg);
-    }
-  }, [rotationDeg]);
-
-  // Actualizar opacidad sin recrear el overlay
-  useEffect(() => {
-    const overlay = overlayRef.current as any;
-    if (overlay && typeof overlay.updateOpacity === 'function') {
-      overlay.updateOpacity(overlayOpacity);
-    }
-  }, [overlayOpacity]);
-
-  // Actualizar bounds sin recrear el overlay
-  useEffect(() => {
-    const overlay = overlayRef.current as any;
-    if (overlay && typeof overlay.updateBounds === 'function' && overlayBounds) {
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-      const bounds = new google.maps.LatLngBounds(
-        new google.maps.LatLng(swLat, swLng),
-        new google.maps.LatLng(neLat, neLng)
-      );
-      overlay.updateBounds(bounds);
-    }
-  }, [overlayBounds]);
-
-  // Permitir edición del rectángulo del overlay
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    if (!overlayEditable || !overlayBounds) {
-      overlayListenersRef.current.forEach((listener) => listener.remove());
-      overlayListenersRef.current = [];
-      if (overlayRectangleRef.current) {
-        overlayRectangleRef.current.setMap(null);
-        overlayRectangleRef.current = null;
-      }
-      return;
-    }
-
-    const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-    const bounds = new google.maps.LatLngBounds(
-      new google.maps.LatLng(swLat, swLng),
-      new google.maps.LatLng(neLat, neLng)
-    );
-
-    if (!overlayRectangleRef.current) {
-      const rectangle = new google.maps.Rectangle({
-        bounds,
-        map,
-        editable: true,
-        draggable: true,
-        fillColor: '#2563EB',
-        fillOpacity: 0.15,
-        strokeColor: '#2563EB',
-        strokeOpacity: 0.9,
-        strokeWeight: 3,
-      });
-      overlayRectangleRef.current = rectangle;
-
-      // NO usar fitBounds - permitir que el usuario mantenga su nivel de zoom actual
-      // map.fitBounds(bounds);
-
-      const notifyBounds = () => {
-        if (overlaySilentRef.current) return;
-        if (!onOverlayBoundsChange) return;
-        const rectBounds = rectangle.getBounds();
-        if (!rectBounds) return;
-        const ne = rectBounds.getNorthEast();
-        const sw = rectBounds.getSouthWest();
-        onOverlayBoundsChange([
-          [sw.lat(), sw.lng()],
-          [ne.lat(), ne.lng()],
-        ]);
-      };
-
-      overlayListenersRef.current = [
-        google.maps.event.addListener(rectangle, 'bounds_changed', notifyBounds),
-        google.maps.event.addListener(rectangle, 'dragend', notifyBounds),
+  // Función auxiliar para convertir bounds a corners (4 puntos)
+  // Soporta tanto formato antiguo (2 puntos: bounding box) como nuevo (4 puntos: esquinas independientes)
+  const boundsToCorners = useCallback((
+    bounds: [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]]
+  ): [google.maps.LatLng, google.maps.LatLng, google.maps.LatLng, google.maps.LatLng] => {
+    // Si tiene 4 puntos, usar directamente (formato nuevo: esquinas independientes)
+    if (bounds.length === 4) {
+      const [[nwLat, nwLng], [neLat, neLng], [seLat, seLng], [swLat, swLng]] = bounds;
+      return [
+        new google.maps.LatLng(nwLat, nwLng), // NW
+        new google.maps.LatLng(neLat, neLng), // NE
+        new google.maps.LatLng(seLat, seLng), // SE
+        new google.maps.LatLng(swLat, swLng), // SW
       ];
-    } else {
-      overlaySilentRef.current = true;
-      overlayRectangleRef.current.setBounds(bounds);
-      overlaySilentRef.current = false;
     }
 
-    return () => {
-      overlayListenersRef.current.forEach((listener) => listener.remove());
-      overlayListenersRef.current = [];
+    // Si tiene 2 puntos, convertir de bounding box a rectángulo (formato antiguo)
+    const [[swLat, swLng], [neLat, neLng]] = bounds;
+    return [
+      new google.maps.LatLng(neLat, swLng), // NW
+      new google.maps.LatLng(neLat, neLng), // NE
+      new google.maps.LatLng(swLat, neLng), // SE
+      new google.maps.LatLng(swLat, swLng), // SW
+    ];
+  }, []);
+
+  const attachOverlayPolygonListeners = useCallback((polygon: google.maps.Polygon) => {
+    if (!onOverlayBoundsChange) return;
+
+    cleanupOverlayPolygonListeners();
+    const path = polygon.getPath();
+
+    const emitChange = () => {
+      if (overlayPolygonSilentUpdateRef.current) return;
+      const pathArray = path.getArray();
+      if (pathArray.length < 4) return;
+
+      const serialized = pathArray.map((latLng) => ({ lat: latLng.lat(), lng: latLng.lng() }));
+      overlayPolygonLastValidPathRef.current = serialized;
+      const formatted = serialized.map(
+        (corner) => [corner.lat, corner.lng] as [number, number]
+      ) as [[number, number], [number, number], [number, number], [number, number]];
+      if (activeOverlayIdRef.current) {
+        onOverlayBoundsChange(activeOverlayIdRef.current, formatted);
+      }
     };
-  }, [overlayEditable, overlayBounds, onOverlayBoundsChange]);
+
+    const restoreLastValidPath = () => {
+      if (!overlayPolygonLastValidPathRef.current.length) return;
+      overlayPolygonSilentUpdateRef.current = true;
+      path.clear();
+      overlayPolygonLastValidPathRef.current.forEach((corner) =>
+        path.push(new google.maps.LatLng(corner.lat, corner.lng))
+      );
+      overlayPolygonSilentUpdateRef.current = false;
+    };
+
+    overlayPolygonListenersRef.current = [
+      google.maps.event.addListener(path, 'set_at', emitChange),
+      google.maps.event.addListener(path, 'insert_at', (index: number) => {
+        if (overlayPolygonSilentUpdateRef.current) return;
+        if (path.getLength() > 4) {
+          overlayPolygonSilentUpdateRef.current = true;
+          path.removeAt(index);
+          overlayPolygonSilentUpdateRef.current = false;
+        }
+        emitChange();
+      }),
+      google.maps.event.addListener(path, 'remove_at', () => {
+        if (overlayPolygonSilentUpdateRef.current) return;
+        if (path.getLength() < 4) {
+          restoreLastValidPath();
+          return;
+        }
+        emitChange();
+      }),
+      google.maps.event.addListener(polygon, 'dragend', emitChange),
+    ];
+  }, [cleanupOverlayPolygonListeners, onOverlayBoundsChange]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !isLoaded) {
+      overlayInstancesRef.current.forEach((instance) => instance.setMap(null));
+      overlayInstancesRef.current.clear();
+      return;
+    }
+
+    const GroundOverlayWithPerspective = createGroundOverlayClass();
+    const nextIds = new Set<string>();
+
+    overlayLayersForMap.forEach((layer) => {
+      if (!layer.bounds || layer.visible === false) {
+        const existing = overlayInstancesRef.current.get(layer.id);
+        if (existing) {
+          existing.setMap(null);
+          overlayInstancesRef.current.delete(layer.id);
+        }
+        return;
+      }
+
+      if (!layer.url) {
+        return;
+      }
+
+      const corners = boundsToCorners(layer.bounds);
+      let overlayInstance = overlayInstancesRef.current.get(layer.id);
+      if (!overlayInstance) {
+        overlayInstance = new GroundOverlayWithPerspective(layer.url, corners, layer.opacity);
+        overlayInstance.setMap(map);
+        overlayInstancesRef.current.set(layer.id, overlayInstance);
+      } else {
+        const handler = overlayInstance as any;
+        if (typeof handler.updateCorners === 'function') handler.updateCorners(corners);
+        if (typeof handler.updateOpacity === 'function') handler.updateOpacity(layer.opacity);
+        if (!handler.getMap()) handler.setMap(map);
+      }
+      nextIds.add(layer.id);
+    });
+
+    overlayInstancesRef.current.forEach((instance, id) => {
+      if (!nextIds.has(id)) {
+        instance.setMap(null);
+        overlayInstancesRef.current.delete(id);
+      }
+    });
+
+    return () => {
+      overlayInstancesRef.current.forEach((instance) => instance.setMap(null));
+      overlayInstancesRef.current.clear();
+    };
+  }, [overlayLayersForMap, isLoaded, boundsToCorners]);
+
+  // Mostrar polígono editable para calibrar el plano
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !isLoaded || !overlayEditable) {
+      cleanupOverlayPolygon();
+      return;
+    }
+
+    if (!resolvedActiveOverlayId) {
+      cleanupOverlayPolygon();
+      return;
+    }
+
+    const editingBounds = resolvedActiveOverlayBounds ?? dropBounds;
+    if (!editingBounds) {
+      cleanupOverlayPolygon();
+      return;
+    }
+
+    const corners = boundsToCorners(editingBounds);
+    overlayPolygonLastValidPathRef.current = corners.map((corner) => ({
+      lat: corner.lat(),
+      lng: corner.lng(),
+    }));
+
+    if (!overlayPolygonRef.current) {
+      const polygon = new google.maps.Polygon({
+        map,
+        paths: corners,
+        strokeColor: '#3B82F6',
+        strokeOpacity: 0.9,
+        strokeWeight: 2,
+        fillColor: '#3B82F6',
+        fillOpacity: 0.15,
+        draggable: true,
+        editable: true,
+        zIndex: 1200,
+      });
+      overlayPolygonRef.current = polygon;
+      attachOverlayPolygonListeners(polygon);
+    } else {
+      const path = overlayPolygonRef.current.getPath();
+      overlayPolygonSilentUpdateRef.current = true;
+      path.clear();
+      corners.forEach((corner) => path.push(corner));
+      overlayPolygonSilentUpdateRef.current = false;
+      overlayPolygonRef.current.setMap(map);
+      overlayPolygonRef.current.setOptions({ draggable: true, editable: true });
+    }
+  }, [
+    overlayEditable,
+    resolvedActiveOverlayBounds,
+    dropBounds,
+    resolvedActiveOverlayId,
+    isLoaded,
+    boundsToCorners,
+    attachOverlayPolygonListeners,
+    cleanupOverlayPolygon,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      cleanupOverlayPolygon();
+    };
+  }, [cleanupOverlayPolygon]);
 
   // Renderizar polígonos de lotes
   useEffect(() => {
@@ -791,24 +984,54 @@ export default function GoogleMap({
       const color = ESTADO_COLORES[lote.estado || 'desconocido'] || ESTADO_COLORES.desconocido;
       const isHighlighted = highlightLoteId === lote.id;
 
-      // Si tiene solo 1 punto, renderizar como marcador (pin)
-      if (lote.plano_poligono.length === 1) {
-        // Remover polígono si existe
-        const existingPolygon = lotesPolygonsRef.current.get(lote.id);
-        if (existingPolygon) {
-          existingPolygon.setMap(null);
-          lotesPolygonsRef.current.delete(lote.id);
-        }
+      // Solo renderizar como marcador (pin) - siempre usar el primer punto
+      const [lat, lng] = lote.plano_poligono[0];
+      const position = { lat, lng };
 
-        const [lat, lng] = lote.plano_poligono[0];
-        const position = { lat, lng };
+      // Crear o actualizar marcador
+      if (!lotesLabelsRef.current.has(lote.id)) {
+        const marker = new google.maps.Marker({
+          position,
+          map,
+          draggable: true,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: color,
+            fillOpacity: 0.9,
+            strokeColor: '#ffffff',
+            strokeWeight: 3,
+            scale: 12,
+          },
+          label: {
+            text: lote.codigo,
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: 'bold',
+          },
+          zIndex: isHighlighted ? 1001 : 1000,
+          title: `${lote.codigo} - Arrastra para reposicionar`,
+          animation: google.maps.Animation.DROP,
+        });
 
-        // Crear o actualizar marcador
-        if (!lotesLabelsRef.current.has(lote.id)) {
-          const marker = new google.maps.Marker({
-            position,
-            map,
-            draggable: true,
+        // Agregar listener para cuando empieza a arrastrar
+        const dragStartListener = marker.addListener('dragstart', () => {
+          marker.setOptions({
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: color,
+              fillOpacity: 0.6,
+              strokeColor: '#ffffff',
+              strokeWeight: 4,
+              scale: 16,
+            },
+          });
+        });
+
+        // Agregar listener para arrastrar el marcador
+        const dragEndListener = marker.addListener('dragend', () => {
+          const pos = marker.getPosition();
+          // Volver al tamaño normal
+          marker.setOptions({
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               fillColor: color,
@@ -817,35 +1040,28 @@ export default function GoogleMap({
               strokeWeight: 3,
               scale: 12,
             },
-            label: {
-              text: lote.codigo,
-              color: '#ffffff',
-              fontSize: '11px',
-              fontWeight: 'bold',
+          });
+          if (pos && onMarkerDragEnd) {
+            onMarkerDragEnd(lote.id, pos.lat(), pos.lng());
+          }
+        });
+
+        // Agregar listener para hover
+        const mouseoverListener = marker.addListener('mouseover', () => {
+          marker.setOptions({
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: color,
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 4,
+              scale: 14,
             },
-            zIndex: isHighlighted ? 1001 : 1000,
-            title: `${lote.codigo} - Arrastra para reposicionar`,
-            animation: google.maps.Animation.DROP,
           });
+        });
 
-          // Agregar listener para cuando empieza a arrastrar
-          const dragStartListener = marker.addListener('dragstart', () => {
-            marker.setOptions({
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: color,
-                fillOpacity: 0.6,
-                strokeColor: '#ffffff',
-                strokeWeight: 4,
-                scale: 16,
-              },
-            });
-          });
-
-          // Agregar listener para arrastrar el marcador
-          const dragEndListener = marker.addListener('dragend', () => {
-            const pos = marker.getPosition();
-            // Volver al tamaño normal
+        const mouseoutListener = marker.addListener('mouseout', () => {
+          if (highlightLoteId !== lote.id) {
             marker.setOptions({
               icon: {
                 path: google.maps.SymbolPath.CIRCLE,
@@ -856,156 +1072,31 @@ export default function GoogleMap({
                 scale: 12,
               },
             });
-            if (pos && onMarkerDragEnd) {
-              onMarkerDragEnd(lote.id, pos.lat(), pos.lng());
-            }
-          });
+          }
+        });
 
-          // Agregar listener para hover
-          const mouseoverListener = marker.addListener('mouseover', () => {
-            marker.setOptions({
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: color,
-                fillOpacity: 1,
-                strokeColor: '#ffffff',
-                strokeWeight: 4,
-                scale: 14,
-              },
-            });
-          });
-
-          const mouseoutListener = marker.addListener('mouseout', () => {
-            if (highlightLoteId !== lote.id) {
-              marker.setOptions({
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  fillColor: color,
-                  fillOpacity: 0.9,
-                  strokeColor: '#ffffff',
-                  strokeWeight: 3,
-                  scale: 12,
-                },
-              });
-            }
-          });
-
-          lotesLabelsRef.current.set(lote.id, marker);
-          lotesPolygonListenersRef.current.set(lote.id, [dragStartListener, dragEndListener, mouseoverListener, mouseoutListener]);
-        } else {
-          const marker = lotesLabelsRef.current.get(lote.id)!;
-          marker.setOptions({
-            position,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              fillColor: color,
-              fillOpacity: isHighlighted ? 1 : 0.9,
-              strokeColor: '#ffffff',
-              strokeWeight: isHighlighted ? 4 : 3,
-              scale: isHighlighted ? 14 : 12,
-            },
-            label: {
-              text: lote.codigo,
-              color: '#ffffff',
-              fontSize: isHighlighted ? '12px' : '11px',
-              fontWeight: 'bold',
-            },
-            zIndex: isHighlighted ? 1001 : 1000,
-          });
-        }
-        return;
-      }
-
-      // Si tiene 3+ puntos, renderizar como polígono
-      if (lote.plano_poligono.length >= 3) {
-        const path = lote.plano_poligono.map(([lat, lng]) => ({ lat, lng }));
-
-        // Crear o actualizar polígono
-        if (!lotesPolygonsRef.current.has(lote.id)) {
-          const polygon = new google.maps.Polygon({
-            paths: path,
-            strokeColor: color,
-            strokeOpacity: isHighlighted ? 1 : 0.8,
-            strokeWeight: isHighlighted ? 3 : 2,
+        lotesLabelsRef.current.set(lote.id, marker);
+        lotesPolygonListenersRef.current.set(lote.id, [dragStartListener, dragEndListener, mouseoverListener, mouseoutListener]);
+      } else {
+        const marker = lotesLabelsRef.current.get(lote.id)!;
+        marker.setOptions({
+          position,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
             fillColor: color,
-            fillOpacity: isHighlighted ? 0.5 : 0.35,
-            map,
-            draggable: false,
-            editable: false,
-            clickable: true,
-          });
-          lotesPolygonsRef.current.set(lote.id, polygon);
-        } else {
-          const polygon = lotesPolygonsRef.current.get(lote.id)!;
-          polygon.setOptions({
-            paths: path,
-            strokeColor: color,
-            strokeOpacity: isHighlighted ? 1 : 0.8,
-            strokeWeight: isHighlighted ? 3 : 2,
-            fillColor: color,
-            fillOpacity: isHighlighted ? 0.5 : 0.35,
-          });
-        }
-
-        // Calcular centro del polígono para la etiqueta
-        const [latSum, lngSum] = lote.plano_poligono.reduce(
-          (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
-          [0, 0]
-        );
-        const center = {
-          lat: latSum / lote.plano_poligono.length,
-          lng: lngSum / lote.plano_poligono.length,
-        };
-
-        // Crear o actualizar label
-        if (!lotesLabelsRef.current.has(lote.id)) {
-          const label = new google.maps.Marker({
-            position: center,
-            map,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 0,
-            },
-            label: {
-              text: lote.codigo,
-              color: '#ffffff',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              className: 'lote-label',
-            },
-            clickable: false,
-            zIndex: 1000,
-          });
-          lotesLabelsRef.current.set(lote.id, label);
-        } else {
-          const label = lotesLabelsRef.current.get(lote.id)!;
-          label.setOptions({
-            position: center,
-            label: {
-              text: lote.codigo,
-              color: '#ffffff',
-              fontSize: isHighlighted ? '12px' : '11px',
-              fontWeight: 'bold',
-            },
-          });
-        }
-      }
-
-      // Agregar event listeners al polígono (solo si es polígono, no marcador)
-      const polygon = lotesPolygonsRef.current.get(lote.id);
-      if (polygon) {
-        const existingListeners = lotesPolygonListenersRef.current.get(lote.id);
-        if (existingListeners) {
-          existingListeners.forEach((listener) => listener.remove());
-        }
-
-        const listeners: google.maps.MapsEventListener[] = [];
-        listeners.push(
-          polygon.addListener('click', () => {
-            // Aquí se puede agregar lógica para seleccionar el lote
-          })
-        );
-        lotesPolygonListenersRef.current.set(lote.id, listeners);
+            fillOpacity: isHighlighted ? 1 : 0.9,
+            strokeColor: '#ffffff',
+            strokeWeight: isHighlighted ? 4 : 3,
+            scale: isHighlighted ? 14 : 12,
+          },
+          label: {
+            text: lote.codigo,
+            color: '#ffffff',
+            fontSize: isHighlighted ? '12px' : '11px',
+            fontWeight: 'bold',
+          },
+          zIndex: isHighlighted ? 1001 : 1000,
+        });
       }
     });
 
@@ -1060,7 +1151,7 @@ export default function GoogleMap({
 
     const dataTransfer = event.dataTransfer;
     const loteId = draggingLoteId || dataTransfer?.getData('application/x-lote-id') || dataTransfer?.getData('text/plain');
-    if (!loteId) {
+    if (!loteId || !dropBounds) {
       setIsDragActive(false);
       return;
     }
@@ -1079,7 +1170,7 @@ export default function GoogleMap({
     if (!latLng) return;
 
     onPinDrop?.(loteId, latLng.lat(), latLng.lng());
-  }, [draggingLoteId, onPinDrop]);
+  }, [draggingLoteId, onPinDrop, dropBounds]);
 
   const legendItems = useMemo(
     () => ['disponible', 'reservado', 'vendido'] as const,
@@ -1096,36 +1187,24 @@ export default function GoogleMap({
       return;
     }
 
-    let focused = false;
-
-    if (lote.plano_poligono && lote.plano_poligono.length >= 3) {
-      const bounds = new google.maps.LatLngBounds();
-      lote.plano_poligono.forEach(([lat, lng]) => bounds.extend(new google.maps.LatLng(lat, lng)));
-      if (!bounds.isEmpty()) {
-        map.fitBounds(bounds);
-        focused = true;
-      }
+    // Como solo usamos pins, simplemente centrar en el primer punto
+    let point: [number, number] | null = null;
+    if (lote.plano_poligono && lote.plano_poligono.length >= 1) {
+      point = lote.plano_poligono[0];
+    } else if (lote.ubicacion) {
+      point = [lote.ubicacion.lat, lote.ubicacion.lng];
     }
 
-    if (!focused) {
-      let point: [number, number] | null = null;
-      if (lote.plano_poligono && lote.plano_poligono.length >= 1) {
-        point = lote.plano_poligono[0];
-      } else if (lote.ubicacion) {
-        point = [lote.ubicacion.lat, lote.ubicacion.lng];
-      }
-
-      if (point) {
-        map.panTo({ lat: point[0], lng: point[1] });
-        const currentZoom = map.getZoom();
-        if (!currentZoom || currentZoom < 18) {
-          map.setZoom(18);
-        }
+    if (point) {
+      map.panTo({ lat: point[0], lng: point[1] });
+      const currentZoom = map.getZoom();
+      if (!currentZoom || currentZoom < 19) {
+        map.setZoom(19);
       }
     }
 
     onFocusHandled?.();
-  }, [focusLoteRequest, isLoaded, lotes, overlayBounds, onFocusHandled]);
+  }, [focusLoteRequest, isLoaded, lotes, onFocusHandled]);
 
   if (!isLoaded) {
     return loadingFallback;
@@ -1157,24 +1236,17 @@ export default function GoogleMap({
         )}
       </div>
 
-      {/* Barra de búsqueda - Movida arriba a la derecha para no chocar con controles */}
-      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 flex flex-col gap-2 w-72 z-[1000]">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Buscar ubicación</div>
-        <input
-          ref={searchInputRef}
-          type="text"
-          placeholder="Buscar dirección o referencia"
-          className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {onToggleFull && (
+      {/* Botón de pantalla completa */}
+      {onToggleFull && (
+        <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2 z-[1000]">
           <button
             onClick={onToggleFull}
-            className="text-sm text-blue-600 hover:text-blue-700 text-left"
+            className="text-sm text-blue-600 hover:text-blue-700 px-3 py-1.5 font-medium"
           >
             {fullScreenActive ? 'Salir de pantalla completa' : 'Pantalla completa'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Leyenda - Movida abajo a la derecha, debajo del buscador */}
       <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow flex flex-col gap-2 px-4 py-3 text-xs text-gray-700 z-[1000]">

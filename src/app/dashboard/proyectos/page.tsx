@@ -275,7 +275,11 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
                 className="crm-card rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative flex flex-col min-w-[18rem] snap-center md:min-w-0"
               >
                 {/* Imagen del proyecto con overlay */}
-                <div className="relative w-full h-56 overflow-hidden bg-gradient-to-br from-crm-primary/15 to-crm-primary/8">
+                <Link
+                  href={`/dashboard/proyectos/${p.id}`}
+                  className="relative block w-full h-56 overflow-hidden bg-gradient-to-br from-crm-primary/15 to-crm-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 rounded-t-2xl"
+                  aria-label={`Ver proyecto ${p.nombre}`}
+                >
                   {p.imagen_url ? (
                     <img
                       src={p.imagen_url}
@@ -328,13 +332,19 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
                       {p.tipo === "propio" ? "📋 Propio" : "🤝 Corretaje"}
                     </span>
                   </div>
-                </div>
+                </Link>
 
                 <div className="p-5 space-y-4 flex-1 flex flex-col">
                   {/* Título y ubicación */}
                   <div className="space-y-2">
-                    <h3 className="font-bold text-xl text-crm-text-primary line-clamp-2 group-hover:text-crm-primary transition-colors">
-                      {p.nombre}
+                    <h3 className="font-bold text-xl text-crm-text-primary line-clamp-2 transition-colors group-hover:text-crm-primary">
+                      <Link
+                        href={`/dashboard/proyectos/${p.id}`}
+                        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/70 rounded-md -m-1 p-1"
+                        aria-label={`Abrir proyecto ${p.nombre}`}
+                      >
+                        {p.nombre}
+                      </Link>
                     </h3>
                     {p.ubicacion && (
                       <div className="flex items-center gap-2 text-sm text-crm-text-secondary">

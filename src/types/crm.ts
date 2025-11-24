@@ -60,9 +60,19 @@ export type ClienteCached = {
     totalLotes: number;
   };
 
+  export type NotificacionTipoCliente =
+    | 'cliente'
+    | 'proyecto'
+    | 'lote'
+    | 'sistema'
+    | 'evento'
+    | 'recordatorio'
+    | 'venta'
+    | 'reserva';
+
   export type Notificacion = {
     id: string;
-    tipo: 'cliente' | 'proyecto' | 'lote' | 'sistema';
+    tipo: NotificacionTipoCliente;
     titulo: string;
     mensaje: string;
     leida: boolean;
@@ -73,7 +83,7 @@ export type ClienteCached = {
 
   export type NotificacionNoLeida = {
     id: string;
-    tipo: 'cliente' | 'proyecto' | 'lote' | 'sistema';
+    tipo: NotificacionTipoCliente;
     titulo: string;
     mensaje: string;
     data?: Record<string, unknown>;

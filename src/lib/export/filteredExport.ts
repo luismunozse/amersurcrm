@@ -64,6 +64,7 @@ export interface ClienteExportFilters {
   estado?: string;
   tipo?: string;
   vendedor?: string;
+  origen?: string;  // Filtro por origen del lead
   sortBy?: string;
   sortOrder?: string;
 }
@@ -485,51 +486,113 @@ async function exportToPDFWithFilters(
   columns: ExportColumn[]
 ): Promise<void> {
   const doc = new jsPDF('landscape');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const headerBg: [number, number, number] = [12, 25, 59];
+  const accentColor: [number, number, number] = [149, 193, 31];
+  const secondaryText: [number, number, number] = [71, 85, 105];
 
-  // Título
+  // Cabecera
+  const headerHeight = 24;
+  doc.setFillColor(...headerBg);
+  doc.roundedRect(marginX - 4, 10, pageWidth - (marginX - 4) * 2, headerHeight, 4, 4, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('AMERSUR CRM', marginX, 20);
   doc.setFontSize(16);
-  doc.text('Reporte de Datos Filtrados', 14, 15);
+  doc.text('Reporte de Proyectos', marginX, 30);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  const generatedText = `Generado: ${new Date().toLocaleString('es-PE')}`;
+  doc.text(generatedText, pageWidth - marginX, 20, { align: 'right' });
+  const countText = `Registros exportados: ${data.length}`;
+  doc.text(countText, pageWidth - marginX, 27, { align: 'right' });
 
-  // Filtros aplicados
-  if (filterMetadata.length > 0) {
-    doc.setFontSize(10);
-    doc.text('Filtros Aplicados:', 14, 25);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
 
-    const filtersTable = filterMetadata.map((meta) => [meta.filtro, meta.valor]);
+  // Resumen visual
+  const summaryStartY = 10 + headerHeight + 8;
+  const availableWidth = pageWidth - marginX * 2;
+  const cardWidth = (availableWidth - 8) / 2;
+  const cardHeight = 18;
+  const activeFiltersCount = filterMetadata.filter(
+    (meta) => meta.filtro !== 'Registros Exportados'
+  ).length;
 
+  const drawSummaryCard = (x: number, title: string, value: string) => {
+    doc.setDrawColor(229, 231, 235);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, summaryStartY, cardWidth, cardHeight, 3, 3, 'FD');
+    doc.setFontSize(9);
+    doc.setTextColor(...secondaryText);
+    doc.text(title, x + 6, summaryStartY + 7);
+    doc.setFontSize(13);
+    doc.setTextColor(...headerBg);
+    doc.text(value, x + 6, summaryStartY + 15);
+  };
+
+  drawSummaryCard(marginX, 'Registros filtrados', String(data.length));
+  drawSummaryCard(
+    marginX + cardWidth + 8,
+    'Filtros activos',
+    activeFiltersCount.toString()
+  );
+
+  let currentY = summaryStartY + cardHeight + 10;
+
+  // Tabla de filtros aplicada
+  const visibleFilters = filterMetadata.filter((meta) => meta.valor && meta.valor !== '0');
+  if (visibleFilters.length > 0) {
     autoTable(doc, {
-      startY: 30,
+      startY: currentY,
       head: [['Filtro', 'Valor']],
-      body: filtersTable,
+      body: visibleFilters.map((meta) => [meta.filtro, meta.valor]),
       theme: 'grid',
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [66, 139, 202] },
-      margin: { left: 14 },
+      styles: { fontSize: 8, cellPadding: 2, textColor: [31, 41, 55] },
+      headStyles: { fillColor: accentColor, textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      margin: { left: marginX, right: marginX },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: availableWidth - 50 },
+      },
     });
+    currentY = (doc as any).lastAutoTable.finalY + 10;
   }
 
-  // Tabla de datos
+  // Tabla principal de datos
   const headers = columns.map((col) => col.label);
-  const rows = data.map((row) => columns.map((col) => row[col.label] || '-'));
+  const rows = data.map((row) =>
+    columns.map((col) => {
+      const value = row[col.label];
+      if (value === null || value === undefined || value === '') return '-';
+      return value;
+    })
+  );
 
   autoTable(doc, {
-    startY: (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : 60,
+    startY: currentY,
     head: [headers],
     body: rows,
     theme: 'striped',
-    styles: { fontSize: 7 },
-    headStyles: { fillColor: [66, 139, 202], fontStyle: 'bold' },
-    margin: { left: 14, right: 14 },
+    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+    headStyles: { fillColor: headerBg, textColor: [255, 255, 255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [247, 249, 252] },
+    margin: { left: marginX, right: marginX, top: 20 },
     columnStyles: columns.reduce(
       (acc, col, idx) => {
-        acc[idx] = { cellWidth: col.width ? col.width * 2 : 'auto' };
+        acc[idx] = {
+          cellWidth: col.width ? col.width * 2 : 'auto',
+          halign: 'left',
+        };
         return acc;
       },
       {} as Record<number, any>
     ),
   });
 
-  // Guardar PDF
   doc.save(fileName);
 }
 

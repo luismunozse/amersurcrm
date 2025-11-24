@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent } from '@/components/ui/Card';
 import { MapPin, Info } from 'lucide-react';
+import type { OverlayLayerConfig } from '@/types/overlay-layers';
 
 interface LoteState {
   id: string;
@@ -22,12 +23,28 @@ interface MapeoLotesVisualizacionProps {
   planosUrl: string | null;
   proyectoLatitud?: number | null;
   proyectoLongitud?: number | null;
-  overlayBounds?: [[number, number], [number, number]] | null;
+  overlayBounds?: [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]] | null;
   overlayRotation?: number | null;
+  overlayLayers?: OverlayLayerConfig[] | null;
   lotes?: LoteState[];
 }
 
 const GoogleMap = dynamic(() => import('./GoogleMap'), { ssr: false });
+
+type BoundsTuple =
+  | [[number, number], [number, number]]
+  | [[number, number], [number, number], [number, number], [number, number]];
+
+const boundsToBoundingBox = (bounds?: BoundsTuple | null): [[number, number], [number, number]] | null => {
+  if (!bounds) return null;
+  if (bounds.length === 2) return bounds as [[number, number], [number, number]];
+  const lats = bounds.map(point => point[0]);
+  const lngs = bounds.map(point => point[1]);
+  return [
+    [Math.min(...lats), Math.min(...lngs)],
+    [Math.max(...lats), Math.max(...lngs)],
+  ];
+};
 
 const DEFAULT_CENTER: [number, number] = [-12.0464, -77.0428];
 const DEFAULT_ZOOM = 17;
@@ -39,6 +56,7 @@ export default function MapeoLotesVisualizacion({
   proyectoLongitud,
   overlayBounds,
   overlayRotation,
+  overlayLayers,
   lotes = [],
 }: MapeoLotesVisualizacionProps) {
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
@@ -76,11 +94,33 @@ export default function MapeoLotesVisualizacion({
     [lotes, selectedLoteId]
   );
 
+  const resolvedOverlayBounds = useMemo(() => {
+    if (overlayLayers && overlayLayers.length) {
+      const primary = overlayLayers.find((layer) => layer.isPrimary) ?? overlayLayers[0];
+      return primary?.bounds ?? overlayBounds ?? null;
+    }
+    return overlayBounds ?? null;
+  }, [overlayLayers, overlayBounds]);
+
+  const resolvedPlanosUrl = useMemo(() => {
+    if (overlayLayers && overlayLayers.length) {
+      return overlayLayers[0]?.url || planosUrl;
+    }
+    return planosUrl;
+  }, [overlayLayers, planosUrl]);
+
+  const activeOverlayId = useMemo(
+    () => overlayLayers?.find((layer) => layer.isPrimary)?.id ?? overlayLayers?.[0]?.id ?? null,
+    [overlayLayers]
+  );
+
   const mapCenter = useMemo(() => {
-    // 1. Si hay bounds del overlay, usar el centro de esos bounds
-    if (overlayBounds) {
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-      return [(swLat + neLat) / 2, (swLng + neLng) / 2] as [number, number];
+    if (resolvedOverlayBounds) {
+      const bounding = boundsToBoundingBox(resolvedOverlayBounds);
+      if (bounding) {
+        const [[swLat, swLng], [neLat, neLng]] = bounding;
+        return [(swLat + neLat) / 2, (swLng + neLng) / 2] as [number, number];
+      }
     }
 
     // 2. Si no hay bounds pero hay coordenadas del proyecto, usar esas
@@ -93,19 +133,22 @@ export default function MapeoLotesVisualizacion({
   }, [overlayBounds, proyectoLatitud, proyectoLongitud]);
 
   const mapZoom = useMemo(() => {
-    if (overlayBounds) {
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
-      const latDiff = Math.abs(neLat - swLat);
-      const lngDiff = Math.abs(neLng - swLng);
-      const span = Math.max(latDiff, lngDiff);
-      if (span > 0.08) return 14;
-      if (span > 0.05) return 15;
-      if (span > 0.02) return 16;
-      if (span > 0.01) return 17;
-      return 18;
+    if (resolvedOverlayBounds) {
+      const bounding = boundsToBoundingBox(resolvedOverlayBounds);
+      if (bounding) {
+        const [[swLat, swLng], [neLat, neLng]] = bounding;
+        const latDiff = Math.abs(neLat - swLat);
+        const lngDiff = Math.abs(neLng - swLng);
+        const span = Math.max(latDiff, lngDiff);
+        if (span > 0.08) return 14;
+        if (span > 0.05) return 15;
+        if (span > 0.02) return 16;
+        if (span > 0.01) return 17;
+        return 18;
+      }
     }
     return DEFAULT_ZOOM;
-  }, [overlayBounds]);
+  }, [resolvedOverlayBounds]);
 
   if (!planosUrl) {
     return (
@@ -284,16 +327,16 @@ export default function MapeoLotesVisualizacion({
                 <GoogleMap
                   defaultCenter={mapCenter}
                   defaultZoom={mapZoom}
-                  planosUrl={planosUrl}
-                  overlayBounds={overlayBounds ?? undefined}
+                  planosUrl={resolvedPlanosUrl}
+                  overlayBounds={resolvedOverlayBounds ?? undefined}
                   overlayOpacity={0.7}
-                  rotationDeg={overlayRotation ?? 0}
+                  overlayLayers={overlayLayers ?? undefined}
+                  activeOverlayId={activeOverlayId ?? undefined}
                   overlayEditable={false}
                   projectPolygon={[]}
                   projectDrawingActive={false}
                   lotes={lotes}
                   highlightLoteId={selectedLoteId}
-                  loteDrawingActive={false}
                 />
               </div>
             </CardContent>

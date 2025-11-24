@@ -15,7 +15,7 @@ export default function ProjectTabs({ lotesSection, mapeoSection }: ProjectTabsP
     <div className="space-y-4">
       {/* Tabs Navigation */}
       <div className="crm-card p-1">
-        <div className="flex gap-1">
+        <div className="flex flex-col gap-1 sm:grid sm:grid-cols-2">
           <button
             key="tab-lotes"
             onClick={() => setActiveTab('lotes')}

@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { dispatchNotificationChannels } from "@/lib/notificationsDelivery";
 
+function revalidateNotificaciones() {
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/notificaciones");
+}
+
 export async function marcarNotificacionLeida(notificacionId: string) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -17,7 +22,7 @@ export async function marcarNotificacionLeida(notificacionId: string) {
 
   if (error) throw new Error(error.message);
   
-  revalidatePath("/dashboard");
+  revalidateNotificaciones();
 }
 
 export async function marcarTodasLeidas() {
@@ -33,7 +38,7 @@ export async function marcarTodasLeidas() {
 
   if (error) throw new Error(error.message);
   
-  revalidatePath("/dashboard");
+  revalidateNotificaciones();
 }
 
 export async function crearNotificacion(
@@ -113,5 +118,23 @@ export async function crearNotificacion(
     console.warn("No se pudo despachar notificación externa:", deliveryError);
   }
 
+  revalidateNotificaciones();
+
   return inserted;
+}
+
+export async function eliminarNotificacion(notificacionId: string) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { error } = await supabase
+    .from("notificacion")
+    .delete()
+    .eq("id", notificacionId)
+    .eq("usuario_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidateNotificaciones();
 }

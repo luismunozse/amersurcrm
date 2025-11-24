@@ -98,11 +98,14 @@ export async function obtenerMetricasReportes(
     }
 
     // Clientes totales (no solo del período)
-    const { data: totalClientes } = await supabase
+    const { count: totalClientesCount, error: totalClientesError } = await supabase
       .schema('crm')
       .from('cliente')
-      .select('id, estado_cliente')
-      .eq('estado_cliente', 'cliente');
+      .select('id', { count: 'exact', head: true });
+
+    if (totalClientesError) {
+      console.error('Error obteniendo total de clientes:', totalClientesError);
+    }
 
     // 2. Métricas de Propiedades (incluye lotes y propiedades)
     // 2.1 Lotes
@@ -152,7 +155,7 @@ export async function obtenerMetricasReportes(
 
     // 5. Calcular métricas
     const clientesNuevos = clientesData?.length || 0;
-    const clientesActivos = totalClientes?.length || 0;
+    const clientesActivos = totalClientesCount ?? 0;
 
     // Combinar lotes y propiedades
     const propiedadesNuevas = (lotesData?.length || 0) + (propiedadesData?.length || 0);
@@ -173,7 +176,24 @@ export async function obtenerMetricasReportes(
       .gte('fecha_venta', startDate)
       .lte('fecha_venta', endDate);
 
-    const valorTotalVentas = ventasData?.reduce((sum, v) => sum + (Number(v.precio_total) || 0), 0) || 0;
+    const valorVentasRegistradas =
+      ventasData?.reduce((sum, v) => sum + (Number(v.precio_total) || 0), 0) || 0;
+
+    const valorLotesVendidos =
+      lotesEstados
+        ?.filter((l) => l.estado === "vendido")
+        .reduce((sum, lote) => sum + (Number((lote as { precio?: number }).precio) || 0), 0) || 0;
+
+    const valorPropiedadesVendidas =
+      propiedadesEstados
+        ?.filter((p) => p.estado_comercial === "vendido")
+        .reduce(
+          (sum, propiedad) => sum + (Number((propiedad as { precio_venta?: number }).precio_venta) || 0),
+          0,
+        ) || 0;
+
+    const valorTotalVentas =
+      valorVentasRegistradas > 0 ? valorVentasRegistradas : valorLotesVendidos + valorPropiedadesVendidas;
 
     const proyectosNuevos = proyectosData?.length || 0;
     const vendedoresActivos = vendedoresData?.length || 0;

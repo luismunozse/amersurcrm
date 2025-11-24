@@ -52,7 +52,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
   const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
@@ -193,8 +193,8 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     }
   };
 
-  const handleView = (loteId: string) => {
-    setDetailId(loteId);
+  const handleView = (lote: Lote) => {
+    setSelectedLote(lote);
   };
 
   const handleDuplicate = async (loteId: string, codigo: string) => {
@@ -326,8 +326,8 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle className="flex items-center gap-2 flex-wrap">
               <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
@@ -345,11 +345,11 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                 onClick={handleDeleteAll}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-crm-danger border-crm-danger hover:bg-crm-danger hover:text-white transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-crm-danger border-crm-danger hover:bg-crm-danger hover:text-white transition-colors w-full sm:w-auto"
               >
                 <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Eliminar todos los lotes</span>
-                <span className="sm:hidden">Eliminar todos</span>
+                <span className="hidden md:inline">Eliminar todos los lotes</span>
+                <span className="md:hidden">Eliminar todos</span>
               </Button>
             )}
           </div>
@@ -516,7 +516,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                                 
                                 <button
                                   onClick={() => {
-                                    handleView(lote.id);
+                                    handleView(lote);
                                     closeMenu();
                                   }}
                                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
@@ -565,145 +565,121 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                 ))}
               </div>
 
-              {/* Vista móvil y tablet - Cards compactas */}
-              <div className="lg:hidden space-y-3">
-                {lotesAMostrar.map((lote) => (
-                  <div
-                    key={lote.id}
-                    className="bg-crm-card border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors p-4"
-                  >
-                    {/* Header del lote */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                          <span className="text-sm font-semibold text-crm-primary">
-                            {lote.codigo.charAt(0)}
-                          </span>
+              {/* Vista móvil y tablet - Lista compacta */}
+              <div className="lg:hidden rounded-xl border border-crm-border divide-y divide-crm-border bg-transparent">
+                {lotesAMostrar.map((lote) => {
+                  const dataObj = parseData(lote.data);
+                  return (
+                    <div key={lote.id} className="relative p-4 space-y-3 bg-crm-card/40">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-crm-text-primary">{lote.codigo}</p>
+                          <p className="text-xs text-crm-text-muted">
+                            {dataObj?.tipo_unidad || 'Lote'}
+                            {dataObj?.manzana && ` · Mz. ${dataObj.manzana}`}
+                          </p>
+                        </div>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getEstadoColor(lote.estado)}`}>
+                          {getEstadoText(lote.estado)}
+                        </span>
+                      </div>
+
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-xs text-crm-text-muted uppercase tracking-wide">Proyecto</dt>
+                          <dd className="font-medium text-crm-primary truncate">
+                            {lote.proyecto ? lote.proyecto.nombre : 'No especificado'}
+                          </dd>
                         </div>
                         <div>
-                          <div className="font-semibold text-crm-text-primary">{lote.codigo}</div>
-                          {(() => {
-                            const dataObj = parseData(lote.data);
-                            return (
-                              <>
-                                <div className="text-xs text-crm-text-muted">
-                                  {dataObj?.tipo_unidad || 'Lote'}
-                                  {dataObj?.manzana && ` - Mz. ${dataObj.manzana}`}
+                          <dt className="text-xs text-crm-text-muted uppercase tracking-wide">Superficie</dt>
+                          <dd className="text-crm-text-primary">
+                            {lote.sup_m2 ? `${lote.sup_m2} m²` : 'No especificado'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-crm-text-muted uppercase tracking-wide">Precio</dt>
+                          <dd className="text-crm-text-primary">
+                            {lote.precio ? (
+                              <span className="font-medium">{formatPrecio(lote.precio, lote.moneda)}</span>
+                            ) : 'No especificado'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-crm-text-muted uppercase tracking-wide">Fecha</dt>
+                          <dd className="text-crm-text-muted">{formatFecha(lote.created_at)}</dd>
+                        </div>
+                      </dl>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap gap-2">
+                          {getEstadoButtons(lote).slice(0, 1)}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleView(lote)}
+                            className="text-green-600 hover:text-green-700 transition-colors p-2"
+                            title="Ver detalles"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => toggleMenu(lote.id)}
+                              className="text-crm-text-muted hover:text-crm-text-primary transition-colors p-2"
+                              title="Más opciones"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                            {openMenuId === lote.id && (
+                              <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-crm-border bg-crm-card shadow-lg">
+                                <div className="py-1 text-left">
+                                  {getEstadoButtons(lote).slice(1).length > 0 && (
+                                    <div className="px-3 py-1 space-y-1 border-b border-crm-border/80">
+                                      {getEstadoButtons(lote).slice(1).map((button, index) => (
+                                        <div key={index}>{button}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      handleEdit(lote.id);
+                                      closeMenu();
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                    Editar lote
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleDuplicate(lote.id, lote.codigo);
+                                      closeMenu();
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
+                                    Duplicar lote
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleDelete(lote.id, lote.codigo);
+                                      closeMenu();
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-danger hover:bg-crm-card-hover transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Eliminar lote
+                                  </button>
                                 </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getEstadoColor(lote.estado)}`}>
-                        {getEstadoText(lote.estado)}
-                      </span>
-                    </div>
-
-                    {/* Información del lote */}
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <div className="text-xs text-crm-text-muted mb-1">Proyecto</div>
-                        <div className="text-sm text-crm-primary font-medium truncate">
-                          {lote.proyecto ? lote.proyecto.nombre : 'No especificado'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-crm-text-muted mb-1">Superficie</div>
-                        <div className="text-sm text-crm-text-primary">
-                          {lote.sup_m2 ? `${lote.sup_m2} m²` : 'No especificado'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-crm-text-muted mb-1">Precio</div>
-                        <div className="text-sm text-crm-text-primary">
-                          {lote.precio ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-crm-text-muted font-medium">S/</span>
-                              <span className="font-medium">{formatPrecio(lote.precio, lote.moneda).replace('S/', '')}</span>
-                            </div>
-                          ) : (
-                            'No especificado'
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-crm-text-muted mb-1">Fecha</div>
-                        <div className="text-sm text-crm-text-muted">{formatFecha(lote.created_at)}</div>
-                      </div>
-                    </div>
-
-                    {/* Botones de estado - Solo el más importante */}
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {getEstadoButtons(lote).slice(0, 1)}
-                    </div>
-
-                    {/* Botones de acción con menú */}
-                    <div className="flex items-center justify-between pt-3 border-t border-crm-border">
-                      {/* Botón principal de acción */}
-                      <button
-                        onClick={() => handleView(lote.id)}
-                        className="text-green-600 hover:text-green-700 transition-colors p-2"
-                        title="Ver detalles"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      
-                      {/* Menú de más opciones */}
-                      <div className="relative">
-                        <button
-                          onClick={() => toggleMenu(lote.id)}
-                          className="text-crm-text-muted hover:text-crm-text-primary transition-colors p-2"
-                          title="Más opciones"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                        
-                        {/* Menú desplegable */}
-                        {openMenuId === lote.id && (
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-crm-card border border-crm-border rounded-lg shadow-lg z-50">
-                            <div className="py-1">
-                              {/* Botones de estado restantes */}
-                              {getEstadoButtons(lote).slice(1).map((button, index) => (
-                                <div key={index} className="px-3 py-1">
-                                  {button}
-                                </div>
-                              ))}
-                              
-                              {/* Separador */}
-                              {getEstadoButtons(lote).length > 1 && (
-                                <div className="border-t border-crm-border my-1"></div>
-                              )}
-                              
-                              {/* Acciones adicionales */}
-                              
-                              <button
-                                onClick={() => {
-                                  handleEdit(lote.id);
-                                  closeMenu();
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
-                              >
-                                <Edit className="w-4 h-4" />
-                                Editar lote
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleDelete(lote.id, lote.codigo);
-                                  closeMenu();
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-danger hover:bg-crm-card-hover transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Eliminar lote
-                              </button>
-                            </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -744,9 +720,9 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       }}
     />
     <LoteDetailModal
-      open={!!detailId}
-      onClose={() => setDetailId(null)}
-      lote={lotesAMostrar.find(l => l.id === detailId) || null}
+      open={!!selectedLote}
+      onClose={() => setSelectedLote(null)}
+      lote={selectedLote}
     />
     {reservandoLoteId && (
       <ModalReservaLote

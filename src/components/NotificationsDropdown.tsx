@@ -26,6 +26,10 @@ const tipoIcons = {
   proyecto: "🏢",
   lote: "🏠",
   sistema: "⚙️",
+  evento: "📅",
+  recordatorio: "⏰",
+  venta: "💰",
+  reserva: "📝",
 };
 
 const tipoColors = {
@@ -33,6 +37,10 @@ const tipoColors = {
   proyecto: "text-green-600",
   lote: "text-orange-600",
   sistema: "text-gray-600",
+  evento: "text-purple-600",
+  recordatorio: "text-yellow-600",
+  venta: "text-emerald-600",
+  reserva: "text-indigo-600",
 };
 
 export default function NotificationsDropdown({ notificaciones, count }: NotificationsDropdownProps) {

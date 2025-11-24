@@ -1,9 +1,11 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import type { LoteCoordenadas } from "@/types/proyectos";
+import type { OverlayLayerConfig } from "@/types/overlay-layers";
 
 export async function subirPlanos(proyectoId: string, fd: FormData) {
   const planosFile = fd.get("planos") as File | null;
@@ -637,7 +639,13 @@ export async function guardarCoordenadasMultiples(proyectoId: string, coordenada
 }
 
 // Guardar bounds de overlay del plano
-export async function guardarOverlayBounds(proyectoId: string, bounds: [[number, number], [number, number]], rotationDeg?: number, opacity?: number) {
+// Soporta tanto formato antiguo (2 puntos: bounding box) como nuevo (4 puntos: esquinas independientes)
+export async function guardarOverlayBounds(
+  proyectoId: string,
+  bounds: [[number, number], [number, number]] | [[number, number], [number, number], [number, number], [number, number]],
+  rotationDeg?: number,
+  opacity?: number
+) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -663,6 +671,63 @@ export async function guardarOverlayBounds(proyectoId: string, bounds: [[number,
 
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
   return { success: true };
+}
+
+const sanitizeOverlayLayer = (layer: OverlayLayerConfig, index: number) => {
+  if (!layer.url) return null;
+  return {
+    id: layer.id ?? randomUUID(),
+    name: layer.name ?? `Capa ${index + 1}`,
+    url: layer.url,
+    bounds: layer.bounds ?? null,
+    opacity: typeof layer.opacity === "number" ? layer.opacity : null,
+    visible: typeof layer.visible === "boolean" ? layer.visible : true,
+    isPrimary: typeof layer.isPrimary === "boolean" ? layer.isPrimary : index === 0,
+    order: typeof layer.order === "number" ? layer.order : index,
+  } satisfies OverlayLayerConfig;
+};
+
+export async function guardarOverlayLayers(
+  proyectoId: string,
+  layers: OverlayLayerConfig[]
+) {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  try {
+    const perfil = await obtenerPerfilUsuario();
+    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
+      throw new Error("No tienes permisos para actualizar las capas del plano");
+    }
+  } catch (error) {
+    throw new Error("Error verificando permisos: " + (error as Error).message);
+  }
+
+  const sanitizedLayers = (layers || [])
+    .map(sanitizeOverlayLayer)
+    .filter((layer): layer is NonNullable<typeof layer> => layer !== null);
+
+  const primaryLayer = sanitizedLayers.find((layer) => layer.isPrimary) ?? sanitizedLayers[0] ?? null;
+
+  const payload: Record<string, unknown> = {
+    overlay_layers: sanitizedLayers.length ? sanitizedLayers : null,
+  };
+
+  payload.planos_url = primaryLayer?.url ?? null;
+  payload.overlay_bounds = primaryLayer?.bounds ?? null;
+  payload.overlay_opacity =
+    primaryLayer && typeof primaryLayer.opacity === "number" ? primaryLayer.opacity : null;
+
+  const { error } = await supabase
+    .from("proyecto")
+    .update(payload)
+    .eq("id", proyectoId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { success: true, layers: sanitizedLayers };
 }
 
 export async function obtenerCoordenadasProyecto(proyectoId: string) {

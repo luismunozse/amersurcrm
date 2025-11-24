@@ -53,6 +53,11 @@ const navigation = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
   )},
+  { name: "AmersurChat", href: "/dashboard/extension", icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+      </svg>
+  ), badge: "Nuevo" },
   { name: "Centro de Ayuda", href: "/dashboard/ayuda", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -86,9 +91,9 @@ const adminNavigation = [
 ];
 
 function NavLink({
-  href, active, children, onClick, collapsed = false, label = "", style,
+  href, active, children, onClick, collapsed = false, label = "", style, badge,
 }: {
-  href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean; label?: string; style?: React.CSSProperties;
+  href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean; label?: string; style?: React.CSSProperties; badge?: string;
 }) {
   const content = (
     <Link
@@ -127,9 +132,16 @@ function NavLink({
         <div className="absolute inset-0 bg-crm-primary/0 group-hover:bg-crm-primary/10 rounded-xl transition-colors duration-300" />
       )}
 
-      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3")}
+      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3 justify-between")}
       >
-        {children}
+        <div className="flex items-center gap-3">
+          {children}
+        </div>
+        {badge && !collapsed && (
+          <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full">
+            {badge}
+          </span>
+        )}
       </div>
     </Link>
   );
@@ -351,6 +363,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                 onClick={onClose}
                 collapsed={collapsed}
                 label={item.name}
+                badge={'badge' in item ? (item as any).badge : undefined}
                 style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
               >
                 <span className={cn(

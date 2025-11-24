@@ -1,0 +1,238 @@
+"use server";
+
+import { NextRequest, NextResponse } from "next/server";
+import { createServiceRoleClient } from "@/lib/supabase.server";
+
+const WHATSAPP_BOT_API_KEY = process.env.WHATSAPP_BOT_API_KEY;
+const CRM_AUTOMATION_USER_ID = process.env.CRM_AUTOMATION_USER_ID ?? null;
+
+interface WhatsAppLeadPayload {
+  telefono: string;
+  nombre?: string;
+  mensaje_inicial?: string;
+  origen_lead?: string;
+  canal?: string;
+  chat_id?: string;
+  fecha_contacto?: string;
+}
+
+type RawVendedor = {
+  id: string;
+  username: string | null;
+  nombre_completo: string | null;
+  rol?: { nombre?: string | null } | Array<{ nombre?: string | null }> | null;
+};
+
+type Vendedor = {
+  id: string;
+  username: string;
+  nombre_completo: string | null;
+};
+
+/**
+ * POST /api/whatsapp/lead/create
+ *
+ * Crea un lead automáticamente cuando alguien escribe por WhatsApp
+ * Llamado por el bot de WhatsApp Web
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Validar autenticación
+    const apiKey = request.headers.get("x-api-key") || request.headers.get("authorization")?.replace("Bearer ", "");
+
+    if (!WHATSAPP_BOT_API_KEY) {
+      console.error("[WhatsAppLead] WHATSAPP_BOT_API_KEY no configurada");
+      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+    }
+
+    if (apiKey !== WHATSAPP_BOT_API_KEY) {
+      console.warn("[WhatsAppLead] API Key inválida");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Parsear body
+    const body: WhatsAppLeadPayload = await request.json().catch(() => ({}));
+
+    if (!body.telefono) {
+      return NextResponse.json({ error: "Falta campo requerido: telefono" }, { status: 400 });
+    }
+
+    const supabase = createServiceRoleClient();
+
+    // Verificar si ya existe un cliente con este teléfono
+    const { data: clienteExistente } = await supabase
+      .schema("crm")
+      .from("cliente")
+      .select("id, nombre, estado_cliente, vendedor_asignado")
+      .or(`telefono.eq.${body.telefono},telefono_whatsapp.eq.${body.telefono}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (clienteExistente) {
+      console.log(`[WhatsAppLead] Cliente ya existe: ${clienteExistente.id}`);
+      return NextResponse.json({
+        success: false,
+        message: "Cliente ya existe",
+        clienteId: clienteExistente.id,
+        existente: true,
+      });
+    }
+
+    // Seleccionar vendedor disponible (round-robin)
+    const vendedor = await selectVendedorDisponible(supabase);
+    const createdBy = vendedor?.id ?? CRM_AUTOMATION_USER_ID;
+
+    if (!createdBy) {
+      throw new Error("No hay un usuario disponible para created_by (define CRM_AUTOMATION_USER_ID).");
+    }
+
+    // Preparar datos del lead
+    const nombre = body.nombre || `Lead WhatsApp ${body.telefono.slice(-4)}`;
+    const origenLead = body.origen_lead || "whatsapp_web";
+
+    const notas = buildNotas(body);
+
+    const direccion = {
+      calle: "",
+      numero: "",
+      barrio: "",
+      ciudad: "",
+      provincia: "",
+      pais: "Perú",
+    };
+
+    // Insertar lead usando función RPC (bypasea RLS con SECURITY DEFINER)
+    const { data, error } = await supabase
+      .rpc("create_whatsapp_lead", {
+        p_nombre: nombre,
+        p_telefono: body.telefono,
+        p_telefono_whatsapp: body.telefono,
+        p_origen_lead: origenLead,
+        p_vendedor_asignado: vendedor?.username ?? null,
+        p_created_by: createdBy,
+        p_notas: notas,
+        p_direccion: direccion,
+      })
+      .single();
+
+    if (error) {
+      const message = String(error.message ?? "");
+      if (message.includes("duplicate key value")) {
+        console.info(`[WhatsAppLead] Lead duplicado ignorado (${body.telefono})`);
+        return NextResponse.json({
+          success: false,
+          message: "Lead duplicado",
+          existente: true,
+        });
+      }
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error("No se pudo crear el lead");
+    }
+
+    const leadData = data as { id: string; nombre: string; telefono: string };
+
+    console.log(`✅ [WhatsAppLead] Lead creado: ${leadData.id} | Vendedor: ${vendedor?.username ?? "Sin asignar"}`);
+
+    return NextResponse.json({
+      success: true,
+      message: "Lead creado exitosamente",
+      clienteId: leadData.id,
+      vendedor: vendedor?.nombre_completo ?? vendedor?.username ?? null,
+      existente: false,
+    });
+  } catch (error) {
+    console.error("[WhatsAppLead] Error completo:", error);
+    console.error("[WhatsAppLead] Error tipo:", typeof error);
+    console.error("[WhatsAppLead] Error stack:", error instanceof Error ? error.stack : "N/A");
+
+    const errorMessage = error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : JSON.stringify(error);
+
+    return NextResponse.json(
+      {
+        error: "Error interno del servidor",
+        message: errorMessage,
+        details: error instanceof Error ? error.stack : String(error)
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Selecciona el vendedor con menos clientes asignados (round-robin)
+ */
+async function selectVendedorDisponible(supabase: ReturnType<typeof createServiceRoleClient>) {
+  const { data, error } = await supabase
+    .schema("crm")
+    .from("usuario_perfil")
+    .select("id, username, nombre_completo, rol:rol!usuario_perfil_rol_fk(nombre)")
+    .eq("activo", true);
+
+  if (error) {
+    console.error("[WhatsAppLead] Error obteniendo vendedores:", error);
+    return null;
+  }
+
+  const rawVendedores = (data ?? []) as RawVendedor[];
+
+  const vendedores: Vendedor[] = rawVendedores
+    .map((v) => {
+      const rolNombre = Array.isArray(v.rol) ? v.rol[0]?.nombre : v.rol?.nombre;
+      if (rolNombre !== "ROL_VENDEDOR" || !v.username) return null;
+      return {
+        id: v.id,
+        username: v.username,
+        nombre_completo: v.nombre_completo ?? null,
+      };
+    })
+    .filter((v): v is Vendedor => v !== null);
+
+  if (vendedores.length === 0) {
+    return null;
+  }
+
+  const conteos = await Promise.all(
+    vendedores.map(async (vend) => {
+      const { count, error } = await supabase
+        .schema("crm")
+        .from("cliente")
+        .select("id", { count: "exact", head: true })
+        .eq("vendedor_asignado", vend.username);
+      return {
+        vendedor: vend,
+        count: error ? Number.POSITIVE_INFINITY : count ?? 0,
+      };
+    })
+  );
+
+  conteos.sort((a, b) => {
+    if (a.count === b.count) {
+      const nameA = a.vendedor.nombre_completo ?? a.vendedor.username;
+      const nameB = b.vendedor.nombre_completo ?? b.vendedor.username;
+      return nameA.localeCompare(nameB);
+    }
+    return a.count - b.count;
+  });
+
+  return conteos[0]?.vendedor ?? null;
+}
+
+/**
+ * Construye las notas del lead con información del WhatsApp
+ */
+function buildNotas(data: WhatsAppLeadPayload): string | null {
+  const parts = [
+    `Lead capturado desde WhatsApp Web`,
+    data.mensaje_inicial ? `Mensaje: "${data.mensaje_inicial.substring(0, 200)}"` : null,
+    data.chat_id ? `Chat ID: ${data.chat_id}` : null,
+  ].filter(Boolean);
+
+  return parts.join(" · ") || null;
+}

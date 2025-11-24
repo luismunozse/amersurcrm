@@ -12,16 +12,18 @@ export type EstadoCliente =
   | 'desestimado'
   | 'potencial';
 
-export type OrigenLead = 
-  | 'web' 
-  | 'recomendacion' 
-  | 'feria' 
-  | 'campaña' 
+export type OrigenLead =
+  | 'web'
+  | 'recomendacion'
+  | 'feria'
+  | 'campaña'
   | 'campaña_facebook'
   | 'campaña_tiktok'
-  | 'redes_sociales' 
-  | 'publicidad' 
-  | 'referido' 
+  | 'facebook_ads'  // Leads capturados automáticamente desde Facebook Lead Ads
+  | 'whatsapp_web'  // Leads capturados automáticamente desde WhatsApp Web
+  | 'redes_sociales'
+  | 'publicidad'
+  | 'referido'
   | 'otro';
 
 export type FormaPago = 
@@ -165,6 +167,8 @@ export const ORIGENES_LEAD_OPTIONS = [
   { value: 'campaña', label: 'Campaña Publicitaria' },
   { value: 'campaña_facebook', label: 'Campaña de Facebook' },
   { value: 'campaña_tiktok', label: 'Campaña de TikTok' },
+  { value: 'facebook_ads', label: 'Facebook Lead Ads (Automático)' },
+  { value: 'whatsapp_web', label: 'WhatsApp Web (Automático)' },
   { value: 'redes_sociales', label: 'Redes Sociales' },
   { value: 'publicidad', label: 'Publicidad' },
   { value: 'referido', label: 'Referido' },
@@ -238,4 +242,10 @@ export function formatCapacidadCompra(capacidad?: number): string {
 export function formatSaldoPendiente(saldo: number): string {
   if (saldo === 0) return 'Sin saldo';
   return `S/ ${saldo.toLocaleString()}`;
+}
+
+export function getOrigenLeadLabel(origen: string | null): string {
+  if (!origen) return 'No especificado';
+  const option = ORIGENES_LEAD_OPTIONS.find(opt => opt.value === origen);
+  return option?.label || origen;
 }

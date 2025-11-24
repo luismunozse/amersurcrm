@@ -4,16 +4,30 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Upload, Check, MapPin, Search, RefreshCcw, Trash2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  Check,
+  MapPin,
+  Search,
+  RefreshCcw,
+  Trash2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Layers,
+  Eye,
+  EyeOff,
+  Star,
+  Loader2,
+  Plus,
+} from 'lucide-react';
 import BlueprintUploader from '@/components/BlueprintUploader';
 import { toast } from 'sonner';
 import {
-  subirPlanos,
-  eliminarPlanos,
+  guardarOverlayLayers,
   guardarOverlayBounds,
   guardarPoligonoLote,
   eliminarLote,
 } from './_actions';
+import type { OverlayLayerConfig } from '@/types/overlay-layers';
 
 interface LatLngLiteral {
   lat: number;
@@ -41,6 +55,7 @@ interface MapeoLotesMejoradoProps {
   initialBounds?: [[number, number], [number, number]] | null;
   initialRotation?: number | null;
   initialOpacity?: number | null;
+  initialOverlayLayers?: OverlayLayerConfig[] | null;
   lotes?: LoteState[];
 }
 
@@ -49,6 +64,136 @@ const GoogleMap = dynamic(() => import('./GoogleMap'), { ssr: false });
 const DEFAULT_CENTER: [number, number] = [-12.0464, -77.0428];
 const DEFAULT_ZOOM = 17;
 
+type BoundsTuple =
+  | [[number, number], [number, number]]
+  | [[number, number], [number, number], [number, number], [number, number]];
+
+const generateLayerId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const normalizeLayer = (layer: OverlayLayerConfig, index: number): OverlayLayerConfig => ({
+  id: layer.id ?? generateLayerId(),
+  name: layer.name ?? `Capa ${index + 1}`,
+  url: layer.url ?? null,
+  bounds: layer.bounds ?? null,
+  opacity: typeof layer.opacity === 'number' ? layer.opacity : 0.7,
+  visible: typeof layer.visible === 'boolean' ? layer.visible : true,
+  isPrimary: typeof layer.isPrimary === 'boolean' ? layer.isPrimary : index === 0,
+  order: typeof layer.order === 'number' ? layer.order : index,
+});
+
+const buildInitialLayers = (
+  layers: OverlayLayerConfig[] | null | undefined,
+  fallbackUrl: string | null,
+  fallbackBounds: BoundsTuple | null | undefined,
+  fallbackOpacity: number | null | undefined
+) => {
+  if (layers && layers.length) {
+    return layers.filter(layer => layer.url).map((layer, index) => normalizeLayer(layer, index));
+  }
+  if (fallbackUrl) {
+    return [
+      normalizeLayer(
+        {
+          id: 'layer-default',
+          name: 'Plano principal',
+          url: fallbackUrl,
+          bounds: fallbackBounds ?? null,
+          opacity: fallbackOpacity ?? 0.7,
+          visible: true,
+          isPrimary: true,
+          order: 0,
+        },
+        0
+      ),
+    ];
+  }
+  return [];
+};
+
+const boundsToPolygon = (bounds?: BoundsTuple | null) => {
+  if (!bounds) return [];
+  if (bounds.length === 4) {
+    return bounds.map(([lat, lng]) => ({ lat, lng }));
+  }
+  const [[swLat, swLng], [neLat, neLng]] = bounds;
+  return [
+    { lat: neLat, lng: swLng },
+    { lat: neLat, lng: neLng },
+    { lat: swLat, lng: neLng },
+    { lat: swLat, lng: swLng },
+  ];
+};
+
+const boundsToBoundingBox = (bounds?: BoundsTuple | null) => {
+  if (!bounds) return null;
+  if (bounds.length === 2) return bounds as [[number, number], [number, number]];
+  const lats = bounds.map(point => point[0]);
+  const lngs = bounds.map(point => point[1]);
+  const sw: [number, number] = [Math.min(...lats), Math.min(...lngs)];
+  const ne: [number, number] = [Math.max(...lats), Math.max(...lngs)];
+  return [sw, ne] as [[number, number], [number, number]];
+};
+
+const polygonToBounds = (polygon: { lat: number; lng: number }[]) => {
+  if (!polygon.length) return null;
+  const lats = polygon.map(p => p.lat);
+  const lngs = polygon.map(p => p.lng);
+  const sw: [number, number] = [Math.min(...lats), Math.min(...lngs)];
+  const ne: [number, number] = [Math.max(...lats), Math.max(...lngs)];
+  return [
+    [ne[0], sw[1]],
+    [ne[0], ne[1]],
+    [sw[0], ne[1]],
+    [sw[0], sw[1]],
+  ] as [[number, number], [number, number], [number, number], [number, number]];
+};
+
+const rotateBoundsByDegrees = (
+  bounds: BoundsTuple,
+  deltaDegrees: number
+): [[number, number], [number, number], [number, number], [number, number]] | null => {
+  if (!bounds) return null;
+  const polygon = boundsToPolygon(bounds);
+  if (polygon.length < 4) return null;
+  const center = polygon.reduce(
+    (acc, point) => ({
+      lat: acc.lat + point.lat / polygon.length,
+      lng: acc.lng + point.lng / polygon.length,
+    }),
+    { lat: 0, lng: 0 }
+  );
+  const radians = (deltaDegrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const rotated = polygon.map((point) => {
+    const x = point.lng - center.lng;
+    const y = point.lat - center.lat;
+    const rotatedX = x * cos - y * sin;
+    const rotatedY = x * sin + y * cos;
+    return { lat: rotatedY + center.lat, lng: rotatedX + center.lng };
+  });
+  return rotated.map((point) => [point.lat, point.lng]) as [
+    [number, number],
+    [number, number],
+    [number, number],
+    [number, number],
+  ];
+};
+
+const estimateRotationFromBounds = (bounds?: BoundsTuple | null) => {
+  if (!bounds) return 0;
+  const polygon = boundsToPolygon(bounds);
+  if (polygon.length < 2) return 0;
+  const [p0, p1] = polygon;
+  const dx = p1.lng - p0.lng;
+  const dy = p1.lat - p0.lat;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  return Number.isFinite(angle) ? Math.round(angle * 10) / 10 : 0;
+};
+
 export default function MapeoLotesMejorado({
   proyectoId,
   planosUrl,
@@ -56,35 +201,43 @@ export default function MapeoLotesMejorado({
   proyectoLatitud,
   proyectoLongitud,
   initialBounds,
-  initialRotation,
+  initialRotation: _initialRotation,
   initialOpacity,
+  initialOverlayLayers,
   lotes = [],
 }: MapeoLotesMejoradoProps) {
-  // Estados principales
-  // Determinar el paso inicial:
-  // - Si NO hay área definida → Paso 1 (siempre)
-  // - Si hay área pero NO hay plano → Paso 2
-  // - Si hay área Y plano → Paso 3
+  const computeInitialLayers = () =>
+    buildInitialLayers(initialOverlayLayers, planosUrl, initialBounds, initialOpacity);
+
+  const [overlayLayers, setOverlayLayers] = useState<OverlayLayerConfig[]>(() => computeInitialLayers());
+
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(() => {
-    if (!initialBounds) return 1; // Sin área, empezar en Paso 1
-    if (!planosUrl) return 2; // Con área pero sin plano, empezar en Paso 2
-    return 3; // Con área y plano, empezar en Paso 3
+    const initialList = computeInitialLayers();
+    const hasBounds =
+      initialList.some((layer) => layer.bounds && boundsToBoundingBox(layer.bounds)) || Boolean(initialBounds);
+    if (!hasBounds) return 1;
+    const hasPlano = initialList.some((layer) => layer.url) || Boolean(planosUrl);
+    return hasPlano ? 3 : 2;
   });
 
-  const [planUrl, setPlanUrl] = useState<string | null>(planosUrl);
-  const [isUploading, setIsUploading] = useState(false);
+  const [activeOverlayId, setActiveOverlayId] = useState<string | null>(() => {
+    const initialList = computeInitialLayers();
+    return initialList.find((layer) => layer.isPrimary)?.id ?? initialList[0]?.id ?? null;
+  });
 
   // Estados del área/plano
   const [overlayBounds, setOverlayBounds] = useState<[[number, number], [number, number]] | undefined>(
     initialBounds ?? undefined
   );
   const [areaPolygon, setAreaPolygon] = useState<{ lat: number; lng: number }[]>([]);
-  const [overlayRotation, setOverlayRotation] = useState<number>(initialRotation ?? 0);
-  const [overlayOpacity, setOverlayOpacity] = useState(initialOpacity ?? 0.7);
   const [isDrawingArea, setIsDrawingArea] = useState(false);
   const [overlayDirty, setOverlayDirty] = useState(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<[number, number] | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isUploadingLayer, setIsUploadingLayer] = useState(false);
+  const [uploadingLayerId, setUploadingLayerId] = useState<string | null>(null);
+  const [isSavingLayers, setIsSavingLayers] = useState(false);
+  const [layerRotations, setLayerRotations] = useState<Record<string, number>>({});
 
   // Debug: Log cuando cambia el centro del mapa
   useEffect(() => {
@@ -121,8 +274,62 @@ export default function MapeoLotesMejorado({
   }, [lotes]);
 
   useEffect(() => {
-    setPlanUrl(planosUrl);
-  }, [planosUrl]);
+    const normalized = computeInitialLayers();
+    setOverlayLayers(normalized);
+    setOverlayDirty(false);
+  }, [initialOverlayLayers, planosUrl, initialBounds, initialOpacity]);
+
+  useEffect(() => {
+    if (!overlayLayers.length) {
+      if (activeOverlayId !== null) {
+        setActiveOverlayId(null);
+      }
+      return;
+    }
+    if (!activeOverlayId || !overlayLayers.some((layer) => layer.id === activeOverlayId)) {
+      const fallback = overlayLayers.find((layer) => layer.isPrimary) ?? overlayLayers[0];
+      setActiveOverlayId(fallback?.id ?? null);
+    }
+  }, [overlayLayers, activeOverlayId]);
+
+  useEffect(() => {
+    setLayerRotations((prev) => {
+      const next: Record<string, number> = {};
+      overlayLayers.forEach((layer) => {
+        if (typeof prev[layer.id] === 'number') {
+          next[layer.id] = prev[layer.id];
+        } else {
+          next[layer.id] = estimateRotationFromBounds(layer.bounds) ?? 0;
+        }
+      });
+      return next;
+    });
+  }, [overlayLayers]);
+
+  const primaryOverlay = useMemo(
+    () => overlayLayers.find((layer) => layer.isPrimary) ?? overlayLayers[0] ?? null,
+    [overlayLayers]
+  );
+
+  const activeOverlay = useMemo(() => {
+    if (!overlayLayers.length) return primaryOverlay ?? null;
+    const current = overlayLayers.find((layer) => layer.id === activeOverlayId);
+    return current ?? primaryOverlay ?? overlayLayers[0] ?? null;
+  }, [overlayLayers, activeOverlayId, primaryOverlay]);
+
+  const planUrl = activeOverlay?.url ?? null;
+  const resolvedOverlayBounds = useMemo(() => activeOverlay?.bounds ?? overlayBounds ?? null, [activeOverlay, overlayBounds]);
+  const dropBounds = useMemo(
+    () => boundsToBoundingBox(primaryOverlay?.bounds ?? overlayBounds ?? null),
+    [primaryOverlay, overlayBounds]
+  );
+  const sortedOverlayLayers = useMemo(
+    () =>
+      [...overlayLayers].sort(
+        (a, b) => (a.order ?? overlayLayers.indexOf(a)) - (b.order ?? overlayLayers.indexOf(b))
+      ),
+    [overlayLayers]
+  );
 
   // Estadísticas globales (sin filtros)
   const stats = useMemo(() => {
@@ -187,24 +394,23 @@ export default function MapeoLotesMejorado({
   }, [selectedLote]);
 
   const mapCenter = useMemo(() => {
-    // 1. Si hay bounds del overlay, usar el centro de esos bounds
-    if (overlayBounds) {
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+    const bounding = boundsToBoundingBox(resolvedOverlayBounds);
+    if (bounding) {
+      const [[swLat, swLng], [neLat, neLng]] = bounding;
       return [(swLat + neLat) / 2, (swLng + neLng) / 2] as [number, number];
     }
 
-    // 2. Si no hay bounds pero hay coordenadas del proyecto, usar esas
     if (proyectoLatitud != null && proyectoLongitud != null) {
       return [proyectoLatitud, proyectoLongitud] as [number, number];
     }
 
-    // 3. Fallback a las coordenadas por defecto (Lima)
     return DEFAULT_CENTER;
-  }, [overlayBounds, proyectoLatitud, proyectoLongitud]);
+  }, [resolvedOverlayBounds, proyectoLatitud, proyectoLongitud]);
 
   const mapZoom = useMemo(() => {
-    if (overlayBounds) {
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+    const bounding = boundsToBoundingBox(resolvedOverlayBounds);
+    if (bounding) {
+      const [[swLat, swLng], [neLat, neLng]] = bounding;
       const latDiff = Math.abs(neLat - swLat);
       const lngDiff = Math.abs(neLng - swLng);
       const span = Math.max(latDiff, lngDiff);
@@ -215,7 +421,7 @@ export default function MapeoLotesMejorado({
       return 18;
     }
     return DEFAULT_ZOOM;
-  }, [overlayBounds]);
+  }, [resolvedOverlayBounds]);
 
   // Handlers
   const handleStartDrawingPolygon = () => {
@@ -249,6 +455,14 @@ export default function MapeoLotesMejorado({
     // areaPolygon actualizado
   }, [areaPolygon]);
 
+  const handleRedrawProjectArea = () => {
+    setAreaPolygon([]);
+    setOverlayBounds(undefined);
+    setOverlayDirty(true);
+    setCurrentStep(1);
+    handleStartDrawingPolygon();
+  };
+
   const handleSaveArea = async () => {
     if (areaPolygon.length < 3) {
       toast.error('Dibuja el área del proyecto primero (mínimo 3 vértices)');
@@ -269,81 +483,251 @@ export default function MapeoLotesMejorado({
     }
   };
 
-  const handleUploadPlano = async (file: File) => {
-    // Validar que exista el área antes de subir el plano
-    if (!overlayBounds) {
-      toast.error('Primero debes definir el área del proyecto en el Paso 1');
-      return;
-    }
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('planos', file);
-
-    try {
-      const result = await subirPlanos(proyectoId, formData);
-
-      if (result && typeof result === 'object' && 'url' in result) {
-        const response = result as { success: boolean; url?: string };
-        if (response.url) {
-          setPlanUrl(response.url);
-          toast.success('Plano subido correctamente');
-          setCurrentStep(3);
-        }
-      } else {
-        throw new Error('Respuesta inválida del servidor');
-      }
-    } catch (error) {
-      console.error('Error al subir plano:', error);
-      toast.error(error instanceof Error ? error.message : 'Error subiendo plano');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDeletePlano = async () => {
-    if (!planUrl) return;
-    if (!confirm('¿Seguro que deseas eliminar el plano? Esto eliminará todas las ubicaciones de lotes.')) return;
-    try {
-      await eliminarPlanos(proyectoId);
-      setPlanUrl(null);
-      setCurrentStep(2);
-      toast.success('Plano eliminado correctamente');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el plano');
-    }
-  };
-
-  const handleOverlayBoundsChange = (bounds: [[number, number], [number, number]]) => {
-    setOverlayBounds(bounds);
+  const handleAddLayer = () => {
+    const fallbackBounds = primaryOverlay?.bounds ?? dropBounds ?? overlayBounds ?? null;
+    const maxOrder = overlayLayers.reduce(
+      (max, layer, index) => Math.max(max, typeof layer.order === 'number' ? layer.order : index),
+      -1
+    );
+    const nextOrder = maxOrder + 1;
+    const newLayer: OverlayLayerConfig = {
+      id: generateLayerId(),
+      name: `Capa ${overlayLayers.length + 1}`,
+      url: null,
+      bounds: fallbackBounds,
+      opacity: 0.7,
+      visible: true,
+      isPrimary: overlayLayers.length === 0,
+      order: nextOrder,
+    };
+    setOverlayLayers((prev) => [...prev, newLayer]);
+    setActiveOverlayId(newLayer.id);
     setOverlayDirty(true);
   };
 
-  const handleSaveAdjustments = async () => {
-    if (!overlayBounds) return;
+  const handleLayerNameChange = (layerId: string, value: string) => {
+    setOverlayLayers((prev) =>
+      prev.map((layer) => (layer.id === layerId ? { ...layer, name: value.slice(0, 80) } : layer))
+    );
+    setOverlayDirty(true);
+  };
+
+  const handleUploadLayer = async (layerId: string, file: File) => {
+    if (!file) return;
+    if (!dropBounds) {
+      toast.error('Primero define el área del proyecto (Paso 1)');
+      return;
+    }
+
+    setIsUploadingLayer(true);
+    setUploadingLayerId(layerId);
     try {
-      await guardarOverlayBounds(proyectoId, overlayBounds, Math.round(overlayRotation), overlayOpacity);
-      toast.success('Ajustes guardados');
-      setOverlayDirty(false);
+      const formData = new FormData();
+      formData.append('planos', file);
+      formData.append('proyectoId', proyectoId);
+
+      const response = await fetch('/api/proyectos/upload-overlay-layer', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.url) {
+        throw new Error(data?.error || 'No se pudo subir la capa');
+      }
+
+      setOverlayLayers((prev) =>
+        prev.map((layer) => (layer.id === layerId ? { ...layer, url: data.url } : layer))
+      );
+      setOverlayDirty(true);
+      toast.success('Imagen de capa actualizada');
+      setCurrentStep(3);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error guardando ajustes');
+      console.error('Error al subir capa:', error);
+      toast.error(error instanceof Error ? error.message : 'Error subiendo capa');
+    } finally {
+      setIsUploadingLayer(false);
+      setUploadingLayerId(null);
+    }
+  };
+
+  const handleClearLayerImage = (layerId: string) => {
+    setOverlayLayers((prev) => {
+      const next = prev.map((layer) => (layer.id === layerId ? { ...layer, url: null } : layer));
+      if (!next.some((layer) => layer.url)) {
+        setCurrentStep(2);
+      }
+      return next;
+    });
+    setOverlayDirty(true);
+  };
+
+  const handleDeleteLayer = (layerId: string) => {
+    const confirmDelete = confirm('¿Eliminar esta capa? Esta acción no se puede deshacer.');
+    if (!confirmDelete) return;
+
+    setOverlayLayers((prev) => {
+      const filtered = prev.filter((layer) => layer.id !== layerId);
+      if (filtered.length === 0) {
+        setActiveOverlayId(null);
+        setCurrentStep(2);
+        return [];
+      }
+      if (!filtered.some((layer) => layer.isPrimary)) {
+        filtered[0] = { ...filtered[0], isPrimary: true };
+      }
+      if (activeOverlayId === layerId) {
+        setActiveOverlayId(filtered[0]?.id ?? null);
+      }
+      if (!filtered.some((layer) => layer.url)) {
+        setCurrentStep(2);
+      }
+      return filtered;
+    });
+    setOverlayDirty(true);
+  };
+
+  const handleSetPrimaryLayer = (layerId: string) => {
+    setOverlayLayers((prev) =>
+      prev.map((layer) => ({
+        ...layer,
+        isPrimary: layer.id === layerId,
+      }))
+    );
+    setActiveOverlayId(layerId);
+    setOverlayDirty(true);
+  };
+
+  const handleToggleVisibility = (layerId: string) => {
+    setOverlayLayers((prev) =>
+      prev.map((layer) => (layer.id === layerId ? { ...layer, visible: !(layer.visible === false) } : layer))
+    );
+    setOverlayDirty(true);
+  };
+
+  const handleOpacityChange = (layerId: string, value: number) => {
+    setOverlayLayers((prev) =>
+      prev.map((layer) => (layer.id === layerId ? { ...layer, opacity: value } : layer))
+    );
+    setOverlayDirty(true);
+  };
+
+  const handleLayerRotationChange = (layerId: string, targetAngle: number) => {
+    const layer = overlayLayers.find((l) => l.id === layerId);
+    if (!layer) return;
+    const sourceBounds = layer.bounds ?? dropBounds ?? overlayBounds ?? null;
+    if (!sourceBounds) {
+      toast.error('Define el área del proyecto antes de rotar la capa');
+      return;
+    }
+    const currentAngle = layerRotations[layerId] ?? estimateRotationFromBounds(layer.bounds ?? sourceBounds) ?? 0;
+    const delta = targetAngle - currentAngle;
+    if (Math.abs(delta) < 0.01) return;
+    const rotated = rotateBoundsByDegrees(layer.bounds ?? sourceBounds, delta);
+    if (!rotated) return;
+    setOverlayLayers((prev) =>
+      prev.map((l) => (l.id === layerId ? { ...l, bounds: rotated } : l))
+    );
+    const bounding = boundsToBoundingBox(rotated);
+    if (bounding) {
+      setOverlayBounds(bounding);
+    }
+    setLayerRotations((prev) => ({ ...prev, [layerId]: targetAngle }));
+    setOverlayDirty(true);
+  };
+
+  const handleLayerRotationStep = (layerId: string, delta: number) => {
+    const current = layerRotations[layerId] ?? 0;
+    const next = Math.max(-180, Math.min(180, current + delta));
+    handleLayerRotationChange(layerId, next);
+  };
+
+  const handleFitLayerToProjectArea = (layerId?: string) => {
+    const targetId = layerId ?? activeOverlay?.id ?? null;
+    if (!targetId) {
+      toast.error('Selecciona una capa para ajustar');
+      return;
+    }
+
+    const projectQuadrilateral = areaPolygon.length >= 3 ? polygonToBounds(areaPolygon) : null;
+    const fallbackBounds =
+      projectQuadrilateral ??
+      (overlayBounds
+        ? (boundsToPolygon(overlayBounds).map((point) => [point.lat, point.lng]) as BoundsTuple)
+        : null) ??
+      (primaryOverlay?.bounds ?? null);
+
+    if (!fallbackBounds) {
+      toast.error('Define el área del proyecto antes de ajustar la capa');
+      return;
+    }
+
+    setOverlayLayers((prev) =>
+      prev.map((layer) =>
+        layer.id === targetId
+          ? { ...layer, bounds: fallbackBounds }
+          : layer
+      )
+    );
+    const bounding = boundsToBoundingBox(fallbackBounds);
+    if (bounding) {
+      setOverlayBounds(bounding);
+    }
+    setOverlayDirty(true);
+    toast.success('Capa ajustada al área del proyecto');
+  };
+
+  const handleOverlayBoundsChange = useCallback(
+    (layerId: string, bounds: BoundsTuple) => {
+      setOverlayLayers((prev) =>
+        prev.map((layer) => (layer.id === layerId ? { ...layer, bounds } : layer))
+      );
+      const bounding = boundsToBoundingBox(bounds);
+      if (bounding) {
+        setOverlayBounds(bounding);
+      }
+      setOverlayDirty(true);
+    },
+    []
+  );
+
+  const handleSaveLayers = async () => {
+    if (!overlayLayers.length) {
+      toast.error('Agrega al menos una capa antes de guardar');
+      return;
+    }
+    if (!overlayLayers.some((layer) => layer.url)) {
+      toast.error('Sube al menos una imagen antes de guardar');
+      return;
+    }
+    setIsSavingLayers(true);
+    try {
+      await guardarOverlayLayers(proyectoId, overlayLayers);
+      toast.success('Capas del plano guardadas');
+      setOverlayDirty(false);
+      if (currentStep < 3 && overlayLayers.some((layer) => layer.url)) {
+        setCurrentStep(3);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar las capas');
+    } finally {
+      setIsSavingLayers(false);
     }
   };
 
   const upsertLotePin = useCallback(async (loteId: string, lat: number, lng: number, showToast = true) => {
-    if (!overlayBounds) {
-      toast.error('Primero debes definir el área del plano');
+    if (!dropBounds) {
+      toast.error('Define la capa principal antes de ubicar lotes');
       return;
     }
 
-    if (!planUrl) {
-      toast.error('Primero debes subir el plano del proyecto');
+    if (!primaryOverlay?.url) {
+      toast.error('Sube una imagen para la capa principal del plano');
       return;
     }
 
     setSavingLotePolygon(true);
     try {
-      const [[swLat, swLng], [neLat, neLng]] = overlayBounds;
+      const [[swLat, swLng], [neLat, neLng]] = dropBounds;
       const normalizedX = (lng - swLng) / (neLng - swLng);
       const normalizedY = (lat - swLat) / (neLat - swLat);
 
@@ -354,7 +738,7 @@ export default function MapeoLotesMejorado({
         normalizedY < -margin ||
         normalizedY > 1 + margin
       ) {
-        toast.error('⚠️ El lote debe ubicarse DENTRO del plano. Intenta soltarlo nuevamente dentro del área.');
+        toast.error('⚠️ El lote debe ubicarse DENTRO de los límites de la capa principal.');
         console.warn('❌ Coordenadas fuera del plano:', { normalizedX, normalizedY });
         setSavingLotePolygon(false);
         return;
@@ -380,7 +764,7 @@ export default function MapeoLotesMejorado({
     } finally {
       setSavingLotePolygon(false);
     }
-  }, [proyectoId, overlayBounds, planUrl]);
+  }, [proyectoId, dropBounds, primaryOverlay?.url]);
 
   const handlePinDrop = useCallback(async (loteId: string, lat: number, lng: number) => {
     setSelectedLoteId(loteId);
@@ -393,8 +777,8 @@ export default function MapeoLotesMejorado({
   }, [upsertLotePin]);
 
   const handleLoteDragStart = useCallback((event: DragEvent, loteId: string) => {
-    if (!planUrl) {
-      toast.error('Primero sube el plano del proyecto');
+    if (!primaryOverlay?.url) {
+      toast.error('Primero sube la capa principal del plano');
       event.preventDefault();
       return;
     }
@@ -406,7 +790,7 @@ export default function MapeoLotesMejorado({
     } catch (error) {
       console.warn('No se pudo asignar dataTransfer', error);
     }
-  }, [planUrl]);
+  }, [primaryOverlay?.url]);
 
   const handleLoteDragEnd = useCallback(() => {
     setDraggingLoteId(null);
@@ -515,6 +899,9 @@ export default function MapeoLotesMejorado({
     }
   };
 
+  // Computed boolean to avoid TypeScript type narrowing issues
+  const isOverlayEditable = currentStep === 2;
+
   return (
     <div className="space-y-6">
       {/* Header con progreso */}
@@ -556,7 +943,7 @@ export default function MapeoLotesMejorado({
                   <span className="text-xs font-bold text-white">2</span>
                 )}
               </div>
-              <span className="text-sm font-medium">Plano</span>
+              <span className="text-sm font-medium">Capas</span>
             </div>
 
             <div className={`h-0.5 w-8 ${currentStep >= 3 ? 'bg-green-400' : 'bg-gray-200'}`} />
@@ -731,7 +1118,7 @@ export default function MapeoLotesMejorado({
                       onClick={() => setCurrentStep(2)}
                       className="text-xs text-crm-text-secondary hover:text-crm-primary"
                     >
-                      ← Ajustar plano
+                      ← Gestionar capas
                     </button>
                   </div>
 
@@ -927,24 +1314,19 @@ export default function MapeoLotesMejorado({
                     defaultCenter={mapCenter}
                     defaultZoom={mapZoom}
                     planosUrl={planUrl}
-                    overlayBounds={overlayBounds}
-                    overlayOpacity={overlayOpacity}
-                    rotationDeg={overlayRotation}
-                    overlayEditable={false}
+                    overlayBounds={resolvedOverlayBounds ?? undefined}
+                    overlayLayers={overlayLayers}
+                    activeOverlayId={activeOverlay?.id ?? null}
+                    overlayEditable={isOverlayEditable}
+                    dropAreaBounds={dropBounds ?? null}
                     onOverlayBoundsChange={handleOverlayBoundsChange}
                     onMapCenterChange={setCurrentMapCenter}
-                    onCreateDefaultBounds={() => {
-                      setOverlayDirty(true);
-                    }}
                     projectPolygon={areaPolygon}
                     onProjectPolygonChange={handlePolygonChange}
                     projectDrawingActive={isDrawingArea}
                     onProjectDrawingFinished={handleProjectDrawingFinished}
                     lotes={lotesState}
                     highlightLoteId={selectedLoteId}
-                    loteDrawingActive={Boolean(drawingLoteId)}
-                    onLoteDrawingFinished={() => setDrawingLoteId(null)}
-                    onLotePolygonComplete={handleLotePolygonComplete}
                     draggingLoteId={draggingLoteId}
                     onPinDrop={handlePinDrop}
                     onMarkerDragEnd={handleMarkerDragEnd}
@@ -1012,9 +1394,18 @@ export default function MapeoLotesMejorado({
                       {isDrawingArea ? '✏️ Dibujando... (haz clic en el mapa)' : '✏️ Dibujar área del proyecto'}
                     </button>
                   ) : (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                      <p className="font-medium">✓ Área dibujada ({areaPolygon.length} vértices)</p>
-                      <p className="text-xs mt-1">Arrastra los vértices para ajustar el área</p>
+                    <div className="space-y-3">
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                        <p className="font-medium">✓ Área dibujada ({areaPolygon.length} vértices)</p>
+                        <p className="text-xs mt-1">Arrastra los vértices para ajustar el área</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRedrawProjectArea}
+                        className="w-full px-4 py-2 border border-orange-200 text-orange-600 rounded-lg text-sm font-medium hover:bg-orange-50 transition-colors"
+                      >
+                        ↺ Volver a dibujar el área
+                      </button>
                     </div>
                   )}
 
@@ -1038,9 +1429,7 @@ export default function MapeoLotesMejorado({
 
                   <button
                     onClick={() => {
-                      // Si hay coordenadas del proyecto pero no hay bounds, crear bounds aproximados
                       if (proyectoLatitud != null && proyectoLongitud != null && !overlayBounds) {
-                        // Crear un área aproximada de 500m alrededor de las coordenadas
                         const offset = 0.0045; // Aproximadamente 500m
                         const bounds: [[number, number], [number, number]] = [
                           [proyectoLatitud - offset, proyectoLongitud - offset],
@@ -1052,11 +1441,11 @@ export default function MapeoLotesMejorado({
                     }}
                     className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                   >
-                    🗺️ Saltar al Paso 2 (Cargar Plano)
+                    🗺️ Continuar al Paso 2 (Configurar capas)
                   </button>
 
                   <p className="text-xs text-gray-500 text-center">
-                    Si prefieres, ve directo a cargar el plano sin dibujar el área del proyecto
+                    También puedes configurar las capas y subir imágenes ahora para definir el plano más tarde.
                   </p>
 
                   {overlayDirty && areaPolygon.length >= 3 && (
@@ -1066,96 +1455,271 @@ export default function MapeoLotesMejorado({
               </Card>
             )}
 
-            {/* PASO 2: Subir Plano */}
+            {/* PASO 2: Capas del Plano */}
             {currentStep === 2 && (
               <Card>
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="p-6 space-y-5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Upload className="w-5 h-5 text-blue-600" />
+                      <Layers className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-crm-text-primary">Paso 2: Subir Plano</h3>
-                      <p className="text-xs text-crm-text-muted">El plano se ubicará en el área marcada</p>
+                      <h3 className="font-semibold text-crm-text-primary">Paso 2: Capas del plano</h3>
+                      <p className="text-xs text-crm-text-muted">
+                        Crea varias capas, controla su visibilidad y marca cuál será la principal.
+                      </p>
                     </div>
                   </div>
 
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm">
-                    <p className="text-green-800">✓ Área del proyecto ubicada correctamente</p>
-                    <p className="text-xs text-green-700 mt-1">El plano aparecerá dentro del área marcada</p>
+                    <p className="text-green-800 font-medium">✓ Área del proyecto definida</p>
+                    <p className="text-xs text-green-700 mt-1">
+                      La capa principal usa esta área como zona de drop para los lotes.
+                    </p>
                   </div>
 
-                  <BlueprintUploader
-                    onFileSelect={handleUploadPlano}
-                    isUploading={isUploading}
-                    currentFile={planUrl}
-                    onDelete={handleDeletePlano}
-                    acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
-                    maxSize={10}
-                  />
-
-                  {planUrl && (
-                    <>
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
-                        <p className="text-green-800 font-medium mb-1">✓ Plano cargado</p>
-                        <p className="text-xs text-green-700">
-                          💡 Arrastra las <strong>esquinas verdes</strong> del plano para ajustar su tamaño y posición
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-crm-text-primary">Capas disponibles</p>
+                        <p className="text-xs text-crm-text-muted">
+                          Activa una capa para editarla, subir imagen o marcarla como principal.
                         </p>
                       </div>
-
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-medium text-crm-text-primary mb-2 block">Opacidad del plano</label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            value={overlayOpacity}
-                            onChange={(e) => {
-                              setOverlayOpacity(parseFloat(e.target.value));
-                              setOverlayDirty(true);
-                            }}
-                            className="w-full"
-                          />
-                          <div className="text-xs text-crm-text-muted mt-1">{Math.round(overlayOpacity * 100)}%</div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-crm-text-primary mb-2 block">Rotación</label>
-                          <input
-                            type="range"
-                            min={-180}
-                            max={180}
-                            step={1}
-                            value={overlayRotation}
-                            onChange={(e) => {
-                              setOverlayRotation(parseFloat(e.target.value));
-                              setOverlayDirty(true);
-                            }}
-                            className="w-full"
-                          />
-                          <div className="text-xs text-crm-text-muted mt-1">{overlayRotation.toFixed(0)}°</div>
-                        </div>
-
-                        {overlayDirty && (
-                          <button
-                            onClick={handleSaveAdjustments}
-                            className="w-full px-4 py-2 bg-crm-primary text-white rounded-lg font-medium hover:bg-crm-primary-dark transition-colors text-sm"
-                          >
-                            💾 Guardar ajustes
-                          </button>
-                        )}
-                      </div>
-
                       <button
-                        onClick={() => setCurrentStep(3)}
-                        className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                        onClick={handleAddLayer}
+                        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium flex items-center gap-2 hover:bg-blue-700 transition-colors"
                       >
-                        ✓ Plano listo, continuar
+                        <Plus className="w-4 h-4" />
+                        Agregar capa
                       </button>
-                    </>
+                    </div>
+
+                    {sortedOverlayLayers.length === 0 ? (
+                      <div className="p-4 border border-dashed border-crm-border rounded-lg text-sm text-crm-text-secondary text-center bg-crm-card">
+                        Aún no hay capas configuradas. Agrega la primera para subir la imagen inicial del plano.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedOverlayLayers.map((layer) => {
+                          const isActive = layer.id === activeOverlay?.id;
+                          const isPrimaryLayer = layer.isPrimary;
+                          const opacityValue = typeof layer.opacity === 'number' ? layer.opacity : 0.7;
+                          const inputId = `upload-${layer.id}`;
+                          const canRotate = Boolean(layer.bounds ?? dropBounds ?? overlayBounds);
+                          return (
+                            <div
+                              key={layer.id}
+                              className={`rounded-xl border p-4 space-y-3 transition-colors ${
+                                isActive ? 'border-blue-400 bg-blue-50/40' : 'border-crm-border bg-white'
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex-1 min-w-[160px] space-y-2">
+                                  <input
+                                    value={layer.name ?? ''}
+                                    onChange={(e) => handleLayerNameChange(layer.id, e.target.value)}
+                                    className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Nombre de la capa"
+                                  />
+                                  <div className="text-[11px] text-crm-text-muted">
+                                    {layer.url ? 'Imagen cargada' : 'Sin imagen asignada'}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPrimaryLayer(layer.id)}
+                                    title="Marcar como capa principal"
+                                    className={`p-2 rounded-full border transition-colors ${
+                                      isPrimaryLayer
+                                        ? 'border-yellow-400 text-yellow-500 bg-yellow-50'
+                                        : 'border-crm-border text-crm-text-secondary hover:text-yellow-500'
+                                    }`}
+                                  >
+                                    <Star className="w-4 h-4" fill={isPrimaryLayer ? 'currentColor' : 'none'} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleVisibility(layer.id)}
+                                    title={layer.visible === false ? 'Mostrar capa' : 'Ocultar capa'}
+                                    className="p-2 rounded-full border border-crm-border text-crm-text-secondary hover:text-crm-primary transition-colors"
+                                  >
+                                    {layer.visible === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteLayer(layer.id)}
+                                    title="Eliminar capa"
+                                    className="p-2 rounded-full border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveOverlayId(layer.id)}
+                                  className={`px-3 py-1 rounded-md border ${
+                                    isActive
+                                      ? 'border-blue-500 bg-blue-100 text-blue-700'
+                                      : 'border-crm-border text-crm-text-secondary hover:border-blue-400'
+                                  }`}
+                                >
+                                  {isActive ? 'Capa activa' : 'Activar capa'}
+                                </button>
+                                <label
+                                  htmlFor={inputId}
+                                  className="px-3 py-1 rounded-md border border-crm-border text-crm-text-secondary cursor-pointer hover:border-blue-400 flex items-center gap-2"
+                                >
+                                  {uploadingLayerId === layer.id && isUploadingLayer ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Subiendo...
+                                    </>
+                                  ) : (
+                                    <>Subir imagen</>
+                                  )}
+                                </label>
+                                <input
+                                  id={inputId}
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      void handleUploadLayer(layer.id, file);
+                                    }
+                                    e.target.value = '';
+                                  }}
+                                />
+                                {layer.url && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleClearLayerImage(layer.id)}
+                                    className="px-3 py-1 rounded-md border border-red-200 text-red-500 hover:bg-red-50"
+                                  >
+                                    Quitar imagen
+                                  </button>
+                                )}
+                                <span className="text-crm-text-muted">
+                                  {isPrimaryLayer ? 'Principal' : 'Secundaria'}
+                                </span>
+                              </div>
+
+                              <div>
+                                <label className="text-xs font-medium text-crm-text-primary mb-2 block">
+                                  Opacidad ({Math.round(opacityValue * 100)}%)
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0.1}
+                                  max={1}
+                                  step={0.05}
+                                  value={opacityValue}
+                                  onChange={(e) => handleOpacityChange(layer.id, parseFloat(e.target.value))}
+                                  className="w-full"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-crm-text-primary mb-2 block">
+                                  Rotación ({Math.round(layerRotations[layer.id] ?? 0)}°)
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLayerRotationStep(layer.id, -5)}
+                                    disabled={!canRotate}
+                                    className={`px-2 py-1 text-xs border rounded-md ${
+                                      canRotate
+                                        ? 'border-crm-border hover:border-blue-400'
+                                        : 'border-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    -5°
+                                  </button>
+                                  <input
+                                    type="range"
+                                    min={-180}
+                                    max={180}
+                                    step={1}
+                                    value={layerRotations[layer.id] ?? 0}
+                                    onChange={(e) => handleLayerRotationChange(layer.id, parseFloat(e.target.value))}
+                                    disabled={!canRotate}
+                                    className={`flex-1 ${
+                                      canRotate ? '' : 'opacity-50 cursor-not-allowed'
+                                    }`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLayerRotationStep(layer.id, 5)}
+                                    disabled={!canRotate}
+                                    className={`px-2 py-1 text-xs border rounded-md ${
+                                      canRotate
+                                        ? 'border-crm-border hover:border-blue-400'
+                                        : 'border-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    +5°
+                                  </button>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleFitLayerToProjectArea(layer.id)}
+                                className="w-full px-3 py-2 rounded-lg text-sm font-medium border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                ↘ Ajustar al área del proyecto
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {activeOverlay ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-crm-text-primary">
+                        Imagen de la capa activa:{' '}
+                        <span className="text-crm-text-secondary">{activeOverlay.name ?? 'Sin nombre'}</span>
+                      </p>
+                      <BlueprintUploader
+                        key={activeOverlay.id}
+                        onFileSelect={(file) => void handleUploadLayer(activeOverlay.id, file)}
+                        isUploading={isUploadingLayer && uploadingLayerId === activeOverlay.id}
+                        currentFile={activeOverlay.url}
+                        onDelete={() => handleClearLayerImage(activeOverlay.id)}
+                        acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+                        maxSize={10}
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 border border-dashed border-crm-border rounded-lg text-sm text-crm-text-secondary text-center">
+                      Agrega tu primera capa para comenzar a subir imágenes del plano.
+                    </div>
                   )}
+
+                  {overlayDirty && (
+                    <p className="text-xs text-orange-600 text-center">
+                      Hay cambios sin guardar en la configuración de capas.
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleSaveLayers}
+                    disabled={isSavingLayers || !overlayLayers.length}
+                    className={`w-full px-4 py-3 rounded-lg font-semibold text-white transition-colors ${
+                      isSavingLayers || !overlayLayers.length
+                        ? 'bg-gray-300 cursor-not-allowed'
+                        : 'bg-crm-primary hover:bg-crm-primary-dark'
+                    }`}
+                  >
+                    {isSavingLayers ? 'Guardando capas...' : '💾 Guardar capas y continuar'}
+                  </button>
 
                   <button
                     onClick={() => setCurrentStep(1)}
@@ -1176,24 +1740,19 @@ export default function MapeoLotesMejorado({
                     defaultCenter={mapCenter}
                     defaultZoom={mapZoom}
                     planosUrl={planUrl}
-                    overlayBounds={overlayBounds}
-                    overlayOpacity={overlayOpacity}
-                    rotationDeg={overlayRotation}
-                    overlayEditable={currentStep === 2}
+                    overlayBounds={resolvedOverlayBounds ?? undefined}
+                    overlayLayers={overlayLayers}
+                    activeOverlayId={activeOverlay?.id ?? null}
+                    overlayEditable={isOverlayEditable}
+                    dropAreaBounds={dropBounds ?? null}
                     onOverlayBoundsChange={handleOverlayBoundsChange}
                     onMapCenterChange={setCurrentMapCenter}
-                    onCreateDefaultBounds={() => {
-                      setOverlayDirty(true);
-                    }}
                     projectPolygon={areaPolygon}
                     onProjectPolygonChange={handlePolygonChange}
                     projectDrawingActive={isDrawingArea}
                     onProjectDrawingFinished={handleProjectDrawingFinished}
                     lotes={lotesState}
                     highlightLoteId={selectedLoteId}
-                    loteDrawingActive={Boolean(drawingLoteId)}
-                    onLoteDrawingFinished={() => setDrawingLoteId(null)}
-                    onLotePolygonComplete={handleLotePolygonComplete}
                     draggingLoteId={draggingLoteId}
                     onPinDrop={handlePinDrop}
                     onMarkerDragEnd={handleMarkerDragEnd}

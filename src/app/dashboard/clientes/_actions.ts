@@ -13,6 +13,85 @@ import {
   EstadoCivil
 } from "@/lib/types/clientes";
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createServerActionClient>>;
+
+const ESTADO_CLIENTE_LABELS: Record<string, string> = {
+  por_contactar: "por contactar",
+  contactado: "contactado",
+  transferido: "transferido",
+  intermedio: "en seguimiento",
+  desestimado: "desestimado",
+  potencial: "potencial",
+};
+
+function mapEstadoClienteLabel(estado: string) {
+  return ESTADO_CLIENTE_LABELS[estado] ?? estado;
+}
+
+function buildNombreResumen(nombres: (string | null | undefined)[]) {
+  const clean = nombres.filter((nombre): nombre is string => Boolean(nombre));
+  if (clean.length === 0) return "";
+  if (clean.length <= 3) return clean.join(", ");
+  return `${clean.slice(0, 3).join(", ")} y ${clean.length - 3} más`;
+}
+
+async function getVendedorPerfilByUsername(
+  supabase: SupabaseServerClient,
+  username?: string | null,
+) {
+  if (!username) return null;
+  const { data, error } = await supabase
+    .schema("crm")
+    .from("usuario_perfil")
+    .select("id, username, nombre_completo")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("No se pudo obtener el perfil del vendedor:", error.message);
+    return null;
+  }
+
+  return data;
+}
+
+async function notifyVendedorAsignado(
+  supabase: SupabaseServerClient,
+  vendedorUsername: string | null | undefined,
+  titulo: string,
+  mensaje: string,
+  data?: Record<string, unknown>,
+) {
+  const perfil = await getVendedorPerfilByUsername(supabase, vendedorUsername);
+  if (!perfil?.id) return;
+
+  try {
+    await crearNotificacion(perfil.id, "cliente", titulo, mensaje, data);
+  } catch (error) {
+    console.warn("No se pudo crear notificación para vendedor:", error);
+  }
+}
+
+async function getVendedoresMap(
+  supabase: SupabaseServerClient,
+  usernames: string[],
+) {
+  if (usernames.length === 0) return new Map<string, { id: string; username: string; nombre_completo?: string | null }>();
+
+  const { data, error } = await supabase
+    .schema("crm")
+    .from("usuario_perfil")
+    .select("id, username, nombre_completo")
+    .in("username", usernames);
+
+  if (error || !data) {
+    console.warn("No se pudieron obtener perfiles de vendedores:", error?.message);
+    return new Map();
+  }
+
+  return new Map(data.map((perfil) => [perfil.username, perfil]));
+}
+
 const DireccionSchema = z.object({
   calle: z.string().optional(),
   numero: z.string().optional(),
@@ -336,6 +415,16 @@ export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: st
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  const { data: cliente, error: clienteError } = await supabase
+    .from("cliente")
+    .select("id, nombre, vendedor_username")
+    .eq("id", clienteId)
+    .single();
+
+  if (clienteError || !cliente) {
+    throw new Error("Cliente no encontrado");
+  }
+
   const { error } = await supabase
     .from("cliente")
     .update({ estado_cliente: nuevoEstado })
@@ -343,6 +432,18 @@ export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: st
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/clientes");
+
+  await notifyVendedorAsignado(
+    supabase,
+    cliente.vendedor_username,
+    "Estado de cliente actualizado",
+    `El cliente ${cliente.nombre ?? ""} ahora está marcado como ${mapEstadoClienteLabel(nuevoEstado)}.`,
+    {
+      cliente_id: clienteId,
+      nuevo_estado: nuevoEstado,
+      url: `/dashboard/clientes/${clienteId}`,
+    },
+  );
 }
 
 export async function asignarVendedorCliente(clienteId: string, vendedorUsername: string | null) {
@@ -354,6 +455,12 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
   if (!user) {
     throw new Error("No autenticado");
   }
+
+  const { data: cliente } = await supabase
+    .from("cliente")
+    .select("nombre")
+    .eq("id", clienteId)
+    .maybeSingle();
 
   const payload = {
     vendedor_username: vendedorUsername || null,
@@ -371,6 +478,19 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
 
   revalidatePath(`/dashboard/clientes/${clienteId}`);
   revalidatePath("/dashboard/clientes");
+
+  if (vendedorUsername) {
+    await notifyVendedorAsignado(
+      supabase,
+      vendedorUsername,
+      "Nuevo cliente asignado",
+      `Se te asignó el cliente ${cliente?.nombre ?? ""}.`,
+      {
+        cliente_id: clienteId,
+        url: `/dashboard/clientes/${clienteId}`,
+      },
+    );
+  }
 }
 
 export async function eliminarCliente(id: string) {
@@ -563,7 +683,7 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
   const { data: vendedor, error: vendedorError } = await supabase
     .schema('crm')
     .from('usuario_perfil')
-    .select('username, nombre_completo')
+    .select('id, username, nombre_completo')
     .eq('username', vendedorUsername)
     .eq('activo', true)
     .single();
@@ -571,6 +691,11 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
   if (vendedorError || !vendedor) {
     throw new Error("Vendedor no encontrado o inactivo");
   }
+
+  const { data: clientesSeleccionados } = await supabase
+    .from("cliente")
+    .select("id, nombre")
+    .in("id", ids);
 
   // Actualizar ambos campos para mantener consistencia
   const payload = {
@@ -589,6 +714,26 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
   }
 
   revalidatePath("/dashboard/clientes");
+
+  if (vendedor?.id) {
+    try {
+      const resumen = buildNombreResumen((clientesSeleccionados ?? []).map((c) => c?.nombre));
+      const descripcionExtra = resumen ? ` (${resumen})` : "";
+      await crearNotificacion(
+        vendedor.id,
+        "cliente",
+        "Asignación de clientes",
+        `Se te asignaron ${ids.length} cliente${ids.length === 1 ? "" : "s"}${descripcionExtra}.`,
+        {
+          cliente_ids: ids,
+          url: "/dashboard/clientes?vista=asignados",
+        },
+      );
+    } catch (notifyError) {
+      console.warn("No se pudo crear notificación para asignación masiva:", notifyError);
+    }
+  }
+
   return { success: true, count: ids.length };
 }
 
@@ -598,6 +743,11 @@ export async function cambiarEstadoMasivo(ids: string[], nuevoEstado: EstadoClie
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  const { data: clientes } = await supabase
+    .from("cliente")
+    .select("id, nombre, vendedor_username")
+    .in("id", ids);
+
   const { error } = await supabase
     .from("cliente")
     .update({ estado_cliente: nuevoEstado })
@@ -606,5 +756,45 @@ export async function cambiarEstadoMasivo(ids: string[], nuevoEstado: EstadoClie
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/clientes");
+
+  try {
+    const agrupados = new Map<string, { id: string; nombre: string | null }[]>();
+    (clientes ?? []).forEach((cliente) => {
+      if (!cliente?.vendedor_username) return;
+      const lista = agrupados.get(cliente.vendedor_username) ?? [];
+      lista.push({ id: cliente.id, nombre: cliente.nombre });
+      agrupados.set(cliente.vendedor_username, lista);
+    });
+
+    if (agrupados.size > 0) {
+      const vendedoresMap = await getVendedoresMap(supabase, Array.from(agrupados.keys()));
+      await Promise.all(
+        Array.from(agrupados.entries()).map(async ([username, lista]) => {
+          const perfil = vendedoresMap.get(username);
+          if (!perfil?.id) return;
+          const nombres = lista.map((item) => item.nombre);
+          const resumen = buildNombreResumen(nombres);
+          const mensaje =
+            lista.length === 1
+              ? `El cliente ${nombres[0] ?? ""} ahora está marcado como ${mapEstadoClienteLabel(nuevoEstado)}.`
+              : `${lista.length} clientes${resumen ? ` (${resumen})` : ""} ahora están marcados como ${mapEstadoClienteLabel(nuevoEstado)}.`;
+
+          await crearNotificacion(
+            perfil.id,
+            "cliente",
+            "Clientes actualizados",
+            mensaje,
+            {
+              cliente_ids: lista.map((item) => item.id),
+              nuevo_estado: nuevoEstado,
+            },
+          );
+        }),
+      );
+    }
+  } catch (notificationError) {
+    console.warn("No se pudieron enviar notificaciones por cambio masivo:", notificationError);
+  }
+
   return { success: true, count: ids.length };
 }

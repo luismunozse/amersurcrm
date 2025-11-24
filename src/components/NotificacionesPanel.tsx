@@ -1,141 +1,88 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import {
+  marcarNotificacionLeida,
+  marcarTodasLeidas,
+  eliminarNotificacion as eliminarNotificacionAction,
+} from "@/app/_actionsNotifications";
+import type { NotificacionItem } from "@/types/notificaciones";
 
-type TipoNotificacionKey = "evento" | "recordatorio" | "sistema" | "venta" | "reserva";
-type Prioridad = "baja" | "media" | "alta" | "urgente";
-
-interface NotificacionDb {
-  id: string;
-  tipo: string;
-  titulo: string;
-  mensaje: string;
-  leida: boolean | null;
-  data: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string | null;
-}
-
-interface Notificacion {
-  id: string;
-  tipo: TipoNotificacionKey;
-  titulo: string;
-  mensaje: string;
-  leida: boolean;
-  fecha: string;
-  prioridad: Prioridad;
-  data?: Record<string, unknown> | null;
-}
-
-const TIPOS_NOTIFICACION: Record<TipoNotificacionKey, { label: string; icon: string; color: string }> = {
+const TIPOS_NOTIFICACION: Record<
+  NotificacionItem["tipo"],
+  { label: string; icon: string; color: string }
+> = {
   evento: { label: "Evento", icon: "📅", color: "bg-blue-100 text-blue-800" },
   recordatorio: { label: "Recordatorio", icon: "⏰", color: "bg-orange-100 text-orange-800" },
   sistema: { label: "Sistema", icon: "⚙️", color: "bg-gray-100 text-gray-800" },
   venta: { label: "Venta", icon: "💰", color: "bg-green-100 text-green-800" },
   reserva: { label: "Reserva", icon: "🔒", color: "bg-purple-100 text-purple-800" },
+  cliente: { label: "Cliente", icon: "👤", color: "bg-indigo-100 text-indigo-800" },
+  proyecto: { label: "Proyecto", icon: "🏢", color: "bg-green-100 text-green-800" },
+  lote: { label: "Lote", icon: "🏠", color: "bg-orange-100 text-orange-800" },
 };
 
-const PRIORIDADES: Record<Prioridad, { label: string; color: string; bg: string }> = {
+const PRIORIDADES: Record<
+  NotificacionItem["prioridad"],
+  { label: string; color: string; bg: string }
+> = {
   baja: { label: "Baja", color: "text-gray-600", bg: "bg-gray-100" },
   media: { label: "Media", color: "text-blue-600", bg: "bg-blue-100" },
   alta: { label: "Alta", color: "text-orange-600", bg: "bg-orange-100" },
   urgente: { label: "Urgente", color: "text-red-600", bg: "bg-red-100" },
 };
 
-export default function NotificacionesPanel() {
+interface NotificacionesPanelProps {
+  initialNotificaciones?: NotificacionItem[];
+}
+
+export default function NotificacionesPanel({ initialNotificaciones = [] }: NotificacionesPanelProps) {
   const router = useRouter();
-  const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
-  const [cargando, setCargando] = useState(true);
+  const [notificaciones, setNotificaciones] = useState<NotificacionItem[]>(initialNotificaciones);
+  const [cargando, setCargando] = useState(initialNotificaciones.length === 0);
   const [filtro, setFiltro] = useState<"todas" | "no_leidas" | "hoy" | "sistema">("todas");
-  const supabase = useMemo(() => supabaseBrowser(), []);
   const [accionEnProgreso, setAccionEnProgreso] = useState<string | null>(null);
   const [marcarTodasLoading, setMarcarTodasLoading] = useState(false);
+  const initialFetchSilentRef = useRef(initialNotificaciones.length > 0);
 
-  const cargarNotificaciones = useCallback(async () => {
-    try {
-      setCargando(true);
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-      if (!user) {
-        setNotificaciones([]);
-        return;
+  const cargarNotificaciones = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      try {
+        if (!silent) {
+          setCargando(true);
+        }
+        const response = await fetch("/api/notificaciones", { cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error((payload as { error?: string })?.error || "No se pudieron obtener las notificaciones");
+        }
+        setNotificaciones((payload as { data?: NotificacionItem[] })?.data ?? []);
+      } catch (error) {
+        console.error("Error cargando notificaciones:", error);
+        toast.error("Error cargando notificaciones");
+      } finally {
+        if (!silent) {
+          setCargando(false);
+        }
       }
-
-      const { data, error } = await supabase
-        .from("notificacion")
-        .select("id, tipo, titulo, mensaje, leida, data, created_at, updated_at")
-        .eq("usuario_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-
-      const normalizadas: Notificacion[] = ((data ?? []) as NotificacionDb[]).map((item) => {
-        const tipoNormalizado = (Object.keys(TIPOS_NOTIFICACION).includes(item.tipo)
-          ? item.tipo
-          : "sistema") as TipoNotificacionKey;
-
-        const payload = (item.data ?? null) as { prioridad?: unknown } | null;
-        const prioridadRaw = typeof payload?.prioridad === "string" ? payload.prioridad : undefined;
-        const prioridad = (["baja", "media", "alta", "urgente"].includes(prioridadRaw as string)
-          ? (prioridadRaw as Prioridad)
-          : "media");
-
-        return {
-          id: item.id,
-          tipo: tipoNormalizado,
-          titulo: item.titulo,
-          mensaje: item.mensaje,
-          leida: Boolean(item.leida),
-          fecha: item.created_at,
-          prioridad,
-          data: item.data,
-        };
-      });
-
-      setNotificaciones(normalizadas);
-    } catch (error) {
-      console.error("Error cargando notificaciones:", error);
-      toast.error("Error cargando notificaciones");
-    } finally {
-      setCargando(false);
-    }
-  }, [supabase]);
+    },
+    []
+  );
 
   useEffect(() => {
-    cargarNotificaciones();
+    const shouldSilentFetch = initialFetchSilentRef.current;
+    initialFetchSilentRef.current = false;
+    cargarNotificaciones({ silent: shouldSilentFetch });
   }, [cargarNotificaciones]);
-
-  const obtenerUsuarioId = useCallback(async () => {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error) throw error;
-    if (!user) throw new Error("Sesión inválida");
-    return user.id;
-  }, [supabase]);
 
   const marcarComoLeida = async (id: string) => {
     try {
       setAccionEnProgreso(id);
-      const userId = await obtenerUsuarioId();
-      const { error } = await supabase
-        .from("notificacion")
-        .update({ leida: true, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("usuario_id", userId);
-
-      if (error) throw error;
+      await marcarNotificacionLeida(id);
 
       setNotificaciones((prev) =>
         prev.map((noti) => (noti.id === id ? { ...noti, leida: true } : noti))
@@ -152,14 +99,7 @@ export default function NotificacionesPanel() {
   const marcarTodasComoLeidas = async () => {
     try {
       setMarcarTodasLoading(true);
-      const userId = await obtenerUsuarioId();
-      const { error } = await supabase
-        .from("notificacion")
-        .update({ leida: true, updated_at: new Date().toISOString() })
-        .eq("usuario_id", userId)
-        .eq("leida", false);
-
-      if (error) throw error;
+      await marcarTodasLeidas();
 
       setNotificaciones((prev) => prev.map((noti) => ({ ...noti, leida: true })));
       toast.success("Todas las notificaciones marcadas como leídas");
@@ -174,14 +114,7 @@ export default function NotificacionesPanel() {
   const eliminarNotificacion = async (id: string) => {
     try {
       setAccionEnProgreso(id);
-      const userId = await obtenerUsuarioId();
-      const { error } = await supabase
-        .from("notificacion")
-        .delete()
-        .eq("id", id)
-        .eq("usuario_id", userId);
-
-      if (error) throw error;
+      await eliminarNotificacionAction(id);
 
       setNotificaciones((prev) => prev.filter((noti) => noti.id !== id));
       toast.success("Notificación eliminada");
@@ -193,7 +126,7 @@ export default function NotificacionesPanel() {
     }
   };
 
-  const handleNotificationClick = async (notificacion: Notificacion) => {
+  const handleNotificationClick = async (notificacion: NotificacionItem) => {
     // Si no está leída, marcarla como leída
     if (!notificacion.leida) {
       await marcarComoLeida(notificacion.id);
@@ -227,7 +160,7 @@ export default function NotificacionesPanel() {
       case "no_leidas":
         return !noti.leida;
       case "hoy":
-        return isToday(new Date(noti.fecha));
+        return isToday(new Date(noti.createdAt));
       case "sistema":
         return noti.tipo === "sistema";
       default:
@@ -238,7 +171,7 @@ export default function NotificacionesPanel() {
   const estadisticas = {
     total: notificaciones.length,
     noLeidas: notificaciones.filter((n) => !n.leida).length,
-    hoy: notificaciones.filter((n) => isToday(new Date(n.fecha))).length,
+    hoy: notificaciones.filter((n) => isToday(new Date(n.createdAt))).length,
     urgentes: notificaciones.filter((n) => n.prioridad === "urgente" && !n.leida).length,
   };
 
@@ -325,7 +258,7 @@ export default function NotificacionesPanel() {
           </div>
         ) : (
           notificacionesFiltradas.map((notificacion) => {
-            const fechaRelativa = obtenerFechaRelativa(notificacion.fecha);
+            const fechaRelativa = obtenerFechaRelativa(notificacion.createdAt);
             const tipoInfo = TIPOS_NOTIFICACION[notificacion.tipo] ?? TIPOS_NOTIFICACION.sistema;
             const prioridadInfo = PRIORIDADES[notificacion.prioridad] ?? PRIORIDADES.media;
 
@@ -372,7 +305,7 @@ export default function NotificacionesPanel() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className={`px-2 py-1 rounded-full ${fechaRelativa.bg} ${fechaRelativa.color}`}>
-                          {fechaRelativa.texto} {format(new Date(notificacion.fecha), "HH:mm")}
+                          {fechaRelativa.texto} {format(new Date(notificacion.createdAt), "HH:mm")}
                         </span>
                       </div>
 

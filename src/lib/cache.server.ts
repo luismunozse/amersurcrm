@@ -24,6 +24,7 @@ interface GetClientesParams {
   estado?: string;
   tipo?: string;
   vendedor?: string;
+  origen?: string;  // Filtro por origen del lead
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -42,6 +43,7 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     estado = '',
     tipo = '',
     vendedor = '',
+    origen = '',
     sortBy = 'fecha_alta',
     sortOrder = 'desc'
   } = params || {};
@@ -120,6 +122,10 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     q = q.eq('vendedor_asignado', vendedor);
   }
 
+  if (origen) {
+    q = q.eq('origen_lead', origen);
+  }
+
   // Ordenar
   q = q.order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -166,6 +172,36 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
 
   if (error) throw error;
   return count ?? 0;
+});
+
+export const getCachedLeadsStatsByOrigen = cache(async (): Promise<{ origen: string; count: number }[]> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) return [];
+
+  // Solo obtener estadísticas de leads (estado_cliente = 'lead')
+  const { data, error } = await supabase
+    .schema('crm')
+    .from('cliente')
+    .select('origen_lead')
+    .eq('estado_cliente', 'lead');
+
+  if (error) {
+    console.error('Error obteniendo estadísticas de leads:', error);
+    return [];
+  }
+
+  // Agrupar y contar por origen
+  const stats = (data ?? []).reduce((acc, row) => {
+    const origen = row.origen_lead || 'no_especificado';
+    acc[origen] = (acc[origen] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Convertir a array y ordenar por cantidad descendente
+  return Object.entries(stats)
+    .map(([origen, count]) => ({ origen, count }))
+    .sort((a, b) => b.count - a.count);
 });
 
 /* ========= Proyectos ========= */
