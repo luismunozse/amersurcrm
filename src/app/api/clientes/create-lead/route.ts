@@ -65,12 +65,13 @@ export async function POST(request: NextRequest) {
     // Verificar si ya existe un cliente con este teléfono
     // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
     const telefonoLimpio = telefono.replace(/[^\d]/g, '');
+    const telefonoConPlus = `+${telefonoLimpio}`;
 
     const { data: clienteExistente } = await supabaseAdmin
       .schema("crm")
       .from("cliente")
       .select("id, nombre, estado_cliente")
-      .or(`telefono.eq.${telefonoLimpio},telefono_whatsapp.eq.${telefonoLimpio}`)
+      .or(`telefono.eq.${telefonoLimpio},telefono.eq.${telefonoConPlus},telefono_whatsapp.eq.${telefonoLimpio},telefono_whatsapp.eq.${telefonoConPlus}`)
       .limit(1)
       .maybeSingle();
 

@@ -55,10 +55,11 @@ export async function GET(request: NextRequest) {
 
     // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
     const cleanPhone = phone.replace(/[^\d]/g, "");
+    const cleanPhoneWithPlus = `+${cleanPhone}`;
 
-    console.log(`[ClienteSearch] Buscando cliente con teléfono: ${cleanPhone}`);
+    console.log(`[ClienteSearch] Buscando cliente con teléfono: ${cleanPhone} o ${cleanPhoneWithPlus}`);
 
-    // Buscar cliente por teléfono o whatsapp
+    // Buscar cliente por teléfono o whatsapp (probando con y sin el +)
     const { data: cliente, error } = await supabase
       .schema("crm")
       .from("cliente")
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
         notas
       `
       )
-      .or(`telefono.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhone}`)
+      .or(`telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
