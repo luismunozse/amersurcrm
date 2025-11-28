@@ -57,7 +57,9 @@ export class CRMApiClient {
   }
 
   /**
-   * Renovar token automáticamente usando credenciales guardadas
+   * Renovar token automáticamente usando refresh token
+   * NOTA: Por seguridad, NO guardamos contraseñas.
+   * Si el refresh token falla, el usuario deberá volver a hacer login.
    */
   private async renewToken(): Promise<boolean> {
     try {
@@ -65,22 +67,42 @@ export class CRMApiClient {
         return false;
       }
 
-      const stored = await chrome.storage.local.get(['username', 'password', 'crmUrl']);
+      const stored = await chrome.storage.local.get(['refreshToken', 'crmUrl']);
 
-      if (!stored.username || !stored.password) {
-        console.error('[API] No hay credenciales guardadas para renovar token');
+      if (!stored.refreshToken) {
+        console.error('[API] No hay refresh token disponible');
         return false;
       }
 
+      // Intentar renovar usando refresh token
       const url = stored.crmUrl || this.baseUrl;
-      const renewClient = new CRMApiClient(url);
-      const authState = await renewClient.login(stored.username, stored.password);
+      const response = await fetch(`${url}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken: stored.refreshToken
+        }),
+      });
 
-      // Actualizar token
-      this.setToken(authState.token);
-      await saveCRMConfig(url, authState.token);
+      if (!response.ok) {
+        console.error('[API] Error renovando token con refresh token');
+        // Limpiar tokens inválidos
+        await clearCRMConfig();
+        return false;
+      }
 
-      console.log('[API] Token renovado y guardado');
+      const data = await response.json();
+
+      // Actualizar tokens
+      this.setToken(data.token);
+      await chrome.storage.local.set({
+        authToken: data.token,
+        refreshToken: data.refreshToken || stored.refreshToken,
+      });
+
+      console.log('[API] Token renovado exitosamente con refresh token');
       return true;
     } catch (error) {
       console.error('[API] Error renovando token:', error);
@@ -92,7 +114,7 @@ export class CRMApiClient {
    * Autenticar usuario
    */
   async login(username: string, password: string): Promise<AuthState> {
-    const response = await this.request<{ user: any; token: string; refresh_token?: string }>(
+    const response = await this.request<{ user: any; token: string; refreshToken?: string }>(
       '/api/auth/login',
       {
         method: 'POST',
@@ -100,11 +122,11 @@ export class CRMApiClient {
       }
     );
 
-    // Guardar credenciales para renovación automática
-    if (typeof chrome !== 'undefined' && chrome.storage) {
+    // Guardar refresh token para renovación automática (SEGURO)
+    // NO guardamos contraseñas por seguridad
+    if (typeof chrome !== 'undefined' && chrome.storage && response.refreshToken) {
       await chrome.storage.local.set({
-        username,
-        password,
+        refreshToken: response.refreshToken,
         lastLogin: Date.now(),
       });
     }
@@ -256,7 +278,7 @@ export async function saveCRMConfig(url: string, token: string): Promise<void> {
  */
 export async function clearCRMConfig(): Promise<void> {
   return new Promise((resolve) => {
-    chrome.storage.local.remove(['authToken', 'username', 'password', 'lastLogin'], () => {
+    chrome.storage.local.remove(['authToken', 'refreshToken', 'lastLogin'], () => {
       resolve();
     });
   });

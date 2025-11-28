@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
         rol: perfil?.rol || "vendedor",
       },
       token: authData.session.access_token,
+      refreshToken: authData.session.refresh_token, // Para renovación automática
     });
   } catch (error) {
     console.error("[Login] Error:", error);
