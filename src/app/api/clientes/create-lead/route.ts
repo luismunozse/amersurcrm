@@ -11,17 +11,42 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAdmin = createServiceRoleClient();
 
-    if (authError || !user) {
-      console.error("[CreateLead] Error de autenticación:", authError);
-      return NextResponse.json(
-        { error: "No autenticado" },
-        { status: 401 }
-      );
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[CreateLead] Error de autenticación con token:", authError);
+        return NextResponse.json(
+          { error: "No autenticado" },
+          { status: 401 }
+        );
+      }
+
+      user = authUser;
+      supabase = supabaseAdmin;
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !sessionUser) {
+        console.error("[CreateLead] Error de autenticación:", authError);
+        return NextResponse.json(
+          { error: "No autenticado" },
+          { status: 401 }
+        );
+      }
+
+      user = sessionUser;
     }
 
     // Parsear body

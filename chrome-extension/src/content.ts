@@ -32,18 +32,34 @@ function injectSidebar() {
 
   console.log('[AmersurChat] Inyectando sidebar...');
 
-  // Crear contenedor del sidebar
+  // Crear overlay de fondo (para cerrar al hacer click fuera)
+  const overlay = document.createElement('div');
+  overlay.id = 'amersurchat-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  `;
+
+  // Crear contenedor del sidebar (más estrecho)
   const sidebarContainer = document.createElement('div');
   sidebarContainer.id = 'amersurchat-sidebar';
   sidebarContainer.style.cssText = `
     position: fixed;
     top: 0;
     right: 0;
-    width: 360px;
+    width: 300px;
     height: 100vh;
     z-index: 999999;
     background: white;
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+    box-shadow: -2px 0 12px rgba(0, 0, 0, 0.2);
     transform: translateX(100%);
     transition: transform 0.3s ease;
   `;
@@ -61,56 +77,76 @@ function injectSidebar() {
   iframe.src = chrome.runtime.getURL('sidebar.html');
 
   sidebarContainer.appendChild(iframe);
+
+  // Agregar overlay y sidebar al DOM
+  document.body.appendChild(overlay);
   document.body.appendChild(sidebarContainer);
 
-  // Botón toggle
+  // Función para abrir/cerrar sidebar
+  const toggleSidebar = (forceClose = false) => {
+    const isHidden = sidebarContainer.classList.contains('amersurchat-hidden');
+
+    if (!isHidden || forceClose) {
+      // Cerrar
+      sidebarContainer.classList.add('amersurchat-hidden');
+      sidebarContainer.style.transform = 'translateX(100%)';
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+      toggleButton.style.right = '20px';
+    } else {
+      // Abrir
+      sidebarContainer.classList.remove('amersurchat-hidden');
+      sidebarContainer.style.transform = 'translateX(0)';
+      overlay.style.opacity = '1';
+      overlay.style.pointerEvents = 'auto';
+      toggleButton.style.right = '320px'; // 300px sidebar + 20px margin
+    }
+  };
+
+  // Click en overlay cierra el sidebar
+  overlay.addEventListener('click', () => toggleSidebar(true));
+
+  // Botón toggle (más pequeño y discreto)
   const toggleButton = document.createElement('button');
   toggleButton.id = 'amersurchat-toggle';
   toggleButton.innerHTML = `
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <line x1="9" y1="10" x2="15" y2="10"/>
+      <line x1="9" y1="14" x2="13" y2="14"/>
     </svg>
   `;
+  toggleButton.title = 'Amersur CRM';
   toggleButton.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: #25D366;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     z-index: 999998;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
   `;
 
   toggleButton.addEventListener('mouseenter', () => {
     toggleButton.style.transform = 'scale(1.1)';
+    toggleButton.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.6)';
   });
 
   toggleButton.addEventListener('mouseleave', () => {
     toggleButton.style.transform = 'scale(1)';
+    toggleButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
   });
 
-  toggleButton.addEventListener('click', () => {
-    const isHidden = sidebarContainer.classList.contains('amersurchat-hidden');
-
-    if (isHidden) {
-      sidebarContainer.classList.remove('amersurchat-hidden');
-      sidebarContainer.style.transform = 'translateX(0)';
-      toggleButton.style.right = '380px'; // 360px sidebar + 20px margin
-    } else {
-      sidebarContainer.classList.add('amersurchat-hidden');
-      sidebarContainer.style.transform = 'translateX(100%)';
-      toggleButton.style.right = '20px';
-    }
-  });
+  toggleButton.addEventListener('click', () => toggleSidebar());
 
   document.body.appendChild(toggleButton);
 

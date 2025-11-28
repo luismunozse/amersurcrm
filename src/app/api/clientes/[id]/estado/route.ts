@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +15,36 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createServerOnlyClient();
 
-    // Verificar autenticación
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    if (!user) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAdmin = createServiceRoleClient();
+
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[UpdateEstado] Error de autenticación con token:", authError);
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = authUser;
+      supabase = supabaseAdmin;
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+      if (!sessionUser) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = sessionUser;
     }
 
     const body = await request.json();

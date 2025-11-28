@@ -19,7 +19,8 @@ export class CRMApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    isRetry = false
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
@@ -37,6 +38,16 @@ export class CRMApiClient {
       headers,
     });
 
+    // Si es 401 y no es un reintento, intentar renovar token
+    if (response.status === 401 && !isRetry && typeof chrome !== 'undefined') {
+      console.log('[API] Token expirado, intentando renovar...');
+      const renewed = await this.renewToken();
+      if (renewed) {
+        console.log('[API] Token renovado exitosamente, reintentando petición...');
+        return this.request<T>(endpoint, options, true);
+      }
+    }
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`API Error: ${response.status} - ${error}`);
@@ -46,16 +57,57 @@ export class CRMApiClient {
   }
 
   /**
+   * Renovar token automáticamente usando credenciales guardadas
+   */
+  private async renewToken(): Promise<boolean> {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        return false;
+      }
+
+      const stored = await chrome.storage.local.get(['username', 'password', 'crmUrl']);
+
+      if (!stored.username || !stored.password) {
+        console.error('[API] No hay credenciales guardadas para renovar token');
+        return false;
+      }
+
+      const url = stored.crmUrl || this.baseUrl;
+      const renewClient = new CRMApiClient(url);
+      const authState = await renewClient.login(stored.username, stored.password);
+
+      // Actualizar token
+      this.setToken(authState.token);
+      await saveCRMConfig(url, authState.token);
+
+      console.log('[API] Token renovado y guardado');
+      return true;
+    } catch (error) {
+      console.error('[API] Error renovando token:', error);
+      return false;
+    }
+  }
+
+  /**
    * Autenticar usuario
    */
   async login(username: string, password: string): Promise<AuthState> {
-    const response = await this.request<{ user: any; token: string }>(
+    const response = await this.request<{ user: any; token: string; refresh_token?: string }>(
       '/api/auth/login',
       {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       }
     );
+
+    // Guardar credenciales para renovación automática
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      await chrome.storage.local.set({
+        username,
+        password,
+        lastLogin: Date.now(),
+      });
+    }
 
     return {
       isAuthenticated: true,
@@ -204,7 +256,7 @@ export async function saveCRMConfig(url: string, token: string): Promise<void> {
  */
 export async function clearCRMConfig(): Promise<void> {
   return new Promise((resolve) => {
-    chrome.storage.local.remove(['authToken'], () => {
+    chrome.storage.local.remove(['authToken', 'username', 'password', 'lastLogin'], () => {
       resolve();
     });
   });

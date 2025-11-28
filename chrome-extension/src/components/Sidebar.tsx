@@ -17,7 +17,6 @@ export function Sidebar() {
   const [searchingCliente, setSearchingCliente] = useState(false);
   const [apiClient, setApiClient] = useState<CRMApiClient | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
-  const [creatingLead, setCreatingLead] = useState(false); // Bandera para evitar duplicados
   const [lastProcessedPhone, setLastProcessedPhone] = useState<string | null>(null); // Último teléfono procesado
 
   // Inicializar autenticación
@@ -88,58 +87,15 @@ export function Sidebar() {
         setCliente(found);
         console.log('[Sidebar] Cliente encontrado en CRM:', found.id);
       } else {
-        // Cliente NO existe - Crear lead automáticamente
-        console.log('[Sidebar] Cliente no encontrado, creando lead automáticamente...');
-        await autoCreateLead(phone);
+        // Cliente NO existe - mostrar formulario para crear lead manualmente
+        console.log('[Sidebar] Cliente no encontrado. Mostrar formulario de creación manual.');
+        setCliente(null);
       }
     } catch (error) {
       console.error('[Sidebar] Error buscando cliente:', error);
       setCliente(null);
     } finally {
       setSearchingCliente(false);
-    }
-  }
-
-  async function autoCreateLead(phone: string) {
-    if (!apiClient || !contact) return;
-
-    // Evitar crear múltiples leads simultáneamente
-    if (creatingLead) {
-      console.log('[Sidebar] ⏸️ Ya hay un lead siendo creado, esperando...');
-      return;
-    }
-
-    setCreatingLead(true);
-    try {
-      console.log('[Sidebar] Creando lead automático para:', phone);
-
-      const response = await apiClient.createLead({
-        telefono: phone,
-        nombre: contact.name !== 'Sin nombre' ? contact.name : undefined,
-        mensaje_inicial: 'Lead capturado automáticamente desde WhatsApp',
-      });
-
-      if (response.success && response.clienteId) {
-        console.log('✅ [Sidebar] Lead creado automáticamente:', response.clienteId);
-
-        // Buscar el cliente recién creado para actualizar la UI
-        const nuevoCliente = await apiClient.searchClienteByPhone(phone);
-        setCliente(nuevoCliente);
-
-        // Mostrar notificación de éxito (opcional - podría ser menos intrusivo)
-        console.log('[Sidebar] ✨ Nuevo lead creado y agregado al CRM');
-      } else if (response.existente) {
-        console.log('[Sidebar] El lead ya existía (duplicado)');
-        // Intentar buscar de nuevo
-        const clienteExistente = await apiClient.searchClienteByPhone(phone);
-        setCliente(clienteExistente);
-      }
-    } catch (error) {
-      console.error('[Sidebar] Error creando lead automático:', error);
-      // No mostrar error al usuario, solo loguear
-      // El usuario aún puede crear manualmente si falla
-    } finally {
-      setCreatingLead(false);
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase.server";
 
 /**
  * GET /api/proyectos/list
@@ -10,25 +11,52 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAdmin = createServiceRoleClient();
 
-    console.log('[API /proyectos/list] User:', user?.id, 'Error:', authError);
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      );
+      console.log('[API /proyectos/list] User (token):', authUser?.id, 'Error:', authError);
+
+      if (authError || !authUser) {
+        return NextResponse.json(
+          { error: "No autorizado" },
+          { status: 401 }
+        );
+      }
+
+      user = authUser;
+      supabase = supabaseAdmin;
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createClient();
+      const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
+
+      console.log('[API /proyectos/list] User (session):', sessionUser?.id, 'Error:', authError);
+
+      if (authError || !sessionUser) {
+        return NextResponse.json(
+          { error: "No autorizado" },
+          { status: 401 }
+        );
+      }
+
+      user = sessionUser;
     }
 
     // Obtener proyectos activos
     const { data: proyectos, error } = await supabase
+      .schema("crm")
       .from("proyecto")
       .select("id, nombre, ubicacion, estado")
-      .in("estado", ["planificacion", "en_construccion", "terminado"])
+      .in("estado", ["activo", "pausado"])
       .order("nombre", { ascending: true });
 
     if (error) {
