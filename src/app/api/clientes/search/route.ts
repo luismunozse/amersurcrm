@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Limpiar número (solo dígitos y +)
-    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
+    const cleanPhone = phone.replace(/[^\d]/g, "");
 
     console.log(`[ClienteSearch] Buscando cliente con teléfono: ${cleanPhone}`);
 

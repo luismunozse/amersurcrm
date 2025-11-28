@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = createServiceRoleClient();
 
     // Verificar si ya existe un cliente con este teléfono
-    const telefonoLimpio = telefono.replace(/[^\d+]/g, '');
+    // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
+    const telefonoLimpio = telefono.replace(/[^\d]/g, '');
 
     const { data: clienteExistente } = await supabaseAdmin
       .schema("crm")

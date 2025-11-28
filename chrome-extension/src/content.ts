@@ -39,9 +39,9 @@ function injectSidebar() {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
+    width: calc(100% - 300px);
     height: 100vh;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.2);
     z-index: 999998;
     opacity: 0;
     pointer-events: none;
@@ -106,15 +106,12 @@ function injectSidebar() {
   // Click en overlay cierra el sidebar
   overlay.addEventListener('click', () => toggleSidebar(true));
 
-  // Botón toggle (más pequeño y discreto)
+  // Botón toggle (con logo de la empresa)
   const toggleButton = document.createElement('button');
   toggleButton.id = 'amersurchat-toggle';
+  const logoUrl = chrome.runtime.getURL('icons/icon48.png');
   toggleButton.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-      <line x1="9" y1="10" x2="15" y2="10"/>
-      <line x1="9" y1="14" x2="13" y2="14"/>
-    </svg>
+    <img src="${logoUrl}" alt="Amersur CRM" style="width: 28px; height: 28px; object-fit: contain;" />
   `;
   toggleButton.title = 'Amersur CRM';
   toggleButton.style.cssText = `

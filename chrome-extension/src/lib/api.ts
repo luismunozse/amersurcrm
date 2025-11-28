@@ -144,7 +144,8 @@ export class CRMApiClient {
    */
   async searchClienteByPhone(phone: string): Promise<Cliente | null> {
     try {
-      const cleanPhone = phone.replace(/[^\d+]/g, '');
+      // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
+      const cleanPhone = phone.replace(/[^\d]/g, '');
       const response = await this.request<{ cliente: Cliente | null }>(
         `/api/clientes/search?phone=${encodeURIComponent(cleanPhone)}`
       );
