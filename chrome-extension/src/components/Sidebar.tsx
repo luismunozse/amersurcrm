@@ -149,11 +149,16 @@ export function Sidebar() {
   }
 
   function handleSelectTemplate(mensaje: string) {
-    // Copiar mensaje al portapapeles
-    navigator.clipboard.writeText(mensaje).then(() => {
-      // Mostrar notificación (opcional)
-      console.log('[Sidebar] Plantilla copiada al portapapeles');
-    }).catch((error) => {
+    console.log('[Sidebar] Insertando plantilla en WhatsApp:', mensaje.substring(0, 50));
+
+    // Enviar mensaje al content script para insertar en WhatsApp
+    window.parent.postMessage({
+      type: 'AMERSURCHAT_INSERT_TEMPLATE',
+      text: mensaje,
+    }, '*');
+
+    // También copiar al portapapeles como fallback
+    navigator.clipboard.writeText(mensaje).catch((error) => {
       console.error('[Sidebar] Error copiando plantilla:', error);
     });
   }
@@ -209,6 +214,7 @@ export function Sidebar() {
               contact={contact}
               cliente={cliente}
               loading={searchingCliente}
+              apiClient={apiClient!}
             />
 
             {!cliente && (

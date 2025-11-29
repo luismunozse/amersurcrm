@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 
 /**
  * GET /api/clientes/[id]/interacciones
@@ -63,6 +64,116 @@ export async function GET(
     console.error("[API] Error en /api/clientes/[id]/interacciones:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
+      { status: 500 }
+    );
+  }
+}
+
+export const dynamic = "force-dynamic";
+
+/**
+ * POST /api/clientes/[id]/interacciones
+ *
+ * Crea una nueva interacción para un cliente
+ * Usado por AmersurChat Chrome Extension para registrar mensajes automáticamente
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: clienteId } = await params;
+
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
+
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAdmin = createServiceRoleClient();
+
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[CreateInteraccion] Error de autenticación con token:", authError);
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = authUser;
+      supabase = supabaseAdmin;
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+      if (!sessionUser) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = sessionUser;
+    }
+
+    // Parsear body
+    const body = await request.json();
+    const { tipo, mensaje, direccion } = body;
+
+    if (!tipo || !mensaje) {
+      return NextResponse.json(
+        { error: "Los campos 'tipo' y 'mensaje' son requeridos" },
+        { status: 400 }
+      );
+    }
+
+    // Obtener username del usuario
+    const { data: perfil } = await supabase
+      .schema("crm")
+      .from("usuario_perfil")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const vendedorUsername = perfil?.username || "Sistema";
+
+    // Crear interacción
+    const { data: interaccion, error } = await supabase
+      .schema("crm")
+      .from("interaccion")
+      .insert({
+        cliente_id: clienteId,
+        tipo,
+        notas: mensaje,
+        vendedor_id: user.id,
+        vendedor_username: vendedorUsername,
+        fecha_interaccion: new Date().toISOString(),
+        medio: direccion === 'enviado' ? 'whatsapp_enviado' : 'whatsapp_recibido',
+        resultado: direccion === 'enviado' ? 'enviado' : 'recibido',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[CreateInteraccion] Error creando interacción:", error);
+      return NextResponse.json(
+        { error: "Error creando interacción", details: error.message },
+        { status: 500 }
+      );
+    }
+
+    console.log(`✅ [CreateInteraccion] Interacción creada para cliente ${clienteId}: ${tipo} - ${direccion}`);
+
+    return NextResponse.json({
+      success: true,
+      interaccion,
+    });
+  } catch (error) {
+    console.error("[CreateInteraccion] Error:", error);
+    return NextResponse.json(
+      {
+        error: "Error interno del servidor",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

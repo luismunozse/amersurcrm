@@ -247,6 +247,21 @@ export class CRMApiClient {
       method: 'DELETE',
     });
   }
+
+  /**
+   * Registrar interacción (mensaje de WhatsApp)
+   */
+  async createInteraccion(clienteId: string, tipo: string, mensaje: string, direccion: 'enviado' | 'recibido'): Promise<any> {
+    try {
+      return await this.request(`/api/clientes/${clienteId}/interacciones`, {
+        method: 'POST',
+        body: JSON.stringify({ tipo, mensaje, direccion }),
+      });
+    } catch (error) {
+      console.error('[CRMApiClient] Error creando interacción:', error);
+      return null;
+    }
+  }
 }
 
 /**

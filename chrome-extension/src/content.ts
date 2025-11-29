@@ -155,6 +155,44 @@ waitForWhatsAppWeb().then(() => {
   injectSidebar();
 });
 
+/**
+ * Inserta texto automáticamente en el input de WhatsApp Web
+ */
+function insertTextIntoWhatsApp(text: string): boolean {
+  try {
+    console.log('[AmersurChat] Insertando texto en WhatsApp:', text.substring(0, 50) + '...');
+
+    // Buscar el input de WhatsApp (contenteditable)
+    const inputBox = document.querySelector('[contenteditable="true"][data-tab="10"]') as HTMLElement;
+
+    if (!inputBox) {
+      console.error('[AmersurChat] No se encontró el input de WhatsApp');
+      return false;
+    }
+
+    // Insertar el texto
+    inputBox.focus();
+
+    // Método 1: Usar execCommand (más compatible)
+    document.execCommand('insertText', false, text);
+
+    // Si execCommand no funciona, usar textContent directo
+    if (!inputBox.textContent || inputBox.textContent.trim() === '') {
+      inputBox.textContent = text;
+
+      // Disparar eventos para que WhatsApp detecte el cambio
+      inputBox.dispatchEvent(new Event('input', { bubbles: true }));
+      inputBox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    console.log('[AmersurChat] Texto insertado exitosamente');
+    return true;
+  } catch (error) {
+    console.error('[AmersurChat] Error insertando texto:', error);
+    return false;
+  }
+}
+
 // Escuchar mensajes del sidebar (comunicación con React)
 window.addEventListener('message', (event) => {
   console.log('[AmersurChat] Mensaje recibido:', event.data.type, 'desde:', event.origin);
@@ -181,6 +219,29 @@ window.addEventListener('message', (event) => {
         type: 'AMERSURCHAT_CONTACT_INFO',
         contact,
       }, '*');
+    }
+  }
+
+  // Insertar plantilla de mensaje en WhatsApp
+  if (event.data.type === 'AMERSURCHAT_INSERT_TEMPLATE') {
+    console.log('[AmersurChat] Insertando plantilla en WhatsApp');
+    const { text } = event.data;
+
+    if (text) {
+      const success = insertTextIntoWhatsApp(text);
+
+      // Responder al sidebar con el resultado
+      if (event.source && event.source !== window) {
+        (event.source as Window).postMessage({
+          type: 'AMERSURCHAT_TEMPLATE_INSERTED',
+          success,
+        }, '*');
+      } else {
+        window.postMessage({
+          type: 'AMERSURCHAT_TEMPLATE_INSERTED',
+          success,
+        }, '*');
+      }
     }
   }
 });

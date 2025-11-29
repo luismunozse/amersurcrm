@@ -1,20 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
+import { CRMApiClient } from '@/lib/api';
 
 interface ContactInfoProps {
   contact: WhatsAppContact;
   cliente: Cliente | null;
   loading: boolean;
+  apiClient?: CRMApiClient;
 }
 
-export function ContactInfo({ contact, cliente, loading }: ContactInfoProps) {
+export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInfoProps) {
+  const [ultimaInteraccion, setUltimaInteraccion] = useState<any>(null);
+  const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
+  const [loadingExtra, setLoadingExtra] = useState(false);
+
   const estadoColors: Record<string, string> = {
-    por_contactar: 'bg-yellow-100 text-yellow-800',
-    contactado: 'bg-blue-100 text-blue-800',
-    interesado: 'bg-purple-100 text-purple-800',
-    negociacion: 'bg-orange-100 text-orange-800',
-    cerrado: 'bg-green-100 text-green-800',
-    perdido: 'bg-red-100 text-red-800',
+    por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    contactado: 'bg-blue-100 text-blue-800 border-blue-300',
+    interesado: 'bg-purple-100 text-purple-800 border-purple-300',
+    negociacion: 'bg-orange-100 text-orange-800 border-orange-300',
+    cerrado: 'bg-green-100 text-green-800 border-green-300',
+    perdido: 'bg-red-100 text-red-800 border-red-300',
+  };
+
+  const estadoIcons: Record<string, string> = {
+    por_contactar: '📋',
+    contactado: '📞',
+    interesado: '👀',
+    negociacion: '💰',
+    cerrado: '✅',
+    perdido: '❌',
   };
 
   const estadoLabels: Record<string, string> = {
@@ -25,6 +40,30 @@ export function ContactInfo({ contact, cliente, loading }: ContactInfoProps) {
     cerrado: 'Cerrado',
     perdido: 'Perdido',
   };
+
+  // Cargar información adicional cuando hay un cliente
+  useEffect(() => {
+    if (cliente && apiClient) {
+      setLoadingExtra(true);
+      Promise.all([
+        apiClient.getInteracciones(cliente.id).then(ints => ints[0] || null),
+        apiClient.getProyectosInteres(cliente.id),
+      ])
+        .then(([ultimaInt, proyectos]) => {
+          setUltimaInteraccion(ultimaInt);
+          setProyectosInteres(proyectos);
+        })
+        .catch(error => {
+          console.error('[ContactInfo] Error cargando info adicional:', error);
+        })
+        .finally(() => {
+          setLoadingExtra(false);
+        });
+    } else {
+      setUltimaInteraccion(null);
+      setProyectosInteres([]);
+    }
+  }, [cliente, apiClient]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
@@ -58,46 +97,87 @@ export function ContactInfo({ contact, cliente, loading }: ContactInfoProps) {
 
         {!loading && cliente && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estado:</span>
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  estadoColors[cliente.estado_cliente]
-                }`}
-              >
-                {estadoLabels[cliente.estado_cliente]}
-              </span>
+            {/* Estado destacado */}
+            <div className={`p-3 rounded-lg border-2 ${estadoColors[cliente.estado_cliente]}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{estadoIcons[cliente.estado_cliente]}</span>
+                <div>
+                  <p className="text-xs font-medium opacity-75">Estado del Lead</p>
+                  <p className="font-semibold">{estadoLabels[cliente.estado_cliente]}</p>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Origen:</span>
-              <span className="text-sm text-gray-900 dark:text-gray-100">{cliente.origen_lead}</span>
-            </div>
-
-            {cliente.vendedor_asignado && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Vendedor:</span>
-                <span className="text-sm text-gray-900 dark:text-gray-100">{cliente.vendedor_asignado}</span>
+            {/* Última interacción */}
+            {ultimaInteraccion && (
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  📅 Última interacción:
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {new Date(ultimaInteraccion.fecha).toLocaleString('es-PE', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {ultimaInteraccion.descripcion}
+                </p>
               </div>
             )}
+
+            {/* Proyectos de interés */}
+            {proyectosInteres.length > 0 && (
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-2">
+                  🏠 Proyectos de interés ({proyectosInteres.length}):
+                </p>
+                <div className="space-y-1">
+                  {proyectosInteres.slice(0, 3).map((proyecto: any, idx: number) => (
+                    <p key={idx} className="text-xs text-purple-600 dark:text-purple-400">
+                      • {proyecto.proyecto_nombre || proyecto.lote_nombre || 'Proyecto'}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Origen</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {cliente.origen_lead}
+                </p>
+              </div>
+              {cliente.vendedor_asignado && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Vendedor</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {cliente.vendedor_asignado}
+                  </p>
+                </div>
+              )}
+            </div>
 
             {cliente.email && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Email:</span>
-                <span className="text-sm text-gray-900 dark:text-gray-100">{cliente.email}</span>
+              <div className="pt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{cliente.email}</p>
               </div>
             )}
 
-            <div className="pt-2 mt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Registrado: {new Date(cliente.created_at).toLocaleDateString('es-PE')}
+                📆 Registrado: {new Date(cliente.created_at).toLocaleDateString('es-PE')}
               </span>
             </div>
 
             {cliente.notas && (
               <div className="pt-2">
-                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Notas:</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">💬 Notas:</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded max-h-20 overflow-y-auto">
                   {cliente.notas}
                 </p>
               </div>
