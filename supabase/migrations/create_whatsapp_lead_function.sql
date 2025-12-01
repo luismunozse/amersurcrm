@@ -39,10 +39,18 @@ BEGIN
     p_telefono,
     p_telefono_whatsapp,
     p_origen_lead,
-    'por_contactar',
+    -- Si el origen es whatsapp_web, el cliente YA contactó (envió mensajes), entonces estado = 'contactado'
+    -- Si es de otro origen, estado = 'por_contactar'
+    CASE
+      WHEN p_origen_lead = 'whatsapp_web' THEN 'contactado'
+      ELSE 'por_contactar'
+    END,
     p_vendedor_asignado,
     p_created_by,
-    'Contactar lead generado desde WhatsApp',
+    CASE
+      WHEN p_origen_lead = 'whatsapp_web' THEN 'Responder mensaje del cliente'
+      ELSE 'Contactar lead generado desde WhatsApp'
+    END,
     p_notas,
     p_direccion
   )
