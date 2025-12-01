@@ -1,92 +1,141 @@
 import * as XLSX from "xlsx";
 
 export function generateClientesTemplate() {
-  // Datos de ejemplo para la plantilla
-  const templateData = [
-    {
-      nombre: "Juan Pérez García",
-      email: "juan.perez@email.com",
-      telefono: "+51 987 654 321",
-      tipo_cliente: "persona",
-      documento_identidad: "12345678",
-      telefono_whatsapp: "+51 987 654 321",
-      direccion_calle: "Av. Principal",
-      direccion_numero: "123",
-      direccion_barrio: "Centro",
-      direccion_ciudad: "Huaral",
-      direccion_provincia: "Lima",
-      direccion_pais: "Perú",
-      estado_cliente: "prospecto",
-      origen_lead: "web",
-      vendedor_asignado: "Vendedor 1",
-      proxima_accion: "llamar",
-      interes_principal: "lotes",
-      capacidad_compra_estimada: 150000,
-      forma_pago_preferida: "contado",
-      notas: "Cliente interesado en lotes residenciales"
-    },
-    {
-      nombre: "Empresa Constructora ABC S.A.C.",
-      email: "contacto@empresaabc.com",
-      telefono: "+51 1 234 5678",
-      tipo_cliente: "empresa",
-      documento_identidad: "20123456789",
-      telefono_whatsapp: "+51 987 123 456",
-      direccion_calle: "Av. Comercial",
-      direccion_numero: "456",
-      direccion_barrio: "Zona Industrial",
-      direccion_ciudad: "Lima",
-      direccion_provincia: "Lima",
-      direccion_pais: "Perú",
-      estado_cliente: "lead",
-      origen_lead: "recomendacion",
-      vendedor_asignado: "Vendedor 2",
-      proxima_accion: "reunion",
-      interes_principal: "oficinas",
-      capacidad_compra_estimada: 500000,
-      forma_pago_preferida: "financiacion",
-      notas: "Empresa constructora interesada en oficinas comerciales"
-    }
-  ];
-
   // Crear workbook
   const wb = XLSX.utils.book_new();
-  
-  // Crear worksheet
-  const ws = XLSX.utils.json_to_sheet(templateData);
-  
-  // Ajustar ancho de columnas
-  const colWidths = [
-    { wch: 25 }, // nombre
-    { wch: 30 }, // email
-    { wch: 15 }, // telefono
-    { wch: 12 }, // tipo_cliente
-    { wch: 15 }, // documento_identidad
-    { wch: 15 }, // telefono_whatsapp
-    { wch: 20 }, // direccion_calle
-    { wch: 8 },  // direccion_numero
-    { wch: 15 }, // direccion_barrio
-    { wch: 15 }, // direccion_ciudad
-    { wch: 15 }, // direccion_provincia
-    { wch: 10 }, // direccion_pais
-    { wch: 12 }, // estado_cliente
-    { wch: 15 }, // origen_lead
-    { wch: 15 }, // vendedor_asignado
-    { wch: 15 }, // proxima_accion
-    { wch: 15 }, // interes_principal
-    { wch: 20 }, // capacidad_compra_estimada
-    { wch: 15 }, // forma_pago_preferida
-    { wch: 30 }  // notas
+
+  // ==================== HOJA DE INSTRUCCIONES ====================
+  const instrucciones = [
+    ['INSTRUCCIONES PARA IMPORTACIÓN DE CLIENTES'],
+    [''],
+    ['FORMATO DEL ARCHIVO:'],
+    ['El archivo debe contener las siguientes columnas (en cualquier orden):'],
+    [''],
+    ['COLUMNA', 'REQUERIDO', 'DESCRIPCIÓN', 'EJEMPLO'],
+    ['nombre', 'SÍ', 'Nombre(s) del cliente', 'Juan Carlos'],
+    ['apellido', 'SÍ', 'Apellido(s) del cliente', 'Pérez García'],
+    ['telefono', 'SÍ', 'Teléfono o celular (con código de país)', '51987654321 o +51 987 654 321'],
+    ['proyecto_interes', 'NO', 'Proyecto de interés del cliente', 'Residencial Las Palmeras'],
+    [''],
+    ['NOTAS IMPORTANTES:'],
+    ['• Los campos "nombre", "apellido" y "telefono" son OBLIGATORIOS'],
+    ['• El teléfono debe incluir el código de país (Ej: 51 para Perú)'],
+    ['• El teléfono NO debe estar duplicado en la base de datos'],
+    ['• El sistema detecta automáticamente duplicados y los omite'],
+    ['• Límite máximo: 20,000 registros por archivo'],
+    ['• Formatos soportados: Excel (.xlsx, .xls) o CSV (.csv)'],
+    [''],
+    ['FORMATOS DE TELÉFONO VÁLIDOS:'],
+    ['• 51987654321 (recomendado)'],
+    ['• +51 987 654 321'],
+    ['• 51 987654321'],
+    ['• 0051987654321'],
+    [''],
+    ['PROCESO DE IMPORTACIÓN:'],
+    ['1. Complete la hoja "Plantilla" con los datos de sus clientes'],
+    ['2. Guarde el archivo'],
+    ['3. En el CRM, vaya a "Clientes" > "Importar Masivamente"'],
+    ['4. Seleccione este archivo'],
+    ['5. Revise la vista previa de datos'],
+    ['6. Valide los datos (el sistema detectará errores)'],
+    ['7. Si hay errores, puede exportarlos a CSV para corregirlos'],
+    ['8. Confirme la importación'],
+    [''],
+    ['EJEMPLOS DE USO:'],
+    ['Ver la hoja "Plantilla" para ejemplos completos'],
+    [''],
+    ['¿NECESITA AYUDA?'],
+    ['Contacte al equipo de soporte técnico'],
   ];
-  
-  ws['!cols'] = colWidths;
-  
-  // Agregar worksheet al workbook
-  XLSX.utils.book_append_sheet(wb, ws, "Clientes");
-  
+
+  const wsInstrucciones = XLSX.utils.aoa_to_sheet(instrucciones);
+
+  // Ajustar ancho de columnas para instrucciones
+  wsInstrucciones['!cols'] = [
+    { wch: 20 },  // Columna A
+    { wch: 12 },  // Columna B
+    { wch: 50 },  // Columna C
+    { wch: 40 }   // Columna D
+  ];
+
+  // Estilos para la hoja de instrucciones (si el formato lo soporta)
+  // Hacer el título en negrita (row 1)
+  if (wsInstrucciones['A1']) {
+    wsInstrucciones['A1'].s = {
+      font: { bold: true, sz: 14 }
+    };
+  }
+
+  // ==================== HOJA DE PLANTILLA ====================
+  const templateData = [
+    {
+      nombre: 'Juan Carlos',
+      apellido: 'Pérez García',
+      telefono: '51987654321',
+      proyecto_interes: 'Residencial Las Palmeras'
+    },
+    {
+      nombre: 'María Elena',
+      apellido: 'López Rodríguez',
+      telefono: '51912345678',
+      proyecto_interes: 'Condominio Vista Mar'
+    },
+    {
+      nombre: 'Carlos Alberto',
+      apellido: 'Martínez Silva',
+      telefono: '51987654322',
+      proyecto_interes: 'Torre Empresarial Centro'
+    },
+    {
+      nombre: 'Ana Lucía',
+      apellido: 'Gutiérrez Fernández',
+      telefono: '51912345679',
+      proyecto_interes: ''
+    },
+    {
+      nombre: 'Luis Fernando',
+      apellido: 'Hernández Morales',
+      telefono: '51987654323',
+      proyecto_interes: 'Lotes Campiña Verde'
+    },
+    // Filas vacías para que el usuario pueda empezar a llenar
+    {
+      nombre: '',
+      apellido: '',
+      telefono: '',
+      proyecto_interes: ''
+    },
+    {
+      nombre: '',
+      apellido: '',
+      telefono: '',
+      proyecto_interes: ''
+    },
+    {
+      nombre: '',
+      apellido: '',
+      telefono: '',
+      proyecto_interes: ''
+    },
+  ];
+
+  const wsPlantilla = XLSX.utils.json_to_sheet(templateData);
+
+  // Ajustar ancho de columnas para plantilla
+  wsPlantilla['!cols'] = [
+    { wch: 20 }, // nombre
+    { wch: 25 }, // apellido
+    { wch: 18 }, // telefono
+    { wch: 35 }  // proyecto_interes
+  ];
+
+  // Agregar ambas hojas al workbook
+  XLSX.utils.book_append_sheet(wb, wsInstrucciones, "Instrucciones");
+  XLSX.utils.book_append_sheet(wb, wsPlantilla, "Plantilla");
+
   // Generar archivo
   const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  
+
   return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
@@ -95,7 +144,7 @@ export function downloadTemplate() {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'plantilla_clientes.xlsx';
+  link.download = `plantilla_importacion_clientes_${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -1,8 +1,8 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/clientes/[id]/interacciones
@@ -68,8 +68,6 @@ export async function GET(
     );
   }
 }
-
-export const dynamic = "force-dynamic";
 
 /**
  * POST /api/clientes/[id]/interacciones

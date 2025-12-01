@@ -2,64 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { z } from "zod";
 
-type EstadoCivil = 'soltero' | 'casado' | 'viudo' | 'divorciado' | 'conviviente' | 'otro';
-type TipoCliente = 'persona' | 'empresa';
-type EstadoCliente = 'activo' | 'prospecto' | 'lead' | 'inactivo';
-
 const ClienteImportSchema = z.object({
-  codigo_cliente: z.string().optional(),
   nombre: z.string().min(1, "Nombre requerido"),
-  tipo_cliente: z.enum(['persona', 'empresa']).optional().default('persona'),
-  documento_identidad: z.string().optional(),
-  estado_civil: z.enum(['soltero','casado','viudo','divorciado','conviviente','otro']).optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  telefono: z.string().optional(),
-  telefono_whatsapp: z.string().optional(),
-  direccion_calle: z.string().optional(),
-  direccion_numero: z.string().optional(),
-  direccion_barrio: z.string().optional(),
-  direccion_ciudad: z.string().optional(),
-  direccion_provincia: z.string().optional(),
-  direccion_pais: z.string().optional().default('Perú'),
-  estado_cliente: z.enum(['activo', 'prospecto', 'lead', 'inactivo']).optional().default('prospecto'),
-  origen_lead: z.string().optional(),
-  vendedor_asignado: z.string().optional(),
-  proxima_accion: z.string().optional(),
-  interes_principal: z.string().optional(),
-  capacidad_compra_estimada: z.number().optional(),
-  forma_pago_preferida: z.string().optional(),
-  notas: z.string().optional(),
-  año: z.string().optional(), // Campo adicional para el año
+  apellido: z.string().min(1, "Apellido requerido"),
+  telefono: z.string().min(1, "Teléfono requerido"),
+  proyecto_interes: z.string().optional(),
+  _proyecto_id: z.string().optional(), // ID del proyecto encontrado
+  _proyecto_nombre: z.string().optional(), // Nombre del proyecto encontrado
 });
 
 type ClienteImportSchemaType = z.infer<typeof ClienteImportSchema>;
 
 interface ClienteInsertPayload {
-  codigo_cliente: string | null;
   nombre: string;
-  tipo_cliente: TipoCliente;
-  documento_identidad: string | null;
-  estado_civil: EstadoCivil | null;
-  email: string | null;
-  telefono: string | null;
-  telefono_whatsapp: string | null;
-  origen_lead: string | null;
-  vendedor_asignado: string | null;
-  proxima_accion: string | null;
-  interes_principal: string | null;
-  capacidad_compra_estimada: number | null;
-  forma_pago_preferida: string | null;
+  tipo_cliente: 'persona';
+  telefono: string;
+  estado_cliente: 'lead';
   notas: string | null;
-  estado_cliente?: EstadoCliente;
-  direccion: {
-    calle: string;
-    numero: string;
-    barrio: string;
-    ciudad: string;
-    provincia: string;
-    pais: string;
-  };
   created_by: string;
+  _proyecto_id?: string; // Campo interno para vinculación
+  _proyecto_nombre?: string; // Campo interno para referencia
 }
 
 interface ClienteImportErrorDetail {
@@ -81,13 +43,13 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const dataJson = formData.get("data");
-    
+
     if (!dataJson) {
       return NextResponse.json({ error: "No data provided" }, { status: 400 });
     }
 
     const rawClientes: unknown = JSON.parse(dataJson as string);
-    
+
     if (!Array.isArray(rawClientes)) {
       return NextResponse.json({ error: "Data must be an array" }, { status: 400 });
     }
@@ -96,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
@@ -109,37 +71,25 @@ export async function POST(request: NextRequest) {
       try {
         const cliente = ClienteImportSchema.parse(clientesData[i]) as ClienteImportSchemaType;
 
-        // Preparar datos para inserción (solo columnas existentes en la tabla)
-        const insertData: ClienteInsertPayload = {
-          codigo_cliente: cliente.codigo_cliente?.trim() || null,
-          nombre: cliente.nombre,
-          tipo_cliente: cliente.tipo_cliente ?? 'persona',
-          documento_identidad: cliente.documento_identidad && cliente.documento_identidad.trim() !== '' ? cliente.documento_identidad : null,
-          estado_civil: cliente.estado_civil ?? null,
-          email: cliente.email && cliente.email.trim() !== '' ? cliente.email : null,
-          telefono: cliente.telefono && cliente.telefono.trim() !== '' ? cliente.telefono : null,
-          telefono_whatsapp: cliente.telefono_whatsapp && cliente.telefono_whatsapp.trim() !== '' ? cliente.telefono_whatsapp : null,
-          origen_lead: cliente.origen_lead && cliente.origen_lead.trim() !== '' ? cliente.origen_lead : null,
-          vendedor_asignado: cliente.vendedor_asignado && cliente.vendedor_asignado.trim() !== '' ? cliente.vendedor_asignado : null,
-          proxima_accion: cliente.proxima_accion && cliente.proxima_accion.trim() !== '' ? cliente.proxima_accion : null,
-          interes_principal: cliente.interes_principal && cliente.interes_principal.trim() !== '' ? cliente.interes_principal : null,
-          capacidad_compra_estimada: (typeof cliente.capacidad_compra_estimada === 'number' ? cliente.capacidad_compra_estimada : null),
-          forma_pago_preferida: cliente.forma_pago_preferida && cliente.forma_pago_preferida.trim() !== '' ? cliente.forma_pago_preferida : null,
-          notas: cliente.notas && cliente.notas.trim() !== '' ? cliente.notas : null,
-          direccion: {
-            calle: cliente.direccion_calle || '',
-            numero: cliente.direccion_numero || '',
-            barrio: cliente.direccion_barrio || '',
-            ciudad: cliente.direccion_ciudad || '',
-            provincia: cliente.direccion_provincia || '',
-            pais: cliente.direccion_pais || 'Perú',
-          },
-          created_by: user.id,
-        } as const;
+        // Construir nombre completo y notas
+        const nombreCompleto = `${cliente.nombre.trim()} ${cliente.apellido.trim()}`;
+        let notas = null;
 
-        if (cliente.estado_cliente) {
-          insertData.estado_cliente = cliente.estado_cliente;
+        if (cliente.proyecto_interes && cliente.proyecto_interes.trim()) {
+          notas = `Proyecto de interés: ${cliente.proyecto_interes.trim()}`;
         }
+
+        // Preparar datos para inserción
+        const insertData: ClienteInsertPayload = {
+          nombre: nombreCompleto,
+          tipo_cliente: 'persona',
+          telefono: cliente.telefono.trim(),
+          estado_cliente: 'lead',
+          notas,
+          created_by: user.id,
+          _proyecto_id: cliente._proyecto_id, // Guardar para vinculación posterior
+          _proyecto_nombre: cliente._proyecto_nombre,
+        };
 
         validatedClientes.push(insertData);
       } catch (error) {
@@ -160,23 +110,44 @@ export async function POST(request: NextRequest) {
     // Inserción fila por fila para saltar duplicados por constraint único de teléfono normalizado
     let importedCount = 0;
     let skippedDuplicates = 0;
+
     if (validatedClientes.length > 0) {
-      for (const row of validatedClientes) {
-        const { error } = await supabase
+      for (const cliente of validatedClientes) {
+        // Extraer campos internos antes de insertar
+        const { _proyecto_id, _proyecto_nombre, ...clienteData } = cliente;
+
+        const { data: nuevoCliente, error } = await supabase
           .from("cliente")
-          .insert(row);
+          .insert(clienteData)
+          .select('id')
+          .single();
+
         if (error) {
           const msg = String(error.message || '');
           if (msg.includes('duplicate key value') && msg.includes('uniq_cliente_phone_normalized')) {
             skippedDuplicates++;
             continue; // ignorar duplicados y seguir
           }
-          return NextResponse.json({ 
-            error: "Database error", 
-            details: error.message 
+          return NextResponse.json({
+            error: "Database error",
+            details: error.message
           }, { status: 500 });
         }
+
         importedCount++;
+
+        // Si se creó el cliente y hay un proyecto vinculado, crear la relación
+        if (nuevoCliente && _proyecto_id) {
+          await supabase
+            .from("cliente_propiedad_interes")
+            .insert({
+              cliente_id: nuevoCliente.id,
+              proyecto_id: _proyecto_id,
+              prioridad: 2,
+              notas: `Proyecto: ${_proyecto_nombre || 'sin nombre'}. Agregado automáticamente desde importación.`,
+              agregado_por: 'sistema'
+            });
+        }
       }
     }
 
@@ -198,7 +169,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Import error:", error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: "Internal server error",
       details: String(error)
     }, { status: 500 });
