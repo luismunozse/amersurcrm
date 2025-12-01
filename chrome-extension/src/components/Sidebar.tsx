@@ -8,6 +8,7 @@ import { MessageTemplates } from './MessageTemplates';
 import { ClientHistory } from './ClientHistory';
 import { UpdateLeadStatus } from './UpdateLeadStatus';
 import { ProjectInterest } from './ProjectInterest';
+import { QuickNotes } from './QuickNotes';
 
 export function Sidebar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -54,6 +55,32 @@ export function Sidebar() {
       setLastProcessedPhone(null);
     }
   }, [contact, apiClient]);
+
+  // Verificar pendientes cuando cambia el cliente
+  useEffect(() => {
+    async function checkPendientes() {
+      if (cliente && apiClient) {
+        try {
+          const { pendientes } = await apiClient.getPendientes(cliente.id);
+          // Enviar mensaje al content script para actualizar badge
+          window.parent.postMessage({
+            type: 'AMERSURCHAT_UPDATE_BADGE',
+            count: pendientes,
+          }, '*');
+        } catch (error) {
+          console.error('[Sidebar] Error verificando pendientes:', error);
+        }
+      } else {
+        // Sin cliente, limpiar badge
+        window.parent.postMessage({
+          type: 'AMERSURCHAT_UPDATE_BADGE',
+          count: 0,
+        }, '*');
+      }
+    }
+
+    checkPendientes();
+  }, [cliente, apiClient]);
 
   async function initAuth() {
     try {
@@ -237,6 +264,12 @@ export function Sidebar() {
                 <ProjectInterest
                   clienteId={cliente.id}
                   apiClient={apiClient!}
+                />
+
+                <QuickNotes
+                  clienteId={cliente.id}
+                  apiClient={apiClient!}
+                  onNotaAdded={() => searchCliente(contact.phone)}
                 />
 
                 <ClientHistory

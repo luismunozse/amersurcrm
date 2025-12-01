@@ -262,6 +262,36 @@ export class CRMApiClient {
       return null;
     }
   }
+
+  /**
+   * Agregar nota rápida al cliente (append a notas existentes)
+   */
+  async addQuickNote(clienteId: string, nota: string): Promise<any> {
+    try {
+      return await this.request(`/api/clientes/${clienteId}/notas`, {
+        method: 'POST',
+        body: JSON.stringify({ nota }),
+      });
+    } catch (error) {
+      console.error('[CRMApiClient] Error agregando nota:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener tareas pendientes de un cliente
+   */
+  async getPendientes(clienteId: string): Promise<{ pendientes: number; tiene_pendientes: boolean }> {
+    try {
+      const response = await this.request<{ pendientes: number; tiene_pendientes: boolean }>(
+        `/api/clientes/${clienteId}/pendientes`
+      );
+      return response;
+    } catch (error) {
+      console.error('[CRMApiClient] Error obteniendo pendientes:', error);
+      return { pendientes: 0, tiene_pendientes: false };
+    }
+  }
 }
 
 /**

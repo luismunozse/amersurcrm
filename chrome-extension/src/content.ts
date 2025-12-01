@@ -145,9 +145,48 @@ function injectSidebar() {
 
   toggleButton.addEventListener('click', () => toggleSidebar());
 
+  // Badge de notificaciones (inicialmente oculto)
+  const badge = document.createElement('div');
+  badge.id = 'amersurchat-badge';
+  badge.style.cssText = `
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: #ef4444;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    border: 2px solid white;
+  `;
+  toggleButton.appendChild(badge);
+
   document.body.appendChild(toggleButton);
 
   console.log('[AmersurChat] Sidebar inyectado correctamente');
+}
+
+/**
+ * Actualiza el badge del botón con el número de pendientes
+ */
+function updateBadge(count: number) {
+  const badge = document.getElementById('amersurchat-badge');
+  if (!badge) return;
+
+  if (count > 0) {
+    badge.textContent = count > 9 ? '9+' : count.toString();
+    badge.style.display = 'flex';
+    console.log(`[AmersurChat] Badge actualizado: ${count} pendiente(s)`);
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // Inicializar cuando WhatsApp Web esté listo
@@ -242,6 +281,15 @@ window.addEventListener('message', (event) => {
           success,
         }, '*');
       }
+    }
+  }
+
+  // Actualizar badge con pendientes
+  if (event.data.type === 'AMERSURCHAT_UPDATE_BADGE') {
+    console.log('[AmersurChat] Actualizando badge');
+    const { count } = event.data;
+    if (typeof count === 'number') {
+      updateBadge(count);
     }
   }
 });
