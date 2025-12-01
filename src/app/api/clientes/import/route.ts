@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { z } from "zod";
 
 const ClienteImportSchema = z.object({
@@ -17,7 +17,7 @@ interface ClienteInsertPayload {
   nombre: string;
   tipo_cliente: 'persona';
   telefono: string;
-  estado_cliente: 'lead';
+  estado_cliente: 'por_contactar';
   notas: string | null;
   created_by: string;
   _proyecto_id?: string; // Campo interno para vinculación
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     const clientesData: unknown[] = rawClientes;
 
     const supabase = await createServerOnlyClient();
+    const serviceSupabase = createServiceRoleClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
           nombre: nombreCompleto,
           tipo_cliente: 'persona',
           telefono: cliente.telefono.trim(),
-          estado_cliente: 'lead',
+          estado_cliente: 'por_contactar',
           notas,
           created_by: user.id,
           _proyecto_id: cliente._proyecto_id, // Guardar para vinculación posterior
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
         // Extraer campos internos antes de insertar
         const { _proyecto_id, _proyecto_nombre, ...clienteData } = cliente;
 
-        const { data: nuevoCliente, error } = await supabase
+        const { data: nuevoCliente, error } = await serviceSupabase
           .from("cliente")
           .insert(clienteData)
           .select('id')
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
 
         // Si se creó el cliente y hay un proyecto vinculado, crear la relación
         if (nuevoCliente && _proyecto_id) {
-          await supabase
+          await serviceSupabase
             .from("cliente_propiedad_interes")
             .insert({
               cliente_id: nuevoCliente.id,

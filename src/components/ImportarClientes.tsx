@@ -135,7 +135,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       }).filter((row) => Object.values(row).some((value) => value !== undefined && value !== null && String(value).trim() !== ''));
 
       setData(parsedData);
-      setStep(3);
+      setStep(2); // stay on preview step so the options remain visible
     } catch (error) {
       toast.error(getErrorMessage(error) || 'Error al procesar el archivo');
       setStep(1);
