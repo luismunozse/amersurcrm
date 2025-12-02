@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/auth/roles";
 
+interface VendedorConRol {
+  id: string;
+  username: string;
+  nombre_completo: string;
+  activo: boolean;
+  rol: { nombre: string } | { nombre: string }[] | null;
+}
+
 /**
  * GET /api/admin/vendedores-activos
  * Obtiene la lista de vendedores activos configurados para asignación automática
@@ -125,8 +133,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const vendedorData = vendedor as unknown as VendedorConRol;
+
     // Verificar que el vendedor esté activo
-    if (!vendedor.activo) {
+    if (!vendedorData.activo) {
       return NextResponse.json(
         { error: "El vendedor no está activo en el sistema" },
         { status: 400 }
@@ -134,9 +144,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que tiene rol de vendedor
-    const rolNombre = Array.isArray(vendedor.rol)
-      ? vendedor.rol[0]?.nombre
-      : vendedor.rol?.nombre;
+    const rolNombre = Array.isArray(vendedorData.rol)
+      ? vendedorData.rol[0]?.nombre
+      : vendedorData.rol?.nombre;
 
     if (rolNombre !== "ROL_VENDEDOR") {
       return NextResponse.json(
@@ -185,7 +195,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(
-      `✅ [VendedoresActivos] Vendedor ${vendedor.username} agregado con orden ${nuevoOrden}`
+      `✅ [VendedoresActivos] Vendedor ${vendedorData.username} agregado con orden ${nuevoOrden}`
     );
 
     return NextResponse.json({
