@@ -80,7 +80,9 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
             </svg>
           </div>
           <div className="flex-1">
-            <h2 className="font-semibold text-lg">{contact.name}</h2>
+            <h2 className="font-semibold text-lg">
+              {cliente?.nombre || contact.name}
+            </h2>
             <p className="text-sm opacity-90">{contact.phone}</p>
           </div>
         </div>
