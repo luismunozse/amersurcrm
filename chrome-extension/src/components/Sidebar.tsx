@@ -112,6 +112,13 @@ export function Sidebar() {
       if (found) {
         // Cliente existe en el CRM
         setCliente(found);
+        // Reflejar nombre del CRM en el contacto para mostrarlo en el encabezado
+        setContact((prev) => {
+          if (!prev) return prev;
+          const normalizedName = (found.nombre || '').trim();
+          if (!normalizedName) return prev;
+          return { ...prev, name: normalizedName };
+        });
         console.log('[Sidebar] Cliente encontrado en CRM:', found.id);
       } else {
         // Cliente NO existe - mostrar formulario para crear lead manualmente

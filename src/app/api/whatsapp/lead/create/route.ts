@@ -16,19 +16,6 @@ interface WhatsAppLeadPayload {
   fecha_contacto?: string;
 }
 
-type RawVendedor = {
-  id: string;
-  username: string | null;
-  nombre_completo: string | null;
-  rol?: { nombre?: string | null } | Array<{ nombre?: string | null }> | null;
-};
-
-type Vendedor = {
-  id: string;
-  username: string;
-  nombre_completo: string | null;
-};
-
 /**
  * POST /api/whatsapp/lead/create
  *
@@ -78,9 +65,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Seleccionar vendedor disponible (round-robin)
-    const vendedor = await selectVendedorDisponible(supabase);
-    const createdBy = vendedor?.id ?? CRM_AUTOMATION_USER_ID;
+    // Usuario que crea el lead (sistema de automatización)
+    const createdBy = CRM_AUTOMATION_USER_ID;
 
     if (!createdBy) {
       throw new Error("No hay un usuario disponible para created_by (define CRM_AUTOMATION_USER_ID).");
@@ -102,13 +88,14 @@ export async function POST(request: NextRequest) {
     };
 
     // Insertar lead usando función RPC (bypasea RLS con SECURITY DEFINER)
+    // El vendedor se asigna automáticamente usando la lista de vendedores activos
     const { data, error } = await supabase
       .rpc("create_whatsapp_lead", {
         p_nombre: nombre,
         p_telefono: body.telefono,
         p_telefono_whatsapp: body.telefono,
         p_origen_lead: origenLead,
-        p_vendedor_asignado: vendedor?.username ?? null,
+        p_vendedor_asignado: null, // NULL = asignación automática
         p_created_by: createdBy,
         p_notas: notas,
         p_direccion: direccion,
@@ -132,15 +119,25 @@ export async function POST(request: NextRequest) {
       throw new Error("No se pudo crear el lead");
     }
 
-    const leadData = data as { id: string; nombre: string; telefono: string };
+    const leadData = data as { id: string };
 
-    console.log(`✅ [WhatsAppLead] Lead creado: ${leadData.id} | Vendedor: ${vendedor?.username ?? "Sin asignar"}`);
+    // Obtener datos del lead creado para logging
+    const { data: leadCompleto } = await supabase
+      .schema("crm")
+      .from("cliente")
+      .select("id, nombre, vendedor_asignado")
+      .eq("id", leadData.id)
+      .single();
+
+    const vendedorAsignado = leadCompleto?.vendedor_asignado ?? "Sin asignar";
+
+    console.log(`✅ [WhatsAppLead] Lead creado: ${leadData.id} | Vendedor: ${vendedorAsignado}`);
 
     return NextResponse.json({
       success: true,
       message: "Lead creado exitosamente",
       clienteId: leadData.id,
-      vendedor: vendedor?.nombre_completo ?? vendedor?.username ?? null,
+      vendedor: vendedorAsignado,
       existente: false,
     });
   } catch (error) {
@@ -163,65 +160,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Selecciona el vendedor con menos clientes asignados (round-robin)
- */
-async function selectVendedorDisponible(supabase: ReturnType<typeof createServiceRoleClient>) {
-  const { data, error } = await supabase
-    .schema("crm")
-    .from("usuario_perfil")
-    .select("id, username, nombre_completo, rol:rol!usuario_perfil_rol_fk(nombre)")
-    .eq("activo", true);
-
-  if (error) {
-    console.error("[WhatsAppLead] Error obteniendo vendedores:", error);
-    return null;
-  }
-
-  const rawVendedores = (data ?? []) as RawVendedor[];
-
-  const vendedores: Vendedor[] = rawVendedores
-    .map((v) => {
-      const rolNombre = Array.isArray(v.rol) ? v.rol[0]?.nombre : v.rol?.nombre;
-      if (rolNombre !== "ROL_VENDEDOR" || !v.username) return null;
-      return {
-        id: v.id,
-        username: v.username,
-        nombre_completo: v.nombre_completo ?? null,
-      };
-    })
-    .filter((v): v is Vendedor => v !== null);
-
-  if (vendedores.length === 0) {
-    return null;
-  }
-
-  const conteos = await Promise.all(
-    vendedores.map(async (vend) => {
-      const { count, error } = await supabase
-        .schema("crm")
-        .from("cliente")
-        .select("id", { count: "exact", head: true })
-        .eq("vendedor_asignado", vend.username);
-      return {
-        vendedor: vend,
-        count: error ? Number.POSITIVE_INFINITY : count ?? 0,
-      };
-    })
-  );
-
-  conteos.sort((a, b) => {
-    if (a.count === b.count) {
-      const nameA = a.vendedor.nombre_completo ?? a.vendedor.username;
-      const nameB = b.vendedor.nombre_completo ?? b.vendedor.username;
-      return nameA.localeCompare(nameB);
-    }
-    return a.count - b.count;
-  });
-
-  return conteos[0]?.vendedor ?? null;
 }
 
 /**
