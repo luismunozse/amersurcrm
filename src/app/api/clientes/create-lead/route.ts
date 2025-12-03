@@ -86,16 +86,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Obtener username del usuario actual
-    const { data: perfil } = await supabaseAdmin
-      .schema("crm")
-      .from("usuario_perfil")
-      .select("username")
-      .eq("id", user.id)
-      .single();
-
-    const vendedorAsignado = perfil?.username || null;
-
     // Preparar datos del lead
     const nombreLead = nombre || `Lead WhatsApp ${telefonoLimpio.slice(-4)}`;
 
@@ -120,7 +110,8 @@ export async function POST(request: NextRequest) {
         p_telefono: telefonoLimpio,
         p_telefono_whatsapp: telefonoLimpio,
         p_origen_lead: "whatsapp_web",
-        p_vendedor_asignado: vendedorAsignado,
+        // Enviar NULL para forzar la asignación automática usando la lista de vendedores activos
+        p_vendedor_asignado: null,
         p_created_by: user.id,
         p_notas: notas,
         p_direccion: direccion,
@@ -148,13 +139,24 @@ export async function POST(request: NextRequest) {
 
     const clienteData = nuevoCliente as { id: string; nombre: string; telefono: string };
 
-    console.log(`✅ [CreateLead] Lead creado exitosamente: ${clienteData.id} por usuario ${user.id}`);
+    // Consultar el vendedor asignado para informar a la extensión y dejar trazabilidad
+    const { data: leadDetalle } = await supabaseAdmin
+      .schema("crm")
+      .from("cliente")
+      .select("vendedor_asignado")
+      .eq("id", clienteData.id)
+      .single();
+
+    const vendedorAsignado = leadDetalle?.vendedor_asignado || null;
+
+    console.log(`✅ [CreateLead] Lead creado: ${clienteData.id} | Vendedor asignado: ${vendedorAsignado ?? "sin_vendedor"}`);
 
     return NextResponse.json({
       success: true,
       message: "Lead creado exitosamente",
       clienteId: clienteData.id,
       cliente: clienteData,
+      vendedor: vendedorAsignado || undefined,
       existente: false,
     });
 

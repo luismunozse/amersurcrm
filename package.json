@@ -75,6 +75,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.21",
+    "baseline-browser-mapping": "^2.8.32",
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",

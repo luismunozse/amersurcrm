@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import EliminarVendedorActivoModal from "@/components/EliminarVendedorActivoModal";
+import CambiarEstadoVendedorActivoModal from "@/components/CambiarEstadoVendedorActivoModal";
+import EliminarVendedoresMultipleModal from "@/components/EliminarVendedoresMultipleModal";
 
 interface VendedorActivo {
   id: string;
@@ -34,6 +37,17 @@ export default function VendedoresActivosPage() {
   const [cargando, setCargando] = useState(true);
   const [mostrarAgregar, setMostrarAgregar] = useState(false);
   const [proximoIndice, setProximoIndice] = useState(0);
+
+  // Estados para modales
+  const [eliminarModalOpen, setEliminarModalOpen] = useState(false);
+  const [vendedorAEliminar, setVendedorAEliminar] = useState<VendedorActivo | null>(null);
+  const [cambiarEstadoModalOpen, setCambiarEstadoModalOpen] = useState(false);
+  const [vendedorACambiarEstado, setVendedorACambiarEstado] = useState<VendedorActivo | null>(null);
+  const [eliminarMultipleModalOpen, setEliminarMultipleModalOpen] = useState(false);
+
+  // Estados para selección múltiple
+  const [vendedoresSeleccionados, setVendedoresSeleccionados] = useState<Set<string>>(new Set());
+  const [vendedoresDisponiblesSeleccionados, setVendedoresDisponiblesSeleccionados] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && isAdmin) {
@@ -91,7 +105,7 @@ export default function VendedoresActivosPage() {
 
       if (data.success) {
         toast.success("Vendedor agregado exitosamente");
-        cargarVendedores();
+        await cargarVendedores();
         setMostrarAgregar(false);
       } else {
         toast.error(data.error || "Error al agregar vendedor");
@@ -102,13 +116,16 @@ export default function VendedoresActivosPage() {
     }
   };
 
-  const eliminarVendedor = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar este vendedor de la lista?")) {
-      return;
-    }
+  const abrirModalEliminar = (vendedor: VendedorActivo) => {
+    setVendedorAEliminar(vendedor);
+    setEliminarModalOpen(true);
+  };
+
+  const confirmarEliminarVendedor = async () => {
+    if (!vendedorAEliminar) return;
 
     try {
-      const response = await fetch(`/api/admin/vendedores-activos?id=${id}`, {
+      const response = await fetch(`/api/admin/vendedores-activos?id=${vendedorAEliminar.id}`, {
         method: "DELETE",
       });
 
@@ -116,35 +133,48 @@ export default function VendedoresActivosPage() {
 
       if (data.success) {
         toast.success("Vendedor eliminado exitosamente");
-        cargarVendedores();
+        await cargarVendedores();
       } else {
         toast.error(data.error || "Error al eliminar vendedor");
       }
     } catch (error) {
       console.error("Error eliminando vendedor:", error);
       toast.error("Error al eliminar vendedor");
+    } finally {
+      setEliminarModalOpen(false);
+      setVendedorAEliminar(null);
     }
   };
 
-  const toggleActivo = async (id: string, activo: boolean) => {
+  const abrirModalCambiarEstado = (vendedor: VendedorActivo) => {
+    setVendedorACambiarEstado(vendedor);
+    setCambiarEstadoModalOpen(true);
+  };
+
+  const confirmarCambiarEstado = async () => {
+    if (!vendedorACambiarEstado) return;
+
     try {
       const response = await fetch("/api/admin/vendedores-activos", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, activo: !activo }),
+        body: JSON.stringify({ id: vendedorACambiarEstado.id, activo: !vendedorACambiarEstado.activo }),
       });
 
       const data = await response.json();
 
       if (data.success) {
         toast.success(data.message);
-        cargarVendedores();
+        await cargarVendedores();
       } else {
         toast.error(data.error || "Error al actualizar vendedor");
       }
     } catch (error) {
       console.error("Error actualizando vendedor:", error);
       toast.error("Error al actualizar vendedor");
+    } finally {
+      setCambiarEstadoModalOpen(false);
+      setVendedorACambiarEstado(null);
     }
   };
 
@@ -174,13 +204,113 @@ export default function VendedoresActivosPage() {
 
       if (data.success) {
         toast.success("Orden actualizado");
-        cargarVendedores();
+        await cargarVendedores();
       } else {
         toast.error(data.error || "Error al actualizar orden");
       }
     } catch (error) {
       console.error("Error actualizando orden:", error);
       toast.error("Error al actualizar orden");
+    }
+  };
+
+  // ============= FUNCIONES DE SELECCIÓN MÚLTIPLE =============
+
+  const toggleSeleccionVendedor = (id: string) => {
+    const nuevaSeleccion = new Set(vendedoresSeleccionados);
+    if (nuevaSeleccion.has(id)) {
+      nuevaSeleccion.delete(id);
+    } else {
+      nuevaSeleccion.add(id);
+    }
+    setVendedoresSeleccionados(nuevaSeleccion);
+  };
+
+  const toggleSeleccionDisponible = (id: string) => {
+    const nuevaSeleccion = new Set(vendedoresDisponiblesSeleccionados);
+    if (nuevaSeleccion.has(id)) {
+      nuevaSeleccion.delete(id);
+    } else {
+      nuevaSeleccion.add(id);
+    }
+    setVendedoresDisponiblesSeleccionados(nuevaSeleccion);
+  };
+
+  const seleccionarTodosVendedores = () => {
+    if (vendedoresSeleccionados.size === vendedores.length) {
+      setVendedoresSeleccionados(new Set());
+    } else {
+      setVendedoresSeleccionados(new Set(vendedores.map(v => v.id)));
+    }
+  };
+
+  const seleccionarTodosDisponibles = () => {
+    if (vendedoresDisponiblesSeleccionados.size === vendedoresFiltrados.length) {
+      setVendedoresDisponiblesSeleccionados(new Set());
+    } else {
+      setVendedoresDisponiblesSeleccionados(new Set(vendedoresFiltrados.map(v => v.id)));
+    }
+  };
+
+  const abrirModalEliminarMultiple = () => {
+    if (vendedoresSeleccionados.size === 0) return;
+    setEliminarMultipleModalOpen(true);
+  };
+
+  const confirmarEliminarSeleccionados = async () => {
+    if (vendedoresSeleccionados.size === 0) return;
+
+    try {
+      const promesas = Array.from(vendedoresSeleccionados).map(id =>
+        fetch(`/api/admin/vendedores-activos?id=${id}`, {
+          method: "DELETE",
+        })
+      );
+
+      const resultados = await Promise.all(promesas);
+      const errores = resultados.filter(r => !r.ok);
+
+      if (errores.length === 0) {
+        toast.success(`${vendedoresSeleccionados.size} vendedor(es) eliminado(s) exitosamente`);
+        setVendedoresSeleccionados(new Set());
+        await cargarVendedores();
+      } else {
+        toast.error(`Error al eliminar ${errores.length} vendedor(es)`);
+      }
+    } catch (error) {
+      console.error("Error eliminando vendedores:", error);
+      toast.error("Error al eliminar vendedores");
+    } finally {
+      setEliminarMultipleModalOpen(false);
+    }
+  };
+
+  const agregarSeleccionados = async () => {
+    if (vendedoresDisponiblesSeleccionados.size === 0) return;
+
+    try {
+      const promesas = Array.from(vendedoresDisponiblesSeleccionados).map(vendedorId =>
+        fetch("/api/admin/vendedores-activos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vendedor_id: vendedorId }),
+        })
+      );
+
+      const resultados = await Promise.all(promesas);
+      const errores = resultados.filter(r => !r.ok);
+
+      if (errores.length === 0) {
+        toast.success(`${vendedoresDisponiblesSeleccionados.size} vendedor(es) agregado(s) exitosamente`);
+        setVendedoresDisponiblesSeleccionados(new Set());
+        await cargarVendedores();
+        setMostrarAgregar(false);
+      } else {
+        toast.error(`Error al agregar ${errores.length} vendedor(es)`);
+      }
+    } catch (error) {
+      console.error("Error agregando vendedores:", error);
+      toast.error("Error al agregar vendedores");
     }
   };
 
@@ -258,45 +388,104 @@ export default function VendedoresActivosPage() {
       {/* Modal agregar vendedor */}
       {mostrarAgregar && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3">Seleccionar Vendedor</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900">Seleccionar Vendedores</h3>
+            {vendedoresFiltrados.length > 0 && (
+              <button
+                onClick={seleccionarTodosDisponibles}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                {vendedoresDisponiblesSeleccionados.size === vendedoresFiltrados.length
+                  ? "Deseleccionar todos"
+                  : "Seleccionar todos"}
+              </button>
+            )}
+          </div>
+
           {vendedoresFiltrados.length === 0 ? (
             <p className="text-gray-600">No hay más vendedores disponibles para agregar</p>
           ) : (
-            <div className="space-y-2">
-              {vendedoresFiltrados.map((vendedor) => (
-                <div
-                  key={vendedor.id}
-                  className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">{vendedor.nombre_completo}</p>
-                    <p className="text-sm text-gray-600">@{vendedor.username}</p>
-                  </div>
-                  <button
-                    onClick={() => agregarVendedor(vendedor.id)}
-                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition text-sm"
+            <>
+              <div className="space-y-2 mb-4">
+                {vendedoresFiltrados.map((vendedor) => (
+                  <div
+                    key={vendedor.id}
+                    className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-3"
                   >
-                    Agregar
-                  </button>
+                    <input
+                      type="checkbox"
+                      checked={vendedoresDisponiblesSeleccionados.has(vendedor.id)}
+                      onChange={() => toggleSeleccionDisponible(vendedor.id)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{vendedor.nombre_completo}</p>
+                      <p className="text-sm text-gray-600">@{vendedor.username}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {vendedoresDisponiblesSeleccionados.size > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <p className="text-sm text-blue-800">
+                    {vendedoresDisponiblesSeleccionados.size} vendedor(es) seleccionado(s)
+                  </p>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
-          <button
-            onClick={() => setMostrarAgregar(false)}
-            className="mt-3 text-gray-600 hover:text-gray-800"
-          >
-            Cancelar
-          </button>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setMostrarAgregar(false);
+                setVendedoresDisponiblesSeleccionados(new Set());
+              }}
+              className="flex-1 px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
+            >
+              Cancelar
+            </button>
+            {vendedoresDisponiblesSeleccionados.size > 0 && (
+              <button
+                onClick={agregarSeleccionados}
+                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+              >
+                Agregar {vendedoresDisponiblesSeleccionados.size} vendedor(es)
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Lista de vendedores activos */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">
-            Vendedores Activos ({vendedores.filter((v) => v.activo).length})
-          </h2>
+        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {vendedores.length > 0 && (
+              <input
+                type="checkbox"
+                checked={vendedoresSeleccionados.size === vendedores.length && vendedores.length > 0}
+                onChange={seleccionarTodosVendedores}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+            )}
+            <h2 className="font-semibold text-gray-900">
+              Vendedores Activos ({vendedores.filter((v) => v.activo).length})
+            </h2>
+          </div>
+
+          {vendedoresSeleccionados.size > 0 && (
+            <button
+              onClick={abrirModalEliminarMultiple}
+              className="flex items-center gap-2 text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Eliminar {vendedoresSeleccionados.size}
+            </button>
+          )}
         </div>
 
         {cargando ? (
@@ -317,6 +506,12 @@ export default function VendedoresActivosPage() {
                 }`}
               >
                 <div className="flex items-center gap-4 flex-1">
+                  <input
+                    type="checkbox"
+                    checked={vendedoresSeleccionados.has(vendedor.id)}
+                    onChange={() => toggleSeleccionVendedor(vendedor.id)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
                   <div className="font-bold text-gray-400 text-lg w-8">{vendedor.orden}.</div>
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">
@@ -368,7 +563,7 @@ export default function VendedoresActivosPage() {
 
                   {/* Toggle activo */}
                   <button
-                    onClick={() => toggleActivo(vendedor.id, vendedor.activo)}
+                    onClick={() => abrirModalCambiarEstado(vendedor)}
                     className={`px-3 py-1 rounded text-sm ${
                       vendedor.activo
                         ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
@@ -380,7 +575,7 @@ export default function VendedoresActivosPage() {
 
                   {/* Eliminar */}
                   <button
-                    onClick={() => eliminarVendedor(vendedor.id)}
+                    onClick={() => abrirModalEliminar(vendedor)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded"
                     title="Eliminar"
                   >
@@ -405,6 +600,35 @@ export default function VendedoresActivosPage() {
           <li>• Puedes reordenar, activar/desactivar o eliminar vendedores en cualquier momento</li>
         </ul>
       </div>
+
+      {/* Modales */}
+      <EliminarVendedorActivoModal
+        open={eliminarModalOpen}
+        onClose={() => {
+          setEliminarModalOpen(false);
+          setVendedorAEliminar(null);
+        }}
+        vendedorNombre={vendedorAEliminar?.usuario_perfil.nombre_completo || ""}
+        onConfirm={confirmarEliminarVendedor}
+      />
+
+      <CambiarEstadoVendedorActivoModal
+        open={cambiarEstadoModalOpen}
+        onClose={() => {
+          setCambiarEstadoModalOpen(false);
+          setVendedorACambiarEstado(null);
+        }}
+        vendedorNombre={vendedorACambiarEstado?.usuario_perfil.nombre_completo || ""}
+        estadoActual={vendedorACambiarEstado?.activo || false}
+        onConfirm={confirmarCambiarEstado}
+      />
+
+      <EliminarVendedoresMultipleModal
+        open={eliminarMultipleModalOpen}
+        onClose={() => setEliminarMultipleModalOpen(false)}
+        cantidad={vendedoresSeleccionados.size}
+        onConfirm={confirmarEliminarSeleccionados}
+      />
     </div>
   );
 }

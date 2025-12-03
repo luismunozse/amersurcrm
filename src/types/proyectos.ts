@@ -86,7 +86,7 @@ export interface Lote {
   estado: LoteEstado;
   coordenadas: LoteCoordenadas | null;
   descripcion: string | null;
-  caracteristicas: Record<string, any> | null;
+  caracteristicas: Record<string, unknown> | null;
   imagen_url: string | null;
   created_at: string;
   updated_at: string;
@@ -115,7 +115,7 @@ export interface LoteFormData {
   precio_venta?: number | null;
   estado?: LoteEstado;
   descripcion?: string | null;
-  caracteristicas?: Record<string, any> | null;
+  caracteristicas?: Record<string, unknown> | null;
   coordenadas?: LoteCoordenadas | null;
 }
 
