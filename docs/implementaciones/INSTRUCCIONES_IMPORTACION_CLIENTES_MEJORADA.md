@@ -26,7 +26,7 @@ Se ha creado el archivo `PLANTILLA_IMPORTACION_CLIENTES_MEJORADA.csv` con ejempl
 | direccion_pais | Texto | No | País | Cualquier texto (default: `Perú`) |
 | estado_cliente | Texto | No | Estado del cliente | `por_contactar`, `contactado`, `transferido` (default: `por_contactar`) |
 | origen_lead | Texto | No | Origen del lead | Cualquier texto |
-| vendedor_asignado | Texto | No | Vendedor asignado | Cualquier texto |
+| vendedor_asignado | Texto | No | Username del vendedor asignado | Debe existir un usuario activo con rol `ROL_VENDEDOR` o `ROL_COORDINADOR_VENTAS`. Ej: `mgonzalez` |
 | proxima_accion | Texto | No | Próxima acción | Cualquier texto |
 | interes_principal | Texto | No | Interés principal | Cualquier texto |
 | capacidad_compra_estimada | Número | No | Capacidad de compra | Número decimal (ej: 150000.50) |
@@ -75,6 +75,13 @@ Se ha creado el archivo `PLANTILLA_IMPORTACION_CLIENTES_MEJORADA.csv` con ejempl
 6. **Email único:** Si usas email, debe ser único en el sistema
 7. **Formato CSV:** Usa comillas para textos que contengan comas o espacios
 8. **Codificación:** Guarda el archivo en UTF-8
+
+### Asignación de Vendedores (Opcional)
+
+1. En la columna `vendedor_asignado` escribe el **username exacto** del vendedor (ej: `clopez`, `mgonzalez`). No se aceptan nombres completos ni correos.
+2. Solo se aceptan usuarios activos con rol `Vendedor` o `Coordinador`. Si el username no existe, la fila se marcará con error y no se importará.
+3. Desde la ventana de importación puedes descargar un **Catálogo de Vendedores** (CSV) para copiar y pegar los usernames correctos.
+4. Si dejas la columna vacía, el cliente se importará sin vendedor asignado y podrás asignarlo manualmente después.
 
 ## Validaciones del Sistema
 

@@ -17,9 +17,12 @@ interface ClienteImportData {
   apellido: string;
   telefono: string;
   proyecto_interes?: string;
+  vendedor_asignado?: string;
   // Campos internos para validación
   _proyecto_id?: string;
   _proyecto_nombre?: string;
+  _vendedor_username?: string;
+  _vendedor_nombre?: string | null;
 }
 
 interface ImportResult {
@@ -50,7 +53,21 @@ const IMPORTABLE_FIELDS: Array<keyof ClienteImportData> = [
   'apellido',
   'telefono',
   'proyecto_interes',
+  'vendedor_asignado',
 ];
+
+type ProyectoLookupItem = {
+  id: string;
+  nombre: string;
+  normalized: string;
+};
+
+type VendedorLookupItem = {
+  id: string;
+  username: string;
+  nombre: string | null;
+  normalized: string;
+};
 
 export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   const [step, setStep] = useState(1);
@@ -60,6 +77,8 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [validationResult, setValidationResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const proyectosCacheRef = useRef<ProyectoLookupItem[] | null>(null);
+  const vendedoresCacheRef = useRef<VendedorLookupItem[] | null>(null);
   const router = useRouter();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +148,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                 ? cellValue.toISOString()
                 : String(cellValue);
 
-          rowData[targetKey] = stringValue as ClienteImportData[typeof targetKey];
+          rowData[targetKey] = stringValue;
         });
         return rowData as ClienteImportData;
       }).filter((row) => Object.values(row).some((value) => value !== undefined && value !== null && String(value).trim() !== ''));
@@ -178,6 +197,12 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       'proyecto_interes': 'proyecto_interes',
       'interes': 'proyecto_interes',
       'proyecto_de_interes': 'proyecto_interes',
+      'vendedor': 'vendedor_asignado',
+      'vendedor_asignado': 'vendedor_asignado',
+      'asesor': 'vendedor_asignado',
+      'seller': 'vendedor_asignado',
+      'usuario_vendedor': 'vendedor_asignado',
+      'username_vendedor': 'vendedor_asignado',
     };
 
     return columnMapping[normalized] || normalized;
@@ -192,23 +217,22 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     // Obtener teléfonos existentes en la BD
     const existingPhones = await checkExistingPhones(data.map(d => d.telefono).filter(Boolean));
 
-    // Buscar proyectos para cada row con proyecto_interes
-    toast.loading('Validando proyectos...', { id: 'validating-projects' });
+    // Precargar catálogos si hay filas que lo requieran
+    const requiereProyectos = data.some((row) => row.proyecto_interes && row.proyecto_interes.trim());
+    const requiereVendedores = data.some((row) => row.vendedor_asignado && row.vendedor_asignado.trim());
+    let proyectosCatalog: ProyectoLookupItem[] = [];
+    let vendedoresCatalog: VendedorLookupItem[] = [];
 
-    for (let index = 0; index < data.length; index++) {
-      const row = data[index];
-
-      if (row.proyecto_interes && row.proyecto_interes.trim()) {
-        const proyecto = await searchProyecto(row.proyecto_interes);
-        if (proyecto) {
-          // Guardar ID y nombre del proyecto encontrado
-          row._proyecto_id = proyecto.id;
-          row._proyecto_nombre = proyecto.nombre;
-        }
+    if (requiereProyectos || requiereVendedores) {
+      toast.loading('Cargando catálogos de referencia...', { id: 'validating-catalogs' });
+      if (requiereProyectos) {
+        proyectosCatalog = await loadProyectosCatalog();
       }
+      if (requiereVendedores) {
+        vendedoresCatalog = await loadVendedoresCatalog();
+      }
+      toast.dismiss('validating-catalogs');
     }
-
-    toast.dismiss('validating-projects');
 
     // Validar cada fila
     data.forEach((row, index) => {
@@ -233,11 +257,36 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
         duplicates++;
       }
 
-      // Validar proyecto (warning, no error)
-      if (row.proyecto_interes && row.proyecto_interes.trim()) {
-        if (!row._proyecto_id) {
-          rowWarnings.push(`Proyecto "${row.proyecto_interes}" no encontrado, se guardará como texto en notas`);
+      // Resolver proyecto en cache si corresponde
+      if (row.proyecto_interes && row.proyecto_interes.trim() && proyectosCatalog.length > 0) {
+        const match = findProyectoMatch(row.proyecto_interes, proyectosCatalog);
+        if (match) {
+          row._proyecto_id = match.id;
+          row._proyecto_nombre = match.nombre;
         }
+      }
+
+      // Validar proyecto (warning, no error)
+      if (row.proyecto_interes && row.proyecto_interes.trim() && !row._proyecto_id) {
+        rowWarnings.push(`Proyecto "${row.proyecto_interes}" no encontrado, se guardará como texto en notas`);
+      }
+
+      // Validar vendedor asignado (error si no existe)
+      if (row.vendedor_asignado && row.vendedor_asignado.trim()) {
+        if (vendedoresCatalog.length === 0) {
+          rowErrors.push('No hay vendedores disponibles. Deja la columna "vendedor_asignado" vacía o verifica que existan usuarios con rol vendedor.');
+        } else {
+          const vendedor = findVendedorMatch(row.vendedor_asignado, vendedoresCatalog);
+          if (vendedor) {
+            row._vendedor_username = vendedor.username;
+            row._vendedor_nombre = vendedor.nombre;
+          } else {
+            rowErrors.push(`Vendedor "${row.vendedor_asignado}" no encontrado. Usa el username exacto (ej: mlopez).`);
+          }
+        }
+      } else {
+        row._vendedor_username = undefined;
+        row._vendedor_nombre = undefined;
       }
 
       // Agregar a listas según tenga errores o no
@@ -272,29 +321,56 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     };
   };
 
-  const searchProyecto = async (nombre: string): Promise<{ id: string; nombre: string } | null> => {
+  const loadProyectosCatalog = async (): Promise<ProyectoLookupItem[]> => {
+    if (proyectosCacheRef.current) {
+      return proyectosCacheRef.current;
+    }
+
     try {
-      const response = await fetch('/api/proyectos/search-by-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: nombre.trim() }),
-      });
-
-      if (!response.ok) return null;
-
-      const data = await response.json();
-
-      if (data.found && data.proyecto) {
-        return {
-          id: data.proyecto.id,
-          nombre: data.proyecto.nombre
-        };
+      const response = await fetch('/api/proyectos/list');
+      if (!response.ok) {
+        throw new Error(`No se pudo cargar la lista de proyectos (HTTP ${response.status})`);
       }
-
-      return null;
+      const payload = await response.json();
+      const proyectos: Array<{ id: string; nombre: string }> = payload?.proyectos || [];
+      proyectosCacheRef.current = proyectos.map((proyecto) => ({
+        id: proyecto.id,
+        nombre: proyecto.nombre,
+        normalized: normalizeProjectName(proyecto.nombre),
+      }));
+      return proyectosCacheRef.current;
     } catch (error) {
-      console.error('Error searching proyecto:', error);
-      return null;
+      console.error('Error cargando proyectos:', error);
+      toast.error('No se pudo cargar la lista de proyectos para validar coincidencias');
+      proyectosCacheRef.current = [];
+      return [];
+    }
+  };
+
+  const loadVendedoresCatalog = async (): Promise<VendedorLookupItem[]> => {
+    if (vendedoresCacheRef.current) {
+      return vendedoresCacheRef.current;
+    }
+
+    try {
+      const response = await fetch('/api/clientes/vendedores', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`No se pudo cargar la lista de vendedores (HTTP ${response.status})`);
+      }
+      const payload = await response.json();
+      const vendedores: Array<{ id: string; username: string; nombre_completo?: string | null }> = payload?.vendedores || [];
+      vendedoresCacheRef.current = vendedores.map((v) => ({
+        id: v.id,
+        username: v.username,
+        nombre: v.nombre_completo || null,
+        normalized: normalizeUsername(v.username),
+      }));
+      return vendedoresCacheRef.current;
+    } catch (error) {
+      console.error('Error cargando vendedores:', error);
+      toast.error('No se pudo cargar la lista de vendedores');
+      vendedoresCacheRef.current = [];
+      return [];
     }
   };
 
@@ -320,6 +396,20 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     return String(value || '').replace(/\D/g, '');
   };
 
+  const normalizeProjectName = (value: string): string => {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const normalizeUsername = (value: string): string => {
+    return (value || '').trim().toLowerCase();
+  };
+
   const isValidPhone = (phone: string): boolean => {
     const raw = String(phone || '');
     const minimal = raw.replace(/[\s\-\(\)]/g, '');
@@ -340,6 +430,86 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     const internationalPhoneRegex = /^[\+]?[0-9]{7,15}$/; // 7–15 dígitos, opcional +
 
     return peruvianPhoneRegex.test(cleanForCheck) || internationalPhoneRegex.test(minimal);
+  };
+
+  const findProyectoMatch = (nombre: string, catalog: ProyectoLookupItem[]): { id: string; nombre: string } | null => {
+    const normalizedSearch = normalizeProjectName(nombre);
+    if (!normalizedSearch) return null;
+
+    // 1. Match exacto
+    const exact = catalog.find((item) => item.normalized === normalizedSearch);
+    if (exact) return { id: exact.id, nombre: exact.nombre };
+
+    // 2. Contiene
+    const contains = catalog.filter(
+      (item) =>
+        item.normalized.includes(normalizedSearch) || normalizedSearch.includes(item.normalized)
+    );
+    if (contains.length === 1) return { id: contains[0].id, nombre: contains[0].nombre };
+
+    // 3. Fuzzy matching
+    const scored = catalog
+      .map((item) => ({
+        item,
+        score: calculateSimilarity(normalizedSearch, item.normalized),
+      }))
+      .filter(({ score }) => score >= 0.45)
+      .sort((a, b) => b.score - a.score);
+
+    if (scored.length > 0) {
+      return { id: scored[0].item.id, nombre: scored[0].item.nombre };
+    }
+
+    return null;
+  };
+
+  const calculateSimilarity = (term: string, candidate: string): number => {
+    if (!term || !candidate) return 0;
+
+    if (candidate.includes(term)) return 0.85;
+    if (term.includes(candidate)) return 0.75;
+
+    const distance = levenshteinDistance(term, candidate);
+    const similarity = (Math.max(term.length, candidate.length) - distance) / Math.max(term.length, candidate.length);
+
+    const wordsTerm = term.split(' ');
+    const wordsCandidate = candidate.split(' ');
+    const commonWords = wordsTerm.filter((word) =>
+      wordsCandidate.some((candidateWord) => candidateWord.includes(word) || word.includes(candidateWord))
+    );
+    const wordScore = commonWords.length / Math.max(wordsTerm.length, wordsCandidate.length, 1);
+
+    return (similarity * 0.7) + (wordScore * 0.3);
+  };
+
+  const findVendedorMatch = (valor: string, catalog: VendedorLookupItem[]): VendedorLookupItem | null => {
+    const normalized = normalizeUsername(valor);
+    if (!normalized) return null;
+    return catalog.find((item) => item.normalized === normalized) || null;
+  };
+
+  const levenshteinDistance = (a: string, b: string): number => {
+    const matrix: number[][] = [];
+    for (let i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
   };
 
   const handleValidate = async () => {
@@ -416,9 +586,6 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
 
   const importData = async (data: ClienteImportData[]) => {
     const BATCH_SIZE = 100;
-    let totalImported = 0;
-    let totalSkippedDuplicates = 0;
-
     for (let i = 0; i < data.length; i += BATCH_SIZE) {
       const batch = data.slice(i, i + BATCH_SIZE);
 
@@ -451,13 +618,8 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
         throw new Error(msg);
       }
 
-      try {
-        const payload = await response.json();
-        totalImported += Number(payload?.imported || 0);
-        totalSkippedDuplicates += Number(payload?.skippedDuplicates || 0);
-      } catch {
-        // si no es JSON, ignorar
-      }
+      // Ignorar payload JSON; el resumen se calcula fuera de este helper
+      await response.json().catch(() => null);
 
       const progress = Math.round(((i + batch.length) / data.length) * 100);
       toast.loading(`Importando... ${progress}%`, { id: 'import-progress' });
@@ -489,6 +651,33 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
     toast.success('Errores exportados correctamente');
+  };
+
+  const exportVendedoresCatalog = async () => {
+    try {
+      const catalog = await loadVendedoresCatalog();
+      if (catalog.length === 0) {
+        toast.error('No hay vendedores disponibles para exportar');
+        return;
+      }
+      const csvData = catalog.map((vendedor) => ({
+        username: vendedor.username,
+        nombre_completo: vendedor.nombre || '',
+      }));
+      const csv = Papa.unparse(csvData, { header: true });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `catalogo_vendedores_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('Catálogo de vendedores exportado');
+    } catch (error) {
+      toast.error(getErrorMessage(error) || 'No se pudo exportar el catálogo de vendedores');
+    }
   };
 
   const getExcelHeaders = () => {
@@ -591,10 +780,11 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                     <li>Apellido</li>
                     <li>Teléfono / Celular</li>
                     <li>Proyecto de Interés (opcional)</li>
+                    <li>Vendedor asignado (username opcional)</li>
                   </ul>
                   <p className="mt-2"><strong>Límite:</strong> Hasta {MAX_RECORDS.toLocaleString()} registros por importación</p>
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 space-y-2">
                   <button
                     onClick={downloadTemplate}
                     className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors flex items-center space-x-1"
@@ -604,6 +794,18 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                     </svg>
                     <span>Descargar plantilla con instrucciones</span>
                   </button>
+                  <button
+                    onClick={exportVendedoresCatalog}
+                    className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors flex items-center space-x-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v10l9-5-9-5z" />
+                    </svg>
+                    <span>Descargar catálogo de vendedores (username)</span>
+                  </button>
+                  <p className="text-xs text-crm-text-muted">
+                    Copia el <strong>username</strong> exacto del vendedor (ej: <code>mgonzalez</code>).
+                  </p>
                 </div>
               </div>
             </div>
