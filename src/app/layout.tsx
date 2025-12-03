@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AppToaster from "@/components/Toaster";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = localFont({
   src: [
@@ -87,6 +88,7 @@ export default function RootLayout({
           <ErrorBoundary>
             {children}
             <AppToaster />
+            <SpeedInsights />
           </ErrorBoundary>
         </ThemeProvider>
       </body>
