@@ -3,6 +3,7 @@
 import { DollarSign, FileText, Calendar, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
   ventas: any[];
@@ -77,7 +78,7 @@ export default function TabVentas({ ventas }: Props) {
                       <p className="font-mono text-lg font-bold text-crm-text">
                         {venta.codigo_venta}
                       </p>
-                      <span className={`px-2 py-1 text-xs font-medium rounded bg-${estadoColor}-100 dark:bg-${estadoColor}-900/30 text-${estadoColor}-700 dark:text-${estadoColor}-300`}>
+                      <span className={getSmallBadgeClasses(estadoColor)}>
                         {estadoLabel}
                       </span>
                     </div>

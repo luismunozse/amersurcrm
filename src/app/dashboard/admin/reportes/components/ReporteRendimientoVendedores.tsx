@@ -47,7 +47,7 @@ export default function ReporteRendimientoVendedores({ periodo }: ReporteRendimi
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <div className="text-red-600 mb-4">{error || 'Error cargando datos'}</div>
+        <div className="text-red-600 dark:text-red-400 mb-4">{error || 'Error cargando datos'}</div>
         <Button onClick={() => window.location.reload()}>Reintentar</Button>
       </div>
     );
@@ -134,10 +134,10 @@ export default function ReporteRendimientoVendedores({ periodo }: ReporteRendimi
                       {performer.cumplimiento && (
                         <span className={`px-2 py-0.5 rounded-full ${
                           Number(performer.cumplimiento) >= 100
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                             : Number(performer.cumplimiento) >= 80
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         }`}>
                           {performer.cumplimiento}% meta
                         </span>
@@ -167,7 +167,7 @@ export default function ReporteRendimientoVendedores({ periodo }: ReporteRendimi
             </div>
             <div className="flex justify-between items-center p-3 bg-crm-card-hover rounded-lg">
               <span className="text-crm-text-secondary">Vendedores Activos</span>
-              <span className="font-bold text-green-600">{resumen.vendedoresActivos}</span>
+              <span className="font-bold text-green-600 dark:text-green-400">{resumen.vendedoresActivos}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-crm-card-hover rounded-lg">
               <span className="text-crm-text-secondary">Ventas Totales</span>

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/clientes";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface ClienteAsignado {
   id: string;
@@ -364,7 +365,7 @@ export default async function VendedorDashboardPage() {
                           {cliente.codigo_cliente}
                         </p>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded bg-${getEstadoClienteColor(cliente.estado_cliente as any)}-100 dark:bg-${getEstadoClienteColor(cliente.estado_cliente as any)}-900/30 text-${getEstadoClienteColor(cliente.estado_cliente as any)}-700 dark:text-${getEstadoClienteColor(cliente.estado_cliente as any)}-300`}>
+                      <span className={getSmallBadgeClasses(getEstadoClienteColor(cliente.estado_cliente as any))}>
                         {getEstadoClienteLabel(cliente.estado_cliente as any)}
                       </span>
                     </div>

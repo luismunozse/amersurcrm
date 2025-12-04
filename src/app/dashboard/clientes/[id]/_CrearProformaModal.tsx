@@ -19,6 +19,11 @@ import {
   type CrearProformaInput,
 } from "./proformas/_actions";
 import { buildProformaPdf } from "@/components/proforma/generarProformaPdf";
+import { FormInput } from "@/components/form/FormInput";
+import { FormSelect } from "@/components/form/FormSelect";
+import { FormTextarea } from "@/components/form/FormTextarea";
+import { LoadingButton } from "@/components/form/LoadingButton";
+import { useProformaValidation } from "./proformas/useProformaValidation";
 
 interface CrearProformaModalProps {
   isOpen: boolean;
@@ -97,6 +102,7 @@ export default function CrearProformaModal({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewVersion, setPreviewVersion] = useState(0);
+  const { errors, validateForm, clearError } = useProformaValidation();
 
   useEffect(() => {
     setMounted(true);
@@ -354,8 +360,11 @@ export default function CrearProformaModal({
   };
 
   const handleSubmit = (downloadPdf: boolean) => {
-    if (!form.datos.cliente.nombre) {
-      toast.error("El nombre del cliente es obligatorio");
+    // Validar formulario
+    const isValid = validateForm(form.datos, precioFinalCalculado);
+
+    if (!isValid) {
+      toast.error("Por favor, completa los campos obligatorios");
       return;
     }
 
@@ -437,7 +446,7 @@ export default function CrearProformaModal({
                 Tipo de operación
               </label>
               <select
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-crm-background text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"
                 value={form.tipoOperacion}
                 onChange={(e) =>
                   setForm((prev) => ({
@@ -459,7 +468,7 @@ export default function CrearProformaModal({
                 Moneda
               </label>
               <select
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-crm-background text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"
                 value={form.moneda}
                 onChange={(e) =>
                   setForm((prev) => ({
@@ -483,7 +492,7 @@ export default function CrearProformaModal({
               <input
                 type="number"
                 min={1}
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-crm-background text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"
                 value={form.datos.validezDias ?? 3}
                 onChange={(e) =>
                   updateDatos((prev) => ({
@@ -502,7 +511,7 @@ export default function CrearProformaModal({
                 Asociar con reserva
               </label>
               <select
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-crm-background text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"
                 value={form.reservaId ?? ""}
                 onChange={(e) => applyReserva(e.target.value || null)}
               >
@@ -520,7 +529,7 @@ export default function CrearProformaModal({
                 Asociar con venta
               </label>
               <select
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-crm-background text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"
                 value={form.ventaId ?? ""}
                 onChange={(e) => applyVenta(e.target.value || null)}
               >
@@ -621,33 +630,56 @@ export default function CrearProformaModal({
             <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
               Características del terreno
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {[
-                { label: "Proyecto", field: "proyecto" },
-                { label: "Lote", field: "lote" },
-                { label: "Etapa / Sector", field: "etapa" },
-                { label: "Área del terreno", field: "area", placeholder: "Ej. 120 m²" },
-              ].map((item) => (
-                <div key={item.field}>
-                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                    {item.label}
-                  </label>
-                  <input
-                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    placeholder={item.placeholder}
-                    value={(form.datos.terreno as any)[item.field] ?? ""}
-                    onChange={(e) =>
-                      updateDatos((prev) => ({
-                        ...prev,
-                        terreno: {
-                          ...prev.terreno,
-                          [item.field]: e.target.value,
-                        },
-                      }))
-                    }
-                  />
-                </div>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormInput
+                id="proyecto"
+                label="Proyecto"
+                value={form.datos.terreno?.proyecto ?? ""}
+                onChange={(e) => {
+                  updateDatos((prev) => ({
+                    ...prev,
+                    terreno: { ...prev.terreno, proyecto: e.target.value },
+                  }));
+                  clearError("proyecto");
+                }}
+                error={errors.proyecto}
+              />
+              <FormInput
+                id="lote"
+                label="Lote"
+                value={form.datos.terreno?.lote ?? ""}
+                onChange={(e) => {
+                  updateDatos((prev) => ({
+                    ...prev,
+                    terreno: { ...prev.terreno, lote: e.target.value },
+                  }));
+                  clearError("lote");
+                }}
+                error={errors.lote}
+              />
+              <FormInput
+                id="etapa"
+                label="Etapa / Sector"
+                value={form.datos.terreno?.etapa ?? ""}
+                onChange={(e) =>
+                  updateDatos((prev) => ({
+                    ...prev,
+                    terreno: { ...prev.terreno, etapa: e.target.value },
+                  }))
+                }
+              />
+              <FormInput
+                id="area"
+                label="Área del terreno"
+                placeholder="Ej. 120 m²"
+                value={form.datos.terreno?.area ?? ""}
+                onChange={(e) =>
+                  updateDatos((prev) => ({
+                    ...prev,
+                    terreno: { ...prev.terreno, area: e.target.value },
+                  }))
+                }
+              />
             </div>
           </div>
 
@@ -658,51 +690,44 @@ export default function CrearProformaModal({
                 Descuentos y promociones
               </h3>
               <div className="space-y-3">
-                {/* Precio en lista */}
-                <div>
-                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                    Precio en lista
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    value={form.datos.precios?.precioLista ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? null : Number(e.target.value);
-                      updateDatos((prev) => ({
-                        ...prev,
-                        precios: {
-                          ...prev.precios,
-                          precioLista: value,
-                        },
-                      }));
-                    }}
-                  />
-                </div>
+                <FormInput
+                  id="precioLista"
+                  label="Precio en lista"
+                  type="number"
+                  step="0.01"
+                  required
+                  value={form.datos.precios?.precioLista ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? null : Number(e.target.value);
+                    updateDatos((prev) => ({
+                      ...prev,
+                      precios: {
+                        ...prev.precios,
+                        precioLista: value,
+                      },
+                    }));
+                    clearError("precioLista");
+                  }}
+                  error={errors.precioLista}
+                />
 
-                {/* Descuento */}
-                <div>
-                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                    Descuento
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    value={form.datos.precios?.descuento ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? null : Number(e.target.value);
-                      updateDatos((prev) => ({
-                        ...prev,
-                        precios: {
-                          ...prev.precios,
-                          descuento: value,
-                        },
-                      }));
-                    }}
-                  />
-                </div>
+                <FormInput
+                  id="descuento"
+                  label="Descuento"
+                  type="number"
+                  step="0.01"
+                  value={form.datos.precios?.descuento ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? null : Number(e.target.value);
+                    updateDatos((prev) => ({
+                      ...prev,
+                      precios: {
+                        ...prev.precios,
+                        descuento: value,
+                      },
+                    }));
+                  }}
+                />
 
                 {/* Precio final (readonly, calculado) */}
                 <div>
@@ -721,74 +746,59 @@ export default function CrearProformaModal({
                 Forma de pago
               </h3>
               <div className="space-y-3">
-                {/* Separación */}
-                <div>
-                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                    Separación
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    value={form.datos.formaPago?.separacion ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? null : Number(e.target.value);
-                      updateDatos((prev) => ({
-                        ...prev,
-                        formaPago: {
-                          ...prev.formaPago,
-                          separacion: value,
-                        },
-                      }));
-                    }}
-                  />
-                </div>
+                <FormInput
+                  id="separacion"
+                  label="Separación"
+                  type="number"
+                  step="0.01"
+                  value={form.datos.formaPago?.separacion ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? null : Number(e.target.value);
+                    updateDatos((prev) => ({
+                      ...prev,
+                      formaPago: {
+                        ...prev.formaPago,
+                        separacion: value,
+                      },
+                    }));
+                  }}
+                />
 
-                {/* Abono principal */}
-                <div>
-                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                    Abono principal
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    value={form.datos.formaPago?.abonoPrincipal ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? null : Number(e.target.value);
-                      updateDatos((prev) => ({
-                        ...prev,
-                        formaPago: {
-                          ...prev.formaPago,
-                          abonoPrincipal: value,
-                        },
-                      }));
-                    }}
-                  />
-                </div>
+                <FormInput
+                  id="abonoPrincipal"
+                  label="Abono principal"
+                  type="number"
+                  step="0.01"
+                  value={form.datos.formaPago?.abonoPrincipal ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? null : Number(e.target.value);
+                    updateDatos((prev) => ({
+                      ...prev,
+                      formaPago: {
+                        ...prev.formaPago,
+                        abonoPrincipal: value,
+                      },
+                    }));
+                  }}
+                />
 
-                {/* Número de cuotas */}
-                <div>
-                  <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                    Número de cuotas
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    value={form.datos.formaPago?.numeroCuotas ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value === "" ? null : Number.parseInt(e.target.value, 10);
-                      updateDatos((prev) => ({
-                        ...prev,
-                        formaPago: {
-                          ...prev.formaPago,
-                          numeroCuotas: value,
-                        },
-                      }));
-                    }}
-                  />
-                </div>
+                <FormInput
+                  id="numeroCuotas"
+                  label="Número de cuotas"
+                  type="number"
+                  min={0}
+                  value={form.datos.formaPago?.numeroCuotas ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? null : Number.parseInt(e.target.value, 10);
+                    updateDatos((prev) => ({
+                      ...prev,
+                      formaPago: {
+                        ...prev.formaPago,
+                        numeroCuotas: value,
+                      },
+                    }));
+                  }}
+                />
               </div>
 
               {/* Resumen de cuotas */}
@@ -849,42 +859,34 @@ export default function CrearProformaModal({
               Medios de pago
             </label>
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                  Cuenta en soles
-                </label>
-                <input
-                  className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  value={form.datos.mediosPago?.soles ?? ""}
-                  onChange={(e) =>
-                    updateDatos((prev) => ({
-                      ...prev,
-                      mediosPago: {
-                        ...prev.mediosPago,
-                        soles: e.target.value,
-                      },
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">
-                  Cuenta en dólares
-                </label>
-                <input
-                  className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  value={form.datos.mediosPago?.dolares ?? ""}
-                  onChange={(e) =>
-                    updateDatos((prev) => ({
-                      ...prev,
-                      mediosPago: {
-                        ...prev.mediosPago,
-                        dolares: e.target.value,
-                      },
-                    }))
-                  }
-                />
-              </div>
+              <FormInput
+                id="cuentaSoles"
+                label="Cuenta en soles"
+                value={form.datos.mediosPago?.soles ?? ""}
+                onChange={(e) =>
+                  updateDatos((prev) => ({
+                    ...prev,
+                    mediosPago: {
+                      ...prev.mediosPago,
+                      soles: e.target.value,
+                    },
+                  }))
+                }
+              />
+              <FormInput
+                id="cuentaDolares"
+                label="Cuenta en dólares"
+                value={form.datos.mediosPago?.dolares ?? ""}
+                onChange={(e) =>
+                  updateDatos((prev) => ({
+                    ...prev,
+                    mediosPago: {
+                      ...prev.mediosPago,
+                      dolares: e.target.value,
+                    },
+                  }))
+                }
+              />
             </div>
           </div>
 
@@ -918,7 +920,7 @@ export default function CrearProformaModal({
                         setCuentasEmpresa(nuevasCuentas);
                       }}
                       placeholder="Ej: BCP Soles: 123-456-789"
-                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-crm-border bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
                     />
                     <button
                       type="button"
@@ -942,12 +944,13 @@ export default function CrearProformaModal({
             </div>
 
             <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
-              <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
+              <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-3">
                 Comentarios adicionales
-              </label>
-              <textarea
+              </h3>
+              <FormTextarea
+                id="comentariosAdicionales"
+                label="Comentarios"
                 rows={5}
-                className="w-full px-3 py-2 rounded-lg border border-crm-border bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
                 value={form.datos.comentariosAdicionales ?? ""}
                 onChange={(e) =>
                   updateDatos((prev) => ({
@@ -955,10 +958,8 @@ export default function CrearProformaModal({
                     comentariosAdicionales: e.target.value,
                   }))
                 }
+                helperText="Este texto aparecerá como nota al pie antes de las firmas."
               />
-              <p className="text-xs text-crm-text-muted mt-1">
-                Este texto aparecerá como nota al pie antes de las firmas.
-              </p>
             </div>
           </div>
             </div>
@@ -1058,30 +1059,32 @@ export default function CrearProformaModal({
             Las proformas se guardan en el historial del cliente junto con la información del asesor.
           </p>
           <div className="flex items-center gap-3">
-            <button
+            <LoadingButton
               onClick={onClose}
-              className="px-4 py-2 text-sm border border-crm-border rounded-lg text-crm-text hover:border-crm-primary transition-colors"
+              variant="secondary"
               type="button"
               disabled={isSubmitting}
             >
               Cancelar
-            </button>
-            <button
+            </LoadingButton>
+            <LoadingButton
               onClick={() => handleSubmit(false)}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors disabled:opacity-60"
+              variant="primary"
               type="button"
+              isLoading={isSubmitting}
+              loadingText="Guardando..."
             >
               Guardar
-            </button>
-            <button
+            </LoadingButton>
+            <LoadingButton
               onClick={() => handleSubmit(true)}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm bg-crm-accent text-white rounded-lg hover:bg-crm-accent/90 transition-colors disabled:opacity-60 flex items-center gap-2"
+              variant="accent"
               type="button"
+              isLoading={isSubmitting}
+              loadingText="Generando PDF..."
             >
               Generar PDF
-            </button>
+            </LoadingButton>
           </div>
         </div>
       </div>

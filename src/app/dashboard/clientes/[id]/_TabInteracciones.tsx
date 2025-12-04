@@ -7,6 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { TIPOS_INTERACCION, RESULTADOS_INTERACCION, PROXIMAS_ACCIONES } from "@/lib/types/crm-flujo";
 import { obtenerInteracciones, eliminarInteraccion } from "../_actions_crm";
 import toast from "react-hot-toast";
+import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
   clienteId: string;
@@ -149,7 +150,7 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-crm-text">{tipoInfo?.label || interaccion.tipo}</p>
                         {interaccion.resultado && (
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded bg-${colorResultado}-100 dark:bg-${colorResultado}-900/30 text-${colorResultado}-700 dark:text-${colorResultado}-300`}>
+                          <span className={getSmallBadgeClasses(colorResultado)}>
                             {resultadoInfo?.label || interaccion.resultado}
                           </span>
                         )}

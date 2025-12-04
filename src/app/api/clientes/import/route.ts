@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { z } from "zod";
+import { normalizePhoneE164, isValidPhone } from "@/lib/utils/phone";
 
 const ClienteImportSchema = z.object({
   nombre: z.string().min(1, "Nombre requerido"),
   apellido: z.string().min(1, "Apellido requerido"),
-  telefono: z.string().min(1, "Teléfono requerido"),
+  telefono: z.string().min(1, "Teléfono requerido").refine(
+    (val) => isValidPhone(val),
+    { message: "Formato de teléfono inválido. Use formato peruano (9 dígitos) o internacional (7-15 dígitos)" }
+  ),
   proyecto_interes: z.string().optional(),
   vendedor_asignado: z.string().optional(),
   _proyecto_id: z.string().optional(), // ID del proyecto encontrado
@@ -92,9 +96,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Preparar datos para inserción
-        const phoneKey = normalizePhoneForKey(cliente.telefono);
+        const phoneKey = normalizePhoneE164(cliente.telefono);
         if (!phoneKey) {
-          throw new Error("No se pudo normalizar el teléfono del cliente");
+          throw new Error("Formato de teléfono inválido");
         }
 
         const vendedorInput = cliente.vendedor_asignado?.trim() || null;
@@ -356,10 +360,6 @@ export async function POST(request: NextRequest) {
       details: String(error)
     }, { status: 500 });
   }
-}
-
-function normalizePhoneForKey(value: string): string {
-  return String(value || '').replace(/\D/g, '');
 }
 
 function isDuplicateError(error: { message?: string }): boolean {

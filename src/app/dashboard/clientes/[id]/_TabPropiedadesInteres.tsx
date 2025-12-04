@@ -3,6 +3,7 @@
 import { Heart, DollarSign, Tag } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
   propiedades: any[];
@@ -59,7 +60,7 @@ export default function TabPropiedadesInteres({ propiedades }: Props) {
                           {item.lote.proyecto?.nombre}
                         </p>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded bg-${prioridadColor}-100 dark:bg-${prioridadColor}-900/30 text-${prioridadColor}-700 dark:text-${prioridadColor}-300`}>
+                      <span className={getSmallBadgeClasses(prioridadColor)}>
                         {prioridadLabel}
                       </span>
                     </div>

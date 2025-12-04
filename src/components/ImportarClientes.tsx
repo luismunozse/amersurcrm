@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import { getErrorMessage } from "@/lib/errors";
 import { downloadTemplate } from "@/lib/generateTemplate";
+import { normalizePhoneE164, isValidPhone } from "@/lib/utils/phone";
 
 interface ImportarClientesProps {
   onClose: () => void;
@@ -251,8 +252,8 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       if (!row.telefono || String(row.telefono).trim() === '') {
         rowErrors.push('Teléfono es requerido');
       } else if (!isValidPhone(String(row.telefono))) {
-        rowErrors.push('Teléfono inválido');
-      } else if (existingPhones.has(normalizePhoneForKey(row.telefono))) {
+        rowErrors.push('Formato de teléfono inválido');
+      } else if (existingPhones.has(normalizePhoneE164(row.telefono))) {
         rowErrors.push('Teléfono ya existe en la base de datos');
         duplicates++;
       }
@@ -379,7 +380,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       const response = await fetch('/api/clientes/check-phones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phones: phones.map(normalizePhoneForKey) }),
+        body: JSON.stringify({ phones: phones.map(normalizePhoneE164) }),
       });
 
       if (!response.ok) return new Set();
@@ -390,10 +391,6 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       console.error('Error checking phones:', error);
       return new Set();
     }
-  };
-
-  const normalizePhoneForKey = (value: unknown): string => {
-    return String(value || '').replace(/\D/g, '');
   };
 
   const normalizeProjectName = (value: string): string => {
@@ -408,28 +405,6 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
 
   const normalizeUsername = (value: string): string => {
     return (value || '').trim().toLowerCase();
-  };
-
-  const isValidPhone = (phone: string): boolean => {
-    const raw = String(phone || '');
-    const minimal = raw.replace(/[\s\-\(\)]/g, '');
-
-    // Detectar candidatos peruanos: 51..., +51..., 0051...
-    const isPeruCandidate = minimal.startsWith('51') || minimal.startsWith('+51') || minimal.startsWith('0051');
-
-    // Reglas de limpieza avanzadas SOLO para Perú
-    let cleanForCheck = minimal;
-    if (isPeruCandidate) {
-      const withoutExtension = raw.replace(/(?:\s|^)(?:ext|anexo|x|int)\.?\s*\d+.*/i, '');
-      cleanForCheck = withoutExtension
-        .replace(/[\s\-\(\)\.\/,;:_]/g, '')
-        .replace(/\D/g, ''); // dejar solo dígitos
-    }
-
-    const peruvianPhoneRegex = /^51[0-9]{9}$/; // 51 + 9 dígitos
-    const internationalPhoneRegex = /^[\+]?[0-9]{7,15}$/; // 7–15 dígitos, opcional +
-
-    return peruvianPhoneRegex.test(cleanForCheck) || internationalPhoneRegex.test(minimal);
   };
 
   const findProyectoMatch = (nombre: string, catalog: ProyectoLookupItem[]): { id: string; nombre: string } | null => {
@@ -547,7 +522,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       const seenPhones = new Set<string>();
       const dedupedRows = validRows.filter((row) => {
         if (!row.telefono) return true;
-        const key = normalizePhoneForKey(row.telefono);
+        const key = normalizePhoneE164(row.telefono);
         if (!key) return true;
         if (seenPhones.has(key)) return false;
         seenPhones.add(key);

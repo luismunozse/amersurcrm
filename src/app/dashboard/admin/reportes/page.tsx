@@ -93,7 +93,7 @@ export default function ReportesPage() {
             <select
               value={selectedPeriod}
               onChange={(e) => handlePeriodoChange(e.target.value)}
-              className="px-3 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
+              className="px-3 py-2 border border-crm-border rounded-lg text-sm bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
             >
               <option value="7">Últimos 7 días</option>
               <option value="30">Últimos 30 días</option>
@@ -114,7 +114,7 @@ export default function ReportesPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-700 dark:text-red-300">
           {error}
         </div>
       )}
@@ -137,18 +137,18 @@ export default function ReportesPage() {
           ))
         ) : error ? (
           // Error state
-          <div className="col-span-full bg-red-50 border border-red-200 rounded-xl p-6">
+          <div className="col-span-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                <span className="text-red-600 text-sm">⚠️</span>
+              <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                <span className="text-red-600 dark:text-red-400 text-sm">⚠️</span>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-red-800">Error cargando datos</h3>
-                <p className="text-xs text-red-600">{error}</p>
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error cargando datos</h3>
+                <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
               </div>
               <button
                 onClick={recargar}
-                className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Reintentar

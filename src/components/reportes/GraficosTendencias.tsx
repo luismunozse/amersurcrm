@@ -53,8 +53,8 @@ export default function GraficosTendencias({ tendencias, metricas }: GraficosTen
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900">{`Mes: ${label}`}</p>
+        <div className="bg-crm-card dark:bg-gray-800 p-3 border border-crm-border rounded-lg shadow-lg">
+          <p className="font-medium text-crm-text-primary">{`Mes: ${label}`}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
               {`${entry.dataKey}: ${entry.dataKey === 'ventas' ? formatearMoneda(entry.value) : entry.value}`}

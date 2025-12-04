@@ -2,6 +2,7 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
 import EditarPerfilForm from "./_EditarPerfilForm";
 import AvatarUpload from "./_AvatarUpload";
+import EmailConfirmationToast from "./_EmailConfirmationToast";
 import { User, Mail, Briefcase } from "lucide-react";
 
 export default async function MiPerfilPage() {
@@ -25,6 +26,9 @@ export default async function MiPerfilPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Toast para confirmación de email */}
+      <EmailConfirmationToast />
+
       {/* Header */}
       <div className="bg-crm-card border border-crm-border rounded-xl p-6 shadow-sm">
         <div className="flex items-start gap-6">
@@ -151,6 +155,7 @@ export default async function MiPerfilPage() {
         <EditarPerfilForm
           perfil={perfil}
           isAdmin={isAdmin}
+          currentEmail={user.email || ''}
         />
       </div>
     </div>

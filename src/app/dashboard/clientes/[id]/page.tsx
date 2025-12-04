@@ -4,6 +4,7 @@ import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
 import { ArrowLeft, User, Phone, Mail, MapPin } from "lucide-react";
 import Link from "next/link";
 import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/clientes";
+import { getStatusBadgeClasses } from "@/lib/utils/badge";
 
 type SearchParams = {
   tab?: string | string[];
@@ -170,8 +171,8 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
             </Link>
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-crm-text">{cliente.nombre}</h1>
-                <span className={`px-3 py-1 text-xs font-medium rounded-full bg-${estadoColor}-100 dark:bg-${estadoColor}-900/30 text-${estadoColor}-700 dark:text-${estadoColor}-300`}>
+                <h1 className="text-2xl font-bold text-crm-text-primary">{cliente.nombre}</h1>
+                <span className={getStatusBadgeClasses(estadoColor)}>
                   {getEstadoClienteLabel(cliente.estado_cliente)}
                 </span>
               </div>

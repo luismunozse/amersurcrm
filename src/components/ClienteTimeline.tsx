@@ -2,6 +2,7 @@
 
 import { Phone, Mail, MessageSquare, Users, Video, FileText, Eye, Tag, DollarSign, CreditCard, Calendar } from "lucide-react";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import { getSmallBadgeClasses, getTimelineIconClasses } from "@/lib/utils/badge";
 
 interface TimelineEvent {
   id: string;
@@ -91,9 +92,7 @@ export default function ClienteTimeline({ eventos }: Props) {
           return (
             <div key={evento.id} className="relative pl-16">
               {/* Círculo del evento */}
-              <div
-                className={`absolute left-3 top-0 w-6 h-6 rounded-full border-2 border-crm-background flex items-center justify-center bg-${color}-500 text-white`}
-              >
+              <div className={getTimelineIconClasses(color)}>
                 {icono}
               </div>
 
@@ -106,7 +105,7 @@ export default function ClienteTimeline({ eventos }: Props) {
                       {formatearFecha(evento.fecha)}
                     </p>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded bg-${color}-100 dark:bg-${color}-900/30 text-${color}-700 dark:text-${color}-300`}>
+                  <span className={getSmallBadgeClasses(color)}>
                     {evento.type.charAt(0).toUpperCase() + evento.type.slice(1)}
                   </span>
                 </div>

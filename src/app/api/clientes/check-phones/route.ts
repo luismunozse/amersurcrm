@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+import { normalizePhoneE164 } from "@/lib/utils/phone";
 
 const FALLBACK_BATCH_LIMIT = 100;
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedPhones = phones
-      .map((value) => normalizePhoneKey(value))
+      .map((value) => normalizePhoneE164(value))
       .filter((value): value is string => Boolean(value));
 
     if (normalizedPhones.length === 0) {
@@ -76,8 +77,8 @@ export async function POST(request: NextRequest) {
       }
 
       (fallbackData || []).forEach((row) => {
-        const tel = normalizePhoneKey(row?.telefono);
-        const telWp = normalizePhoneKey(row?.telefono_whatsapp);
+        const tel = normalizePhoneE164(row?.telefono);
+        const telWp = normalizePhoneE164(row?.telefono_whatsapp);
         if (tel) existingFallback.add(tel);
         if (telWp) existingFallback.add(telWp);
       });
@@ -97,16 +98,6 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-function normalizePhoneKey(value: unknown): string | null {
-  if (!value) return null;
-  const digits = String(value).replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.length >= 10 && digits.startsWith("51") === false) {
-    return digits;
-  }
-  return digits.startsWith("51") ? digits : digits.length === 9 ? `51${digits}` : digits;
 }
 
 function chunkArray<T>(items: T[], size: number): T[][] {

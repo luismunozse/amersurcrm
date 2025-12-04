@@ -62,7 +62,7 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <div className="text-red-600 mb-4">{error || 'Error cargando datos'}</div>
+        <div className="text-red-600 dark:text-red-400 mb-4">{error || 'Error cargando datos'}</div>
         <Button onClick={() => window.location.reload()}>Reintentar</Button>
       </div>
     );

@@ -125,12 +125,6 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
   };
 
   // Acciones rápidas
-  const handleCall = () => {
-    if (cliente.telefono) {
-      window.location.href = `tel:${cliente.telefono}`;
-    }
-  };
-
   const getWhatsappLink = (whatsapp: string | null) => {
     if (!whatsapp) return null;
     const digits = whatsapp.replace(/\D/g, '');
@@ -259,24 +253,15 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                     <div className="flex items-center gap-2">
                       {/* Botones de Acciones Rápidas */}
                       <div className="flex gap-2 mr-2">
-                        {cliente.telefono && (
-                          <button
-                            onClick={handleCall}
-                            className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all duration-200 backdrop-blur-sm"
-                            title="Llamar"
-                          >
-                            <PhoneIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                        {cliente.telefono_whatsapp && (
+                        {(cliente.telefono_whatsapp || cliente.telefono) && (
                           <a
-                            href={getWhatsappLink(cliente.telefono_whatsapp) ?? undefined}
+                            href={getWhatsappLink(cliente.telefono_whatsapp || cliente.telefono) ?? undefined}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-crm-success hover:bg-crm-success/90 text-white p-2 rounded-lg transition-all duration-200"
-                            title="WhatsApp"
+                            className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white p-2 rounded-lg transition-all duration-200 shadow-lg"
+                            title="Contactar por WhatsApp"
                             onClick={(event) => {
-                              if (!getWhatsappLink(cliente.telefono_whatsapp)) {
+                              if (!getWhatsappLink(cliente.telefono_whatsapp || cliente.telefono)) {
                                 event.preventDefault();
                               }
                             }}

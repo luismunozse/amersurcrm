@@ -5,6 +5,7 @@ import { FileText, Clock, CheckCircle, XCircle, ArrowRight } from "lucide-react"
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import CrearReservaModal from "@/components/CrearReservaModal";
+import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
   clienteId: string;
@@ -84,7 +85,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas }: Prop
                       <p className="font-mono font-semibold text-crm-text">
                         {reserva.codigo_reserva}
                       </p>
-                      <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-${estadoColor}-100 dark:bg-${estadoColor}-900/30 text-${estadoColor}-700 dark:text-${estadoColor}-300`}>
+                      <span className={`flex items-center gap-1 ${getSmallBadgeClasses(estadoColor)}`}>
                         {estadoIcon}
                         {estadoLabel}
                       </span>

@@ -63,7 +63,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
               value={selectedVendedor}
               onChange={(e) => handleAsignarVendedor(e.target.value)}
               disabled={isAssigning}
-              className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-white text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary/40"
+              className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">Sin asignar</option>
               {vendedores.map((vendedor) => (
