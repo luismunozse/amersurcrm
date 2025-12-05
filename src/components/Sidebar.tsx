@@ -77,7 +77,7 @@ const navigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
-  { name: "Usuarios", href: "/dashboard/admin/usuarios", permisos: [PERMISOS.USUARIOS.VER], icon: (
+  { name: "Usuarios", href: "/dashboard/admin/usuarios", permisos: [PERMISOS.USUARIOS.VER], roles: ['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS'], icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
@@ -235,13 +235,16 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
 
   const canAccessNavItem = useCallback(
     (item: NavItem) => {
-      if (item.permisos?.length && !tieneAlgunoDePermisos(item.permisos)) {
-        return false;
+      const hasPermiso = !item.permisos?.length || tieneAlgunoDePermisos(item.permisos);
+      const hasRol = !item.roles?.length || tieneAlgunoDeRoles(item.roles);
+
+      // Si el ítem define ambos, permitir si cumple al menos uno
+      if (item.permisos?.length && item.roles?.length) {
+        return hasPermiso || hasRol;
       }
-      if (item.roles?.length && !tieneAlgunoDeRoles(item.roles)) {
-        return false;
-      }
-      return true;
+
+      // Caso contrario, debe cumplir el requisito definido
+      return hasPermiso && hasRol;
     },
     [tieneAlgunoDePermisos, tieneAlgunoDeRoles]
   );
@@ -252,11 +255,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
   }, [permisosLoading, canAccessNavItem]);
 
   const filteredAdminNavigation = useMemo(() => {
-    if (permisosLoading) return [];
+    if (permisosLoading) return adminNavigation;
     return adminNavigation.filter(canAccessNavItem);
   }, [permisosLoading, canAccessNavItem]);
 
-  const showAdminSection = !permisosLoading && filteredAdminNavigation.length > 0;
+  const showAdminSection = filteredAdminNavigation.length > 0;
 
   const renderNavItems = (items: NavItem[]) =>
     items.map((item, i) => (

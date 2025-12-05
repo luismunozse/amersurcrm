@@ -1,4 +1,6 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
+import { PERMISOS } from "@/lib/permissions";
+import { puedeAccederARecurso } from "@/lib/permissions/middleware";
 import { redirect, notFound } from "next/navigation";
 import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
 import { ArrowLeft, User, Phone, Mail, MapPin } from "lucide-react";
@@ -55,6 +57,28 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
 
   if (error || !cliente) {
     notFound();
+  }
+
+  const { data: asesorActual } = await supabase
+    .from('usuario_perfil')
+    .select('id, nombre_completo, username, telefono, email')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const puedeVer = await puedeAccederARecurso(
+    PERMISOS.CLIENTES.VER_TODOS,
+    PERMISOS.CLIENTES.VER_ASIGNADOS,
+    async () => {
+      if (!asesorActual?.username) return false;
+      return [
+        cliente.vendedor_asignado,
+        cliente.vendedor_username,
+      ].filter(Boolean).includes(asesorActual.username);
+    }
+  );
+
+  if (!puedeVer) {
+    redirect('/dashboard/clientes');
   }
 
   // Obtener interacciones
@@ -143,12 +167,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     .select('*')
     .eq('cliente_id', id)
     .order('created_at', { ascending: false });
-
-  const { data: asesorActual } = await supabase
-    .from('usuario_perfil')
-    .select('id, nombre_completo, username, telefono, email')
-    .eq('id', user.id)
-    .maybeSingle();
 
   const { data: vendedoresRaw } = await supabase
     .from('usuario_perfil')

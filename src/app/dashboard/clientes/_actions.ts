@@ -496,7 +496,11 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
 }
 
 export async function eliminarCliente(id: string) {
-  await requierePermiso(PERMISOS.CLIENTES.ELIMINAR);
+  await requierePermiso(PERMISOS.CLIENTES.ELIMINAR, {
+    accion: 'eliminar_cliente',
+    recurso_tipo: 'cliente',
+    recurso_id: id,
+  });
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -608,7 +612,11 @@ export async function obtenerTodosLosClientes(params: {
 
 // Eliminar múltiples clientes
 export async function eliminarClientesMasivo(ids: string[]) {
-  await requierePermiso(PERMISOS.CLIENTES.ELIMINAR);
+  await requierePermiso(PERMISOS.CLIENTES.ELIMINAR, {
+    accion: 'eliminar_clientes_masivo',
+    recurso_tipo: 'cliente',
+    cliente_ids: ids,
+  });
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");

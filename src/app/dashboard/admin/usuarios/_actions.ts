@@ -39,7 +39,11 @@ function generarPasswordTemporal(): string {
  * Resetea la contraseña de un usuario y marca que requiere cambio
  */
 export async function resetearPasswordUsuario(userId: string) {
-  await requierePermiso(PERMISOS.USUARIOS.EDITAR);
+  await requierePermiso(PERMISOS.USUARIOS.EDITAR, {
+    accion: 'resetear_password_usuario',
+    recurso_tipo: 'usuario',
+    recurso_id: userId,
+  });
   const supabase = await createServerActionClient();
   const serviceRole = createServiceRoleClient();
 
@@ -95,7 +99,12 @@ export async function cambiarEstadoUsuario(
   activo: boolean,
   motivo: string
 ) {
-  await requierePermiso(PERMISOS.USUARIOS.ACTIVAR_DESACTIVAR);
+  await requierePermiso(PERMISOS.USUARIOS.ACTIVAR_DESACTIVAR, {
+    accion: activo ? 'activar_usuario' : 'desactivar_usuario',
+    recurso_tipo: 'usuario',
+    recurso_id: userId,
+    motivo,
+  });
   const supabase = await createServerActionClient();
 
   if (!motivo || motivo.trim().length < 10) {
@@ -228,7 +237,11 @@ export async function cambiarPasswordPerfil(
  * Elimina un usuario del sistema
  */
 export async function eliminarUsuario(userId: string) {
-  await requierePermiso(PERMISOS.USUARIOS.ELIMINAR);
+  await requierePermiso(PERMISOS.USUARIOS.ELIMINAR, {
+    accion: 'eliminar_usuario',
+    recurso_tipo: 'usuario',
+    recurso_id: userId,
+  });
   const supabase = await createServerActionClient();
   const serviceRole = createServiceRoleClient();
 
