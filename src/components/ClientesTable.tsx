@@ -22,7 +22,7 @@ import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import ExportButton from "@/components/export/ExportButton";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
 import { Download, Loader2 } from "lucide-react";
-import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 import {
   getEstadoClienteLabel,
   ESTADOS_CLIENTE_OPTIONS,
@@ -113,8 +113,13 @@ export default function ClientesTable({
   } | null>(null);
   const router = useRouter();
 
-  // Verificar permisos de administrador
-  const { isAdmin, loading: loadingPermissions } = useAdminPermissions();
+  // Verificar permisos
+  const { tienePermiso, esAdminOCoordinador } = usePermissions();
+  const esSupervisor = esAdminOCoordinador();
+  const puedeEliminarClientes = tienePermiso(PERMISOS.CLIENTES.ELIMINAR);
+  const puedeReasignarClientes = esSupervisor || tienePermiso(PERMISOS.CLIENTES.REASIGNAR);
+  const puedeCambiarEstadoClientes = esSupervisor || tienePermiso(PERMISOS.CLIENTES.EDITAR_TODOS);
+  const puedeGestionarSeleccion = puedeCambiarEstadoClientes || puedeReasignarClientes || puedeEliminarClientes;
 
   // Estado para lista de vendedores
   const [vendedores, setVendedores] = useState<Array<{ id: string; username: string; nombre_completo: string; email: string }>>([]);
@@ -128,22 +133,29 @@ export default function ClientesTable({
     setLocalSearchQuery(searchQuery);
   }, [searchQuery]);
 
-  // Cargar vendedores si es admin
+  // Cargar lista de vendedores disponibles (para filtros y acciones)
   useEffect(() => {
-    if (isAdmin && !loadingPermissions) {
-      setLoadingVendedores(true);
-      obtenerVendedores()
-        .then((data) => {
+    let isMounted = true;
+    setLoadingVendedores(true);
+    obtenerVendedores()
+      .then((data) => {
+        if (isMounted) {
           setVendedores(data);
-        })
-        .catch((error) => {
-          console.error('Error cargando vendedores:', error);
-        })
-        .finally(() => {
+        }
+      })
+      .catch((error) => {
+        console.error('Error cargando vendedores:', error);
+      })
+      .finally(() => {
+        if (isMounted) {
           setLoadingVendedores(false);
-        });
-    }
-  }, [isAdmin, loadingPermissions]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Búsqueda automática con debounce
   useEffect(() => {
@@ -387,6 +399,7 @@ export default function ClientesTable({
     if (estado) params.set('estado', estado);
     if (tipo) params.set('tipo', tipo);
     if (vendedor) params.set('vendedor', vendedor);
+    if (origen) params.set('origen', origen);
     if (sortBy) params.set('sortBy', sortBy);
     if (sortOrder) params.set('sortOrder', sortOrder);
     params.set('page', '1'); // Resetear a página 1 al buscar
@@ -398,6 +411,26 @@ export default function ClientesTable({
   const handleClearSearch = () => {
     setLocalSearchQuery('');
     handleSearch('');
+  };
+
+  const handleVendedorFilterChange = (value: string) => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (searchTelefono) params.set('telefono', searchTelefono);
+    if (searchDni) params.set('dni', searchDni);
+    if (estado) params.set('estado', estado);
+    if (tipo) params.set('tipo', tipo);
+    if (origen) params.set('origen', origen);
+    if (value) params.set('vendedor', value);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    params.set('page', '1');
+
+    router.push(`/dashboard/clientes?${params.toString()}`);
+  };
+
+  const handleClearVendedorFilter = () => {
+    handleVendedorFilterChange('');
   };
 
   // Manejar cambio de estado con modal de contacto
@@ -484,10 +517,47 @@ export default function ClientesTable({
             Se encontraron {total} resultado{total === 1 ? '' : 's'} para "{searchQuery}"
           </p>
         )}
+
+        <div className="mt-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-crm-text-primary">
+              Filtrar por vendedor asignado
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
+              <select
+                value={vendedor || ''}
+                onChange={(e) => handleVendedorFilterChange(e.target.value)}
+                disabled={loadingVendedores}
+                className="w-full sm:w-64 px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary disabled:opacity-60"
+              >
+                <option value="">
+                  {loadingVendedores ? 'Cargando vendedores...' : 'Todos los vendedores'}
+                </option>
+                {vendedores.map((vend) => (
+                  <option key={vend.id} value={vend.username}>
+                    {vend.nombre_completo ? `${vend.nombre_completo} (@${vend.username})` : `@${vend.username}`}
+                  </option>
+                ))}
+                {!loadingVendedores && vendedor && !vendedores.some((vend) => vend.username === vendedor) && (
+                  <option value={vendedor}>@{vendedor}</option>
+                )}
+              </select>
+              {vendedor && (
+                <button
+                  type="button"
+                  onClick={handleClearVendedorFilter}
+                  className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
+                >
+                  Limpiar filtro
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Barra de acciones masivas - Solo visible para administradores */}
-      {selectedIds.size > 0 && isAdmin && (
+      {/* Barra de acciones masivas - Solo visible para roles con permisos */}
+      {selectedIds.size > 0 && puedeGestionarSeleccion && (
         <div className="crm-card p-4 bg-crm-card-hover border border-crm-border">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -504,72 +574,84 @@ export default function ClientesTable({
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Cambiar Estado */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={bulkEstado}
-                  onChange={(e) => setBulkEstado(e.target.value as EstadoCliente)}
-                  className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all"
-                >
-                  {ESTADOS_CLIENTE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setBulkAction('changeEstado')}
-                  disabled={isPending}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  Cambiar Estado
-                </button>
-              </div>
+              {puedeCambiarEstadoClientes && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={bulkEstado}
+                    onChange={(e) => setBulkEstado(e.target.value as EstadoCliente)}
+                    className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all"
+                  >
+                    {ESTADOS_CLIENTE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setBulkAction('changeEstado')}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Cambiar Estado
+                  </button>
+                </div>
+              )}
 
               {/* Asignar Vendedor - Dropdown con lista de vendedores */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={bulkVendedor}
-                  onChange={(e) => setBulkVendedor(e.target.value)}
-                  disabled={loadingVendedores}
-                  className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all min-w-[200px]"
-                >
-                  <option value="">
-                    {loadingVendedores ? 'Cargando...' : 'Seleccionar vendedor'}
-                  </option>
-                  {vendedores.map((vendedor) => (
-                    <option key={vendedor.id} value={vendedor.username}>
-                      {vendedor.nombre_completo} (@{vendedor.username})
+              {puedeReasignarClientes && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={bulkVendedor}
+                    onChange={(e) => setBulkVendedor(e.target.value)}
+                    disabled={loadingVendedores}
+                    className="text-sm border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:ring-2 focus:ring-crm-primary/20 focus:border-crm-primary transition-all min-w-[200px]"
+                  >
+                    <option value="">
+                      {loadingVendedores ? 'Cargando...' : 'Seleccionar vendedor'}
                     </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setBulkAction('assignVendedor')}
-                  disabled={isPending || !bulkVendedor || loadingVendedores}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                  </svg>
-                  Asignar Vendedor
-                </button>
-              </div>
+                    {vendedores.map((vendedor) => (
+                      <option key={vendedor.id} value={vendedor.username}>
+                        {vendedor.nombre_completo} (@{vendedor.username})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setBulkAction('assignVendedor')}
+                    disabled={isPending || !bulkVendedor || loadingVendedores}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    Asignar Vendedor
+                  </button>
+                </div>
+              )}
 
               {/* Eliminar */}
-              <button
-                onClick={() => setBulkAction('delete')}
-                disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-danger hover:bg-crm-danger/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-                Eliminar
-              </button>
+              {puedeEliminarClientes && (
+                <button
+                  onClick={() => setBulkAction('delete')}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-danger hover:bg-crm-danger/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                  Eliminar
+                </button>
+              )}
             </div>
           </div>
+        </div>
+      )}
+
+      {selectedIds.size > 0 && !puedeGestionarSeleccion && (
+        <div className="crm-card p-4 bg-crm-card-hover border border-dashed border-crm-border text-sm text-crm-text-muted">
+          Seleccionaste {selectedIds.size === 1 ? 'un cliente' : `${selectedIds.size} clientes`}, pero tu rol no cuenta con acciones masivas disponibles. Si necesitas ayuda, contacta a tu coordinador.
         </div>
       )}
 
@@ -704,7 +786,7 @@ export default function ClientesTable({
                   >
                     Abrir ficha
                   </Link>
-                  {isAdmin && (
+                  {puedeEliminarClientes && (
                     <button
                       onClick={() => askDelete(cliente)}
                       className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-crm-danger px-3 py-2 text-xs font-semibold text-crm-danger"
@@ -732,8 +814,8 @@ export default function ClientesTable({
             <table className="w-full">
               <thead className="bg-crm-card-hover border-b border-crm-border">
                 <tr>
-                  {/* Checkbox de selección - Solo visible para administradores */}
-                  {isAdmin && (
+                  {/* Checkbox de selección - Solo visible para usuarios autorizados */}
+                  {puedeGestionarSeleccion && (
                     <th className="px-4 py-3 w-12">
                       <input
                         type="checkbox"
@@ -792,7 +874,7 @@ export default function ClientesTable({
                     isPending={isPending}
                     isSelected={selectedIds.has(cliente.id)}
                     onToggleSelect={toggleSelectOne}
-                    isAdmin={isAdmin}
+                    canManageSelection={puedeGestionarSeleccion}
                   />
                 ))}
               </tbody>
@@ -891,7 +973,7 @@ const ClienteRow = memo(function ClienteRow({
   isPending,
   isSelected,
   onToggleSelect,
-  isAdmin,
+  canManageSelection,
 }: {
   cliente: Cliente;
   onEdit: (id: string) => void;
@@ -901,7 +983,7 @@ const ClienteRow = memo(function ClienteRow({
   isPending: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
-  isAdmin: boolean;
+  canManageSelection: boolean;
 }) {
   const getOrigenLeadLabel = (origen?: string | null) => {
     switch (origen) {
@@ -983,8 +1065,8 @@ const ClienteRow = memo(function ClienteRow({
 
   return (
     <tr className={`hover:bg-crm-card-hover transition-colors ${isSelected ? 'bg-crm-primary/5' : ''}`}>
-      {/* Checkbox - Solo visible para administradores */}
-      {isAdmin && (
+      {/* Checkbox - Solo visible para usuarios con permisos de gestión */}
+      {canManageSelection && (
         <td className="px-4 py-4">
           <input
             type="checkbox"

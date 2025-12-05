@@ -44,6 +44,7 @@ export default function LoginPage() {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import LoginForm from "./_LoginForm";
@@ -52,5 +53,9 @@ export default async function LoginPage() {
   const s = await createServerOnlyClient();
   const { data: { user } } = await s.auth.getUser();
   if (user) redirect("/dashboard"); // ya logueado → al dashboard
-  return <LoginForm />;             // si no, mostramos el form
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+      <LoginForm />
+    </Suspense>
+  );
 }

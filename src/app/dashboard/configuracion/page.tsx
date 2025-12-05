@@ -1,5 +1,7 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
+import { PERMISOS } from "@/lib/permissions";
+import { protegerRuta } from "@/lib/permissions/middleware";
 
 export default async function ConfiguracionPage() {
   const supabase = await createServerOnlyClient();
@@ -8,6 +10,8 @@ export default async function ConfiguracionPage() {
   if (!user) {
     redirect("/auth/login");
   }
+
+  await protegerRuta({ permiso: PERMISOS.CONFIGURACION.SISTEMA });
 
   const { data: perfil } = await supabase
     .from("usuario_perfil")

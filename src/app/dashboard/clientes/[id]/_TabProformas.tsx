@@ -68,7 +68,7 @@ export default function TabProformas({
     startTransition(async () => {
       try {
         await generarProformaPdf(proforma);
-        toast.success("Proforma descargada");
+        toast.success("Cotización descargada");
       } catch (error) {
         console.error("Error generando PDF", error);
         toast.error("No se pudo generar la proforma");
@@ -95,9 +95,9 @@ export default function TabProformas({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-crm-text">Proformas</h3>
+          <h3 className="text-lg font-semibold text-crm-text">Cotizaciones</h3>
           <p className="text-sm text-crm-text-muted">
-            Genera proformas personalizadas para tu cliente antes de confirmar una reserva o venta.
+            Genera cotizaciones personalizadas para tu cliente antes de confirmar una reserva o venta.
           </p>
         </div>
 
@@ -106,23 +106,23 @@ export default function TabProformas({
           className="inline-flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors"
         >
           <FilePlus2 className="w-4 h-4" />
-          Nueva Proforma
+          Nueva cotización
         </button>
       </div>
 
       {proformasOrdenadas.length === 0 ? (
         <div className="text-center py-16 bg-crm-background rounded-xl border border-dashed border-crm-border">
           <FileText className="w-12 h-12 mx-auto text-crm-text-muted mb-4 opacity-50" />
-          <h4 className="text-lg font-semibold text-crm-text mb-2">Sin proformas registradas</h4>
+          <h4 className="text-lg font-semibold text-crm-text mb-2">Sin cotizaciones registradas</h4>
           <p className="text-sm text-crm-text-muted mb-4">
-            Crea la primera proforma para este cliente y compártela antes de concretar la reserva.
+            Crea la primera cotización para este cliente y compártela antes de concretar la reserva.
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
             className="inline-flex items-center gap-2 text-crm-primary hover:text-crm-primary/80 transition-colors"
           >
             <FilePlus2 className="w-4 h-4" />
-            Crear proforma
+            Crear cotización
           </button>
         </div>
       ) : (
@@ -224,7 +224,7 @@ export default function TabProformas({
           if (download && result) {
             handleDescargar(result);
           } else {
-            toast.success("Proforma guardada correctamente");
+            toast.success("Cotización guardada correctamente");
           }
           router.refresh();
         }}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import toast from "react-hot-toast";
@@ -17,6 +17,7 @@ interface FormErrors {
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loginType, setLoginType] = useState<LoginType>("admin");
   const [username, setUsername] = useState("");
   const [dni, setDni] = useState("");
@@ -31,6 +32,20 @@ export default function LoginForm() {
   const [resetPending, setResetPending] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const resetInputRef = useRef<HTMLInputElement>(null);
+
+  // Mostrar mensaje de éxito si viene de cambio de contraseña
+  useEffect(() => {
+    if (searchParams.get('passwordChanged') === 'true') {
+      toast.success(
+        'Contraseña actualizada exitosamente. Por favor, inicia sesión con tu nueva contraseña.',
+        { duration: 5000 }
+      );
+      // Limpiar el parámetro de la URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('passwordChanged');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams]);
 
   const remainingLockSeconds = useMemo(() => {
     if (!lockUntil) return 0;

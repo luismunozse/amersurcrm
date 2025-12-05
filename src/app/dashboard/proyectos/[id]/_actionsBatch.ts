@@ -9,6 +9,8 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { PERMISOS } from "@/lib/permissions";
+import { requierePermiso } from "@/lib/permissions/server";
 import type { LoteCoordenadas } from "@/types/proyectos";
 
 /**
@@ -264,6 +266,14 @@ export async function actualizarLotesBatch(
 
   if (!updates || updates.length === 0) {
     throw new Error("No hay actualizaciones para procesar");
+  }
+
+  const incluyeCambioPrecio = updates.some(
+    (update) => update.precio !== undefined || update.moneda !== undefined
+  );
+
+  if (incluyeCambioPrecio) {
+    await requierePermiso(PERMISOS.PRECIOS.MODIFICAR);
   }
 
   const errors: string[] = [];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WhatsAppContact } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
+import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
 
 interface CreateLeadFormProps {
   contact: WhatsAppContact;
@@ -18,9 +19,11 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   // Intentar obtener el último mensaje del chat
   useEffect(() => {
     // Solicitar al content script el último mensaje
-    window.parent.postMessage({ type: 'AMERSURCHAT_GET_LAST_MESSAGE' }, '*');
+    window.parent.postMessage({ type: 'AMERSURCHAT_GET_LAST_MESSAGE' }, WHATSAPP_WEB_ORIGIN);
 
     const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== WHATSAPP_WEB_ORIGIN) return;
+      if (!event.data || typeof event.data !== 'object') return;
       if (event.data.type === 'AMERSURCHAT_LAST_MESSAGE') {
         if (event.data.message) {
           setMensaje(event.data.message.substring(0, 500));

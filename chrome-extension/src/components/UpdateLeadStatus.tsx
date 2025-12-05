@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 
@@ -35,24 +35,7 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
     setError(null);
 
     try {
-      // Llamar a API para actualizar estado
-      const response = await fetch(`${apiClient['baseUrl']}/api/clientes/${cliente.id}/estado`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiClient['token']}`,
-        },
-        body: JSON.stringify({
-          estado_cliente: nuevoEstado,
-          nota: nota || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error actualizando estado');
-      }
-
-      // Notificar actualización exitosa
+      await apiClient.updateEstado(cliente.id, nuevoEstado, nota || undefined);
       setIsExpanded(false);
       setNota('');
       onUpdate();

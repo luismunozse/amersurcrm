@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { crearReserva } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, type Moneda } from "@/lib/types/crm-flujo";
+import { Loader2 } from "lucide-react";
+import DateTimePicker from "@/components/DateTimePicker";
 
 interface Props {
   isOpen: boolean;
@@ -15,6 +17,26 @@ interface Props {
   loteNombre?: string;
 }
 
+type LoteOption = {
+  id: string;
+  numero_lote?: string | null;
+  codigo?: string | null;
+  precio?: number | null;
+  sup_m2?: number | null;
+};
+
+type ProyectoOption = {
+  id: string;
+  nombre: string;
+  ubicacion?: string | null;
+  estado?: string | null;
+  lotes: LoteOption[];
+};
+
+type ProyectosResponse = {
+  proyectos?: ProyectoOption[];
+};
+
 export default function CrearReservaModal({
   isOpen,
   onClose,
@@ -23,7 +45,7 @@ export default function CrearReservaModal({
   loteId,
   loteNombre,
 }: Props) {
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
   const [montoReserva, setMontoReserva] = useState("");
@@ -32,15 +54,144 @@ export default function CrearReservaModal({
   const [metodoPago, setMetodoPago] = useState("");
   const [notas, setNotas] = useState("");
 
+  const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
+  const [selectedProyectoId, setSelectedProyectoId] = useState<string>("");
+  const [selectedLoteId, setSelectedLoteId] = useState<string>(loteId || "");
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+
   // Calcular fecha de vencimiento por defecto (30 días)
   const calcularFechaVencimiento = () => {
     const fecha = new Date();
     fecha.setDate(fecha.getDate() + 30);
-    return fecha.toISOString().slice(0, 16);
+    fecha.setSeconds(0, 0);
+    return fecha.toISOString();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function loadOptions() {
+      setOptionsLoading(true);
+      setOptionsError(null);
+      try {
+        const response = await fetch("/api/reservas/opciones", { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error("No se pudieron cargar los proyectos");
+        }
+        const payload: ProyectosResponse = await response.json();
+        if (cancelled) return;
+        const proyectosData: ProyectoOption[] = (payload.proyectos || []).map((proyecto) => ({
+          ...proyecto,
+          lotes: proyecto.lotes || [],
+        }));
+        setProyectos(proyectosData);
+      } catch (error) {
+        if ((error as Error).name === "AbortError" || cancelled) {
+          return;
+        }
+        console.error("Error cargando proyectos para reserva:", error);
+        setOptionsError("No se pudieron cargar los proyectos o lotes disponibles");
+      } finally {
+        if (!cancelled) {
+          setOptionsLoading(false);
+        }
+      }
+    }
+
+    void loadOptions();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [isOpen]);
+
+  const renderLoteLabel = (lote: LoteOption) => {
+    const partes = [`Lote ${lote.numero_lote || lote.codigo || "sin código"}`];
+    if (lote.sup_m2) {
+      partes.push(`${lote.sup_m2} m²`);
+    }
+    if (typeof lote.precio === "number") {
+      partes.push(`S/ ${lote.precio.toLocaleString("es-PE")}`);
+    }
+    return partes.join(" • ");
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!proyectos.length) {
+      setSelectedProyectoId("");
+      setSelectedLoteId("");
+      return;
+    }
+
+    if (loteId) {
+      const proyectoConLote = proyectos.find((proyecto) =>
+        proyecto.lotes?.some((lote) => lote.id === loteId)
+      );
+      if (proyectoConLote) {
+        setSelectedProyectoId(proyectoConLote.id);
+        setSelectedLoteId(loteId);
+        return;
+      }
+    }
+
+    if (!selectedProyectoId) {
+      const proyectoDefault =
+        proyectos.find((proyecto) => proyecto.lotes.length > 0) || proyectos[0];
+      setSelectedProyectoId(proyectoDefault?.id || "");
+      if (proyectoDefault?.lotes.length) {
+        setSelectedLoteId(proyectoDefault.lotes[0].id);
+      } else {
+        setSelectedLoteId("");
+      }
+    }
+  }, [isOpen, proyectos, loteId, selectedProyectoId]);
+
+  useEffect(() => {
+    if (!selectedProyectoId) return;
+    const proyecto = proyectos.find((p) => p.id === selectedProyectoId);
+    if (!proyecto) {
+      setSelectedLoteId("");
+      return;
+    }
+
+    if (!proyecto.lotes.length) {
+      setSelectedLoteId("");
+      return;
+    }
+
+    if (!proyecto.lotes.some((lote) => lote.id === selectedLoteId)) {
+      setSelectedLoteId(proyecto.lotes[0].id);
+    }
+  }, [selectedProyectoId, selectedLoteId, proyectos]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFechaVencimiento((prev) => prev || calcularFechaVencimiento());
+    }
+  }, [isOpen]);
+
+  const selectedProyecto = proyectos.find((p) => p.id === selectedProyectoId) || null;
+  const lotesDisponibles = selectedProyecto?.lotes ?? [];
+  const loteSeleccionado = lotesDisponibles.find((lote) => lote.id === selectedLoteId);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!selectedProyectoId) {
+      toast.error("Selecciona un proyecto para la reserva");
+      return;
+    }
+
+    if (!selectedLoteId) {
+      toast.error("Selecciona un lote disponible");
+      return;
+    }
 
     if (!montoReserva || parseFloat(montoReserva) <= 0) {
       toast.error("Ingrese un monto válido");
@@ -52,13 +203,20 @@ export default function CrearReservaModal({
       return;
     }
 
-    startTransition(async () => {
+    const vencimientoDate = new Date(fechaVencimiento);
+    if (Number.isNaN(vencimientoDate.getTime())) {
+      toast.error("Fecha de vencimiento inválida");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
       const result = await crearReserva({
         clienteId,
-        loteId,
+        loteId: selectedLoteId,
         montoReserva: parseFloat(montoReserva),
-        moneda: moneda === 'PEN' || moneda === 'USD' ? moneda : undefined,
-        fechaVencimiento,
+        moneda: moneda === "PEN" || moneda === "USD" ? moneda : undefined,
+        fechaVencimiento: vencimientoDate.toISOString(),
         metodoPago: metodoPago || undefined,
         notas: notas || undefined,
       });
@@ -70,13 +228,18 @@ export default function CrearReservaModal({
       } else {
         toast.error(result.error || "Error al crear reserva");
       }
-    });
+    } catch (error) {
+      console.error("Error creando reserva:", error);
+      toast.error("Error inesperado al crear reserva");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
     setMontoReserva("");
     setMoneda("PEN");
-    setFechaVencimiento("");
+    setFechaVencimiento(calcularFechaVencimiento());
     setMetodoPago("");
     setNotas("");
   };
@@ -120,6 +283,78 @@ export default function CrearReservaModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Proyecto y Lote */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Proyecto *
+              </label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedProyectoId}
+                  onChange={(e) => setSelectedProyectoId(e.target.value)}
+                  disabled={optionsLoading || proyectos.length === 0 || isSubmitting}
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-60"
+                >
+                  <option value="">Seleccionar proyecto</option>
+                  {proyectos.map((proyecto) => (
+                    <option key={proyecto.id} value={proyecto.id}>
+                      {proyecto.nombre}
+                    </option>
+                  ))}
+                </select>
+                {optionsLoading && (
+                  <Loader2 className="h-4 w-4 text-crm-primary animate-spin" />
+                )}
+              </div>
+              {optionsError && (
+                <p className="text-xs text-red-500 mt-1">{optionsError}</p>
+              )}
+              {!optionsLoading && proyectos.length === 0 && (
+                <p className="text-xs text-crm-text-muted mt-1">
+                  No hay proyectos activos con lotes disponibles.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                Lote *
+              </label>
+              <select
+                value={selectedLoteId}
+                onChange={(e) => setSelectedLoteId(e.target.value)}
+                disabled={
+                  optionsLoading ||
+                  !selectedProyectoId ||
+                  lotesDisponibles.length === 0 ||
+                  isSubmitting
+                }
+                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-60"
+              >
+                <option value="">Seleccionar lote</option>
+                {lotesDisponibles.map((lote) => (
+                  <option key={lote.id} value={lote.id}>
+                    {renderLoteLabel(lote)}
+                  </option>
+                ))}
+              </select>
+              {selectedProyectoId && !optionsLoading && lotesDisponibles.length === 0 && (
+                <p className="text-xs text-crm-text-muted mt-1">
+                  Este proyecto no tiene lotes disponibles para reservar.
+                </p>
+              )}
+              {loteSeleccionado && (
+                <p className="text-xs text-crm-text-muted mt-1">
+                  {loteSeleccionado.sup_m2 ? `${loteSeleccionado.sup_m2} m²` : "Área no registrada"}
+                  {typeof loteSeleccionado.precio === "number"
+                    ? ` • Ref.: S/ ${loteSeleccionado.precio.toLocaleString("es-PE")}`
+                    : ""}
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Monto y Moneda */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -133,7 +368,8 @@ export default function CrearReservaModal({
                 required
                 min="0"
                 step="0.01"
-                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-60"
                 placeholder="5000.00"
               />
             </div>
@@ -145,7 +381,8 @@ export default function CrearReservaModal({
               <select
                 value={moneda}
                 onChange={(e) => setMoneda(e.target.value as Moneda)}
-                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-60"
               >
                 {MONEDAS.map((m) => (
                   <option key={m.value} value={m.value}>
@@ -161,20 +398,29 @@ export default function CrearReservaModal({
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Fecha de Vencimiento *
             </label>
-            <input
-              type="datetime-local"
+            <DateTimePicker
               value={fechaVencimiento}
-              onChange={(e) => setFechaVencimiento(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+              onChange={setFechaVencimiento}
+              disabled={isSubmitting}
             />
-            <button
-              type="button"
-              onClick={() => setFechaVencimiento(calcularFechaVencimiento())}
-              className="text-xs text-crm-primary hover:underline mt-1"
-            >
-              Establecer en 30 días
-            </button>
+            <div className="flex gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setFechaVencimiento(new Date().toISOString())}
+                className="text-xs text-crm-text-muted hover:text-crm-primary transition-colors disabled:opacity-50"
+                disabled={isSubmitting}
+              >
+                Usar fecha actual
+              </button>
+              <button
+                type="button"
+                onClick={() => setFechaVencimiento(calcularFechaVencimiento())}
+                className="text-xs text-crm-primary hover:underline disabled:opacity-50"
+                disabled={isSubmitting}
+              >
+                +30 días
+              </button>
+            </div>
           </div>
 
           {/* Método de Pago */}
@@ -185,7 +431,8 @@ export default function CrearReservaModal({
             <select
               value={metodoPago}
               onChange={(e) => setMetodoPago(e.target.value)}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-60"
             >
               <option value="">Seleccionar método</option>
               <option value="efectivo">Efectivo</option>
@@ -205,7 +452,8 @@ export default function CrearReservaModal({
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary resize-none"
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary resize-none disabled:opacity-60"
               placeholder="Observaciones sobre la reserva..."
             />
           </div>
@@ -213,7 +461,7 @@ export default function CrearReservaModal({
           {/* Info Box */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
             <p className="text-sm text-blue-800 dark:text-blue-300">
-              ℹ️ Al crear la reserva, el lote cambiará automáticamente a estado <strong>"Reservado"</strong>
+              ℹ️ Al crear la reserva, el lote seleccionado cambiará automáticamente a estado <strong>&ldquo;Reservado&rdquo;</strong>
             </p>
           </div>
 
@@ -222,17 +470,17 @@ export default function CrearReservaModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={isPending}
+              disabled={isSubmitting}
               className="px-4 py-2 text-sm font-medium text-crm-text-primary border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isSubmitting || !selectedLoteId}
               className="px-4 py-2 text-sm font-medium text-white bg-crm-primary rounded-lg hover:bg-crm-primary/90 transition-colors disabled:opacity-50"
             >
-              {isPending ? "Creando..." : "Crear Reserva"}
+              {isSubmitting ? "Creando..." : "Crear Reserva"}
             </button>
           </div>
         </form>

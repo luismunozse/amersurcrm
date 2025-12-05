@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { createClient } from "@/lib/supabase.client";
 
 export default function CambiarPasswordPage() {
   const [passwordActual, setPasswordActual] = useState("");
@@ -80,10 +81,22 @@ export default function CambiarPasswordPage() {
       if (result.success) {
         toast.success("¡Contraseña actualizada exitosamente!");
 
-        // Redirigir al dashboard después de 1 segundo
-        setTimeout(() => {
-          router.replace("/dashboard");
-        }, 1000);
+        // Cerrar sesión y redirigir al login
+        try {
+          const supabase = createClient();
+          await supabase.auth.signOut();
+
+          // Redirigir al login después de 1.5 segundos
+          setTimeout(() => {
+            router.replace("/auth/login?passwordChanged=true");
+          }, 1500);
+        } catch (signOutError) {
+          console.error("Error cerrando sesión:", signOutError);
+          // Redirigir de todas formas
+          setTimeout(() => {
+            router.replace("/auth/login?passwordChanged=true");
+          }, 1500);
+        }
       }
     } catch (error) {
       console.error("Error al cambiar contraseña:", error);

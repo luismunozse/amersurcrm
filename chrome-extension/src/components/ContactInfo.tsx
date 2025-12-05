@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 
@@ -12,7 +12,6 @@ interface ContactInfoProps {
 export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInfoProps) {
   const [ultimaInteraccion, setUltimaInteraccion] = useState<any>(null);
   const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
-  const [loadingExtra, setLoadingExtra] = useState(false);
 
   const estadoColors: Record<string, string> = {
     por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -44,7 +43,6 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   // Cargar información adicional cuando hay un cliente
   useEffect(() => {
     if (cliente && apiClient) {
-      setLoadingExtra(true);
       Promise.all([
         apiClient.getInteracciones(cliente.id).then(ints => ints[0] || null),
         apiClient.getProyectosInteres(cliente.id),
@@ -55,9 +53,6 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
         })
         .catch(error => {
           console.error('[ContactInfo] Error cargando info adicional:', error);
-        })
-        .finally(() => {
-          setLoadingExtra(false);
         });
     } else {
       setUltimaInteraccion(null);

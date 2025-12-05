@@ -185,6 +185,7 @@ export default function PhoneInput({
           <input
             type="tel"
             name={name}
+            autoComplete="tel"
             value={formatPhoneNumber(phoneNumber)}
             onChange={handlePhoneChange}
             placeholder={placeholder}

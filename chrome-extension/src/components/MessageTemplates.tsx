@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface MessageTemplate {
   id: string;
@@ -66,15 +66,11 @@ interface MessageTemplatesProps {
 export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplatesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategoria, setSelectedCategoria] = useState<string>('todas');
-  const [customTemplates, setCustomTemplates] = useState<MessageTemplate[]>([]);
 
-  // Combinar templates por defecto con personalizados
-  const allTemplates = [...TEMPLATES_DEFAULT, ...customTemplates];
-
-  // Filtrar por categoría
-  const filteredTemplates = selectedCategoria === 'todas'
-    ? allTemplates
-    : allTemplates.filter(t => t.categoria === selectedCategoria);
+  const filteredTemplates = useMemo(() => {
+    if (selectedCategoria === 'todas') return TEMPLATES_DEFAULT;
+    return TEMPLATES_DEFAULT.filter((t) => t.categoria === selectedCategoria);
+  }, [selectedCategoria]);
 
   const handleSelectTemplate = (template: MessageTemplate) => {
     // Reemplazar variables

@@ -2,6 +2,8 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { revalidatePath } from "next/cache";
+import { PERMISOS } from "@/lib/permissions";
+import { requierePermiso } from "@/lib/permissions/server";
 
 // ============================================================
 // HELPERS
@@ -18,6 +20,7 @@ async function obtenerUsernameActual(supabase: Awaited<ReturnType<typeof createS
   }
 
   const { data: perfil } = await supabase
+    .schema('crm')
     .from('usuario_perfil')
     .select('username')
     .eq('id', user.id)
@@ -285,6 +288,7 @@ export async function agregarPropiedadInteres(data: {
     }
 
     const { error } = await supabase
+      .schema('crm')
       .from('cliente_propiedad_interes')
       .insert({
         cliente_id: data.clienteId,
@@ -298,6 +302,70 @@ export async function agregarPropiedadInteres(data: {
     if (error) throw error;
 
     revalidarCliente(data.clienteId);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function actualizarPropiedadInteres(data: {
+  interesId: string;
+  prioridad?: 1 | 2 | 3;
+  notas?: string | null;
+  loteId?: string | null;
+  propiedadId?: string | null;
+}) {
+  const supabase = await createServerActionClient();
+
+  try {
+    const updateData: Record<string, any> = {};
+
+    if (data.prioridad !== undefined) updateData.prioridad = data.prioridad;
+    if (data.notas !== undefined) updateData.notas = data.notas;
+    if (data.loteId !== undefined) updateData.lote_id = data.loteId;
+    if (data.propiedadId !== undefined) updateData.propiedad_id = data.propiedadId;
+
+    if (Object.keys(updateData).length === 0) {
+      return { success: false, error: 'No hay cambios para actualizar' };
+    }
+
+    const { data: updated, error } = await supabase
+      .schema('crm')
+      .from('cliente_propiedad_interes')
+      .update(updateData)
+      .eq('id', data.interesId)
+      .select('cliente_id')
+      .single();
+
+    if (error) throw error;
+
+    revalidarCliente(updated?.cliente_id);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function eliminarPropiedadInteres(interesId: string) {
+  const supabase = await createServerActionClient();
+
+  try {
+    const { data: registro } = await supabase
+      .schema('crm')
+      .from('cliente_propiedad_interes')
+      .select('cliente_id')
+      .eq('id', interesId)
+      .single();
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('cliente_propiedad_interes')
+      .delete()
+      .eq('id', interesId);
+
+    if (error) throw error;
+
+    revalidarCliente(registro?.cliente_id);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -372,6 +440,10 @@ export async function crearReserva(data: {
       return authResult;
     }
 
+    if (!data.loteId && !data.propiedadId) {
+      return { success: false, error: 'Debes seleccionar un lote o una propiedad para crear la reserva' };
+    }
+
     // Validar monto de reserva
     const validacionMonto = validarMonto(data.montoReserva, 'Monto de reserva');
     if (!validacionMonto.valid) {
@@ -384,9 +456,12 @@ export async function crearReserva(data: {
       return { success: false, error: validacionFecha.error };
     }
 
+    const fechaVencimientoISO = new Date(data.fechaVencimiento).toISOString();
+
     // Validar que no exista reserva activa para este lote
     if (data.loteId) {
       const { data: reservaExistente } = await supabase
+        .schema('crm')
         .from('reserva')
         .select('id, codigo_reserva')
         .eq('lote_id', data.loteId)
@@ -401,7 +476,7 @@ export async function crearReserva(data: {
       }
 
       // Reservar el lote usando RPC (valida estado y hace la transición de forma segura)
-      const { error: rpcError } = await supabase.rpc('reservar_lote', {
+      const { error: rpcError } = await supabase.rpc('crm.reservar_lote', {
         p_lote: data.loteId
       });
 
@@ -415,6 +490,7 @@ export async function crearReserva(data: {
 
     // Crear reserva
     const { data: reserva, error } = await supabase
+      .schema('crm')
       .from('reserva')
       .insert({
         cliente_id: data.clienteId,
@@ -423,7 +499,7 @@ export async function crearReserva(data: {
         vendedor_username: authResult.username,
         monto_reserva: data.montoReserva,
         moneda: data.moneda || 'PEN',
-        fecha_vencimiento: data.fechaVencimiento,
+        fecha_vencimiento: fechaVencimientoISO,
         metodo_pago: data.metodoPago,
         comprobante_url: data.comprobanteUrl,
         notas: data.notas,
@@ -435,7 +511,7 @@ export async function crearReserva(data: {
     if (error) {
       // Si falla la creación de la reserva, liberar el lote
       if (data.loteId) {
-        await supabase.rpc('liberar_lote', { p_lote: data.loteId });
+        await supabase.rpc('crm.liberar_lote', { p_lote: data.loteId });
       }
       throw error;
     }
@@ -455,6 +531,7 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
   try {
     // Obtener datos de la reserva antes de cancelar
     const { data: reserva } = await supabase
+      .schema('crm')
       .from('reserva')
       .select('lote_id, estado, cliente_id')
       .eq('id', reservaId)
@@ -475,6 +552,7 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
 
     // Cancelar reserva
     const { error } = await supabase
+      .schema('crm')
       .from('reserva')
       .update({
         estado: 'cancelada',
@@ -487,7 +565,7 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
 
     // Liberar lote usando RPC (valida estado y hace la transición de forma segura)
     if (reserva.lote_id) {
-      const { error: rpcError } = await supabase.rpc('liberar_lote', {
+      const { error: rpcError } = await supabase.rpc('crm.liberar_lote', {
         p_lote: reserva.lote_id
       });
 
@@ -742,6 +820,56 @@ export async function registrarPago(data: {
     return { success: true, data: pago };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+export async function anularVenta(ventaId: string, motivo: string) {
+  const supabase = await createServerActionClient();
+
+  try {
+    await requierePermiso(PERMISOS.VENTAS.ANULAR);
+
+    const { data: venta } = await supabase
+      .from('venta')
+      .select('id, estado, cliente_id, lote_id')
+      .eq('id', ventaId)
+      .single();
+
+    if (!venta) {
+      return { success: false, error: 'Venta no encontrada' };
+    }
+
+    if (venta.estado === 'cancelada') {
+      return { success: false, error: 'Esta venta ya fue anulada previamente' };
+    }
+
+    const { error } = await supabase
+      .from('venta')
+      .update({
+        estado: 'cancelada',
+        motivo_cancelacion: motivo,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', ventaId);
+
+    if (error) {
+      throw error;
+    }
+
+    if (venta.lote_id) {
+      try {
+        await supabase.rpc('liberar_lote', { p_lote: venta.lote_id });
+      } catch (rpcError) {
+        console.warn('No se pudo liberar lote asociado a la venta anulada:', rpcError);
+      }
+    }
+
+    revalidarCliente(venta.cliente_id);
+    revalidatePath('/dashboard/ventas');
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Error al anular la venta' };
   }
 }
 

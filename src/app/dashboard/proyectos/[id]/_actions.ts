@@ -4,6 +4,8 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { PERMISOS } from "@/lib/permissions";
+import { requierePermiso } from "@/lib/permissions/server";
 import type { LoteCoordenadas } from "@/types/proyectos";
 import type { OverlayLayerConfig } from "@/types/overlay-layers";
 
@@ -268,6 +270,11 @@ export async function actualizarLote(loteId: string, fd: FormData) {
         throw new Error(`Ya existe un lote con código "${codigo}" en este proyecto`);
       }
     }
+  }
+
+  // Validar permiso para cambios de precio/moneda
+  if (precio !== null || Boolean(moneda)) {
+    await requierePermiso(PERMISOS.PRECIOS.MODIFICAR);
   }
 
   // Construir objeto de actualización dinámicamente

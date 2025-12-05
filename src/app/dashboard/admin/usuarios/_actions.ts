@@ -4,6 +4,8 @@
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
+import { PERMISOS } from "@/lib/permissions";
+import { requierePermiso } from "@/lib/permissions/server";
 
 /**
  * Genera una contraseña temporal aleatoria segura
@@ -37,6 +39,7 @@ function generarPasswordTemporal(): string {
  * Resetea la contraseña de un usuario y marca que requiere cambio
  */
 export async function resetearPasswordUsuario(userId: string) {
+  await requierePermiso(PERMISOS.USUARIOS.EDITAR);
   const supabase = await createServerActionClient();
   const serviceRole = createServiceRoleClient();
 
@@ -92,6 +95,7 @@ export async function cambiarEstadoUsuario(
   activo: boolean,
   motivo: string
 ) {
+  await requierePermiso(PERMISOS.USUARIOS.ACTIVAR_DESACTIVAR);
   const supabase = await createServerActionClient();
 
   if (!motivo || motivo.trim().length < 10) {
@@ -224,6 +228,7 @@ export async function cambiarPasswordPerfil(
  * Elimina un usuario del sistema
  */
 export async function eliminarUsuario(userId: string) {
+  await requierePermiso(PERMISOS.USUARIOS.ELIMINAR);
   const supabase = await createServerActionClient();
   const serviceRole = createServiceRoleClient();
 

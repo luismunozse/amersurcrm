@@ -18,7 +18,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 // Listener para mensajes desde content script o popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   console.log('[AmersurChat] Mensaje recibido:', request);
 
   if (request.type === 'GET_AUTH_STATE') {

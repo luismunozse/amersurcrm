@@ -59,7 +59,7 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
       {/* Modal */}
       <div className="relative w-full max-w-md mx-4 bg-crm-card border border-crm-border rounded-xl shadow-crm-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b border-crm-border">
-          <h3 className="text-lg font-semibold text-red-600">⚠️ Eliminar Usuario</h3>
+          <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">⚠️ Eliminar Usuario</h3>
           <button 
             onClick={handleClose} 
             disabled={isLoading}
@@ -71,25 +71,25 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
 
         <div className="p-6">
           <div className="mb-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-400/50 rounded-lg p-4 mb-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h4 className="text-sm font-medium text-red-800">
+                  <h4 className="text-sm font-medium text-red-800 dark:text-red-200">
                     Esta acción es irreversible
                   </h4>
-                  <p className="mt-1 text-sm text-red-700">
+                  <p className="mt-1 text-sm text-red-700 dark:text-red-100">
                     El usuario será eliminado permanentemente del sistema.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg p-4">
               <h4 className="font-medium text-crm-text-primary mb-2">Usuario a eliminar:</h4>
               <div className="space-y-1">
                 <p className="text-sm text-crm-text-secondary">
@@ -105,7 +105,7 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Para confirmar, escribe <span className="font-mono bg-gray-100 px-2 py-1 rounded">ELIMINAR</span>:
+                Para confirmar, escribe <span className="font-mono bg-gray-100 dark:bg-white/10 text-crm-text-primary dark:text-white px-2 py-1 rounded">ELIMINAR</span>:
               </label>
               <input
                 type="text"
@@ -147,4 +147,3 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
     </div>
   );
 }
-

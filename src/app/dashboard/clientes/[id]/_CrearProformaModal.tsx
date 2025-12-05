@@ -104,9 +104,51 @@ export default function CrearProformaModal({
   const [previewVersion, setPreviewVersion] = useState(0);
   const { errors, validateForm, clearError } = useProformaValidation();
 
+  // Estados para proyectos y lotes
+  const [proyectos, setProyectos] = useState<any[]>([]);
+  const [lotes, setLotes] = useState<any[]>([]);
+  const [selectedProyectoId, setSelectedProyectoId] = useState<string>("");
+  const [loadingProyectos, setLoadingProyectos] = useState(false);
+  const [loadingLotes, setLoadingLotes] = useState(false);
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Cargar proyectos cuando se abre el modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const cargarProyectos = async () => {
+      setLoadingProyectos(true);
+      try {
+        const response = await fetch('/api/reservas/opciones');
+        if (!response.ok) throw new Error('Error al cargar proyectos');
+        const data = await response.json();
+        setProyectos(data.proyectos || []);
+      } catch (error) {
+        console.error('Error cargando proyectos:', error);
+        toast.error('No se pudieron cargar los proyectos');
+      } finally {
+        setLoadingProyectos(false);
+      }
+    };
+
+    void cargarProyectos();
+  }, [isOpen]);
+
+  // Cargar lotes cuando se selecciona un proyecto
+  useEffect(() => {
+    if (!selectedProyectoId) {
+      setLotes([]);
+      return;
+    }
+
+    const proyecto = proyectos.find((p) => p.id === selectedProyectoId);
+    if (proyecto) {
+      setLotes(proyecto.lotes || []);
+    }
+  }, [selectedProyectoId, proyectos]);
 
   // Calcular precio final automáticamente
   const precioFinalCalculado = useMemo(() => {
@@ -150,13 +192,25 @@ export default function CrearProformaModal({
           },
         });
         setCuentasEmpresa(proformaInicial.datos.cuentasEmpresa?.length ? proformaInicial.datos.cuentasEmpresa : [...CUENTAS_EMPRESA_DEFAULT]);
+
+        // Inicializar proyecto seleccionado si existe lote_id en la proforma
+        if (proformaInicial.lote_id && proyectos.length > 0) {
+          // Buscar el proyecto del lote
+          const proyectoDelLote = proyectos.find((p) =>
+            p.lotes?.some((l: any) => l.id === proformaInicial.lote_id)
+          );
+          if (proyectoDelLote) {
+            setSelectedProyectoId(proyectoDelLote.id);
+          }
+        }
       } else {
         const state = initialFormState(cliente, asesorActual);
         setForm(state);
         setCuentasEmpresa(state.datos.cuentasEmpresa?.length ? state.datos.cuentasEmpresa : [...CUENTAS_EMPRESA_DEFAULT]);
+        setSelectedProyectoId("");
       }
     }
-  }, [isOpen, proformaInicial, cliente, asesorActual]);
+  }, [isOpen, proformaInicial, cliente, asesorActual, proyectos]);
 
   // Generar PDF con debounce
   useEffect(() => {
@@ -213,7 +267,7 @@ export default function CrearProformaModal({
             return nextUrl;
           });
         } catch (error) {
-          console.error("Error generando vista previa de proforma:", error);
+        console.error("Error generando vista previa de cotización:", error);
           if (!cancelled) {
             setPreviewError("No se pudo generar la vista previa");
           }
@@ -255,7 +309,7 @@ export default function CrearProformaModal({
       (reservas || []).map((reserva: any) => ({
         id: reserva.id,
         label: `${reserva.codigo_reserva} · ${reserva?.lote?.proyecto?.nombre ?? "Proyecto"} · Lote ${
-          reserva?.lote?.numero_lote ?? "-"
+          reserva?.lote?.codigo ?? "-"
         }`,
         data: reserva,
       })),
@@ -267,7 +321,7 @@ export default function CrearProformaModal({
       (ventas || []).map((venta: any) => ({
         id: venta.id,
         label: `${venta.codigo_venta} · ${venta?.lote?.proyecto?.nombre ?? "Proyecto"} · Lote ${
-          venta?.lote?.numero_lote ?? "-"
+          venta?.lote?.codigo ?? "-"
         }`,
         data: venta,
       })),
@@ -287,6 +341,11 @@ export default function CrearProformaModal({
     if (!option) return;
     const reserva = option.data;
 
+    // Actualizar selector de proyecto si existe
+    if (reserva.lote?.proyecto?.id) {
+      setSelectedProyectoId(reserva.lote.proyecto.id);
+    }
+
     setForm((prev) => ({
       ...prev,
       reservaId,
@@ -298,7 +357,7 @@ export default function CrearProformaModal({
         terreno: {
           ...prev.datos.terreno,
           proyecto: reserva.lote?.proyecto?.nombre ?? prev.datos.terreno.proyecto,
-          lote: reserva.lote?.numero_lote ?? prev.datos.terreno.lote,
+          lote: reserva.lote?.codigo ?? prev.datos.terreno.lote,
         },
         precios: {
           ...prev.datos.precios,
@@ -325,6 +384,11 @@ export default function CrearProformaModal({
     if (!option) return;
     const venta = option.data;
 
+    // Actualizar selector de proyecto si existe
+    if (venta.lote?.proyecto?.id) {
+      setSelectedProyectoId(venta.lote.proyecto.id);
+    }
+
     setForm((prev) => ({
       ...prev,
       ventaId,
@@ -336,7 +400,7 @@ export default function CrearProformaModal({
         terreno: {
           ...prev.datos.terreno,
           proyecto: venta.lote?.proyecto?.nombre ?? prev.datos.terreno.proyecto,
-          lote: venta.lote?.numero_lote ?? prev.datos.terreno.lote,
+          lote: venta.lote?.codigo ?? prev.datos.terreno.lote,
         },
         precios: {
           ...prev.datos.precios,
@@ -391,11 +455,11 @@ export default function CrearProformaModal({
         : await crearProformaAction(payload);
 
       if (!response.success || !response.proforma) {
-        toast.error(response.error || "No se pudo guardar la proforma");
+        toast.error(response.error || "No se pudo guardar la cotización");
         return;
       }
 
-      toast.success(proformaInicial ? "Proforma actualizada" : "Proforma creada");
+      toast.success(proformaInicial ? "Cotización actualizada" : "Cotización creada");
       onCreated(response.proforma, downloadPdf);
       onClose();
     });
@@ -420,7 +484,7 @@ export default function CrearProformaModal({
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-crm-border bg-crm-card/80 backdrop-blur">
           <div>
             <h2 className="text-xl font-semibold text-crm-text-primary">
-              {proformaInicial ? "Editar proforma" : "Nueva proforma"}
+              {proformaInicial ? "Editar cotización" : "Nueva cotización"}
             </h2>
             <p className="text-sm text-crm-text-secondary">
               Cliente: {cliente?.nombre} · {cliente?.codigo_cliente ?? ""}
@@ -631,32 +695,84 @@ export default function CrearProformaModal({
               Características del terreno
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormInput
-                id="proyecto"
-                label="Proyecto"
-                value={form.datos.terreno?.proyecto ?? ""}
-                onChange={(e) => {
-                  updateDatos((prev) => ({
-                    ...prev,
-                    terreno: { ...prev.terreno, proyecto: e.target.value },
-                  }));
-                  clearError("proyecto");
-                }}
-                error={errors.proyecto}
-              />
-              <FormInput
-                id="lote"
-                label="Lote"
-                value={form.datos.terreno?.lote ?? ""}
-                onChange={(e) => {
-                  updateDatos((prev) => ({
-                    ...prev,
-                    terreno: { ...prev.terreno, lote: e.target.value },
-                  }));
-                  clearError("lote");
-                }}
-                error={errors.lote}
-              />
+              <div>
+                <label htmlFor="proyecto" className="block text-sm font-medium text-crm-text mb-1">
+                  Proyecto *
+                </label>
+                <select
+                  id="proyecto"
+                  className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                  value={selectedProyectoId}
+                  disabled={loadingProyectos}
+                  onChange={(e) => {
+                    const proyectoId = e.target.value;
+                    setSelectedProyectoId(proyectoId);
+                    const proyecto = proyectos.find((p) => p.id === proyectoId);
+                    updateDatos((prev) => ({
+                      ...prev,
+                      terreno: { ...prev.terreno, proyecto: proyecto?.nombre || "" },
+                    }));
+                    clearError("proyecto");
+                  }}
+                >
+                  <option value="">Seleccionar proyecto</option>
+                  {proyectos.map((proyecto) => (
+                    <option key={proyecto.id} value={proyecto.id}>
+                      {proyecto.nombre}
+                    </option>
+                  ))}
+                </select>
+                {errors.proyecto && (
+                  <p className="mt-1 text-xs text-red-500">{errors.proyecto}</p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="lote" className="block text-sm font-medium text-crm-text mb-1">
+                  Lote *
+                </label>
+                <select
+                  id="lote"
+                  className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-50"
+                  value={form.loteId || ""}
+                  disabled={!selectedProyectoId || lotes.length === 0}
+                  onChange={(e) => {
+                    const loteId = e.target.value;
+                    const lote = lotes.find((l) => l.id === loteId);
+                    setForm((prev) => ({
+                      ...prev,
+                      loteId: loteId || null,
+                      datos: {
+                        ...prev.datos,
+                        terreno: {
+                          ...prev.datos.terreno,
+                          lote: lote?.codigo || "",
+                          area: lote?.sup_m2 ? `${lote.sup_m2} m²` : prev.datos.terreno.area,
+                        },
+                        precios: {
+                          ...prev.datos.precios,
+                          precioLista: lote?.precio || prev.datos.precios.precioLista,
+                        },
+                      },
+                    }));
+                    clearError("lote");
+                  }}
+                >
+                  <option value="">Seleccionar lote</option>
+                  {lotes.map((lote) => (
+                    <option key={lote.id} value={lote.id}>
+                      Lote {lote.codigo} {lote.sup_m2 ? `• ${lote.sup_m2} m²` : ""} {lote.precio ? `• S/ ${lote.precio.toLocaleString("es-PE")}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {errors.lote && (
+                  <p className="mt-1 text-xs text-red-500">{errors.lote}</p>
+                )}
+                {selectedProyectoId && lotes.length === 0 && (
+                  <p className="mt-1 text-xs text-crm-text-muted">
+                    Este proyecto no tiene lotes disponibles
+                  </p>
+                )}
+              </div>
               <FormInput
                 id="etapa"
                 label="Etapa / Sector"
@@ -746,24 +862,6 @@ export default function CrearProformaModal({
                 Forma de pago
               </h3>
               <div className="space-y-3">
-                <FormInput
-                  id="separacion"
-                  label="Separación"
-                  type="number"
-                  step="0.01"
-                  value={form.datos.formaPago?.separacion ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value === "" ? null : Number(e.target.value);
-                    updateDatos((prev) => ({
-                      ...prev,
-                      formaPago: {
-                        ...prev.formaPago,
-                        separacion: value,
-                      },
-                    }));
-                  }}
-                />
-
                 <FormInput
                   id="abonoPrincipal"
                   label="Abono principal"
@@ -939,7 +1037,7 @@ export default function CrearProformaModal({
                 ))}
               </div>
               <p className="text-xs text-crm-text-muted mt-2">
-                Las cuentas aparecerán en el PDF de la proforma
+                Las cuentas aparecerán en el PDF de la cotización
               </p>
             </div>
 
@@ -1034,7 +1132,7 @@ export default function CrearProformaModal({
                     </div>
                   ) : previewUrl ? (
                     <iframe
-                      title="Vista previa proforma"
+                      title="Vista previa cotización"
                       src={previewUrl}
                       className="absolute inset-0 h-full w-full"
                     />
@@ -1044,7 +1142,7 @@ export default function CrearProformaModal({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       <p className="text-sm text-crm-text-muted">
-                        Completa los datos para ver la proforma en tiempo real
+                        Completa los datos para ver la cotización en tiempo real
                       </p>
                     </div>
                   )}
@@ -1056,7 +1154,7 @@ export default function CrearProformaModal({
 
         <div className="sticky bottom-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t border-crm-border bg-crm-card/80 backdrop-blur">
           <p className="text-xs text-crm-text-muted">
-            Las proformas se guardan en el historial del cliente junto con la información del asesor.
+            Las cotizaciones se guardan en el historial del cliente junto con la información del asesor.
           </p>
           <div className="flex items-center gap-3">
             <LoadingButton
@@ -1143,7 +1241,7 @@ export default function CrearProformaModal({
           <div className="flex-1 bg-white rounded-lg overflow-hidden">
             {previewUrl && (
               <iframe
-                title="Vista previa proforma fullscreen"
+                title="Vista previa cotización fullscreen"
                 src={previewUrl}
                 className="w-full h-full"
               />

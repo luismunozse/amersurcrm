@@ -27,7 +27,6 @@ function resolveDefaultTab(tabRaw: string | undefined): ClienteTabType {
     "timeline",
     "interacciones",
     "propiedades",
-    "visitas",
     "reservas",
     "ventas",
     "proformas",
@@ -68,36 +67,45 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     .eq('cliente_id', id)
     .order('fecha_interaccion', { ascending: false });
 
-  // Obtener propiedades de interés
-  const { data: propiedadesInteres } = await supabase
+  // Obtener propiedades de interés con datos del lote/proyecto
+  const { data: propiedadesInteresData } = await supabase
     .from('cliente_propiedad_interes')
     .select(`
       *,
       lote:lote!lote_id(
         id,
-        numero_lote,
+        codigo,
+        sup_m2,
         estado,
-        proyecto:proyecto!proyecto_id(nombre)
-      ),
-      agregado_por_usuario:usuario_perfil!agregado_por(username, nombre_completo)
+        moneda,
+        precio,
+        proyecto:proyecto!proyecto_id(
+          id,
+          nombre
+        )
+      )
     `)
     .eq('cliente_id', id)
-    .order('created_at', { ascending: false });
+    .order('fecha_agregado', { ascending: false });
 
-  // Obtener visitas
-  const { data: visitas } = await supabase
-    .from('visita_propiedad')
-    .select(`
-      *,
-      lote:lote!lote_id(
-        id,
-        numero_lote,
-        proyecto:proyecto!proyecto_id(nombre)
-      ),
-      vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
-    `)
-    .eq('cliente_id', id)
-    .order('fecha_visita', { ascending: false });
+  const propiedadesInteres = (propiedadesInteresData ?? []).map((item) => {
+    const loteRelacion = Array.isArray(item.lote) ? item.lote[0] : item.lote;
+    if (!loteRelacion) {
+      return { ...item, lote: null };
+    }
+
+    const proyectoRelacion = Array.isArray(loteRelacion.proyecto)
+      ? loteRelacion.proyecto[0]
+      : loteRelacion.proyecto;
+
+    return {
+      ...item,
+      lote: {
+        ...loteRelacion,
+        proyecto: proyectoRelacion ?? null,
+      },
+    };
+  });
 
   // Obtener reservas
   const { data: reservas } = await supabase
@@ -106,7 +114,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       *,
       lote:lote!lote_id(
         id,
-        numero_lote,
+        codigo,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
@@ -121,7 +129,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       *,
       lote:lote!lote_id(
         id,
-        numero_lote,
+        codigo,
         proyecto:proyecto!proyecto_id(nombre)
       ),
       vendedor:usuario_perfil!vendedor_username(username, nombre_completo),
@@ -228,7 +236,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           cliente={cliente}
           interacciones={interacciones || []}
           propiedadesInteres={propiedadesInteres || []}
-          visitas={visitas || []}
           reservas={reservas || []}
           ventas={ventas || []}
           proformas={proformas || []}

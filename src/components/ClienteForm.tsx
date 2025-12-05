@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, FormEvent, useRef } from "react";
-import { crearCliente, actualizarCliente } from "@/app/dashboard/clientes/_actions";
+import { useState, FormEvent, useRef, useEffect } from "react";
+import { crearCliente, actualizarCliente, obtenerVendedores } from "@/app/dashboard/clientes/_actions";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
-import { 
-  TIPOS_CLIENTE_OPTIONS, 
+import {
+  TIPOS_CLIENTE_OPTIONS,
   TIPOS_DOCUMENTO_OPTIONS,
-  ESTADOS_CLIENTE_OPTIONS, 
-  ORIGENES_LEAD_OPTIONS, 
+  ESTADOS_CLIENTE_OPTIONS,
+  ORIGENES_LEAD_OPTIONS,
   INTERESES_PRINCIPALES_OPTIONS,
   ESTADO_CIVIL_OPTIONS
 } from "@/lib/types/clientes";
 import UbicacionSelector from "./UbicacionSelector";
 import PhoneInput from "./PhoneInput";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 
 interface ClienteFormProps {
   cliente?: {
@@ -38,89 +39,62 @@ interface ClienteFormProps {
   isEditing?: boolean;
 }
 
-export default function ClienteForm({ 
-  cliente, 
-  onSuccess, 
-  onCancel, 
-  isEditing = false 
+export default function ClienteForm({
+  cliente,
+  onSuccess,
+  onCancel,
+  isEditing = false
 }: ClienteFormProps) {
   const [pending, setPending] = useState(false);
   const [tipoCliente, setTipoCliente] = useState(cliente?.tipo_cliente || "persona");
   const [tipoDocumento, setTipoDocumento] = useState(cliente?.tipo_documento || "DNI");
   const [ubicacion, setUbicacion] = useState({
-    departamento: '',
-    provincia: '',
-    distrito: '',
+    departamento: cliente?.direccion?.departamento || '',
+    provincia: cliente?.direccion?.provincia || '',
+    distrito: cliente?.direccion?.distrito || '',
     codigoDepartamento: '',
     codigoProvincia: '',
     codigoDistrito: ''
   });
   const formRef = useRef<HTMLFormElement>(null);
-  const [step, setStep] = useState(0);
+  const [vendedores, setVendedores] = useState<Array<{
+    id: string;
+    username: string;
+    nombre_completo: string;
+    email: string;
+  }>>([]);
+  const [loadingVendedores, setLoadingVendedores] = useState(true);
+  const [errorVendedores, setErrorVendedores] = useState(false);
+  const {
+    loading: permisosLoading,
+    tienePermiso,
+    esAdminOCoordinador,
+  } = usePermissions();
+  const esSupervisor = esAdminOCoordinador();
+  const puedeGestionarVendedor = !permisosLoading && (esSupervisor || tienePermiso(PERMISOS.CLIENTES.REASIGNAR));
 
-  const stepsConfig = [
-    {
-      title: "Datos básicos",
-      description: "Tipo de cliente, identificación y contacto principal",
-    },
-    {
-      title: "Contacto & Clasificación",
-      description: "Teléfonos, estado comercial y origen del lead",
-    },
-    {
-      title: "Ubicación & Notas",
-      description: "Dirección detallada y observaciones del cliente",
-    },
-  ];
-
-  const totalSteps = stepsConfig.length;
-
-  const validateStep = (index: number) => {
-    const form = formRef.current;
-    if (!form) return true;
-    const selectors = `[data-step="${index}"] input, [data-step="${index}"] select, [data-step="${index}"] textarea`;
-    const fields = Array.from(form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selectors));
-
-    for (const field of fields) {
-      if (field.disabled) continue;
-      const isRequired = field.hasAttribute('required') || field.dataset.required === 'true';
-      if (!isRequired) continue;
-      if (!field.value || (field.value && !field.value.toString().trim())) {
-        field.reportValidity();
-        field.focus();
-        return false;
+  // Cargar vendedores al montar el componente
+  useEffect(() => {
+    const cargarVendedores = async () => {
+      try {
+        setLoadingVendedores(true);
+        setErrorVendedores(false);
+        const vendedoresData = await obtenerVendedores();
+        setVendedores(vendedoresData);
+      } catch (error) {
+        console.error("Error cargando vendedores:", error);
+        setErrorVendedores(true);
+        setVendedores([]);
+      } finally {
+        setLoadingVendedores(false);
       }
-      if (!field.checkValidity()) {
-        field.reportValidity();
-        field.focus();
-        return false;
-      }
-    }
-    return true;
-  };
+    };
 
-  const goToStep = (index: number) => {
-    setStep(Math.max(0, Math.min(index, totalSteps - 1)));
-  };
-
-  const goNext = () => {
-    if (!validateStep(step)) return;
-    goToStep(step + 1);
-  };
-
-  const goPrev = () => {
-    goToStep(step - 1);
-  };
+    cargarVendedores();
+  }, []);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    for (let i = 0; i < totalSteps; i += 1) {
-      if (!validateStep(i)) {
-        goToStep(i);
-        return;
-      }
-    }
-
     setPending(true);
     const form = formRef.current ?? e.currentTarget;
     const fd = new FormData(form);
@@ -219,6 +193,7 @@ export default function ClienteForm({
                   name="nombre"
                   required
                   minLength={2}
+                  autoComplete={tipoCliente === 'persona' ? 'name' : 'organization'}
                   defaultValue={cliente?.nombre || ""}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                   disabled={pending}
@@ -244,6 +219,7 @@ export default function ClienteForm({
                 <input
                   name="email"
                   type="email"
+                  autoComplete="email"
                   defaultValue={cliente?.email || ""}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                   disabled={pending}
@@ -371,6 +347,7 @@ export default function ClienteForm({
                     <label className="block text-xs font-medium text-crm-text-primary">Calle</label>
                     <input
                       name="direccion_calle"
+                      autoComplete="address-line1"
                       defaultValue={cliente?.direccion?.calle || ""}
                       className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                       disabled={pending}
@@ -382,6 +359,7 @@ export default function ClienteForm({
                     <label className="block text-xs font-medium text-crm-text-primary">Número</label>
                     <input
                       name="direccion_numero"
+                      autoComplete="address-line2"
                       defaultValue={cliente?.direccion?.numero || ""}
                       className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                       disabled={pending}
@@ -392,6 +370,9 @@ export default function ClienteForm({
 
                 {/* Ubicación */}
                 <UbicacionSelector
+                  departamento={cliente?.direccion?.departamento || ""}
+                  provincia={cliente?.direccion?.provincia || ""}
+                  distrito={cliente?.direccion?.distrito || ""}
                   onUbicacionChange={setUbicacion}
                   disabled={pending}
                 />
@@ -452,14 +433,45 @@ export default function ClienteForm({
 
                 {/* Vendedor */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-crm-text-primary">Vendedor</label>
-                  <input
-                    name="vendedor_asignado"
-                    defaultValue={cliente?.vendedor_asignado || ""}
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
-                    disabled={pending}
-                    placeholder="Nombre del vendedor"
-                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-xs font-medium text-crm-text-primary">Vendedor</label>
+                    {!permisosLoading && !puedeGestionarVendedor && (
+                      <span className="text-[10px] text-crm-text-muted uppercase tracking-wide font-semibold">
+                        Solo coordinadores/admin
+                      </span>
+                    )}
+                  </div>
+                  {permisosLoading ? (
+                    <div className="h-10 rounded-lg bg-crm-border/60 animate-pulse" />
+                  ) : puedeGestionarVendedor ? (
+                    <select
+                      name="vendedor_asignado"
+                      defaultValue={cliente?.vendedor_asignado || ""}
+                      className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
+                      disabled={pending || loadingVendedores}
+                    >
+                      <option value="">
+                        {loadingVendedores ? "Cargando vendedores..." : "Sin asignar"}
+                      </option>
+                      {vendedores.map((vendedor) => (
+                        <option key={vendedor.id} value={vendedor.username}>
+                          {vendedor.nombre_completo}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="w-full px-3 py-2 border border-dashed border-crm-border rounded-lg bg-crm-card-hover/40 text-xs text-crm-text-muted">
+                      No cuentas con permisos para reasignar vendedores. Contacta a tu coordinador si necesitas realizar cambios.
+                    </div>
+                  )}
+                  {errorVendedores && puedeGestionarVendedor && (
+                    <p className="text-xs text-yellow-600 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                      </svg>
+                      No se pudieron cargar los vendedores
+                    </p>
+                  )}
                 </div>
 
                 {/* Interés Principal */}
@@ -515,13 +527,18 @@ export default function ClienteForm({
             e.preventDefault();
             formRef.current?.requestSubmit();
           }}
-          disabled={pending}
+          disabled={pending || loadingVendedores}
           className="crm-button-primary px-6 py-2 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg"
         >
           {pending ? (
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               <span>Guardando...</span>
+            </div>
+          ) : loadingVendedores ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Cargando...</span>
             </div>
           ) : (
             isEditing ? "Actualizar Cliente" : "Crear Cliente"

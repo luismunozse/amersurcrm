@@ -125,7 +125,7 @@ export async function obtenerMetricasReportes(
     const { data: propiedadesData, error: propiedadesError } = await supabase
       .schema('crm')
       .from('propiedad')
-      .select('id, estado_comercial, precio_venta, created_at')
+      .select('id, estado_comercial, precio, created_at')
       .gte('created_at', startDate)
       .lte('created_at', endDate);
 
@@ -136,7 +136,7 @@ export async function obtenerMetricasReportes(
     const { data: propiedadesEstados } = await supabase
       .schema('crm')
       .from('propiedad')
-      .select('id, estado_comercial, precio_venta');
+      .select('id, estado_comercial, precio');
 
     // 3. Métricas de Proyectos
     const { data: proyectosData } = await supabase
@@ -188,7 +188,7 @@ export async function obtenerMetricasReportes(
       propiedadesEstados
         ?.filter((p) => p.estado_comercial === "vendido")
         .reduce(
-          (sum, propiedad) => sum + (Number((propiedad as { precio_venta?: number }).precio_venta) || 0),
+          (sum, propiedad) => sum + (Number((propiedad as { precio?: number }).precio) || 0),
           0,
         ) || 0;
 
@@ -332,7 +332,8 @@ export async function obtenerReporteVentas(
         forma_pago,
         vendedor_username,
         propiedad:propiedad_id (
-          nombre,
+          codigo,
+          identificacion_interna,
           proyecto:proyecto_id (
             nombre
           )
@@ -640,7 +641,7 @@ export async function obtenerReportePropiedades(
         codigo,
         tipo,
         estado_comercial,
-        precio_venta,
+        precio,
         created_at,
         proyecto:proyecto_id (
           nombre
@@ -673,7 +674,7 @@ export async function obtenerReportePropiedades(
       codigo: p.codigo,
       tipo: p.tipo || 'propiedad',
       estado: p.estado_comercial,
-      precio: Number(p.precio_venta) || 0,
+      precio: Number(p.precio ?? p.precio_venta) || 0,
       created_at: p.created_at,
       nombreProyecto: p.proyecto?.nombre || 'Sin proyecto'
     }));

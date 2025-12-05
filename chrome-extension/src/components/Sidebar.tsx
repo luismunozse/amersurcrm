@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient, getCRMConfig } from '@/lib/api';
 import { LoginForm } from './LoginForm';
@@ -9,6 +9,7 @@ import { ClientHistory } from './ClientHistory';
 import { UpdateLeadStatus } from './UpdateLeadStatus';
 import { ProjectInterest } from './ProjectInterest';
 import { QuickNotes } from './QuickNotes';
+import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
 
 export function Sidebar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -63,10 +64,10 @@ export function Sidebar() {
         try {
           const { pendientes } = await apiClient.getPendientes(cliente.id);
           // Enviar mensaje al content script para actualizar badge
-          window.parent.postMessage({
-            type: 'AMERSURCHAT_UPDATE_BADGE',
-            count: pendientes,
-          }, '*');
+        window.parent.postMessage({
+          type: 'AMERSURCHAT_UPDATE_BADGE',
+          count: pendientes,
+        }, WHATSAPP_WEB_ORIGIN);
         } catch (error) {
           console.error('[Sidebar] Error verificando pendientes:', error);
         }
@@ -75,7 +76,7 @@ export function Sidebar() {
         window.parent.postMessage({
           type: 'AMERSURCHAT_UPDATE_BADGE',
           count: 0,
-        }, '*');
+        }, WHATSAPP_WEB_ORIGIN);
       }
     }
 
@@ -99,7 +100,7 @@ export function Sidebar() {
 
   async function requestContactInfo() {
     // Solicitar información del contacto al content script
-    window.parent.postMessage({ type: 'AMERSURCHAT_GET_CONTACT' }, '*');
+    window.parent.postMessage({ type: 'AMERSURCHAT_GET_CONTACT' }, WHATSAPP_WEB_ORIGIN);
   }
 
   async function searchCliente(phone: string) {
@@ -136,6 +137,9 @@ export function Sidebar() {
   // Escuchar respuestas del content script
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      if (event.origin !== WHATSAPP_WEB_ORIGIN) return;
+      if (!event.data || typeof event.data !== 'object') return;
+
       if (event.data.type === 'AMERSURCHAT_CONTACT_INFO') {
         setContact(event.data.contact);
       }
@@ -189,7 +193,7 @@ export function Sidebar() {
     window.parent.postMessage({
       type: 'AMERSURCHAT_INSERT_TEMPLATE',
       text: mensaje,
-    }, '*');
+    }, WHATSAPP_WEB_ORIGIN);
 
     // También copiar al portapapeles como fallback
     navigator.clipboard.writeText(mensaje).catch((error) => {

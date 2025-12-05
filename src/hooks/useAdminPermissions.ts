@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useMemo } from "react";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 
 interface AdminPermissions {
   isAdmin: boolean;
@@ -11,41 +12,22 @@ interface AdminPermissions {
 }
 
 export function useAdminPermissions(): AdminPermissions {
-  const [permissions, setPermissions] = useState<AdminPermissions>({
-    isAdmin: false,
-    loading: true,
-    canCreateProjects: false,
-    canCreateProperties: false,
-    canManageUsers: false,
-  });
+  const {
+    loading,
+    esAdmin,
+    tienePermiso,
+  } = usePermissions();
 
-  useEffect(() => {
-    async function checkPermissions() {
-      try {
-        const response = await fetch('/api/auth/check-admin');
-        const data = await response.json();
-        
-        setPermissions({
-          isAdmin: data.isAdmin || false,
-          loading: false,
-          canCreateProjects: data.isAdmin || false,
-          canCreateProperties: data.isAdmin || false,
-          canManageUsers: data.isAdmin || false,
-        });
-      } catch (error) {
-        console.error('Error checking admin permissions:', error);
-        setPermissions({
-          isAdmin: false,
-          loading: false,
-          canCreateProjects: false,
-          canCreateProperties: false,
-          canManageUsers: false,
-        });
-      }
-    }
+  const computed = useMemo(() => {
+    const esAdminActual = esAdmin();
+    return {
+      isAdmin: esAdminActual,
+      loading,
+      canCreateProjects: esAdminActual || tienePermiso(PERMISOS.PROYECTOS.CREAR),
+      canCreateProperties: esAdminActual || tienePermiso(PERMISOS.LOTES.CREAR),
+      canManageUsers: esAdminActual || tienePermiso(PERMISOS.USUARIOS.VER),
+    };
+  }, [esAdmin, loading, tienePermiso]);
 
-    checkPermissions();
-  }, []);
-
-  return permissions;
+  return computed;
 }

@@ -6,6 +6,8 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { getCachedClientes } from "@/lib/cache.server";
 import { esAdmin } from "@/lib/auth/roles";
+import { PERMISOS } from "@/lib/permissions";
+import { requierePermiso } from "@/lib/permissions/server";
 import {
   TipoCliente,
   TipoDocumento,
@@ -494,6 +496,7 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
 }
 
 export async function eliminarCliente(id: string) {
+  await requierePermiso(PERMISOS.CLIENTES.ELIMINAR);
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -605,6 +608,7 @@ export async function obtenerTodosLosClientes(params: {
 
 // Eliminar múltiples clientes
 export async function eliminarClientesMasivo(ids: string[]) {
+  await requierePermiso(PERMISOS.CLIENTES.ELIMINAR);
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -621,16 +625,11 @@ export async function eliminarClientesMasivo(ids: string[]) {
 }
 
 // Obtener lista de vendedores activos
+// Esta función está disponible para todos los usuarios autenticados
 export async function obtenerVendedores() {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
-
-  // Verificar que el usuario es administrador
-  const isAdmin = await esAdmin();
-  if (!isAdmin) {
-    throw new Error("No tienes permisos para ver la lista de vendedores");
-  }
 
   const { data: vendedores, error } = await supabase
     .schema('crm')

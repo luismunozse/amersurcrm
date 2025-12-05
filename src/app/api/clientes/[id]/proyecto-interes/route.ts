@@ -30,6 +30,7 @@ export async function GET(
 
     // Obtener proyectos de interés con información del proyecto
     const { data: intereses, error } = await supabase
+      .schema("crm")
       .from("cliente_propiedad_interes")
       .select(`
         id,
@@ -40,7 +41,11 @@ export async function GET(
         fecha_agregado,
         lote:lote_id (
           id,
+          numero_lote,
           codigo,
+          estado,
+          moneda,
+          precio,
           proyecto:proyecto_id (
             id,
             nombre
@@ -109,7 +114,8 @@ export async function POST(
 
     // Obtener perfil del usuario
     const { data: perfil } = await supabase
-      .from("perfil")
+      .schema("crm")
+      .from("usuario_perfil")
       .select("username")
       .eq("id", user.id)
       .single();
@@ -118,6 +124,7 @@ export async function POST(
 
     // Insertar proyecto de interés
     const { data: nuevoInteres, error: insertError } = await supabase
+      .schema("crm")
       .from("cliente_propiedad_interes")
       .insert({
         cliente_id: clienteId,
@@ -197,6 +204,7 @@ export async function DELETE(
 
     // Eliminar proyecto de interés
     const { error: deleteError } = await supabase
+      .schema("crm")
       .from("cliente_propiedad_interes")
       .delete()
       .eq("id", interesId);

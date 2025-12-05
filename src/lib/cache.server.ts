@@ -136,7 +136,15 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
 
   const { data, error, count } = await q;
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error en getCachedClientes:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
 
   return {
     data: (data ?? []) as ClienteCached[],
@@ -217,7 +225,15 @@ export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
     .select("id,nombre,estado,tipo,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,created_at")
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error en getCachedProyectos:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
   return (data ?? []) as ProyectoCached[];
 });
 
@@ -314,7 +330,15 @@ export const getCachedNotificacionesNoLeidas = cache(async (): Promise<Notificac
     .order("created_at", { ascending: false })
     .limit(20);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error en getCachedNotificacionesNoLeidas:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    throw error;
+  }
   return (data ?? []) as NotificacionNoLeida[];
 });
 

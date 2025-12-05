@@ -97,7 +97,44 @@ export default async function VendedorDashboardPage() {
     redirect('/dashboard');
   }
 
-  // Obtener clientes asignados
+  // Obtener conteos totales (para las métricas)
+  const [
+    { count: totalClientes },
+    { count: totalAccionesPendientes },
+    { count: totalReservasActivas },
+    { count: totalVentasEnProceso }
+  ] = await Promise.all([
+    // Total de clientes asignados
+    supabase
+      .from('cliente')
+      .select('*', { count: 'exact', head: true })
+      .eq('vendedor_asignado', perfil.username),
+
+    // Total de acciones pendientes
+    supabase
+      .from('cliente_interaccion')
+      .select('*', { count: 'exact', head: true })
+      .eq('vendedor_username', perfil.username)
+      .not('proxima_accion', 'is', null)
+      .not('proxima_accion', 'eq', 'ninguna')
+      .gte('fecha_proxima_accion', new Date().toISOString()),
+
+    // Total de reservas activas
+    supabase
+      .from('reserva')
+      .select('*', { count: 'exact', head: true })
+      .eq('vendedor_username', perfil.username)
+      .eq('estado', 'activa'),
+
+    // Total de ventas en proceso
+    supabase
+      .from('venta')
+      .select('*', { count: 'exact', head: true })
+      .eq('vendedor_username', perfil.username)
+      .eq('estado', 'en_proceso')
+  ]);
+
+  // Obtener datos para mostrar (limitados a 10)
   const { data: clientesAsignados } = await supabase
     .from('cliente')
     .select('id, codigo_cliente, nombre, telefono, estado_cliente, ultimo_contacto, proxima_accion')
@@ -105,7 +142,6 @@ export default async function VendedorDashboardPage() {
     .order('ultimo_contacto', { ascending: false, nullsFirst: false })
     .limit(10);
 
-  // Obtener próximas acciones pendientes
   const { data: proximasAcciones } = await supabase
     .from('cliente_interaccion')
     .select(`
@@ -124,7 +160,6 @@ export default async function VendedorDashboardPage() {
     .order('fecha_proxima_accion', { ascending: true })
     .limit(10);
 
-  // Obtener reservas activas
   const { data: reservasActivas } = await supabase
     .from('reserva')
     .select(`
@@ -142,7 +177,6 @@ export default async function VendedorDashboardPage() {
     .order('fecha_vencimiento', { ascending: true })
     .limit(10);
 
-  // Obtener ventas en proceso
   const { data: ventasEnProceso } = await supabase
     .from('venta')
     .select(`
@@ -161,19 +195,20 @@ export default async function VendedorDashboardPage() {
     .order('created_at', { ascending: false })
     .limit(10);
 
-  // Calcular estadísticas
-  const totalClientes = clientesAsignados?.length || 0;
-  const totalAccionesPendientes = proximasAcciones?.length || 0;
-  const totalReservasActivas = reservasActivas?.length || 0;
-  const totalVentasEnProceso = ventasEnProceso?.length || 0;
+  // Obtener TODAS las ventas en proceso para calcular montos correctos
+  const { data: todasVentasEnProceso } = await supabase
+    .from('venta')
+    .select('precio_total, saldo_pendiente, moneda')
+    .eq('vendedor_username', perfil.username)
+    .eq('estado', 'en_proceso');
 
-  // Calcular monto total de ventas en proceso
-  const montoTotalVentas = ventasEnProceso?.reduce((sum, venta) => {
+  // Calcular monto total de ventas en proceso (de todas las ventas, no solo las 10 mostradas)
+  const montoTotalVentas = todasVentasEnProceso?.reduce((sum, venta) => {
     if (venta.moneda === 'PEN') return sum + venta.precio_total;
     return sum;
   }, 0) || 0;
 
-  const montoSaldoPendiente = ventasEnProceso?.reduce((sum, venta) => {
+  const montoSaldoPendiente = todasVentasEnProceso?.reduce((sum, venta) => {
     if (venta.moneda === 'PEN') return sum + venta.saldo_pendiente;
     return sum;
   }, 0) || 0;
@@ -197,7 +232,7 @@ export default async function VendedorDashboardPage() {
             <div className="p-3 bg-blue-500/10 rounded-lg">
               <Users className="h-6 w-6 text-blue-500" />
             </div>
-            <span className="text-2xl font-bold text-crm-text">{totalClientes}</span>
+            <span className="text-2xl font-bold text-crm-text">{totalClientes ?? 0}</span>
           </div>
           <h3 className="text-sm font-medium text-crm-text-muted">Clientes Asignados</h3>
         </div>
@@ -207,7 +242,7 @@ export default async function VendedorDashboardPage() {
             <div className="p-3 bg-orange-500/10 rounded-lg">
               <Clock className="h-6 w-6 text-orange-500" />
             </div>
-            <span className="text-2xl font-bold text-crm-text">{totalAccionesPendientes}</span>
+            <span className="text-2xl font-bold text-crm-text">{totalAccionesPendientes ?? 0}</span>
           </div>
           <h3 className="text-sm font-medium text-crm-text-muted">Acciones Pendientes</h3>
         </div>
@@ -217,7 +252,7 @@ export default async function VendedorDashboardPage() {
             <div className="p-3 bg-purple-500/10 rounded-lg">
               <FileText className="h-6 w-6 text-purple-500" />
             </div>
-            <span className="text-2xl font-bold text-crm-text">{totalReservasActivas}</span>
+            <span className="text-2xl font-bold text-crm-text">{totalReservasActivas ?? 0}</span>
           </div>
           <h3 className="text-sm font-medium text-crm-text-muted">Reservas Activas</h3>
         </div>
@@ -227,14 +262,14 @@ export default async function VendedorDashboardPage() {
             <div className="p-3 bg-green-500/10 rounded-lg">
               <TrendingUp className="h-6 w-6 text-green-500" />
             </div>
-            <span className="text-2xl font-bold text-crm-text">{totalVentasEnProceso}</span>
+            <span className="text-2xl font-bold text-crm-text">{totalVentasEnProceso ?? 0}</span>
           </div>
           <h3 className="text-sm font-medium text-crm-text-muted">Ventas en Proceso</h3>
         </div>
       </div>
 
       {/* Monto de Ventas */}
-      {totalVentasEnProceso > 0 && (
+      {(totalVentasEnProceso ?? 0) > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-5">
             <div className="flex items-center gap-3 mb-2">

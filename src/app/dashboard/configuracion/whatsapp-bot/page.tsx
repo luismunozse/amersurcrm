@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-import { esAdmin } from "@/lib/auth/roles";
+import { PERMISOS } from "@/lib/permissions";
+import { protegerRuta } from "@/lib/permissions/middleware";
 import WhatsAppBotConfig from "./_WhatsAppBotConfig";
 
 export const metadata = {
@@ -8,11 +8,7 @@ export const metadata = {
 };
 
 export default async function WhatsAppBotConfigPage() {
-  // Solo administradores pueden acceder
-  const isAdmin = await esAdmin();
-  if (!isAdmin) {
-    redirect("/dashboard");
-  }
+  await protegerRuta({ permiso: PERMISOS.CONFIGURACION.SISTEMA });
 
   return (
     <div className="container mx-auto p-6">

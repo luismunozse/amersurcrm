@@ -3,7 +3,10 @@
  * Inyecta el sidebar de AmersurChat
  */
 
-import { extractContactInfo } from './lib/whatsapp';
+import { extractContactInfo, getLastReceivedMessage } from './lib/whatsapp';
+
+const EXTENSION_ORIGIN = new URL(chrome.runtime.getURL('')).origin;
+let sidebarWindow: Window | null = null;
 
 console.log('[AmersurChat] Content script cargado');
 
@@ -75,7 +78,10 @@ function injectSidebar() {
     border: none;
   `;
   iframe.src = chrome.runtime.getURL('sidebar.html');
-
+  sidebarWindow = iframe.contentWindow;
+  iframe.addEventListener('load', () => {
+    sidebarWindow = iframe.contentWindow;
+  });
   sidebarContainer.appendChild(iframe);
 
   // Agregar overlay y sidebar al DOM
@@ -234,9 +240,20 @@ function insertTextIntoWhatsApp(text: string): boolean {
 
 // Escuchar mensajes del sidebar (comunicación con React)
 window.addEventListener('message', (event) => {
-  console.log('[AmersurChat] Mensaje recibido:', event.data.type, 'desde:', event.origin);
+  if (event.origin !== EXTENSION_ORIGIN) return;
+  if (!event.data || typeof event.data !== 'object') return;
+  if (sidebarWindow && event.source !== sidebarWindow) return;
 
-  // Aceptar mensajes del sidebar (desde el iframe o desde la misma ventana)
+  console.log('[AmersurChat] Mensaje recibido:', event.data.type, 'desde extensión');
+
+  const reply = (payload: any) => {
+    if (event.source && typeof (event.source as Window).postMessage === 'function') {
+      (event.source as Window).postMessage(payload, EXTENSION_ORIGIN);
+    } else {
+      console.warn('[AmersurChat] No se pudo responder al mensaje (sin fuente válida)');
+    }
+  };
+
   if (event.data.type === 'AMERSURCHAT_GET_CONTACT') {
     console.log('[AmersurChat] Solicitando información del contacto...');
 
@@ -245,20 +262,10 @@ window.addEventListener('message', (event) => {
 
     console.log('[AmersurChat] Contacto extraído:', contact);
 
-    // Enviar respuesta al iframe si viene del iframe, sino a window
-    if (event.source && event.source !== window) {
-      // Mensaje viene del iframe, responder al iframe
-      (event.source as Window).postMessage({
-        type: 'AMERSURCHAT_CONTACT_INFO',
-        contact,
-      }, '*');
-    } else {
-      // Mensaje viene de la misma ventana
-      window.postMessage({
-        type: 'AMERSURCHAT_CONTACT_INFO',
-        contact,
-      }, '*');
-    }
+    reply({
+      type: 'AMERSURCHAT_CONTACT_INFO',
+      contact,
+    });
   }
 
   // Insertar plantilla de mensaje en WhatsApp
@@ -270,17 +277,10 @@ window.addEventListener('message', (event) => {
       const success = insertTextIntoWhatsApp(text);
 
       // Responder al sidebar con el resultado
-      if (event.source && event.source !== window) {
-        (event.source as Window).postMessage({
-          type: 'AMERSURCHAT_TEMPLATE_INSERTED',
-          success,
-        }, '*');
-      } else {
-        window.postMessage({
-          type: 'AMERSURCHAT_TEMPLATE_INSERTED',
-          success,
-        }, '*');
-      }
+      reply({
+        type: 'AMERSURCHAT_TEMPLATE_INSERTED',
+        success,
+      });
     }
   }
 
@@ -291,5 +291,13 @@ window.addEventListener('message', (event) => {
     if (typeof count === 'number') {
       updateBadge(count);
     }
+  }
+
+  if (event.data.type === 'AMERSURCHAT_GET_LAST_MESSAGE') {
+    const message = getLastReceivedMessage();
+    reply({
+      type: 'AMERSURCHAT_LAST_MESSAGE',
+      message,
+    });
   }
 });

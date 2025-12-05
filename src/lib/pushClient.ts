@@ -47,7 +47,13 @@ export async function registerPushSubscription({
     return;
   }
 
-  const swRegistration = await navigator.serviceWorker.register(serviceWorkerPath, { scope: "/" });
+  let swRegistration = await navigator.serviceWorker.getRegistration(serviceWorkerPath);
+  if (!swRegistration) {
+    swRegistration = await navigator.serviceWorker.register(serviceWorkerPath, { scope: "/" });
+  }
+
+  // Asegurarnos de que el Service Worker esté activo/controlando la página
+  const controllingRegistration = await navigator.serviceWorker.ready;
 
   const permission = await Notification.requestPermission();
 
@@ -56,13 +62,21 @@ export async function registerPushSubscription({
     return;
   }
 
-  const existingSubscription = await swRegistration.pushManager.getSubscription();
-  const subscription =
-    existingSubscription ??
-    (await swRegistration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    }));
+  const pushManager = controllingRegistration.pushManager;
+  const existingSubscription = await pushManager.getSubscription();
+  let subscription = existingSubscription;
+  if (!subscription) {
+    try {
+      subscription = await pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+    } catch (error) {
+      console.error("[push] Error creando suscripción push:", error);
+      // AbortError suele indicar que el SW aún no controla la página; permitir reintentos posteriores
+      return;
+    }
+  }
 
   const p256dh = subscription.getKey("p256dh");
   const auth = subscription.getKey("auth");

@@ -24,13 +24,11 @@ export class CRMApiClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+    const headers = new Headers(options.headers);
+    headers.set('Content-Type', 'application/json');
 
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      headers.set('Authorization', `Bearer ${this.token}`);
     }
 
     const response = await fetch(url, {
@@ -181,7 +179,12 @@ export class CRMApiClient {
       const response = await this.request<{ interacciones: any[] }>(
         `/api/clientes/${clienteId}/interacciones`
       );
-      return response.interacciones || [];
+      const interacciones = response.interacciones || [];
+      return [...interacciones].sort((a, b) => {
+        const fechaA = new Date(a.fecha).getTime();
+        const fechaB = new Date(b.fecha).getTime();
+        return fechaB - fechaA;
+      });
     } catch (error) {
       console.error('[CRMApiClient] Error obteniendo interacciones:', error);
       return [];
@@ -191,10 +194,13 @@ export class CRMApiClient {
   /**
    * Actualizar estado del cliente
    */
-  async updateEstado(clienteId: string, nuevoEstado: string): Promise<any> {
+  async updateEstado(clienteId: string, nuevoEstado: string, nota?: string): Promise<any> {
     return this.request(`/api/clientes/${clienteId}/estado`, {
       method: 'PATCH',
-      body: JSON.stringify({ estado: nuevoEstado }),
+      body: JSON.stringify({
+        estado_cliente: nuevoEstado,
+        ...(nota ? { nota } : {}),
+      }),
     });
   }
 

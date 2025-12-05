@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Info, MessageSquare, Heart, Eye, FileText, DollarSign, Clock, FileSpreadsheet } from "lucide-react";
+import { Info, MessageSquare, Heart, FileText, DollarSign, Clock, FileSpreadsheet } from "lucide-react";
 import TabInformacionBasica from "./_TabInformacionBasica";
 import TabInteracciones from "./_TabInteracciones";
 import TabPropiedadesInteres from "./_TabPropiedadesInteres";
-import TabVisitas from "./_TabVisitas";
 import TabReservas from "./_TabReservas";
 import TabVentas from "./_TabVentas";
 import TabTimeline from "./_TabTimeline";
@@ -15,7 +14,6 @@ interface Props {
   cliente: any;
   interacciones: any[];
   propiedadesInteres: any[];
-  visitas: any[];
   reservas: any[];
   ventas: any[];
   proformas: any[];
@@ -28,7 +26,6 @@ export type ClienteTabType =
   | 'info'
   | 'interacciones'
   | 'propiedades'
-  | 'visitas'
   | 'reservas'
   | 'ventas'
   | 'proformas'
@@ -38,7 +35,6 @@ export default function ClienteDetailTabs({
   cliente,
   interacciones,
   propiedadesInteres,
-  visitas,
   reservas,
   ventas,
   proformas,
@@ -78,12 +74,6 @@ export default function ClienteDetailTabs({
       count: propiedadesInteres.length,
     },
     {
-      id: 'visitas' as ClienteTabType,
-      label: 'Visitas',
-      icon: Eye,
-      count: visitas.length,
-    },
-    {
       id: 'reservas' as ClienteTabType,
       label: 'Reservas',
       icon: FileText,
@@ -97,7 +87,7 @@ export default function ClienteDetailTabs({
     },
     {
       id: 'proformas' as ClienteTabType,
-      label: 'Proformas',
+      label: 'Cotizaciones',
       icon: FileSpreadsheet,
       count: proformas.length,
     },
@@ -151,8 +141,12 @@ export default function ClienteDetailTabs({
         )}
         {activeTab === 'timeline' && <TabTimeline clienteId={cliente.id} />}
         {activeTab === 'interacciones' && <TabInteracciones clienteId={cliente.id} clienteNombre={cliente.nombre} interacciones={interacciones} />}
-        {activeTab === 'propiedades' && <TabPropiedadesInteres propiedades={propiedadesInteres} />}
-        {activeTab === 'visitas' && <TabVisitas visitas={visitas} />}
+        {activeTab === 'propiedades' && (
+          <TabPropiedadesInteres
+            propiedades={propiedadesInteres}
+            clienteId={cliente.id}
+          />
+        )}
         {activeTab === 'reservas' && <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} />}
         {activeTab === 'ventas' && <TabVentas ventas={ventas} />}
         {activeTab === 'proformas' && (
