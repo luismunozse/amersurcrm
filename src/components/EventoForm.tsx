@@ -174,7 +174,7 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
                   type="datetime-local"
                   value={formData.fecha_inicio}
                   onChange={(e) => handleChange('fecha_inicio', e.target.value)}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
+                  className="crm-datetime-input"
                   required
                 />
               </div>
@@ -187,7 +187,7 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
                   type="datetime-local"
                   value={formData.fecha_fin}
                   onChange={(e) => handleChange('fecha_fin', e.target.value)}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
+                  className="crm-datetime-input"
                 />
               </div>
 

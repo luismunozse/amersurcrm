@@ -15,6 +15,7 @@ import ClienteForm from "@/components/ClienteForm";
 import { buildProformaPdf } from "@/components/proforma/generarProformaPdf";
 import type { ProformaDatos } from "@/types/proforma";
 import { CONDICIONES_COMERCIALES_DEFAULT, REQUISITOS_CONTRATO_DEFAULT, CUENTAS_EMPRESA_DEFAULT } from "@/types/proforma";
+import DateTimePicker from "@/components/DateTimePicker";
 
 interface ModalReservaLoteProps {
   open: boolean;
@@ -44,7 +45,13 @@ export default function ModalReservaLote({
   const [montoInicial, setMontoInicial] = useState("");
   const [numeroCuotas, setNumeroCuotas] = useState("1");
   const [formaPago, setFormaPago] = useState("contado");
-  const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const obtenerFechaVencimientoPorDefecto = () => {
+    const fechaDefecto = new Date();
+    fechaDefecto.setDate(fechaDefecto.getDate() + 30);
+    return fechaDefecto.toISOString();
+  };
+
+  const [fechaVencimiento, setFechaVencimiento] = useState<string>(obtenerFechaVencimientoPorDefecto());
   const [notas, setNotas] = useState("");
 
   // Estados UI
@@ -65,9 +72,7 @@ export default function ModalReservaLote({
       cargarClientes();
       cargarVendedor();
       // Establecer fecha de vencimiento por defecto (30 días)
-      const fechaDefecto = new Date();
-      fechaDefecto.setDate(fechaDefecto.getDate() + 30);
-      setFechaVencimiento(fechaDefecto.toISOString().split('T')[0]);
+      setFechaVencimiento(obtenerFechaVencimientoPorDefecto());
     }
   }, [open]);
 
@@ -306,6 +311,7 @@ export default function ModalReservaLote({
       setMontoInicial("");
       setNumeroCuotas("1");
       setFormaPago("contado");
+      setFechaVencimiento(obtenerFechaVencimientoPorDefecto());
       setNotas("");
     }
 
@@ -448,10 +454,9 @@ export default function ModalReservaLote({
                   <label className="block text-sm font-medium text-crm-text-secondary mb-2">
                     Fecha de Vencimiento *
                   </label>
-                  <Input
-                    type="date"
+                  <DateTimePicker
                     value={fechaVencimiento}
-                    onChange={(e) => setFechaVencimiento(e.target.value)}
+                    onChange={(value) => setFechaVencimiento(value)}
                   />
                 </div>
               </div>

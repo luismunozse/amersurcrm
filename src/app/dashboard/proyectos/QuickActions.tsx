@@ -17,6 +17,7 @@ import {
 import { eliminarProyecto } from "./_actions";
 import EditProjectModal from "./_EditProjectModal";
 import type { ProyectoMediaItem } from "@/types/proyectos";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 
 type QuickActionsProps = {
   id: string;
@@ -58,6 +59,9 @@ export default function QuickActions({
   const [showEditModal, setShowEditModal] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const router = useRouter();
+  const { tienePermiso } = usePermissions();
+  const puedeEditarProyecto = tienePermiso(PERMISOS.PROYECTOS.EDITAR);
+  const puedeEliminarProyecto = tienePermiso(PERMISOS.PROYECTOS.ELIMINAR);
 
   const copyLink = async () => {
     try {
@@ -129,7 +133,7 @@ export default function QuickActions({
   };
 
   const actionItems = useMemo<ActionConfig[]>(() => {
-    return [
+    const actions: ActionConfig[] = [
       {
         key: "unidades",
         label: "Ver unidades",
@@ -148,19 +152,28 @@ export default function QuickActions({
         icon: ChartBarIcon,
         onClick: handleReports,
       },
-      {
+    ];
+
+    if (puedeEditarProyecto) {
+      actions.push({
         key: "editar",
         label: "Editar",
         icon: PencilSquareIcon,
         onClick: handleEdit,
-      },
-      {
+      });
+    }
+
+    if (puedeEliminarProyecto) {
+      actions.push({
         key: "eliminar",
         label: showDeleteConfirm ? "Confirmar eliminación" : "Eliminar",
         icon: TrashIcon,
         onClick: handleDelete,
         tone: "danger",
-      },
+      });
+    }
+
+    actions.push(
       {
         key: "compartir",
         label: "Compartir",
@@ -172,9 +185,22 @@ export default function QuickActions({
         label: "Abrir nueva pestaña",
         icon: ArrowTopRightOnSquareIcon,
         onClick: () => window.open(`/dashboard/proyectos/${id}`, "_blank"),
-      },
-    ];
-  }, [copyLink, handleDelete, handleEdit, handleReports, id, openMaps, router, showDeleteConfirm]);
+      }
+    );
+
+    return actions;
+  }, [
+    copyLink,
+    handleDelete,
+    handleEdit,
+    handleReports,
+    id,
+    openMaps,
+    router,
+    showDeleteConfirm,
+    puedeEditarProyecto,
+    puedeEliminarProyecto,
+  ]);
 
   if (showDeleteConfirm) {
     return (
@@ -241,25 +267,29 @@ export default function QuickActions({
           >
             <ChartBarIcon className="w-4 h-4" />
           </button>
-          <button
-            onClick={handleEdit}
-            className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
-            title="Editar proyecto"
-            aria-label="Editar proyecto"
-            type="button"
-          >
-            <PencilSquareIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleDelete}
-            className="p-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
-            title="Eliminar proyecto"
-            aria-label="Eliminar proyecto"
-            type="button"
-            disabled={isDeleting}
-          >
-            <TrashIcon className="w-4 h-4" />
-          </button>
+          {puedeEditarProyecto && (
+            <button
+              onClick={handleEdit}
+              className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+              title="Editar proyecto"
+              aria-label="Editar proyecto"
+              type="button"
+            >
+              <PencilSquareIcon className="w-4 h-4" />
+            </button>
+          )}
+          {puedeEliminarProyecto && (
+            <button
+              onClick={handleDelete}
+              className="p-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+              title="Eliminar proyecto"
+              aria-label="Eliminar proyecto"
+              type="button"
+              disabled={isDeleting}
+            >
+              <TrashIcon className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={copyLink}
             className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
@@ -317,7 +347,7 @@ export default function QuickActions({
         </div>
       )}
 
-      {proyecto && (
+      {proyecto && puedeEditarProyecto && (
         <EditProjectModal proyecto={proyecto} isOpen={showEditModal} onClose={handleCloseEdit} />
       )}
     </>

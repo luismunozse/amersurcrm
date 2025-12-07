@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { subirPlanos, eliminarPlanos } from "./_actions";
-import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 import toast from "react-hot-toast";
 import PlanosViewer from "./_PlanosViewer";
 
@@ -14,8 +14,9 @@ interface PlanosUploaderProps {
 
 export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }: PlanosUploaderProps) {
   const [pending, start] = useTransition();
-  const { isAdmin, loading } = useAdminPermissions();
+  const { loading, tienePermiso, esAdmin } = usePermissions();
   const [dragActive, setDragActive] = useState(false);
+  const puedeGestionarPlanos = esAdmin() || tienePermiso(PERMISOS.PROYECTOS.EDITAR);
 
   const handleFileUpload = (file: File) => {
     if (!file) return;
@@ -98,8 +99,8 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
     );
   }
 
-  if (!isAdmin) {
-    return null; // No mostrar nada si no es admin
+  if (!puedeGestionarPlanos) {
+    return null; // No mostrar nada si no tiene permiso
   }
 
   return (

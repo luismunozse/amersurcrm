@@ -9,7 +9,7 @@ import { compressImage, compressImages, formatFileSize } from "@/lib/imageCompre
 
 export default function NewProyectoForm() {
   const [pending, start] = useTransition();
-  const { isAdmin, loading } = useAdminPermissions();
+  const { isAdmin, loading, canCreateProjects } = useAdminPermissions();
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
@@ -47,7 +47,7 @@ export default function NewProyectoForm() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canCreateProjects) {
     return null;
   }
 

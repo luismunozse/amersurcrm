@@ -8,6 +8,7 @@ import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
 import { UserProfileProvider } from "./UserProfileContext";
 import { registerPushSubscription } from "@/lib/pushClient";
+import NotificationPermissionPrompt from "@/components/NotificationPermissionPrompt";
 
 export default function DashboardClient({
   children,
@@ -116,6 +117,7 @@ export default function DashboardClient({
           <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
         </div>
       </div>
+      <NotificationPermissionPrompt />
     </UserProfileProvider>
   );
 }

@@ -111,21 +111,11 @@
 
 ---
 
-## 🎯 Cómo Cambiar a Realtime (Cuando actualices a Pro)
+## 🎯 Estado de Realtime
 
-### **1 solo cambio necesario:**
-
-En `src/components/Header.tsx` línea 7:
-
-```tsx
-// AHORA (Polling):
-import NotificationsDropdown from "./NotificationsDropdownPolling";
-
-// DESPUÉS (Realtime - cuando actualices a Pro):
-import NotificationsDropdown from "./NotificationsDropdown";
-```
-
-¡Eso es todo! 🎉
+El dashboard ya usa `src/components/NotificationsDropdown.tsx`, que se conecta directo a Supabase Realtime.
+Si por algún motivo necesitas volver al fallback por polling, crea nuevamente `NotificationsDropdownPolling.tsx`
+y cambia temporalmente el import en `src/components/Header.tsx`.
 
 ---
 
@@ -157,7 +147,7 @@ import NotificationsDropdown from "./NotificationsDropdown";
 1. `src/app/dashboard/propiedades/_actions.ts` ✨ NUEVO
 2. `src/app/api/admin/usuarios/route.ts` ✨ NUEVO
 3. `src/app/dashboard/proyectos/_actions.ts` ✨ NUEVO
-4. `src/components/NotificationsDropdownPolling.tsx` ✨ NUEVO
+4. `src/components/NotificationsDropdown.tsx` - Realtime habilitado
 
 ### **UI/Header:**
 5. `src/components/UserAvatarMenu.tsx` - Eliminado badge duplicado

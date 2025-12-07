@@ -3,6 +3,9 @@
  */
 
 import { AuthState, Cliente, CreateLeadPayload, CreateLeadResponse } from '@/types/crm';
+import { createLogger } from './logger';
+
+const logger = createLogger('CRMApiClient');
 
 export class CRMApiClient {
   private baseUrl: string;
@@ -11,6 +14,7 @@ export class CRMApiClient {
   constructor(baseUrl: string, token: string | null = null) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remover trailing slash
     this.token = token;
+    logger.info('CRMApiClient inicializado', { baseUrl: this.baseUrl, hasToken: !!token });
   }
 
   setToken(token: string) {
@@ -23,6 +27,16 @@ export class CRMApiClient {
     isRetry = false
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const method = options.method || 'GET';
+    const requestId = `${method} ${endpoint}`;
+
+    logger.debug(`Iniciando petición`, {
+      method,
+      endpoint,
+      url,
+      isRetry,
+      hasToken: !!this.token,
+    });
 
     const headers = new Headers(options.headers);
     headers.set('Content-Type', 'application/json');
@@ -31,27 +45,85 @@ export class CRMApiClient {
       headers.set('Authorization', `Bearer ${this.token}`);
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    const startTime = Date.now();
 
-    // Si es 401 y no es un reintento, intentar renovar token
-    if (response.status === 401 && !isRetry && typeof chrome !== 'undefined') {
-      console.log('[API] Token expirado, intentando renovar...');
-      const renewed = await this.renewToken();
-      if (renewed) {
-        console.log('[API] Token renovado exitosamente, reintentando petición...');
-        return this.request<T>(endpoint, options, true);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
+
+      const responseTime = Date.now() - startTime;
+
+      logger.debug(`Respuesta recibida`, {
+        requestId,
+        status: response.status,
+        statusText: response.statusText,
+        responseTime: `${responseTime}ms`,
+      });
+
+      // Si es 401 y no es un reintento, intentar renovar token
+      if (response.status === 401 && !isRetry && typeof chrome !== 'undefined') {
+        logger.warn('Token expirado, intentando renovar...', { requestId });
+        const renewed = await this.renewToken();
+        if (renewed) {
+          logger.info('Token renovado exitosamente, reintentando petición...', { requestId });
+          return this.request<T>(endpoint, options, true);
+        } else {
+          logger.error('No se pudo renovar el token', undefined, { requestId });
+        }
       }
-    }
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error: ${response.status} - ${error}`);
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error(`Error en petición`, undefined, {
+          requestId,
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        });
+        throw new Error(`API Error: ${response.status} - ${errorText}`);
+      }
 
-    return response.json();
+      const data = await response.json();
+      logger.info(`Petición exitosa`, {
+        requestId,
+        responseTime: `${responseTime}ms`,
+        dataSize: JSON.stringify(data).length,
+      });
+
+      // Enviar métrica de performance
+      logger.sendMetric('api_request', requestId, responseTime, 'ms', {
+        method,
+        endpoint,
+        status: response.status,
+        dataSize: JSON.stringify(data).length,
+      }).catch(() => {
+        // Ignorar errores al enviar métricas
+      });
+
+      return data;
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      
+      // Manejar errores de red (timeout, sin conexión, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        const networkError = new Error('Error de conexión: No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+        logger.error('Error de red', networkError, {
+          requestId,
+          responseTime: `${responseTime}ms`,
+          originalError: error.message,
+        });
+        throw networkError;
+      }
+
+      logger.error('Error en petición', error instanceof Error ? error : undefined, {
+        requestId,
+        responseTime: `${responseTime}ms`,
+      });
+      
+      throw error;
+    }
   }
 
   /**
@@ -112,29 +184,47 @@ export class CRMApiClient {
    * Autenticar usuario
    */
   async login(username: string, password: string): Promise<AuthState> {
-    const response = await this.request<{ user: any; token: string; refreshToken?: string }>(
-      '/api/auth/login',
-      {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      }
-    );
+    logger.info('Iniciando login', { username, baseUrl: this.baseUrl });
+    
+    try {
+      const response = await this.request<{ user: any; token: string; refreshToken?: string }>(
+        '/api/auth/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        }
+      );
 
-    // Guardar refresh token para renovación automática (SEGURO)
-    // NO guardamos contraseñas por seguridad
-    if (typeof chrome !== 'undefined' && chrome.storage && response.refreshToken) {
-      await chrome.storage.local.set({
-        refreshToken: response.refreshToken,
-        lastLogin: Date.now(),
+      logger.info('Login exitoso', {
+        userId: response.user?.id,
+        username: response.user?.username,
+        hasRefreshToken: !!response.refreshToken,
       });
-    }
 
-    return {
-      isAuthenticated: true,
-      user: response.user,
-      token: response.token,
-      crmUrl: this.baseUrl,
-    };
+      // Guardar tokens para persistencia de sesión
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        await chrome.storage.local.set({
+          authToken: response.token,
+          refreshToken: response.refreshToken || null,
+          crmUrl: this.baseUrl,
+          lastLogin: Date.now(),
+        });
+        logger.debug('Tokens guardados en storage');
+      }
+
+      // Actualizar token en el cliente
+      this.setToken(response.token);
+
+      return {
+        isAuthenticated: true,
+        user: response.user,
+        token: response.token,
+        crmUrl: this.baseUrl,
+      };
+    } catch (error) {
+      logger.error('Error en login', error instanceof Error ? error : undefined, { username });
+      throw error;
+    }
   }
 
   /**

@@ -195,6 +195,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
     loading: permisosLoading,
     tieneAlgunoDePermisos,
     tieneAlgunoDeRoles,
+    esAdmin,
   } = usePermissions();
 
   const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
@@ -235,6 +236,9 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
 
   const canAccessNavItem = useCallback(
     (item: NavItem) => {
+      // Los administradores pueden ver todos los items del menú
+      if (esAdmin()) return true;
+
       const hasPermiso = !item.permisos?.length || tieneAlgunoDePermisos(item.permisos);
       const hasRol = !item.roles?.length || tieneAlgunoDeRoles(item.roles);
 
@@ -246,7 +250,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
       // Caso contrario, debe cumplir el requisito definido
       return hasPermiso && hasRol;
     },
-    [tieneAlgunoDePermisos, tieneAlgunoDeRoles]
+    [esAdmin, tieneAlgunoDePermisos, tieneAlgunoDeRoles]
   );
 
   const filteredNavigation = useMemo(() => {
@@ -471,12 +475,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
               </>
             )}
 
-            {!permisosLoading && !showAdminSection && !collapsed && (
-              <div className="mt-6 text-xs text-crm-text-muted border border-dashed border-crm-border rounded-xl px-4 py-3 bg-crm-sidebar-hover/30">
-                Algunas secciones administrativas se muestran solo a usuarios con permisos
-                elevados. Si necesitas acceso, contacta a tu coordinador.
-              </div>
-            )}
+            {/* Mensaje informativo eliminado para simplificar la vista cuando no hay secciones admin visibles */}
           </nav>
 
         </div>

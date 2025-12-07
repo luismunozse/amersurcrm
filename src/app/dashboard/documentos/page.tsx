@@ -26,8 +26,6 @@ export default async function DocumentosPage() {
 
   try {
     const serviceRole = createServiceRoleClient();
-    console.log('[DEBUG] Service Role Key exists:', Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY));
-    console.log('[DEBUG] Service Role Key length:', process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
 
     const { data, error } = await serviceRole
       .from('google_drive_sync_config')
@@ -35,16 +33,12 @@ export default async function DocumentosPage() {
       .eq('activo', true)
       .maybeSingle();
 
-    console.log('[DEBUG] Query result - data:', data);
-    console.log('[DEBUG] Query result - error:', error);
-
     if (error) {
       googleDriveConfigError = error.message;
     } else {
       googleDriveConfig = data;
     }
   } catch (error) {
-    console.log('[DEBUG] Exception caught:', error);
     googleDriveConfigError = error instanceof Error ? error.message : 'Error desconocido';
   }
 

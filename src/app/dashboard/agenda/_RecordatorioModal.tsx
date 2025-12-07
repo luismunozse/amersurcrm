@@ -190,7 +190,7 @@ export default function RecordatorioModal({
                   type="datetime-local"
                   value={formData.fecha_recordatorio}
                   onChange={(e) => handleInputChange("fecha_recordatorio", e.target.value)}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
+                  className="crm-datetime-input"
                   required
                 />
               </div>

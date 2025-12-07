@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 
 export async function POST(request: Request) {
   try {
@@ -51,46 +51,120 @@ export async function POST(request: Request) {
     }
 
     if (email !== undefined) {
+      const emailTrimmed = email.trim();
+      
+      // Definir dominios inválidos una sola vez para reutilizar
+      const invalidDomains = ['.local', '.admin', '.test', '.localhost'];
+      
       // Validar formato de email
       const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      if (!emailRegex.test(email)) {
+      if (!emailRegex.test(emailTrimmed)) {
         return NextResponse.json(
           { success: false, error: "Formato de email inválido. Debe ser un email válido (ej: usuario@ejemplo.com)" },
           { status: 400 }
         );
       }
 
-      // Actualizar email via Supabase Auth (envía correo de confirmación automáticamente)
-      const { error: emailError } = await supabase.auth.updateUser({
-        email: email
-      });
-
-      if (emailError) {
-        console.error("Error al actualizar email:", emailError);
-        console.error("Error code:", (emailError as any).code);
-        console.error("Error message:", emailError.message);
-
-        // Mensajes de error más específicos basados en el código de error
-        let errorMessage = "Error al actualizar el email.";
-
-        const errorCode = (emailError as any).code;
-        const errorMsg = emailError.message?.toLowerCase() || "";
-
-        if (errorCode === "email_address_invalid" || errorMsg.includes("invalid")) {
-          errorMessage = "El formato del email es inválido. Usa un dominio válido como @gmail.com, @outlook.com, @hotmail.com";
-        } else if (errorCode === "email_exists" || errorMsg.includes("already") || errorMsg.includes("exists")) {
-          errorMessage = "Este email ya está registrado en el sistema.";
-        } else if (errorCode === "same_email") {
-          errorMessage = "El nuevo email es igual al email actual.";
-        } else {
-          // Mostrar el error original de Supabase para debugging
-          errorMessage = `Error al actualizar email: ${emailError.message}`;
-        }
-
+      // Validar que el dominio sea válido (no dominios locales como .local, .admin, etc.)
+      const domain = emailTrimmed.split('@')[1]?.toLowerCase();
+      const hasInvalidDomain = invalidDomains.some(invalid => domain?.endsWith(invalid));
+      
+      if (hasInvalidDomain) {
         return NextResponse.json(
-          { success: false, error: errorMessage },
+          { 
+            success: false, 
+            error: "No se puede usar un dominio local (.local, .admin, etc.). Por favor, usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com, @yahoo.com, etc." 
+          },
           { status: 400 }
         );
+      }
+
+      // Verificar si el email es igual al actual (no tiene sentido actualizar)
+      if (emailTrimmed === user.email) {
+        return NextResponse.json(
+          { success: false, error: "El nuevo email es igual al email actual. No se requiere ningún cambio." },
+          { status: 400 }
+        );
+      }
+
+      // Detectar si el email actual tiene un dominio inválido
+      const currentEmailDomain = user.email?.split('@')[1]?.toLowerCase() || '';
+      const currentEmailIsInvalid = invalidDomains.some(invalid => currentEmailDomain.endsWith(invalid));
+
+      let emailUpdateSuccess = false;
+
+      // Si el email actual es inválido, usar service role para actualizar directamente
+      if (currentEmailIsInvalid) {
+        console.log("Email actual tiene dominio inválido, usando service role para actualizar directamente");
+        const srv = createServiceRoleClient();
+        const { error: adminError } = await srv.auth.admin.updateUserById(user.id, {
+          email: emailTrimmed,
+          email_confirm: true // Confirmar automáticamente sin enviar correo
+        });
+
+        if (adminError) {
+          console.error("Error al actualizar email con service role:", adminError);
+          const errorCode = (adminError as any).code;
+          const errorMsg = adminError.message?.toLowerCase() || "";
+
+          let errorMessage = "Error al actualizar el email.";
+
+          if (errorCode === "email_address_invalid" || errorMsg.includes("invalid")) {
+            errorMessage = "El formato del email es inválido o el dominio no es válido. Usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com, @yahoo.com, etc.";
+          } else if (errorCode === "email_exists" || errorMsg.includes("already") || errorMsg.includes("exists")) {
+            errorMessage = "Este email ya está registrado en el sistema. Por favor, usa otro email.";
+          } else {
+            errorMessage = `Error al actualizar email: ${adminError.message}`;
+          }
+
+          return NextResponse.json(
+            { success: false, error: errorMessage },
+            { status: 400 }
+          );
+        }
+
+        emailUpdateSuccess = true;
+        // Retornar éxito indicando que se actualizó directamente (sin correo de confirmación)
+        return NextResponse.json({
+          success: true,
+          message: "Email actualizado exitosamente. Tu email ha sido cambiado directamente.",
+          emailUpdatedDirectly: true
+        });
+      } else {
+        // Si el email actual es válido, usar el método normal que envía correo de confirmación
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: emailTrimmed
+        });
+
+        if (emailError) {
+          console.error("Error al actualizar email:", emailError);
+          console.error("Error code:", (emailError as any).code);
+          console.error("Error message:", emailError.message);
+
+          // Mensajes de error más específicos basados en el código de error
+          let errorMessage = "Error al actualizar el email.";
+
+          const errorCode = (emailError as any).code;
+          const errorMsg = emailError.message?.toLowerCase() || "";
+
+          if (errorCode === "email_address_invalid" || errorMsg.includes("invalid")) {
+            errorMessage = "El formato del email es inválido o el dominio no es válido. Usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com, @yahoo.com, etc.";
+          } else if (errorCode === "email_exists" || errorMsg.includes("already") || errorMsg.includes("exists")) {
+            errorMessage = "Este email ya está registrado en el sistema. Por favor, usa otro email.";
+          } else if (errorCode === "same_email") {
+            errorMessage = "El nuevo email es igual al email actual.";
+          } else {
+            // Mostrar el error original de Supabase para debugging
+            errorMessage = `Error al actualizar email: ${emailError.message}`;
+          }
+
+          return NextResponse.json(
+            { success: false, error: errorMessage },
+            { status: 400 }
+          );
+        }
+
+        emailUpdateSuccess = true;
       }
     }
 

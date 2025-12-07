@@ -168,10 +168,10 @@ async function verificarCondicionPermiso(
 
     const { data, error } = await supabase
       .schema('crm')
-      .rpc('verificar_condicion_permiso', {
-        user_id: userId,
-        permiso_codigo: permiso,
-        valor_actual: valorActual || null,
+    .rpc('verificar_condicion_permiso', {
+        p_usuario_id: userId,
+        p_permiso_codigo: permiso,
+        p_valor_actual: valorActual || null,
       });
 
     if (error) {

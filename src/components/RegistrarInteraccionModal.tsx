@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { registrarInteraccion, actualizarInteraccion } from "@/app/dashboard/clientes/_actions_crm";
+import DateTimePicker from "@/components/DateTimePicker";
 import {
   TIPOS_INTERACCION,
   RESULTADOS_INTERACCION,
@@ -51,8 +52,7 @@ export default function RegistrarInteraccionModal({
       // Formatear fecha si existe
       if (interaccionToEdit.fecha_proxima_accion) {
         const fecha = new Date(interaccionToEdit.fecha_proxima_accion);
-        const formatted = fecha.toISOString().slice(0, 16);
-        setFechaProximaAccion(formatted);
+        setFechaProximaAccion(fecha.toISOString());
       } else {
         setFechaProximaAccion("");
       }
@@ -248,11 +248,9 @@ export default function RegistrarInteraccionModal({
                   <label className="block text-sm font-medium text-crm-text-primary mb-2">
                     Fecha
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={fechaProximaAccion}
-                    onChange={(e) => setFechaProximaAccion(e.target.value)}
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                  <DateTimePicker
+                    value={fechaProximaAccion || undefined}
+                    onChange={setFechaProximaAccion}
                   />
                 </div>
               )}

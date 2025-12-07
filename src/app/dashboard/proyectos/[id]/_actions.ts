@@ -16,15 +16,7 @@ export async function subirPlanos(proyectoId: string, fd: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para subir planos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
-  }
+  await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
 
   if (!planosFile || planosFile.size === 0) {
     throw new Error("Debe seleccionar un archivo de planos");
@@ -69,15 +61,7 @@ export async function eliminarPlanos(proyectoId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar planos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
-  }
+  await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
 
   try {
     // Obtener la URL actual de los planos
@@ -142,14 +126,11 @@ export async function crearLote(fd: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para crear lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  await requierePermiso(PERMISOS.LOTES.CREAR);
+  const perfil = await obtenerPerfilUsuario();
+  const rolNombre = perfil?.rol?.nombre;
+  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+    throw new Error("Solo administradores o coordinadores pueden crear lotes");
   }
 
   // Validar que el código sea único dentro del proyecto
@@ -205,6 +186,8 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
+
+  await requierePermiso(PERMISOS.LOTES.EDITAR);
 
   // Verificar permisos y ruta según rol
   const perfil = await obtenerPerfilUsuario();
@@ -435,13 +418,11 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  await requierePermiso(PERMISOS.LOTES.ELIMINAR);
+  const perfil = await obtenerPerfilUsuario();
+  const rolNombre = perfil?.rol?.nombre;
+  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+    throw new Error("Solo administradores o coordinadores pueden eliminar lotes");
   }
 
   const { error } = await supabase
@@ -462,14 +443,11 @@ export async function eliminarTodosLosLotes(proyectoId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  await requierePermiso(PERMISOS.LOTES.ELIMINAR);
+  const perfil = await obtenerPerfilUsuario();
+  const rolNombre = perfil?.rol?.nombre;
+  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+    throw new Error("Solo administradores o coordinadores pueden eliminar lotes");
   }
 
   // Primero obtener la cantidad de lotes que se van a eliminar
@@ -503,14 +481,11 @@ export async function duplicarLote(loteId: string, proyectoId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Solo admin
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para duplicar lotes");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  await requierePermiso(PERMISOS.LOTES.CREAR);
+  const perfil = await obtenerPerfilUsuario();
+  const rolNombre = perfil?.rol?.nombre;
+  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+    throw new Error("Solo administradores o coordinadores pueden duplicar lotes");
   }
 
   // Traer lote original
@@ -1134,6 +1109,90 @@ export async function crearReservaConVinculacion(datos: {
     return {
       data: null,
       error: error instanceof Error ? error.message : 'Error desconocido creando reserva'
+    };
+  }
+}
+
+/**
+ * Obtiene el detalle completo de un lote incluyendo reserva y cliente si aplica
+ */
+export async function obtenerDetalleLote(loteId: string): Promise<{
+  data: {
+    lote: any;
+    reserva: any | null;
+    cliente: any | null;
+    proyecto: any | null;
+  } | null;
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerActionClient();
+    
+    // Obtener lote con proyecto
+    const { data: lote, error: loteError } = await supabase
+      .schema('crm')
+      .from('lote')
+      .select(`
+        *,
+        proyecto:proyecto_id (
+          id,
+          nombre,
+          ubicacion,
+          estado
+        )
+      `)
+      .eq('id', loteId)
+      .single();
+
+    if (loteError || !lote) {
+      return { data: null, error: 'Lote no encontrado' };
+    }
+
+    let reserva = null;
+    let cliente = null;
+
+    // Si el lote está reservado o vendido, buscar la reserva activa
+    if (lote.estado === 'reservado' || lote.estado === 'vendido') {
+      const { data: reservaData } = await supabase
+        .schema('crm')
+        .from('reserva')
+        .select(`
+          *,
+          cliente:cliente_id (
+            id,
+            nombre,
+            email,
+            telefono,
+            documento,
+            tipo_documento
+          )
+        `)
+        .eq('lote_id', loteId)
+        .in('estado', ['activa', 'completada'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (reservaData) {
+        reserva = reservaData;
+        cliente = reservaData.cliente;
+      }
+    }
+
+    return {
+      data: {
+        lote,
+        reserva,
+        cliente,
+        proyecto: lote.proyecto
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('Error obteniendo detalle del lote:', error);
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Error obteniendo detalle'
     };
   }
 }

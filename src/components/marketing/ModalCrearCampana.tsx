@@ -409,7 +409,7 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
                     required={!formData.enviar_inmediatamente}
                     value={formData.fecha_inicio}
                     onChange={(e) => setFormData({ ...formData, fecha_inicio: e.target.value })}
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    className="crm-datetime-input"
                   />
                 </div>
               )}

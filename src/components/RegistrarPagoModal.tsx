@@ -238,7 +238,7 @@ export default function RegistrarPagoModal({
                           type="datetime-local"
                           value={fechaPago}
                           onChange={(e) => setFechaPago(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2.5 bg-crm-background border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent text-crm-text"
+                          className="crm-datetime-input pl-10 pr-4"
                           required
                           disabled={isPending}
                         />

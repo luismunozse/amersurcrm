@@ -52,9 +52,20 @@ export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail
 
     // Validar email
     if (email && email.trim()) {
+      const emailTrimmed = email.trim();
       const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      if (!emailRegex.test(email.trim())) {
+      
+      if (!emailRegex.test(emailTrimmed)) {
         newErrors.email = "Formato de email inválido. Debe ser un email válido (ej: usuario@ejemplo.com)";
+      } else {
+        // Validar que el dominio sea válido (no dominios locales)
+        const domain = emailTrimmed.split('@')[1]?.toLowerCase();
+        const invalidDomains = ['.local', '.admin', '.test', '.localhost'];
+        const hasInvalidDomain = invalidDomains.some(invalid => domain?.endsWith(invalid));
+        
+        if (hasInvalidDomain) {
+          newErrors.email = "No se puede usar un dominio local (.local, .admin, etc.). Usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com";
+        }
       }
     }
 
@@ -93,10 +104,19 @@ export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail
 
         if (result.success) {
           if (emailChanged) {
-            toast.success(
-              "Se ha enviado un correo de confirmación al nuevo email. Tu email actual no cambiará hasta que confirmes desde el correo.",
-              { duration: 8000 }
-            );
+            if (result.emailUpdatedDirectly) {
+              // Email actualizado directamente (desde un email inválido)
+              toast.success(
+                "Email actualizado exitosamente. Tu email ha sido cambiado directamente.",
+                { duration: 5000 }
+              );
+            } else {
+              // Email actualizado con confirmación (desde un email válido)
+              toast.success(
+                "Se ha enviado un correo de confirmación al nuevo email. Tu email actual no cambiará hasta que confirmes desde el correo.",
+                { duration: 8000 }
+              );
+            }
           } else {
             toast.success("Perfil actualizado exitosamente");
           }

@@ -4,6 +4,8 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { revalidatePath } from "next/cache";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
+import type { TipoEvento, EstadoEvento } from "@/lib/types/agenda";
+import type { ProximaAccion, ResultadoInteraccion, TipoInteraccion } from "@/lib/types/crm-flujo";
 
 // ============================================================
 // HELPERS
@@ -30,7 +32,7 @@ async function obtenerUsernameActual(supabase: Awaited<ReturnType<typeof createS
     return { success: false, error: 'Usuario sin username' } as const;
   }
 
-  return { success: true, username: perfil.username } as const;
+  return { success: true, username: perfil.username, userId: user.id } as const;
 }
 
 /**
@@ -76,16 +78,95 @@ function revalidarCliente(clienteId?: string) {
 }
 
 // ============================================================
+// AGENDA
+// ============================================================
+
+type SupabaseActionClient = Awaited<ReturnType<typeof createServerActionClient>>;
+
+const INTERACCION_EVENTO_MAP: Record<TipoInteraccion, { tipo: TipoEvento; titulo: string; duracion?: number }> = {
+  llamada: { tipo: 'llamada', titulo: 'Llamada con cliente', duracion: 15 },
+  email: { tipo: 'email', titulo: 'Correo enviado', duracion: 15 },
+  whatsapp: { tipo: 'seguimiento', titulo: 'Mensaje por WhatsApp', duracion: 10 },
+  visita: { tipo: 'visita', titulo: 'Visita con cliente', duracion: 60 },
+  reunion: { tipo: 'cita', titulo: 'Reunión con cliente', duracion: 45 },
+  mensaje: { tipo: 'seguimiento', titulo: 'Mensaje al cliente', duracion: 10 },
+};
+
+const PROXIMA_ACCION_EVENTO_MAP: Record<Exclude<ProximaAccion, 'ninguna'>, { tipo: TipoEvento; titulo: string; duracion?: number }> = {
+  llamar: { tipo: 'llamada', titulo: 'Llamar al cliente', duracion: 15 },
+  enviar_propuesta: { tipo: 'email', titulo: 'Enviar propuesta', duracion: 20 },
+  reunion: { tipo: 'cita', titulo: 'Reunión agendada', duracion: 45 },
+  visita: { tipo: 'visita', titulo: 'Visita agendada', duracion: 60 },
+  seguimiento: { tipo: 'seguimiento', titulo: 'Seguimiento al cliente', duracion: 20 },
+  cierre: { tipo: 'tarea', titulo: 'Cierre de venta', duracion: 30 },
+};
+
+async function crearEventoAgenda(
+  supabase: SupabaseActionClient,
+  userId: string,
+  data: {
+    titulo: string;
+    tipo: TipoEvento;
+    fechaInicio: string;
+    fechaFin?: string;
+    clienteId?: string;
+    propiedadId?: string;
+    duracionMinutos?: number;
+    prioridad?: 'baja' | 'media' | 'alta' | 'urgente';
+    estado?: EstadoEvento;
+    descripcion?: string;
+    etiquetas?: string[];
+    todoElDia?: boolean;
+    notas?: string;
+  }
+) {
+  try {
+    const payload = {
+      titulo: data.titulo,
+      tipo: data.tipo,
+      prioridad: data.prioridad ?? 'media',
+      fecha_inicio: data.fechaInicio,
+      fecha_fin: data.fechaFin,
+      duracion_minutos: data.duracionMinutos ?? 60,
+      todo_el_dia: data.todoElDia ?? false,
+      vendedor_id: userId,
+      cliente_id: data.clienteId,
+      propiedad_id: data.propiedadId,
+      descripcion: data.descripcion,
+      notas: data.notas ?? data.descripcion,
+      etiquetas: data.etiquetas ?? [],
+      estado: data.estado ?? ('pendiente' as EstadoEvento),
+      recordar_antes_minutos: 15,
+      notificar_email: false,
+      notificar_push: false,
+      created_by: userId,
+    };
+
+    const { error } = await supabase.from('evento').insert(payload);
+
+    if (error) {
+      console.warn('No se pudo crear evento en agenda:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn('No se pudo crear evento en agenda:', error);
+    return false;
+  }
+}
+
+// ============================================================
 // INTERACCIONES
 // ============================================================
 
 export async function registrarInteraccion(data: {
   clienteId: string;
-  tipo: 'llamada' | 'email' | 'whatsapp' | 'visita' | 'reunion' | 'mensaje';
-  resultado?: 'contesto' | 'no_contesto' | 'reagendo' | 'interesado' | 'no_interesado' | 'cerrado' | 'pendiente';
+  tipo: TipoInteraccion;
+  resultado?: ResultadoInteraccion;
   notas?: string;
   duracionMinutos?: number;
-  proximaAccion?: 'llamar' | 'enviar_propuesta' | 'reunion' | 'visita' | 'seguimiento' | 'cierre' | 'ninguna';
+  proximaAccion?: ProximaAccion;
   fechaProximaAccion?: string;
 }) {
   const supabase = await createServerActionClient();
@@ -125,6 +206,50 @@ export async function registrarInteraccion(data: {
       throw error;
     }
 
+    const interaccion = Array.isArray(insertedData) ? insertedData[0] : insertedData;
+    const fechaInteraccion = interaccion?.fecha_interaccion || new Date().toISOString();
+    let agendaTouched = false;
+
+    // Registrar el evento realizado (interacción actual)
+    const eventoInteraccion = INTERACCION_EVENTO_MAP[data.tipo];
+    if (eventoInteraccion) {
+      const creado = await crearEventoAgenda(supabase, authResult.userId, {
+        titulo: eventoInteraccion.titulo,
+        tipo: eventoInteraccion.tipo,
+        fechaInicio: fechaInteraccion,
+        duracionMinutos: data.duracionMinutos ?? eventoInteraccion.duracion,
+        prioridad: 'media',
+        clienteId: data.clienteId,
+        descripcion: data.notas,
+        notas: data.notas,
+        estado: 'completado',
+      });
+      agendaTouched = agendaTouched || creado;
+    }
+
+    // Registrar próxima acción agendada
+    if (data.proximaAccion && data.proximaAccion !== 'ninguna' && data.fechaProximaAccion) {
+      const proximaConfig = PROXIMA_ACCION_EVENTO_MAP[data.proximaAccion as Exclude<ProximaAccion, 'ninguna'>];
+      if (proximaConfig) {
+        const fechaObjetivo = new Date(data.fechaProximaAccion);
+        const estado: EstadoEvento = fechaObjetivo < new Date() ? 'completado' : 'pendiente';
+        const creado = await crearEventoAgenda(supabase, authResult.userId, {
+          titulo: proximaConfig.titulo,
+          tipo: proximaConfig.tipo,
+          fechaInicio: fechaObjetivo.toISOString(),
+          duracionMinutos: proximaConfig.duracion,
+          prioridad: 'alta',
+          clienteId: data.clienteId,
+          descripcion: 'Programado desde una interacción con el cliente',
+          estado,
+        });
+        agendaTouched = agendaTouched || creado;
+      }
+    }
+
+    if (agendaTouched) {
+      revalidatePath('/dashboard/agenda');
+    }
     revalidarCliente(data.clienteId);
     return { success: true, data: insertedData };
   } catch (error: any) {
@@ -186,11 +311,11 @@ export async function obtenerInteracciones(
 
 export async function actualizarInteraccion(data: {
   interaccionId: string;
-  tipo?: 'llamada' | 'email' | 'whatsapp' | 'visita' | 'reunion' | 'mensaje';
-  resultado?: 'contesto' | 'no_contesto' | 'reagendo' | 'interesado' | 'no_interesado' | 'cerrado' | 'pendiente';
+  tipo?: TipoInteraccion;
+  resultado?: ResultadoInteraccion;
   notas?: string;
   duracionMinutos?: number;
-  proximaAccion?: 'llamar' | 'enviar_propuesta' | 'reunion' | 'visita' | 'seguimiento' | 'cierre' | 'ninguna';
+  proximaAccion?: ProximaAccion;
   fechaProximaAccion?: string;
 }) {
   const supabase = await createServerActionClient();
@@ -394,6 +519,7 @@ export async function registrarVisita(data: {
       return authResult;
     }
 
+    const fechaVisita = data.fechaVisita ? new Date(data.fechaVisita).toISOString() : new Date().toISOString();
     const { error } = await supabase
       .from('visita_propiedad')
       .insert({
@@ -401,7 +527,7 @@ export async function registrarVisita(data: {
         lote_id: data.loteId,
         propiedad_id: data.propiedadId,
         vendedor_username: authResult.username,
-        fecha_visita: data.fechaVisita || new Date().toISOString(),
+        fecha_visita: fechaVisita,
         duracion_minutos: data.duracionMinutos,
         feedback: data.feedback,
         nivel_interes: data.nivelInteres,
@@ -409,6 +535,23 @@ export async function registrarVisita(data: {
 
     if (error) throw error;
 
+    const estadoEvento: EstadoEvento = new Date(fechaVisita) < new Date() ? 'completado' : 'pendiente';
+    const creado = await crearEventoAgenda(supabase, authResult.userId, {
+      titulo: 'Visita con cliente',
+      tipo: 'visita',
+      fechaInicio: fechaVisita,
+      duracionMinutos: data.duracionMinutos ?? 60,
+      prioridad: 'alta',
+      clienteId: data.clienteId,
+      propiedadId: data.propiedadId,
+      descripcion: data.feedback,
+      notas: data.feedback,
+      estado: estadoEvento,
+    });
+
+    if (creado) {
+      revalidatePath('/dashboard/agenda');
+    }
     revalidarCliente(data.clienteId);
     return { success: true };
   } catch (error: any) {
@@ -516,6 +659,24 @@ export async function crearReserva(data: {
       throw error;
     }
 
+    const fechaReserva = reserva?.fecha_reserva || reserva?.created_at || new Date().toISOString();
+    const tituloReserva = reserva?.codigo_reserva ? `Reserva ${reserva.codigo_reserva}` : 'Reserva registrada';
+    const eventoReserva = await crearEventoAgenda(supabase, authResult.userId, {
+      titulo: tituloReserva,
+      tipo: 'tarea',
+      fechaInicio: fechaReserva,
+      duracionMinutos: 30,
+      prioridad: 'alta',
+      clienteId: data.clienteId,
+      propiedadId: data.propiedadId,
+      descripcion: data.notas || 'Reserva creada desde el módulo de clientes',
+      notas: data.notas,
+      estado: 'completado',
+    });
+
+    if (eventoReserva) {
+      revalidatePath('/dashboard/agenda');
+    }
     revalidarCliente(data.clienteId);
     revalidatePath('/dashboard/proyectos');
 

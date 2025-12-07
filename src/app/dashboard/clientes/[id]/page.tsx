@@ -1,6 +1,6 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { PERMISOS } from "@/lib/permissions";
-import { puedeAccederARecurso } from "@/lib/permissions/middleware";
+import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { redirect, notFound } from "next/navigation";
 import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
 import { ArrowLeft, User, Phone, Mail, MapPin } from "lucide-react";
@@ -60,24 +60,26 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
   }
 
   const { data: asesorActual } = await supabase
+    .schema('crm')
     .from('usuario_perfil')
     .select('id, nombre_completo, username, telefono, email')
     .eq('id', user.id)
     .maybeSingle();
 
-  const puedeVer = await puedeAccederARecurso(
-    PERMISOS.CLIENTES.VER_TODOS,
-    PERMISOS.CLIENTES.VER_ASIGNADOS,
-    async () => {
-      if (!asesorActual?.username) return false;
-      return [
-        cliente.vendedor_asignado,
-        cliente.vendedor_username,
-      ].filter(Boolean).includes(asesorActual.username);
-    }
-  );
+  const usuarioActual = await obtenerPermisosUsuario();
+  if (!usuarioActual) {
+    redirect('/login');
+  }
 
-  if (!puedeVer) {
+  const puedeVerTodos = usuarioActual.permisos.includes(PERMISOS.CLIENTES.VER_TODOS);
+  const puedeVerAsignados = usuarioActual.permisos.includes(PERMISOS.CLIENTES.VER_ASIGNADOS);
+  const esClientePropio = [
+    cliente.created_by === usuarioActual.id,
+    cliente.vendedor_asignado === usuarioActual.id,
+    usuarioActual.username ? cliente.vendedor_username === usuarioActual.username : false,
+  ].some(Boolean);
+
+  if (!puedeVerTodos && (!puedeVerAsignados || !esClientePropio)) {
     redirect('/dashboard/clientes');
   }
 

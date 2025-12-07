@@ -35,11 +35,13 @@ function normalizeDate(value?: string): Date {
 export default function DateTimePicker({ value, onChange, disabled }: DateTimePickerProps) {
   const initialDate = normalizeDate(value);
   const [open, setOpen] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(initialDate));
   const [selectedHour, setSelectedHour] = useState(initialDate.getHours());
   const [selectedMinute, setSelectedMinute] = useState(initialDate.getMinutes() - (initialDate.getMinutes() % minuteStep));
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const parsed = normalizeDate(value);
@@ -48,6 +50,30 @@ export default function DateTimePicker({ value, onChange, disabled }: DateTimePi
     setSelectedHour(parsed.getHours());
     setSelectedMinute(parsed.getMinutes() - (parsed.getMinutes() % minuteStep));
   }, [value]);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spacing = 8;
+    const width = 320;
+    const height = 380;
+    let top = rect.bottom + spacing;
+    let left = rect.right - width;
+    if (top + height > window.innerHeight - spacing) {
+      top = rect.top - height - spacing;
+    }
+    if (left < spacing) {
+      left = spacing;
+    }
+    if (left + width > window.innerWidth - spacing) {
+      left = window.innerWidth - spacing - width;
+    }
+    setPopoverStyle({
+      top: Math.max(spacing, top),
+      left,
+      maxHeight: `${Math.min(height, window.innerHeight - spacing * 2)}px`,
+    });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,13 +144,17 @@ export default function DateTimePicker({ value, onChange, disabled }: DateTimePi
         )}
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
+        ref={triggerRef}
       >
         <Calendar className="h-4 w-4 text-crm-primary" />
         <span className="flex-1 text-sm">{formattedValue}</span>
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-2 w-80 rounded-xl border border-crm-border bg-crm-card shadow-xl p-4">
+        <div
+          className="fixed z-50 w-80 rounded-xl border border-crm-border bg-crm-card shadow-xl p-4"
+          style={popoverStyle}
+        >
           <div className="flex items-center justify-between mb-4">
             <button
               type="button"

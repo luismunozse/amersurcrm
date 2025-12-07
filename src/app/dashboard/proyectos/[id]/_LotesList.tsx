@@ -10,6 +10,7 @@ import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
 import ModalReservaLote from "./ModalReservaLote";
 import DeleteAllLotesModal from "./_DeleteAllLotesModal";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 
 type Lote = {
   id: string;
@@ -55,6 +56,10 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
   const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const { esAdminOCoordinador, tienePermiso } = usePermissions();
+  const puedeCrearLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.CREAR);
+  const puedeEditarLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.EDITAR);
+  const puedeEliminarLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.ELIMINAR);
 
   // Sincronizar el estado cuando cambien los lotes
   useEffect(() => {
@@ -524,37 +529,43 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                                   <Eye className="w-4 h-4" />
                                   Ver detalles
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    handleEdit(lote.id);
-                                    closeMenu();
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                  Editar lote
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    handleDuplicate(lote.id, lote.codigo);
-                                    closeMenu();
-                                  }}
-                                  title="Duplicar lote"
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
-                                  Duplicar lote
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    handleDelete(lote.id, lote.codigo);
-                                    closeMenu();
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-danger hover:bg-crm-card-hover transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Eliminar lote
-                                </button>
+                                {puedeEditarLotes && (
+                                  <button
+                                    onClick={() => {
+                                      handleEdit(lote.id);
+                                      closeMenu();
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                    Editar lote
+                                  </button>
+                                )}
+                                {puedeCrearLotes && (
+                                  <button
+                                    onClick={() => {
+                                      handleDuplicate(lote.id, lote.codigo);
+                                      closeMenu();
+                                    }}
+                                    title="Duplicar lote"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
+                                    Duplicar lote
+                                  </button>
+                                )}
+                                {puedeEliminarLotes && (
+                                  <button
+                                    onClick={() => {
+                                      handleDelete(lote.id, lote.codigo);
+                                      closeMenu();
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-danger hover:bg-crm-card-hover transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Eliminar lote
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )}
@@ -641,36 +652,42 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                                       ))}
                                     </div>
                                   )}
-                                  <button
-                                    onClick={() => {
-                                      handleEdit(lote.id);
-                                      closeMenu();
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                    Editar lote
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleDuplicate(lote.id, lote.codigo);
-                                      closeMenu();
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
-                                    Duplicar lote
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleDelete(lote.id, lote.codigo);
-                                      closeMenu();
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-danger hover:bg-crm-card-hover transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Eliminar lote
-                                  </button>
+                                  {puedeEditarLotes && (
+                                    <button
+                                      onClick={() => {
+                                        handleEdit(lote.id);
+                                        closeMenu();
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                      Editar lote
+                                    </button>
+                                  )}
+                                  {puedeCrearLotes && (
+                                    <button
+                                      onClick={() => {
+                                        handleDuplicate(lote.id, lote.codigo);
+                                        closeMenu();
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
+                                      Duplicar lote
+                                    </button>
+                                  )}
+                                  {puedeEliminarLotes && (
+                                    <button
+                                      onClick={() => {
+                                        handleDelete(lote.id, lote.codigo);
+                                        closeMenu();
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-danger hover:bg-crm-card-hover transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Eliminar lote
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -723,6 +740,23 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       open={!!selectedLote}
       onClose={() => setSelectedLote(null)}
       lote={selectedLote}
+      proyectoId={proyectoId}
+      onReservar={
+        selectedLote?.estado === "disponible"
+          ? () => {
+              setSelectedLote(null);
+              setReservandoLoteId(selectedLote.id);
+            }
+          : undefined
+      }
+      onEditar={
+        puedeEditarLotes
+          ? () => {
+              setSelectedLote(null);
+              if (selectedLote) setEditingLote(selectedLote.id);
+            }
+          : undefined
+      }
     />
     {reservandoLoteId && (
       <ModalReservaLote

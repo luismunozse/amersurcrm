@@ -652,7 +652,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                   type="datetime-local"
                   value={formData.fecha_inicio}
                   onChange={(e) => handleInputChange("fecha_inicio", e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                  className="crm-datetime-input"
                   required
                 />
               </div>
@@ -662,7 +662,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                   type="datetime-local"
                   value={formData.fecha_fin}
                   onChange={(e) => handleInputChange("fecha_fin", e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                  className="crm-datetime-input"
                 />
               </div>
               <div className="space-y-2">
@@ -837,7 +837,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                   type="datetime-local"
                   value={formData.proximo_paso_fecha}
                   onChange={(e) => handleInputChange("proximo_paso_fecha", e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                  className="crm-datetime-input"
                   required={requiereProximoPaso}
                 />
                 {requiereProximoPaso && (
@@ -859,7 +859,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                   type="datetime-local"
                   value={formData.sla_vencimiento}
                   onChange={(e) => handleInputChange("sla_vencimiento", e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                  className="crm-datetime-input"
                 />
               </div>
               <div className="space-y-2">
@@ -918,7 +918,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                     type="datetime-local"
                     value={formData.snooze_hasta}
                     onChange={(e) => handleInputChange("snooze_hasta", e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                    className="crm-datetime-input"
                   />
                 </div>
               </div>

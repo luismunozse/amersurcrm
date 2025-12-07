@@ -1,27 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifications";
-import type { Notificacion, NotificacionNoLeida } from "@/types/crm";
-import { createClient, createRealtimeClient } from "@/lib/supabase.client";
 import toast from "react-hot-toast";
+import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifications";
+import type { NotificacionNoLeida } from "@/types/crm";
+import { dedupeNotifications } from "@/lib/notifications/dedupe";
+import { createClient } from "@/lib/supabase.client";
 
-type NotificacionInsertPayload = {
-  new: NotificacionNoLeida & { usuario_id?: string | null };
+type NotificacionRow = NotificacionNoLeida & {
+  usuario_id?: string | null;
+  leida?: boolean | null;
+  data?: Record<string, unknown> | null;
 };
 
-type NotificacionUpdatePayload = {
-  new: Notificacion & { usuario_id?: string | null };
-};
-
-interface NotificationsDropdownProps {
-  notificaciones: NotificacionNoLeida[];
-  count: number;
-}
-
-const tipoIcons = {
+const tipoIcons: Record<string, string> = {
   cliente: "👤",
   proyecto: "🏢",
   lote: "🏠",
@@ -29,233 +24,249 @@ const tipoIcons = {
   evento: "📅",
   recordatorio: "⏰",
   venta: "💰",
-  reserva: "📝",
+  reserva: "🔒",
 };
 
-const tipoColors = {
+const tipoColors: Record<string, string> = {
   cliente: "text-blue-600",
   proyecto: "text-green-600",
   lote: "text-orange-600",
   sistema: "text-gray-600",
-  evento: "text-purple-600",
-  recordatorio: "text-yellow-600",
-  venta: "text-emerald-600",
-  reserva: "text-indigo-600",
+  evento: "text-blue-600",
+  recordatorio: "text-orange-600",
+  venta: "text-green-600",
+  reserva: "text-purple-600",
 };
+
+interface NotificationsDropdownProps {
+  notificaciones: NotificacionNoLeida[];
+  count: number;
+}
+
+function normalizePayload(payload: NotificacionRow): NotificacionNoLeida {
+  return {
+    id: payload.id,
+    tipo: (payload.tipo ?? "sistema") as NotificacionNoLeida["tipo"],
+    titulo: payload.titulo,
+    mensaje: payload.mensaje,
+    data: payload.data ?? undefined,
+    created_at: payload.created_at ?? new Date().toISOString(),
+  };
+}
+
+function showBrowserNotification(notificacion: NotificacionNoLeida) {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return;
+  }
+
+  const display = () =>
+    new Notification(notificacion.titulo, {
+      body: notificacion.mensaje,
+      icon: "/logo-amersur.png",
+      badge: "/logo-amersur.png",
+      tag: notificacion.id,
+    });
+
+  if (Notification.permission === "granted") {
+    display();
+  } else if (Notification.permission === "default") {
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        display();
+      }
+    });
+  }
+}
 
 export default function NotificationsDropdown({ notificaciones, count }: NotificationsDropdownProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState(notificaciones);
+  const [items, setItems] = useState(() => dedupeNotifications(notificaciones));
   const [unreadCount, setUnreadCount] = useState(count);
-  const [userId, setUserId] = useState<string | null>(null);
+  const itemsRef = useRef(items);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Obtener userId y configurar audio
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        console.log('👤 Usuario conectado:', user.id, '| Email:', user.email);
-        setUserId(user.id);
-      }
-    });
-
-    // Precargar sonido de notificación (desactivado temporalmente)
-    // TODO: Descargar un sonido desde https://notificationsounds.com/
-    // y guardarlo como /public/notification.mp3
-    // if (typeof window !== 'undefined') {
-    //   audioRef.current = new Audio('/notification.mp3');
-    //   audioRef.current.volume = 0.5;
-    // }
-  }, []);
+  const audioUnlockedRef = useRef(false);
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    setItems(notificaciones);
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    setItems(dedupeNotifications(notificaciones));
     setUnreadCount(count);
   }, [notificaciones, count]);
 
-  // Realtime: Suscribirse a nuevas notificaciones
   useEffect(() => {
-    if (!userId) return;
+    if (typeof window === "undefined") return;
 
-    let channel: any = null;
-    let supabase: any = null;
+    const unlockAudio = async () => {
+      if (audioUnlockedRef.current || !audioRef.current) return;
 
-    // OBTENER SESIÓN Y CONFIGURAR REALTIME
+      audioRef.current.muted = true;
+      try {
+        await audioRef.current.play();
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.muted = false;
+        audioUnlockedRef.current = true;
+      } catch {
+        audioRef.current.muted = false;
+      }
+    };
+
+    const handleInteraction = () => {
+      void unlockAudio();
+    };
+
+    window.addEventListener("click", handleInteraction);
+    window.addEventListener("keydown", handleInteraction);
+
+    return () => {
+      window.removeEventListener("click", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
+    };
+  }, []);
+
+  const handleRealtimeInsert = useCallback((payload: NotificacionRow, currentUserId: string) => {
+    if (!payload || payload.usuario_id !== currentUserId) {
+      return;
+    }
+
+    const normalized = normalizePayload(payload);
+    const alreadyExists = itemsRef.current.some((item) => item.id === normalized.id);
+
+    setItems((prev) => dedupeNotifications([normalized, ...prev]).slice(0, 20));
+    if (!alreadyExists) {
+      setUnreadCount((prev) => prev + 1);
+    }
+
+    toast.success(normalized.titulo, {
+      icon: tipoIcons[normalized.tipo] ?? "🔔",
+      duration: 4000,
+    });
+
+    showBrowserNotification(normalized);
+    if (audioUnlockedRef.current && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      void audioRef.current.play().catch(() => {
+        // Ignorar rechazos de autoplay
+      });
+    }
+  }, []);
+
+  const handleRealtimeUpdate = useCallback((payload: NotificacionRow, currentUserId: string) => {
+    if (!payload || payload.usuario_id !== currentUserId) {
+      return;
+    }
+
+    const normalized = normalizePayload(payload);
+
+    if (payload.leida) {
+      const existed = itemsRef.current.some((item) => item.id === normalized.id);
+      setItems((prev) => prev.filter((item) => item.id !== normalized.id));
+      if (existed) {
+        setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
+      }
+      return;
+    }
+
+    setItems((prev) => {
+      const idx = prev.findIndex((item) => item.id === normalized.id);
+      if (idx === -1) {
+        return prev;
+      }
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], ...normalized };
+      return updated;
+    });
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    const errorNotifiedRef = { current: false };
+
+    const cleanupChannel = () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
+
+    const scheduleRetry = () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+      retryTimeout = setTimeout(() => {
+        if (isMounted) {
+          void setupRealtime();
+        }
+      }, 5000);
+    };
+
+    const handleStatusChange = (status: string) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        if (!errorNotifiedRef.current) {
+          toast.error("No se pudo conectar a notificaciones en tiempo real. Reintentando...");
+          errorNotifiedRef.current = true;
+        }
+        scheduleRetry();
+      }
+
+      if (status === "SUBSCRIBED") {
+        errorNotifiedRef.current = false;
+      }
+    };
+
     const setupRealtime = async () => {
-      // OBTENER SESIÓN DEL CLIENTE SSR
-      const ssupabase = createClient();
-      const { data: { session } } = await ssupabase.auth.getSession();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (!session) {
-        console.error('❌ No hay sesión activa');
+      if (!user || !isMounted) {
         return;
       }
 
-      console.log('🔑 Sesión obtenida, token JWT presente:', !!session.access_token);
+      cleanupChannel();
 
-      // CREAR CLIENTE REALTIME Y SINCRONIZAR SESIÓN
-      supabase = createRealtimeClient();
-
-      // IMPORTANTE: Establecer la sesión manualmente
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-
-      console.log('🔌 Conectando a notificaciones en tiempo real...');
-      console.log('🎯 Filtrando notificaciones para usuario_id:', userId);
-      console.log('⚠️ PRUEBA FINAL: Patrón recomendado por Supabase');
-
-      channel = supabase.channel(`notificaciones:${userId}`);
-      console.log('📝 Canal creado:', channel);
-
-      // IMPORTANTE: Registrar todos los listeners ANTES de suscribirse
-      console.log('📝 Registrando listener de broadcast...');
-      console.log('📝 Bindings ANTES de broadcast:', Object.keys(channel.bindings));
-
-      channel.on(
-        'broadcast',
-        { event: 'test' },
-        (payload: { payload: unknown }) => {
-          console.log('📻 [BROADCAST RECIBIDO]', payload);
-          toast.success('Broadcast funciona! ' + JSON.stringify(payload.payload));
-        }
-      );
-
-      console.log('📝 Bindings DESPUÉS de broadcast:', Object.keys(channel.bindings));
-      console.log('📝 Listener de broadcast registrado');
-
-      console.log('📝 Registrando listener de postgres_changes...');
-      console.log('📝 Bindings ANTES de postgres_changes:', Object.keys(channel.bindings));
-
-      channel.on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'crm',
-          table: 'notificacion',
-          filter: `usuario_id=eq.${userId}`
-        },
-        (payload: NotificacionInsertPayload) => {
-          console.log('🔔 [INSERT RECIBIDO]', payload.new);
-          console.log('📦 [PAYLOAD COMPLETO]', payload);
-
-          const newNotif = payload.new;
-
-          // Filtrar manualmente en el cliente
-          if (newNotif.usuario_id && newNotif.usuario_id !== userId) {
-            console.log('⏭️ Notificación ignorada - no es para este usuario');
-            return;
-          }
-
-          console.log('✅ Notificación es para este usuario - procesando...');
-
-          // Agregar a la lista (máximo 20)
-          setItems((prev) => [newNotif, ...prev].slice(0, 20));
-          setUnreadCount((prev) => prev + 1);
-
-          // Toast de notificación
-          toast.success(newNotif.titulo, {
-            icon: tipoIcons[newNotif.tipo as keyof typeof tipoIcons] || '🔔',
-            duration: 4000,
-          });
-
-          // Notificación del navegador
-          if (typeof window !== 'undefined' && 'Notification' in window) {
-            if (Notification.permission === 'granted') {
-              new Notification(newNotif.titulo, {
-                body: newNotif.mensaje,
-                icon: '/logo-amersur.png',
-                badge: '/logo-amersur.png',
-                tag: newNotif.id,
-              });
-            } else if (Notification.permission === 'default') {
-              Notification.requestPermission().then((permission) => {
-                if (permission === 'granted') {
-                  new Notification(newNotif.titulo, {
-                    body: newNotif.mensaje,
-                    icon: '/logo-amersur.png',
-                    badge: '/logo-amersur.png',
-                    tag: newNotif.id,
-                  });
-                }
-              });
-            }
-          }
-
-          // Reproducir sonido
-          if (audioRef.current) {
-            audioRef.current.play().catch((e) => {
-              console.log('No se pudo reproducir el sonido:', e);
-            });
-          }
-        }
-      );
-
-      console.log('📝 Bindings DESPUÉS de postgres_changes:', Object.keys(channel.bindings));
-      console.log('📝 Listener de INSERT registrado');
-
-      console.log('📝 Registrando listener de UPDATE...');
-      channel.on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'crm',
-          table: 'notificacion',
-          filter: `usuario_id=eq.${userId}`
-        },
-        (payload: NotificacionUpdatePayload) => {
-          const updatedNotif = payload.new;
-
-          // Si se marcó como leída, remover de la lista
-          if (updatedNotif.leida) {
-            setItems((prev) => prev.filter((n) => n.id !== updatedNotif.id));
-            setUnreadCount((prev) => Math.max(0, prev - 1));
-          }
-        }
-      );
-
-      console.log('📝 Bindings DESPUÉS de UPDATE:', Object.keys(channel.bindings));
-      console.log('📝 Listener de UPDATE registrado');
-
-      console.log('📝 Suscribiendo al canal...');
-      console.log('📝 Bindings FINAL antes de subscribe:', Object.keys(channel.bindings));
-      channel.subscribe((status: string, err?: unknown) => {
-        console.log('📡 Estado de suscripción:', status);
-        if (err) {
-          console.error('❌ Error en suscripción:', err);
-        }
-
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Conectado a notificaciones en tiempo real');
-          console.log('📋 Estado del canal:', channel.state);
-
-          // Inspeccionar qué listeners están registrados
-          console.log('👂 Bindings del canal:', channel.bindings);
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error al conectar a notificaciones en tiempo real');
-        } else if (status === 'TIMED_OUT') {
-          console.warn('⏱️ Timeout al conectar a notificaciones');
-        } else if (status === 'CLOSED') {
-          console.log('🔌 Desconectado de notificaciones en tiempo real');
-        }
-      });
+      channel = supabase
+        .channel(`notificaciones:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "crm",
+            table: "notificacion",
+            filter: `usuario_id=eq.${user.id}`,
+          },
+          (event) => handleRealtimeInsert(event.new as NotificacionRow, user.id),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "crm",
+            table: "notificacion",
+            filter: `usuario_id=eq.${user.id}`,
+          },
+          (event) => handleRealtimeUpdate(event.new as NotificacionRow, user.id),
+        )
+        .subscribe(handleStatusChange);
     };
 
-    // Ejecutar setup
-    setupRealtime();
+    void setupRealtime();
 
-    // Cleanup: desconectar cuando el componente se desmonte
     return () => {
-      if (channel && supabase) {
-        console.log('🔌 Desconectando de notificaciones...');
-        supabase.removeChannel(channel);
+      isMounted = false;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
       }
+      cleanupChannel();
     };
-  }, [userId]);
+  }, [handleRealtimeInsert, handleRealtimeUpdate, supabase]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -284,13 +295,8 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   };
 
   const handleNotificationClick = async (notificacion: NotificacionNoLeida) => {
-    // Marcar como leída
     await handleMarkAsRead(notificacion.id);
-
-    // Cerrar el dropdown
     setIsOpen(false);
-
-    // Navegar a la URL si existe
     if (notificacion.data?.url) {
       router.push(notificacion.data.url as string);
     }
@@ -312,7 +318,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
     const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return "Ahora";
     if (diffInMinutes < 60) return `${diffInMinutes}m`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
@@ -321,6 +327,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
   return (
     <div className="relative" ref={dropdownRef}>
+      <audio ref={audioRef} src="/notification.mp3" preload="auto" className="hidden" aria-hidden="true" />
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -337,19 +344,12 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
       {isOpen && (
         <>
-          {/* Overlay */}
-          {/* Dropdown */}
           <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-crm-border z-50">
             <div className="p-4 border-b border-crm-border">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-crm-text-primary">
-                  Notificaciones
-                </h3>
+                <h3 className="text-lg font-semibold text-crm-text-primary">Notificaciones</h3>
                 {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllAsRead}
-                    className="text-sm text-crm-primary hover:text-crm-primary/80"
-                  >
+                  <button onClick={handleMarkAllAsRead} className="text-sm text-crm-primary hover:text-crm-primary/80">
                     Marcar todas como leídas
                   </button>
                 )}
@@ -366,23 +366,15 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
                       onClick={() => handleNotificationClick(notificacion)}
                     >
                       <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0">
-                          <span className="text-2xl">
-                            {tipoIcons[notificacion.tipo]}
-                          </span>
-                        </div>
+                        <span className="text-2xl">{tipoIcons[notificacion.tipo] ?? "🔔"}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <p className={`text-sm font-medium ${tipoColors[notificacion.tipo]}`}>
+                            <p className={`text-sm font-medium ${tipoColors[notificacion.tipo] ?? "text-crm-text-primary"}`}>
                               {notificacion.titulo}
                             </p>
-                            <span className="text-xs text-crm-text-muted">
-                              {formatTimeAgo(notificacion.created_at)}
-                            </span>
+                            <span className="text-xs text-crm-text-muted">{formatTimeAgo(notificacion.created_at)}</span>
                           </div>
-                          <p className="text-sm text-crm-text-secondary mt-1 line-clamp-2">
-                            {notificacion.mensaje}
-                          </p>
+                          <p className="text-sm text-crm-text-secondary mt-1 line-clamp-2">{notificacion.mensaje}</p>
                         </div>
                       </div>
                     </div>
@@ -392,11 +384,19 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
                 <div className="p-8 text-center">
                   <div className="text-4xl mb-2">🔔</div>
                   <p className="text-crm-text-muted">No hay notificaciones</p>
-                  <p className="text-xs text-crm-text-muted mt-1">
-                    Te notificaremos cuando haya novedades
-                  </p>
+                  <p className="text-xs text-crm-text-muted mt-1">Te notificaremos cuando haya novedades</p>
                 </div>
               )}
+            </div>
+
+            <div className="p-4 border-t border-crm-border bg-crm-card-hover/40">
+              <Link
+                href="/dashboard/notificaciones"
+                className="flex items-center justify-center w-full text-sm font-medium text-crm-primary hover:text-white hover:bg-crm-primary rounded-lg px-3 py-2 transition-colors"
+                onClick={() => setIsOpen(false)}
+              >
+                Ver todas las notificaciones
+              </Link>
             </div>
           </div>
         </>

@@ -114,12 +114,15 @@ export default function ClientesTable({
   const router = useRouter();
 
   // Verificar permisos
-  const { tienePermiso, esAdminOCoordinador } = usePermissions();
+  const { tienePermiso, esAdminOCoordinador, tieneAlgunoDeRoles } = usePermissions();
   const esSupervisor = esAdminOCoordinador();
+  const puedeFiltrarPorVendedor = tieneAlgunoDeRoles(['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS', 'ROL_GERENTE']);
   const puedeEliminarClientes = tienePermiso(PERMISOS.CLIENTES.ELIMINAR);
   const puedeReasignarClientes = esSupervisor || tienePermiso(PERMISOS.CLIENTES.REASIGNAR);
   const puedeCambiarEstadoClientes = esSupervisor || tienePermiso(PERMISOS.CLIENTES.EDITAR_TODOS);
+  const puedeEditarClientes = esSupervisor || tienePermiso(PERMISOS.CLIENTES.EDITAR_TODOS);
   const puedeGestionarSeleccion = puedeCambiarEstadoClientes || puedeReasignarClientes || puedeEliminarClientes;
+  const puedeExportarClientes = esSupervisor; // Solo admin/coordinador
 
   // Estado para lista de vendedores
   const [vendedores, setVendedores] = useState<Array<{ id: string; username: string; nombre_completo: string; email: string }>>([]);
@@ -518,42 +521,44 @@ export default function ClientesTable({
           </p>
         )}
 
-        <div className="mt-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium text-crm-text-primary">
-              Filtrar por vendedor asignado
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
-              <select
-                value={vendedor || ''}
-                onChange={(e) => handleVendedorFilterChange(e.target.value)}
-                disabled={loadingVendedores}
-                className="w-full sm:w-64 px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary disabled:opacity-60"
-              >
-                <option value="">
-                  {loadingVendedores ? 'Cargando vendedores...' : 'Todos los vendedores'}
-                </option>
-                {vendedores.map((vend) => (
-                  <option key={vend.id} value={vend.username}>
-                    {vend.nombre_completo ? `${vend.nombre_completo} (@${vend.username})` : `@${vend.username}`}
-                  </option>
-                ))}
-                {!loadingVendedores && vendedor && !vendedores.some((vend) => vend.username === vendedor) && (
-                  <option value={vendedor}>@{vendedor}</option>
-                )}
-              </select>
-              {vendedor && (
-                <button
-                  type="button"
-                  onClick={handleClearVendedorFilter}
-                  className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
+        {puedeFiltrarPorVendedor && (
+          <div className="mt-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium text-crm-text-primary">
+                Filtrar por vendedor asignado
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
+                <select
+                  value={vendedor || ''}
+                  onChange={(e) => handleVendedorFilterChange(e.target.value)}
+                  disabled={loadingVendedores}
+                  className="w-full sm:w-64 px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary disabled:opacity-60"
                 >
-                  Limpiar filtro
-                </button>
-              )}
+                  <option value="">
+                    {loadingVendedores ? 'Cargando vendedores...' : 'Todos los vendedores'}
+                  </option>
+                  {vendedores.map((vend) => (
+                    <option key={vend.id} value={vend.username}>
+                      {vend.nombre_completo ? `${vend.nombre_completo} (@${vend.username})` : `@${vend.username}`}
+                    </option>
+                  ))}
+                  {!loadingVendedores && vendedor && !vendedores.some((vend) => vend.username === vendedor) && (
+                    <option value={vendedor}>@{vendedor}</option>
+                  )}
+                </select>
+                {vendedor && (
+                  <button
+                    type="button"
+                    onClick={handleClearVendedorFilter}
+                    className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
+                  >
+                    Limpiar filtro
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Barra de acciones masivas - Solo visible para roles con permisos */}
@@ -664,82 +669,84 @@ export default function ClientesTable({
               Mostrando {clientes.length} de {total} cliente{total === 1 ? '' : 's'}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={async () => {
-                if (selectedIds.size === 0) {
-                  toast.error('Selecciona al menos un cliente');
-                  return;
-                }
-                try {
-                  setExportingSelected(true);
-                  const selectedData = clientes.filter((c) => selectedIds.has(c.id));
-                  await exportFilteredClientes(selectedData, addCountToFilters(baseFilters, selectedData.length), 'excel', {
-                    fileName: 'clientes-seleccionados',
-                    includeFiltersSheet: true,
-                    includeTimestamp: true,
-                  });
-                  toast.success('Exportación de seleccionados completada');
-                } catch (error) {
-                  console.error(error);
-                  toast.error('Error exportando seleccionados');
-                } finally {
-                  setExportingSelected(false);
-                }
-              }}
-              disabled={exportingSelected || selectedIds.size === 0}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-crm-border text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50"
-            >
-              {exportingSelected ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              {exportingSelected ? 'Exportando...' : 'Exportar seleccionados'}
-            </button>
-            <button
-              onClick={async () => {
-                try {
-                  setExportingAll(true);
-                  const full = await obtenerTodosLosClientes({
-                    searchTerm: searchQuery,
-                    searchTelefono,
-                    searchDni,
-                    estado,
-                    tipo,
-                    vendedor,
-                    sortBy: initialSortBy,
-                    sortOrder: initialSortOrder,
-                  });
-                  await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'excel', {
-                    fileName: 'clientes',
-                    includeFiltersSheet: true,
-                    includeTimestamp: true,
-                  });
-                  toast.success(`Exportación completada (${full.total} registros)`);
-                } catch (error) {
-                  console.error(error);
-                  toast.error('Error exportando clientes');
-                } finally {
-                  setExportingAll(false);
-                }
-              }}
-              disabled={exportingAll}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
-            >
-              {exportingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {exportingAll ? 'Exportando todo...' : 'Exportar todos'}
-            </button>
-          </div>
+          {puedeExportarClientes && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={async () => {
+                  if (selectedIds.size === 0) {
+                    toast.error('Selecciona al menos un cliente');
+                    return;
+                  }
+                  try {
+                    setExportingSelected(true);
+                    const selectedData = clientes.filter((c) => selectedIds.has(c.id));
+                    await exportFilteredClientes(selectedData, addCountToFilters(baseFilters, selectedData.length), 'excel', {
+                      fileName: 'clientes-seleccionados',
+                      includeFiltersSheet: true,
+                      includeTimestamp: true,
+                    });
+                    toast.success('Exportación de seleccionados completada');
+                  } catch (error) {
+                    console.error(error);
+                    toast.error('Error exportando seleccionados');
+                  } finally {
+                    setExportingSelected(false);
+                  }
+                }}
+                disabled={exportingSelected || selectedIds.size === 0}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-crm-border text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50"
+              >
+                {exportingSelected ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {exportingSelected ? 'Exportando...' : 'Exportar seleccionados'}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setExportingAll(true);
+                    const full = await obtenerTodosLosClientes({
+                      searchTerm: searchQuery,
+                      searchTelefono,
+                      searchDni,
+                      estado,
+                      tipo,
+                      vendedor,
+                      sortBy: initialSortBy,
+                      sortOrder: initialSortOrder,
+                    });
+                    await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'excel', {
+                      fileName: 'clientes',
+                      includeFiltersSheet: true,
+                      includeTimestamp: true,
+                    });
+                    toast.success(`Exportación completada (${full.total} registros)`);
+                  } catch (error) {
+                    console.error(error);
+                    toast.error('Error exportando clientes');
+                  } finally {
+                    setExportingAll(false);
+                  }
+                }}
+                disabled={exportingAll}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
+              >
+                {exportingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {exportingAll ? 'Exportando todo...' : 'Exportar todos'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Vista mobile */}
         <div className="sm:hidden px-4 py-4 space-y-4">
-          {clientes.map((cliente) => {
+          {clientes.map((cliente, index) => {
             const estadoLabel = getEstadoClienteLabel(cliente.estado_cliente as EstadoCliente);
             return (
               <div
-                key={cliente.id}
+                key={`mobile-${index}-${cliente.id}`}
                 className="rounded-2xl border border-crm-border bg-crm-card p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -863,9 +870,9 @@ export default function ClientesTable({
                 </tr>
               </thead>
               <tbody className="divide-y divide-crm-border">
-                {clientes.map((cliente) => (
+                {clientes.map((cliente, index) => (
                   <ClienteRow
-                    key={cliente.id}
+                    key={`row-${index}-${cliente.id}`}
                     cliente={cliente}
                     onEdit={handleEdit}
                     onDelete={askDelete}
@@ -875,6 +882,7 @@ export default function ClientesTable({
                     isSelected={selectedIds.has(cliente.id)}
                     onToggleSelect={toggleSelectOne}
                     canManageSelection={puedeGestionarSeleccion}
+                    puedeEditarClientes={puedeEditarClientes}
                   />
                 ))}
               </tbody>
@@ -974,6 +982,7 @@ const ClienteRow = memo(function ClienteRow({
   isSelected,
   onToggleSelect,
   canManageSelection,
+  puedeEditarClientes,
 }: {
   cliente: Cliente;
   onEdit: (id: string) => void;
@@ -984,6 +993,7 @@ const ClienteRow = memo(function ClienteRow({
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   canManageSelection: boolean;
+  puedeEditarClientes: boolean;
 }) {
   const getOrigenLeadLabel = (origen?: string | null) => {
     switch (origen) {
@@ -1156,15 +1166,17 @@ const ClienteRow = memo(function ClienteRow({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
             </svg>
           </button>
-          <button
-            onClick={() => onEdit(cliente.id)}
-            className="text-crm-primary hover:text-crm-primary/80 transition-colors"
-            title="Editar"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-            </svg>
-          </button>
+          {puedeEditarClientes && (
+            <button
+              onClick={() => onEdit(cliente.id)}
+              className="text-crm-primary hover:text-crm-primary/80 transition-colors"
+              title="Editar"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+          )}
           {cliente.telefono && (
             <a
               href={`tel:${cliente.telefono}`}

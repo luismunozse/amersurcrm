@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ClienteForm from "@/components/ClienteForm";
 import ImportarClientes from "@/components/ImportarClientes";
 
@@ -55,12 +56,19 @@ export default function NewClienteForm() {
     };
   }, []);
 
+  const router = useRouter();
+
   const handleOpenForm = () => {
     if (closeTimer.current !== null) {
       window.clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
     setShowForm(true);
+  };
+
+  const handleSuccess = () => {
+    router.refresh();
+    closeForm();
   };
 
   const closeForm = () => {
@@ -136,7 +144,7 @@ export default function NewClienteForm() {
         >
           <div className="flex-1 overflow-hidden bg-white dark:bg-crm-card shadow-2xl rounded-l-3xl">
             <ClienteForm
-              onSuccess={closeForm}
+              onSuccess={handleSuccess}
               onCancel={closeForm}
             />
           </div>
@@ -147,7 +155,7 @@ export default function NewClienteForm() {
 
   return (
     <ClienteForm
-      onSuccess={closeForm}
+      onSuccess={handleSuccess}
       onCancel={closeForm}
     />
   );

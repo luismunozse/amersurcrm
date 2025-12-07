@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LazyDashboardStats } from "@/components/LazyDashboardStats";
 import { RecentActivities } from "@/components/RecentActivities";
 import { RecentProjects } from "@/components/RecentProjects";
-import { getCachedClientes, getCachedProyectos, getCachedNotificacionesNoLeidas } from "@/lib/cache.server";
+import { getCachedClientes, getCachedProyectos, getCachedNotificacionesNoLeidas, getCachedClientesDashboardMetrics } from "@/lib/cache.server";
 import SecondaryPanelDrawer from "@/components/dashboard/SecondaryPanelDrawer";
+import { obtenerPermisosUsuario } from "@/lib/permissions/server";
+import { PERMISOS } from "@/lib/permissions";
 
 type ClienteLite = {
   ultimo_contacto?: string | null;
@@ -29,6 +31,8 @@ interface DashboardMetrics {
   proyectosSinPlanos: number;
   notificacionesPendientes: number;
   hasError: boolean;
+  puedeCrearProyectos: boolean;
+  puedeEditarProyectos: boolean;
 }
 
 const initialMetrics: DashboardMetrics = {
@@ -40,15 +44,49 @@ const initialMetrics: DashboardMetrics = {
   proyectosSinPlanos: 0,
   notificacionesPendientes: 0,
   hasError: false,
+  puedeCrearProyectos: false,
+  puedeEditarProyectos: false,
 };
 
 async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   try {
-    const [clientesResult, proyectosData, notificacionesData] = await Promise.all([
-      getCachedClientes(),
-      getCachedProyectos(),
-      getCachedNotificacionesNoLeidas(),
+    const startTime = Date.now();
+    
+    // Ejecutar queries en paralelo con timing individual
+    const [clientesResult, proyectosData, notificacionesData, clienteServerMetrics, permisosUsuario] = await Promise.all([
+      (async () => {
+        const t = Date.now();
+        const result = await getCachedClientes({ mode: "dashboard", pageSize: 12, withTotal: false });
+        console.log(`[Dashboard] getCachedClientes: ${Date.now() - t}ms`);
+        return result;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const result = await getCachedProyectos();
+        console.log(`[Dashboard] getCachedProyectos: ${Date.now() - t}ms`);
+        return result;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const result = await getCachedNotificacionesNoLeidas();
+        console.log(`[Dashboard] getCachedNotificacionesNoLeidas: ${Date.now() - t}ms`);
+        return result;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const result = await getCachedClientesDashboardMetrics();
+        console.log(`[Dashboard] getCachedClientesDashboardMetrics: ${Date.now() - t}ms`);
+        return result;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const result = await obtenerPermisosUsuario();
+        console.log(`[Dashboard] obtenerPermisosUsuario: ${Date.now() - t}ms`);
+        return result;
+      })(),
     ]);
+    
+    console.log(`[Dashboard] Total parallel queries: ${Date.now() - startTime}ms`);
 
     const clientes = Array.isArray(clientesResult?.data)
       ? (clientesResult.data as ClienteLite[])
@@ -87,14 +125,16 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     );
 
     return {
-      totalClientes: clientesResult?.total ?? clientes.length,
-      clientesSinSeguimiento: clienteMetrics.sinSeguimiento,
-      clientesConAccion: clienteMetrics.conAccion,
-      clientesFueraDeRango: clienteMetrics.fueraDeRango,
+      totalClientes: clienteServerMetrics.total ?? clienteMetrics.sinSeguimiento + clienteMetrics.conAccion,
+      clientesSinSeguimiento: clienteServerMetrics.sinSeguimiento ?? clienteMetrics.sinSeguimiento,
+      clientesConAccion: clienteServerMetrics.conAccion ?? clienteMetrics.conAccion,
+      clientesFueraDeRango: clienteServerMetrics.fueraDeRango ?? clienteMetrics.fueraDeRango,
       proyectosActivos: proyectoMetrics.activos,
       proyectosSinPlanos: proyectoMetrics.sinPlanos,
       notificacionesPendientes: notificaciones.length,
       hasError: false,
+      puedeCrearProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.CREAR) ?? false,
+      puedeEditarProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.EDITAR) ?? false,
     } satisfies DashboardMetrics;
   } catch (error) {
     // Mejorar el logging del error
@@ -147,7 +187,7 @@ function buildHeroHighlights(metrics: DashboardMetrics) {
 }
 
 function buildQuickActions(metrics: DashboardMetrics) {
-  return [
+  const actions = [
     {
       title: "Registrar cliente",
       description: `${metrics.clientesFueraDeRango} clientes sin contacto en 7 días.`,
@@ -156,17 +196,6 @@ function buildQuickActions(metrics: DashboardMetrics) {
       icon: (
         <svg className="w-6 h-6" role="img" aria-label="Registrar cliente" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      ),
-    },
-    {
-      title: "Publicar proyecto",
-      description: `${metrics.proyectosSinPlanos} proyectos necesitan planos o renders`,
-      href: "/dashboard/proyectos",
-      color: "success" as const,
-      icon: (
-        <svg className="w-6 h-6" role="img" aria-label="Publicar proyecto" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h7" />
         </svg>
       ),
     },
@@ -194,19 +223,30 @@ function buildQuickActions(metrics: DashboardMetrics) {
       ),
     },
   ];
+
+  if (metrics.puedeCrearProyectos) {
+    actions.splice(1, 0, {
+      title: "Publicar proyecto",
+      description: `${metrics.proyectosSinPlanos} proyectos necesitan planos o renders`,
+      href: "/dashboard/proyectos",
+      color: "info" as const,
+      icon: (
+        <svg className="w-6 h-6" role="img" aria-label="Publicar proyecto" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h7" />
+        </svg>
+      ),
+    });
+  }
+
+  return actions;
 }
 
 function buildFocusAreas(metrics: DashboardMetrics) {
-  return [
+  const items = [
     {
       title: "Actualizar estados de clientes",
       description: `${metrics.clientesSinSeguimiento} clientes aún no tienen seguimiento registrado`,
       href: "/dashboard/clientes",
-    },
-    {
-      title: "Subir nuevos planos o renders",
-      description: `${metrics.proyectosSinPlanos} proyectos activos requieren archivos visuales`,
-      href: "/dashboard/proyectos",
     },
     {
       title: "Confirmar visitas de la semana",
@@ -214,6 +254,16 @@ function buildFocusAreas(metrics: DashboardMetrics) {
       href: "/dashboard/agenda",
     },
   ];
+
+  if (metrics.puedeEditarProyectos) {
+    items.splice(1, 0, {
+      title: "Subir nuevos planos o renders",
+      description: `${metrics.proyectosSinPlanos} proyectos activos requieren archivos visuales`,
+      href: "/dashboard/proyectos",
+    });
+  }
+
+  return items;
 }
 
 // Loading component para el dashboard

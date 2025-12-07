@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import LoteWizard from "@/components/LoteWizard";
 import ImportarLotesModal from "@/components/ImportarLotesModal";
 import EliminarLotesMasivoModal from "@/components/EliminarLotesMasivoModal";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
 
 interface Proyecto {
   id: string;
@@ -34,6 +35,9 @@ export default function NewLoteForm({
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const router = useRouter();
+  const { esAdminOCoordinador, tienePermiso } = usePermissions();
+  const puedeGestionarLotes =
+    esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.CREAR);
 
   // Encontrar el proyecto actual
   const proyectoActual = proyectos.find(p => p.id === proyectoId);
@@ -45,6 +49,7 @@ export default function NewLoteForm({
   };
 
   return (
+    puedeGestionarLotes && (
     <>
       <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-end">
         {lotes.length > 0 && (
@@ -107,5 +112,6 @@ export default function NewLoteForm({
         />
       )}
     </>
+    )
   );
 }

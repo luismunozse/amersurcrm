@@ -239,25 +239,34 @@ export async function POST(request: NextRequest) {
     let emailFinal: string;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (esRolAdmin) {
-      // Para admin: usar username@amersur.admin si no se proporciona email
-      emailFinal = email || `${username}@amersur.admin`;
-    } else {
-      // Para vendedores/coordinadores: el email es OPCIONAL
-      if (email && email.trim()) {
-        // Si se proporciona, validar formato
-        if (!emailRegex.test(email.trim())) {
-          return NextResponse.json({
-            error: "El formato del email no es válido"
-          }, { status: 400 });
-        }
-        emailFinal = email.trim().toLowerCase();
-      } else {
-        // Si NO se proporciona, generar un email válido usando el DNI
-        // Usamos @amersur.local como dominio interno (válido pero no público)
-        emailFinal = `${dni}@amersur.local`;
-      }
+    // Validar que el email sea proporcionado y tenga un formato válido
+    if (!email || !email.trim()) {
+      return NextResponse.json({
+        error: "El email es obligatorio. Por favor, proporciona un email válido con un dominio de internet (ej: @gmail.com, @outlook.com, etc.)"
+      }, { status: 400 });
     }
+
+    const emailTrimmed = email.trim().toLowerCase();
+    
+    // Validar formato básico
+    if (!emailRegex.test(emailTrimmed)) {
+      return NextResponse.json({
+        error: "El formato del email no es válido"
+      }, { status: 400 });
+    }
+
+    // Validar que el dominio sea válido (no dominios locales)
+    const domain = emailTrimmed.split('@')[1]?.toLowerCase();
+    const invalidDomains = ['.local', '.admin', '.test', '.localhost'];
+    const hasInvalidDomain = invalidDomains.some(invalid => domain?.endsWith(invalid));
+    
+    if (hasInvalidDomain) {
+      return NextResponse.json({
+        error: "No se puede usar un dominio local (.local, .admin, etc.). Por favor, usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com, etc."
+      }, { status: 400 });
+    }
+
+    emailFinal = emailTrimmed;
     
     // Verificar si el email ya existe
     const { data: existingEmail } = await supabase

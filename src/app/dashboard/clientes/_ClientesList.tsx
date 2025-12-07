@@ -749,7 +749,7 @@ function RegistrarContactoModal({
                 type="datetime-local"
                 value={fechaProxima}
                 onChange={(e) => setFechaProxima(e.target.value)}
-                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                className="crm-datetime-input"
                 disabled={loading}
               />
             </div>

@@ -2,7 +2,7 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type AnySupabaseClient = SupabaseClient<any, string, any, any>;
-import { GoogleDriveClient, getGoogleDriveClient } from "./client";
+import { GoogleDriveClient, getGoogleDriveClient, GoogleOAuthClient } from "./client";
 
 interface GoogleDriveSyncConfig {
   id: string;
@@ -82,17 +82,65 @@ export async function getConfiguredGoogleDriveClient({
       return null;
     }
 
-    // Obtener cliente con refresh automático de tokens
-    const client = await getGoogleDriveClient({
-      accessToken: config.access_token,
-      refreshToken: config.refresh_token || undefined,
-      expiryDate: config.token_expires_at ? new Date(config.token_expires_at).getTime() : undefined,
-      clientId,
-      clientSecret,
-      redirectUri,
-    });
+    // Verificar si el token necesita ser refrescado
+    const now = Date.now();
+    const expiryDate = config.token_expires_at ? new Date(config.token_expires_at).getTime() : undefined;
+    const needsRefresh = expiryDate && expiryDate < now + 5 * 60 * 1000;
 
-    return { client, config };
+    // Obtener cliente con refresh automático de tokens
+    let client: GoogleDriveClient;
+    let updatedConfig = config;
+
+    if (needsRefresh && config.refresh_token) {
+      // El token está expirado o próximo a expirar, refrescarlo
+      const oauthClient = new GoogleOAuthClient(clientId, clientSecret, redirectUri);
+      
+      try {
+        const newTokens = await oauthClient.refreshAccessToken(config.refresh_token);
+        
+        // Guardar el nuevo token en la base de datos
+        const newExpiryDate = new Date(newTokens.expiry_date);
+        const { error: updateError } = await supabase
+          .from('google_drive_sync_config')
+          .update({
+            access_token: newTokens.access_token,
+            token_expires_at: newExpiryDate.toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', config.id);
+
+        if (updateError) {
+          console.error('Error guardando token refrescado:', updateError);
+          // Continuar con el token anterior aunque esté expirado
+          client = new GoogleDriveClient(config.access_token);
+        } else {
+          // Actualizar la configuración local con el nuevo token
+          updatedConfig = {
+            ...config,
+            access_token: newTokens.access_token,
+            token_expires_at: newExpiryDate.toISOString(),
+          };
+          client = new GoogleDriveClient(newTokens.access_token);
+          console.log('Token de Google Drive refrescado exitosamente');
+        }
+      } catch (refreshError) {
+        console.error('Error refrescando token de Google Drive:', refreshError);
+        // Si falla el refresh, intentar usar el token actual (puede que aún funcione)
+        client = new GoogleDriveClient(config.access_token);
+      }
+    } else {
+      // El token aún es válido, usar el cliente normal
+      client = await getGoogleDriveClient({
+        accessToken: config.access_token,
+        refreshToken: config.refresh_token || undefined,
+        expiryDate,
+        clientId,
+        clientSecret,
+        redirectUri,
+      });
+    }
+
+    return { client, config: updatedConfig };
   } catch (error) {
     console.error('Error obteniendo cliente de Google Drive:', error);
     return null;

@@ -27,7 +27,45 @@ interface GetClientesParams {
   origen?: string;  // Filtro por origen del lead
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  mode?: 'list' | 'dashboard';
+  withTotal?: boolean;
 }
+
+type ClienteDashboardMetrics = {
+  total: number;
+  sinSeguimiento: number;
+  conAccion: number;
+  fueraDeRango: number;
+};
+
+const CLIENTE_LIST_COLUMNS = `
+      id,
+      codigo_cliente,
+      nombre,
+      tipo_cliente,
+      email,
+      telefono,
+      telefono_whatsapp,
+      estado_cliente,
+      origen_lead,
+      vendedor_asignado,
+      vendedor_username,
+      fecha_alta,
+      ultimo_contacto,
+      proxima_accion,
+      created_at
+    `;
+
+const CLIENTE_DASHBOARD_COLUMNS = `
+      id,
+      nombre,
+      email,
+      estado_cliente,
+      vendedor_username,
+      ultimo_contacto,
+      proxima_accion,
+      created_at
+    `;
 
 export const getCachedClientes = cache(async (params?: GetClientesParams): Promise<{ data: ClienteCached[], total: number }> => {
   const supabase = await createOptimizedServerClient();
@@ -45,96 +83,127 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     vendedor = '',
     origen = '',
     sortBy = 'fecha_alta',
-    sortOrder = 'desc'
+    sortOrder = 'desc',
+    mode = 'list',
+    withTotal = mode === 'list'
   } = params || {};
 
+  const selectedColumns = mode === 'dashboard' ? CLIENTE_DASHBOARD_COLUMNS : CLIENTE_LIST_COLUMNS;
+
   // Obtener el rol y username del usuario
+  // NOTA: No usar .schema('crm') porque el cliente ya tiene db: { schema: "crm" } configurado
   const { data: perfil } = await supabase
-    .schema('crm')
     .from('usuario_perfil')
-    .select('rol, username')
+    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
     .eq('id', userId)
     .single();
 
-  const esAdmin = perfil?.rol === 'ROL_ADMIN';
-  const esGerente = perfil?.rol === 'ROL_GERENTE';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
   const username = perfil?.username;
 
-  let q = supabase
-    .schema('crm')
-    .from("cliente")
-    .select(`
-      id,
-      codigo_cliente,
-      nombre,
-      tipo_cliente,
-      email,
-      telefono,
-      telefono_whatsapp,
-      documento_identidad,
-      estado_cliente,
-      origen_lead,
-      vendedor_asignado,
-      fecha_alta,
-      ultimo_contacto,
-      proxima_accion,
-      interes_principal,
-      capacidad_compra_estimada,
-      forma_pago_preferida,
-      propiedades_reservadas,
-      propiedades_compradas,
-      propiedades_alquiladas,
-      saldo_pendiente,
-      notas,
-      direccion,
-      created_at
-    `, { count: 'exact' });
+  const usarVistaAccesible = !esAdmin && !esGerente && !vendedor && username;
+  const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
 
-  // Filtro por rol: vendedores solo ven sus clientes asignados
-  if (!esAdmin && !esGerente && !vendedor && username) {
-    // Si es vendedor y no se está filtrando por vendedor específico, mostrar solo sus clientes
-    // Usar vendedor_username (columna TEXT) en lugar de vendedor_asignado
-    q = q.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
-  }
+  // buildBaseQuery ahora recibe las columnas a seleccionar y opciones
+  // IMPORTANTE: .select() debe llamarse PRIMERO para que .or() esté disponible
+  const buildBaseQuery = (selectColumns: string, options?: { count?: 'exact' | 'planned' | 'estimated', head?: boolean }) => {
+    // Crear query con .select() primero para obtener PostgrestFilterBuilder (que tiene .or())
+    let query = supabase.schema('crm').from(tablaClientes).select(selectColumns, options);
 
-  // Aplicar filtros
-  if (searchTerm) {
-    q = q.or(`nombre.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,codigo_cliente.ilike.%${searchTerm}%`);
-  }
+    // Filtros de permisos usando vista accesible (solo para vendedores, no admins)
+    if (usarVistaAccesible) {
+      query = query.eq('usuario_id', userId);
+      // Si usamos vista accesible, aplicar filtros adicionales directamente
+      if (searchDni) {
+        query = query.ilike('documento_identidad', `%${searchDni}%`);
+      }
+      if (estado) {
+        query = query.eq('estado_cliente', estado);
+      }
+      if (tipo) {
+        query = query.eq('tipo_cliente', tipo);
+      }
+      if (origen) {
+        query = query.eq('origen_lead', origen);
+      }
+      // Para búsquedas en vista accesible, usar filtros individuales
+      if (searchTerm) {
+        query = query.ilike('nombre', `%${searchTerm}%`);
+      }
+      if (searchTelefono) {
+        query = query.ilike('telefono', `%${searchTelefono}%`);
+      }
+      return query;
+    }
 
-  if (searchTelefono) {
-    q = q.or(`telefono.ilike.%${searchTelefono}%,telefono_whatsapp.ilike.%${searchTelefono}%`);
-  }
+    // Determinar qué filtros necesitamos
+    const necesitaFiltroPermisos = !esAdmin && !esGerente && username && !vendedor;
+    const necesitaFiltroVendedor = !!vendedor && vendedor.trim() !== '' && (esAdmin || esGerente);
 
-  if (searchDni) {
-    q = q.ilike('documento_identidad', `%${searchDni}%`);
-  }
+    // Construir todas las condiciones OR en un solo array
+    const orConditions: string[] = [];
 
-  if (estado) {
-    q = q.eq('estado_cliente', estado);
-  }
+    // 1. Filtros de permisos para vendedores (solo si no hay filtro de vendedor específico)
+    if (necesitaFiltroPermisos) {
+      orConditions.push(`created_by.eq.${userId}`);
+      orConditions.push(`vendedor_username.eq.${username}`);
+    }
 
-  if (tipo) {
-    q = q.eq('tipo_cliente', tipo);
-  }
+    // 2. Filtro por vendedor (admins pueden filtrar por cualquier vendedor)
+    if (necesitaFiltroVendedor && vendedor && vendedor.trim() !== '') {
+      orConditions.push(`vendedor_asignado.eq.${vendedor}`);
+      orConditions.push(`vendedor_username.eq.${vendedor}`);
+    }
 
-  if (vendedor) {
-    q = q.eq('vendedor_asignado', vendedor);
-  }
+    // 3. Búsquedas: agregar todas las condiciones de búsqueda
+    if (searchTerm && searchTerm.trim() !== '') {
+      orConditions.push(`nombre.ilike.%${searchTerm}%`);
+      orConditions.push(`email.ilike.%${searchTerm}%`);
+      orConditions.push(`codigo_cliente.ilike.%${searchTerm}%`);
+    }
 
-  if (origen) {
-    q = q.eq('origen_lead', origen);
-  }
+    if (searchTelefono && searchTelefono.trim() !== '') {
+      orConditions.push(`telefono.ilike.%${searchTelefono}%`);
+      orConditions.push(`telefono_whatsapp.ilike.%${searchTelefono}%`);
+    }
 
-  // Ordenar
-  q = q.order(sortBy, { ascending: sortOrder === 'asc' });
+    // Aplicar todas las condiciones OR juntas (solo una vez)
+    // Ahora .or() está disponible porque ya llamamos .select()
+    if (orConditions.length > 0) {
+      query = query.or(orConditions.join(','));
+    }
 
-  // Paginación
+    // Filtros individuales (no requieren OR, se aplican con AND sobre los resultados del OR)
+    if (searchDni && searchDni.trim() !== '') {
+      query = query.ilike('documento_identidad', `%${searchDni}%`);
+    }
+
+    if (estado && estado.trim() !== '') {
+      query = query.eq('estado_cliente', estado);
+    }
+
+    if (tipo && tipo.trim() !== '') {
+      query = query.eq('tipo_cliente', tipo);
+    }
+
+    if (origen && origen.trim() !== '') {
+      query = query.eq('origen_lead', origen);
+    }
+
+    return query;
+  };
+
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
-  q = q.range(start, end);
-
-  const { data, error, count } = await q;
+  
+  // Ahora pasamos las columnas a buildBaseQuery (ya incluye .select())
+  const { data, error } = await buildBaseQuery(selectedColumns)
+    .order(sortBy, { ascending: sortOrder === 'asc' })
+    .range(start, end);
 
   if (error) {
     console.error('Error en getCachedClientes:', {
@@ -146,9 +215,23 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     throw error;
   }
 
+  // Deduplicar resultados por ID (puede haber duplicados si hay múltiples condiciones OR)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dataArray = data as any[];
+  const uniqueData = dataArray ? Array.from(
+    new Map(dataArray.map(item => [item.id, item])).values()
+  ) : [];
+
+  let total = uniqueData.length;
+  if (withTotal) {
+    // Usar 'exact' en lugar de 'planned' para obtener el conteo real con filtros aplicados
+    const { count } = await buildBaseQuery('id', { count: 'exact', head: true });
+    total = count ?? total;
+  }
+
   return {
-    data: (data ?? []) as ClienteCached[],
-    total: count ?? 0
+    data: uniqueData as ClienteCached[],
+    total,
   };
 });
 
@@ -158,17 +241,21 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
   if (!userId) return 0;
 
   // Obtener el rol y username del usuario
+  // NOTA: No usar .schema('crm') porque el cliente ya tiene db: { schema: "crm" } configurado
   const { data: perfil } = await supabase
-    .schema('crm')
     .from('usuario_perfil')
-    .select('rol, username')
+    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
     .eq('id', userId)
     .single();
 
-  const esAdmin = perfil?.rol === 'ROL_ADMIN';
-  const esGerente = perfil?.rol === 'ROL_GERENTE';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
   const username = perfil?.username;
 
+  // IMPORTANTE: .select() debe llamarse PRIMERO para que .or() esté disponible
   let query = supabase.schema('crm').from('cliente').select('*', { count: 'exact', head: true });
 
   // Vendedores solo ven sus clientes
@@ -180,6 +267,52 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
 
   if (error) throw error;
   return count ?? 0;
+});
+
+export const getCachedClientesDashboardMetrics = cache(async (): Promise<ClienteDashboardMetrics> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) {
+    return { total: 0, sinSeguimiento: 0, conAccion: 0, fueraDeRango: 0 };
+  }
+
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .eq('id', userId)
+    .single();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
+  const username = perfil?.username;
+
+  const { data, error } = await supabase
+    .schema('crm')
+    .rpc('obtener_metricas_dashboard_clientes', {
+      p_usuario_id: userId,
+      p_es_admin: esAdmin,
+      p_es_gerente: esGerente,
+      p_username: username ?? null,
+    })
+    .single();
+
+  if (error) {
+    console.error('Error obteniendo métricas del dashboard:', error);
+    throw error;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const metricas = data as any;
+  return {
+    total: metricas?.total ?? 0,
+    sinSeguimiento: metricas?.sin_seguimiento ?? 0,
+    conAccion: metricas?.con_accion ?? 0,
+    fueraDeRango: metricas?.fuera_de_rango ?? 0,
+  };
 });
 
 export const getCachedLeadsStatsByOrigen = cache(async (): Promise<{ origen: string; count: number }[]> => {
@@ -261,37 +394,65 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return { totalClientes: 0, totalProyectos: 0, totalLotes: 0 };
 
-  // Obtener el rol y username del usuario para determinar qué datos mostrar
   const { data: perfil } = await supabase
     .schema('crm')
     .from('usuario_perfil')
-    .select('rol, username')
+    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
     .eq('id', userId)
     .single();
 
-  const esAdmin = perfil?.rol === 'ROL_ADMIN';
-  const esGerente = perfil?.rol === 'ROL_GERENTE';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
   const username = perfil?.username;
 
-  // Administradores y gerentes ven todos los clientes del sistema
-  // Vendedores solo ven sus clientes asignados
-  let clientesQuery = supabase.schema('crm').from("cliente").select("*", { count: "exact", head: true });
+  // Total de clientes según permisos (usa la misma lógica que el dashboard de clientes)
+  const { data: clienteMetrics, error: clienteMetricsError } = await supabase
+    .schema('crm')
+    .rpc('obtener_metricas_dashboard_clientes', {
+      p_usuario_id: userId,
+      p_es_admin: esAdmin,
+      p_es_gerente: esGerente,
+      p_username: username ?? null,
+    })
+    .single();
 
-  if (!esAdmin && !esGerente && username) {
-    // Vendedor: solo sus clientes (donde created_by = userId o vendedor_username = username)
-    clientesQuery = clientesQuery.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let totalClientes = (clienteMetrics as any)?.total ?? 0;
+
+  // Fallback: si la RPC falla, contar manualmente usando la vista accesible para vendedores
+  if (clienteMetricsError) {
+    console.error('Error obteniendo total de clientes vía RPC:', clienteMetricsError);
+
+    const usarVistaAccesible = !esAdmin && !esGerente && username;
+    const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
+
+    // IMPORTANTE: .select() debe llamarse PRIMERO para que .or() esté disponible
+    let clientesQuery = supabase.schema('crm').from(tablaClientes).select('id', { count: 'exact', head: true });
+
+    if (usarVistaAccesible) {
+      clientesQuery = clientesQuery.eq('usuario_id', userId);
+    } else if (!esAdmin && !esGerente && username) {
+      clientesQuery = clientesQuery.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+    }
+
+    const { count, error } = await clientesQuery;
+    if (error) {
+      console.error('Error obteniendo total de clientes (fallback):', error);
+    } else if (typeof count === 'number') {
+      totalClientes = count;
+    }
   }
 
-  const [cRes, pRes, lRes] = await Promise.all([
-    clientesQuery,
-    // Proyectos: todos los proyectos (todos pueden ver)
+  const [pRes, lRes] = await Promise.all([
     supabase.schema('crm').from("proyecto").select("*", { count: "exact", head: true }),
-    // Lotes: todos los lotes (todos pueden ver)
     supabase.schema('crm').from("lote").select("*", { count: "exact", head: true }),
   ]);
 
   return {
-    totalClientes: cRes.count ?? 0,
+    totalClientes,
     totalProyectos: pRes.count ?? 0,
     totalLotes: lRes.count ?? 0,
   };

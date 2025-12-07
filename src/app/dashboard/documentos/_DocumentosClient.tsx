@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   FolderOpen,
   Search,
@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Clock,
   Folder,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import GoogleDriveFolders from "./_GoogleDriveFolders";
 import DocumentosList, { GoogleDriveDocumento } from "./_DocumentosList";
@@ -19,7 +20,6 @@ import GoogleDriveStatus from "./_GoogleDriveStatus";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { useEffect } from "react";
 
 interface DocumentosClientProps {
   googleDriveConectado: boolean;
@@ -47,45 +47,21 @@ export default function DocumentosClient({
   const [busqueda, setBusqueda] = useState('');
   const [sincronizando, setSincronizando] = useState(false);
   const [documentosEnCarpeta, setDocumentosEnCarpeta] = useState<GoogleDriveDocumento[]>([]);
-  const [, setCargandoDocumentos] = useState(false);
+  const [cargandoDocumentos, setCargandoDocumentos] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<'all' | 'carpetas' | 'pdf' | 'images' | 'docs' | 'sheets' | 'other'>('all');
   const [orden, setOrden] = useState<'recientes' | 'antiguos' | 'nombre-asc' | 'nombre-desc' | 'tamano-desc' | 'tamano-asc'>('recientes');
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ id: string; name: string }>>([{ id: 'root', name: 'Mi Drive' }]);
   const [mostrarCarpetasMovil, setMostrarCarpetasMovil] = useState(false);
   const [mostrarFiltrosMovil, setMostrarFiltrosMovil] = useState(false);
 
-  // Cargar documentos de la carpeta actual desde Google Drive
-  useEffect(() => {
-    if (googleDriveConectado) {
-      cargarDocumentosDeCarpeta(carpetaSeleccionada);
+  const cargarDocumentosDeCarpeta = useCallback(async (folderId: string | null, source: "cache" | "drive" = "cache") => {
+    // No intentar cargar si Google Drive no está conectado y se solicita desde drive
+    if (source === 'drive' && !googleDriveConectado) {
+      setDocumentosEnCarpeta([]);
+      setCargandoDocumentos(false);
+      return;
     }
-  }, [carpetaSeleccionada, googleDriveConectado]);
 
-  useEffect(() => {
-    const cargarBreadcrumbs = async (folderId: string | null) => {
-      if (!googleDriveConectado) return;
-
-      if (!folderId || folderId === 'root') {
-        setBreadcrumbs([{ id: 'root', name: 'Mi Drive' }]);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/google-drive/folders/${folderId}/path`);
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          setBreadcrumbs(data.path);
-        }
-      } catch (error) {
-        console.error('Error cargando breadcrumbs principales:', error);
-      }
-    };
-
-    cargarBreadcrumbs(carpetaSeleccionada);
-  }, [carpetaSeleccionada, googleDriveConectado]);
-
-  const cargarDocumentosDeCarpeta = async (folderId: string | null, source: "cache" | "drive" = "cache") => {
     setCargandoDocumentos(true);
     try {
       const params = new URLSearchParams();
@@ -99,9 +75,16 @@ export default function DocumentosClient({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        // Si es un error 503 (Service Unavailable) y no hay conexión, no mostrar error
+        if (response.status === 503 && !googleDriveConectado) {
+          setDocumentosEnCarpeta([]);
+          setCargandoDocumentos(false);
+          return;
+        }
         throw new Error(data.message || 'Error al cargar archivos');
       }
 
+      // Solo intentar cargar desde drive si hay conexión activa
       if (data.source === 'cache' && !data.cacheHit && googleDriveConectado && source !== 'drive') {
         await cargarDocumentosDeCarpeta(folderId, 'drive');
         return;
@@ -135,11 +118,55 @@ export default function DocumentosClient({
       setDocumentosEnCarpeta(documentos);
     } catch (error) {
       console.error('Error cargando documentos:', error);
-      setDocumentosEnCarpeta([]);
+      // Si el error es sobre falta de conexión y no está conectado, no mostrar toast
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      if (errorMessage.includes('No hay conexión activa') && !googleDriveConectado) {
+        // Silenciar el error si Google Drive no está conectado
+        setDocumentosEnCarpeta([]);
+      } else {
+        // Mostrar error solo si es inesperado
+        toast.error(errorMessage);
+        setDocumentosEnCarpeta([]);
+      }
     } finally {
       setCargandoDocumentos(false);
     }
-  };
+  }, [googleDriveConectado]);
+
+  // Cargar documentos de la carpeta actual desde Google Drive
+  useEffect(() => {
+    if (googleDriveConectado) {
+      cargarDocumentosDeCarpeta(carpetaSeleccionada);
+    } else {
+      // Si no hay conexión, limpiar documentos y estado de carga
+      setDocumentosEnCarpeta([]);
+      setCargandoDocumentos(false);
+    }
+  }, [carpetaSeleccionada, googleDriveConectado, cargarDocumentosDeCarpeta]);
+
+  useEffect(() => {
+    const cargarBreadcrumbs = async (folderId: string | null) => {
+      if (!googleDriveConectado) return;
+
+      if (!folderId || folderId === 'root') {
+        setBreadcrumbs([{ id: 'root', name: 'Mi Drive' }]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/google-drive/folders/${folderId}/path`);
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          setBreadcrumbs(data.path);
+        }
+      } catch (error) {
+        console.error('Error cargando breadcrumbs principales:', error);
+      }
+    };
+
+    cargarBreadcrumbs(carpetaSeleccionada);
+  }, [carpetaSeleccionada, googleDriveConectado]);
 
   // Filtrar documentos
   const documentosFiltrados = useMemo(() => {
@@ -515,15 +542,27 @@ export default function DocumentosClient({
               </span>
             </div>
 
-            <DocumentosList
-              documentos={documentosFiltrados}
-              vista={vistaActual}
-              onOpenFolder={(doc) => {
-                if (doc.es_carpeta && doc.google_drive_file_id) {
-                  setCarpetaSeleccionada(doc.google_drive_file_id);
-                }
-              }}
-            />
+            {cargandoDocumentos ? (
+              <div className="crm-card p-12 rounded-xl text-center">
+                <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 text-crm-primary animate-spin" />
+                </div>
+                <h3 className="text-lg font-semibold text-crm-text-primary mb-2">Cargando documentos...</h3>
+                <p className="text-sm text-crm-text-secondary">
+                  Obteniendo archivos desde Google Drive
+                </p>
+              </div>
+            ) : (
+              <DocumentosList
+                documentos={documentosFiltrados}
+                vista={vistaActual}
+                onOpenFolder={(doc) => {
+                  if (doc.es_carpeta && doc.google_drive_file_id) {
+                    setCarpetaSeleccionada(doc.google_drive_file_id);
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

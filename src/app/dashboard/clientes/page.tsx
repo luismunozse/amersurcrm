@@ -2,6 +2,8 @@ import { getCachedClientes } from "@/lib/cache.server";
 import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
 import ExportButton from "@/components/export/ExportButton";
+import { obtenerPermisosUsuario } from "@/lib/permissions/server";
+import { PERMISOS } from "@/lib/permissions";
 
 type SP = Promise<{
   q?: string | string[];
@@ -29,6 +31,10 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
   const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
 
   try {
+    const permisosUsuario = await obtenerPermisosUsuario();
+    const rol = permisosUsuario?.rol;
+    const puedeExportar = rol === 'ROL_ADMIN' || rol === 'ROL_COORDINADOR_VENTAS';
+
     // Obtener clientes paginados con filtros
     const { data: clientes, total } = await getCachedClientes({
       page,
@@ -64,15 +70,17 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
             <p className="text-sm text-crm-text-muted md:text-base">Gestiona tu cartera desde el móvil o escritorio.</p>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start md:self-auto">
-            <ExportButton
-              type="clientes"
-              data={clientes}
-              filters={exportFilters}
-              fileName="clientes"
-              label="Exportar"
-              size="sm"
-              variant="secondary"
-            />
+            {puedeExportar && (
+              <ExportButton
+                type="clientes"
+                data={clientes}
+                filters={exportFilters}
+                fileName="clientes"
+                label="Exportar"
+                size="sm"
+                variant="secondary"
+              />
+            )}
             <div className="text-sm text-crm-text-muted">
               {total.toLocaleString()} {total === 1 ? 'cliente' : 'clientes'} total
             </div>

@@ -145,14 +145,11 @@ export async function crearLotesBatch(
     throw new Error("No autenticado");
   }
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para crear lotes por lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  await requierePermiso(PERMISOS.LOTES.CREAR);
+  const perfil = await obtenerPerfilUsuario();
+  const rolNombre = perfil?.rol?.nombre;
+  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+    throw new Error("Solo administradores o coordinadores pueden crear lotes por lotes");
   }
 
   if (!lotes || lotes.length === 0) {

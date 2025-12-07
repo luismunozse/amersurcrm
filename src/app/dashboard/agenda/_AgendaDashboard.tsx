@@ -912,7 +912,7 @@ export default function AgendaDashboard() {
                   type="datetime-local"
                   value={nuevaFechaReprogramar}
                   onChange={(e) => setNuevaFechaReprogramar(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                  className="crm-datetime-input"
                   required
                 />
               </div>

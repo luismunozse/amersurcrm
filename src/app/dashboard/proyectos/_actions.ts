@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { PERMISOS } from "@/lib/permissions";
+import { requierePermiso } from "@/lib/permissions/server";
 import { redirect } from "next/navigation";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import type { ProyectoMediaItem } from "@/types/proyectos";
@@ -106,15 +108,7 @@ export async function crearProyecto(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para crear proyectos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
-  }
+  await requierePermiso(PERMISOS.PROYECTOS.CREAR);
 
   try {
     const nombre = String(formData.get("nombre") || "").trim();

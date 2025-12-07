@@ -9,7 +9,11 @@ import { ClientHistory } from './ClientHistory';
 import { UpdateLeadStatus } from './UpdateLeadStatus';
 import { ProjectInterest } from './ProjectInterest';
 import { QuickNotes } from './QuickNotes';
+import { ConnectionStatus } from './ConnectionStatus';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('Sidebar');
 
 export function Sidebar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,7 +50,7 @@ export function Sidebar() {
     if (contact && apiClient) {
       // Solo buscar si el teléfono cambió (evita búsquedas redundantes)
       if (contact.phone !== lastProcessedPhone) {
-        console.log('[Sidebar] Nuevo contacto detectado:', contact.phone);
+        logger.info('Nuevo contacto detectado', { phone: contact.phone });
         setLastProcessedPhone(contact.phone);
         searchCliente(contact.phone);
       }
@@ -55,7 +59,7 @@ export function Sidebar() {
       setCliente(null);
       setLastProcessedPhone(null);
     }
-  }, [contact, apiClient]);
+  }, [contact, apiClient, lastProcessedPhone]);
 
   // Verificar pendientes cuando cambia el cliente
   useEffect(() => {
@@ -69,7 +73,7 @@ export function Sidebar() {
           count: pendientes,
         }, WHATSAPP_WEB_ORIGIN);
         } catch (error) {
-          console.error('[Sidebar] Error verificando pendientes:', error);
+          logger.error('Error verificando pendientes', error instanceof Error ? error : undefined);
         }
       } else {
         // Sin cliente, limpiar badge
@@ -84,15 +88,21 @@ export function Sidebar() {
   }, [cliente, apiClient]);
 
   async function initAuth() {
+    logger.info('Inicializando autenticación...');
     try {
       const config = await getCRMConfig();
+      logger.debug('Configuración obtenida', { hasToken: !!config.token, url: config.url });
+      
       if (config.token) {
         const client = new CRMApiClient(config.url, config.token);
         setApiClient(client);
         setIsAuthenticated(true);
+        logger.info('Autenticación restaurada desde storage');
+      } else {
+        logger.info('No hay token guardado, requiere login');
       }
     } catch (error) {
-      console.error('[Sidebar] Error inicializando auth:', error);
+      logger.error('Error inicializando auth', error instanceof Error ? error : undefined);
     } finally {
       setLoading(false);
     }
@@ -104,8 +114,12 @@ export function Sidebar() {
   }
 
   async function searchCliente(phone: string) {
-    if (!apiClient || !phone) return;
+    if (!apiClient || !phone) {
+      logger.debug('Búsqueda de cliente cancelada', { hasApiClient: !!apiClient, hasPhone: !!phone });
+      return;
+    }
 
+    logger.info('Buscando cliente', { phone });
     setSearchingCliente(true);
     try {
       const found = await apiClient.searchClienteByPhone(phone);
@@ -113,6 +127,8 @@ export function Sidebar() {
       if (found) {
         // Cliente existe en el CRM
         setCliente(found);
+        logger.info('Cliente encontrado en CRM', { clienteId: found.id, nombre: found.nombre });
+        
         // Reflejar nombre del CRM en el contacto para mostrarlo en el encabezado
         setContact((prev) => {
           if (!prev) return prev;
@@ -120,14 +136,13 @@ export function Sidebar() {
           if (!normalizedName) return prev;
           return { ...prev, name: normalizedName };
         });
-        console.log('[Sidebar] Cliente encontrado en CRM:', found.id);
       } else {
         // Cliente NO existe - mostrar formulario para crear lead manualmente
-        console.log('[Sidebar] Cliente no encontrado. Mostrar formulario de creación manual.');
+        logger.info('Cliente no encontrado. Mostrar formulario de creación manual.', { phone });
         setCliente(null);
       }
     } catch (error) {
-      console.error('[Sidebar] Error buscando cliente:', error);
+      logger.error('Error buscando cliente', error instanceof Error ? error : undefined, { phone });
       setCliente(null);
     } finally {
       setSearchingCliente(false);
@@ -157,7 +172,7 @@ export function Sidebar() {
       const user = await client.getCurrentUser();
       setUserName(user.username || user.email?.split('@')[0] || 'Usuario');
     } catch (error) {
-      console.error('[Sidebar] Error obteniendo usuario:', error);
+      logger.error('Error obteniendo usuario', error instanceof Error ? error : undefined);
       setUserName('Usuario');
     }
 
@@ -187,7 +202,9 @@ export function Sidebar() {
   }
 
   function handleSelectTemplate(mensaje: string) {
-    console.log('[Sidebar] Insertando plantilla en WhatsApp:', mensaje.substring(0, 50));
+    logger.info('Insertando plantilla en WhatsApp', { 
+      mensajePreview: mensaje.substring(0, 50) 
+    });
 
     // Enviar mensaje al content script para insertar en WhatsApp
     window.parent.postMessage({
@@ -197,7 +214,7 @@ export function Sidebar() {
 
     // También copiar al portapapeles como fallback
     navigator.clipboard.writeText(mensaje).catch((error) => {
-      console.error('[Sidebar] Error copiando plantilla:', error);
+      logger.error('Error copiando plantilla', error instanceof Error ? error : undefined);
     });
   }
 
@@ -233,7 +250,8 @@ export function Sidebar() {
             Cerrar sesión
           </button>
         </div>
-        <p className="text-sm opacity-90">CRM WhatsApp Integration</p>
+        <p className="text-sm opacity-90 mb-2">CRM WhatsApp Integration</p>
+        <ConnectionStatus apiClient={apiClient} />
       </div>
 
       {/* Contenido */}
