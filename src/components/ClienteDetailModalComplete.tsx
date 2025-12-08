@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import type { SVGProps } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, DocumentTextIcon, ClockIcon, TagIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, DocumentTextIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 

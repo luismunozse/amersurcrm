@@ -2,17 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 
-// Interfaz para los datos del lote desde Excel
-interface LoteExcelRow {
-  codigo: string;
-  tipo_unidad?: string;
-  sup_m2?: number | string;
-  precio?: number | string;
-  precio_m2?: number | string;
-  moneda?: string;
-  estado?: string;
-}
-
 // Interfaz para el resultado de la importación
 interface ImportResult {
   success: boolean;

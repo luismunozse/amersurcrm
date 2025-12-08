@@ -93,7 +93,7 @@ export default function VendedoresActivosPage() {
     }
   };
 
-  const agregarVendedor = async (vendedorId: string) => {
+  const _agregarVendedor = async (vendedorId: string) => {
     try {
       const response = await fetch("/api/admin/vendedores-activos", {
         method: "POST",

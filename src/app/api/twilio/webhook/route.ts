@@ -211,7 +211,7 @@ async function procesarMensajeEntrante(
 async function procesarActualizacionEstado(
   supabase: ServiceSupabaseClient,
   event: TwilioWebhookEvent,
-  esWhatsApp: boolean
+  _esWhatsApp: boolean
 ) {
   try {
     const messageSid = event.MessageSid || event.SmsSid || '';

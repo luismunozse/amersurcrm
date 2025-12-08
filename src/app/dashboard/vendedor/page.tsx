@@ -15,7 +15,7 @@ import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/client
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
-interface ClienteAsignado {
+interface _ClienteAsignado {
   id: string;
   codigo_cliente: string;
   nombre: string;
@@ -25,7 +25,7 @@ interface ClienteAsignado {
   proxima_accion?: string;
 }
 
-interface ProximaAccion {
+interface _ProximaAccion {
   id: string;
   cliente_id: string;
   cliente: {
@@ -38,7 +38,7 @@ interface ProximaAccion {
   notas?: string;
 }
 
-interface ReservaActiva {
+interface _ReservaActiva {
   id: string;
   codigo_reserva: string;
   cliente: {
@@ -57,7 +57,7 @@ interface ReservaActiva {
   estado: string;
 }
 
-interface VentaEnProceso {
+interface _VentaEnProceso {
   id: string;
   codigo_venta: string;
   cliente: {

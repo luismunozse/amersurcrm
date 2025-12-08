@@ -3,11 +3,6 @@
  */
 
 import { z } from 'zod';
-import type {
-  LoteEstado,
-  ProyectoEstado,
-  TipoTerreno,
-} from '@/types/proyectos';
 
 // ============================================================================
 // BASE SCHEMAS

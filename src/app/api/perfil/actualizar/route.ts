@@ -91,8 +91,6 @@ export async function POST(request: Request) {
       const currentEmailDomain = user.email?.split('@')[1]?.toLowerCase() || '';
       const currentEmailIsInvalid = invalidDomains.some(invalid => currentEmailDomain.endsWith(invalid));
 
-      let emailUpdateSuccess = false;
-
       // Si el email actual es inválido, usar service role para actualizar directamente
       if (currentEmailIsInvalid) {
         console.log("Email actual tiene dominio inválido, usando service role para actualizar directamente");
@@ -123,7 +121,6 @@ export async function POST(request: Request) {
           );
         }
 
-        emailUpdateSuccess = true;
         // Retornar éxito indicando que se actualizó directamente (sin correo de confirmación)
         return NextResponse.json({
           success: true,
@@ -164,7 +161,6 @@ export async function POST(request: Request) {
           );
         }
 
-        emailUpdateSuccess = true;
       }
     }
 

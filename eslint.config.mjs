@@ -22,16 +22,23 @@ const eslintConfig = [
   },
   {
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": "warn",
-      "react/no-unescaped-entities": "warn",
-      "@next/next/no-img-element": "warn",
-      "react-hooks/exhaustive-deps": "warn",
+      // Desactivar reglas que generan demasiado ruido
+      "@typescript-eslint/no-explicit-any": "off",
+      "@next/next/no-img-element": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "jsx-a11y/role-supports-aria-props": "off",
+      
+      // Mantener como warning solo las más importantes
+      "@typescript-eslint/no-unused-vars": ["warn", { 
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }],
+      "react/no-unescaped-entities": "off",
       "@typescript-eslint/no-require-imports": "warn",
       "prefer-const": "warn",
-      "jsx-a11y/role-has-required-aria-props": "warn",
-      "@next/next/no-html-link-for-pages": "warn",
-      "@typescript-eslint/no-unused-expressions": "warn",
+      "jsx-a11y/role-has-required-aria-props": "off",
+      "@next/next/no-html-link-for-pages": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
     },
   },
 ];

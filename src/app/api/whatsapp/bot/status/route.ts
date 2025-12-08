@@ -10,7 +10,7 @@ const WHATSAPP_BOT_API_KEY = process.env.WHATSAPP_BOT_API_KEY;
  *
  * Obtiene el estado actual del bot (para debugging)
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const { getBotState } = await import("@/lib/whatsapp-bot-state");
   return NextResponse.json(getBotState());
 }
