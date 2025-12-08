@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       await Promise.all([
         supabase
           .from("usuario_perfil")
-          .select("id, nombre_completo, email, username, activo, rol:rol!usuario_perfil_rol_fk(nombre)")
+          .select("id, nombre_completo, email, username, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
           .eq("dni", dniSanitized)
           .maybeSingle<PerfilConRol>(),
         supabase

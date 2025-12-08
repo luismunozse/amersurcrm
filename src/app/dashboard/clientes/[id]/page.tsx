@@ -172,7 +172,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
 
   const { data: vendedoresRaw } = await supabase
     .from('usuario_perfil')
-    .select('id, username, nombre_completo, telefono, email, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('id, username, nombre_completo, telefono, email, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
     .eq('activo', true)
     .order('nombre_completo', { ascending: true });
 

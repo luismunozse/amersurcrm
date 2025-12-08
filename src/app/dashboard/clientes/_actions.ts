@@ -647,7 +647,7 @@ export async function obtenerVendedores() {
       username,
       nombre_completo,
       email,
-      rol:rol!usuario_perfil_rol_fk (
+      rol:rol!usuario_perfil_rol_id_fkey (
         nombre
       )
     `)

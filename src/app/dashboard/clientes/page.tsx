@@ -3,7 +3,6 @@ import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
 import ExportButton from "@/components/export/ExportButton";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
-import { PERMISOS } from "@/lib/permissions";
 
 type SP = Promise<{
   q?: string | string[];

@@ -94,7 +94,7 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
   // NOTA: No usar .schema('crm') porque el cliente ya tiene db: { schema: "crm" } configurado
   const { data: perfil } = await supabase
     .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
     .eq('id', userId)
     .single();
 
@@ -244,7 +244,7 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
   // NOTA: No usar .schema('crm') porque el cliente ya tiene db: { schema: "crm" } configurado
   const { data: perfil } = await supabase
     .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
     .eq('id', userId)
     .single();
 
@@ -279,7 +279,7 @@ export const getCachedClientesDashboardMetrics = cache(async (): Promise<Cliente
   const { data: perfil } = await supabase
     .schema('crm')
     .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
     .eq('id', userId)
     .single();
 
@@ -397,7 +397,7 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
   const { data: perfil } = await supabase
     .schema('crm')
     .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_fk(nombre)')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
     .eq('id', userId)
     .single();
 

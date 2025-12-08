@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, MessageSquare } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, CheckCircle, Clock, MessageSquare } from "lucide-react";
 import { obtenerPlantillas, eliminarPlantilla } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingTemplate } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";

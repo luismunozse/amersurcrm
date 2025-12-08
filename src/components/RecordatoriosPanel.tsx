@@ -1,78 +1,91 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { format, isToday, isTomorrow, isYesterday } from "date-fns";
+import { format, isToday, isTomorrow, isPast, addMinutes, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import toast from "react-hot-toast";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
-type Prioridad = "baja" | "media" | "alta" | "urgente";
-type TipoRecordatorioKey =
-  | "seguimiento_cliente"
-  | "llamada_prospecto"
-  | "envio_documentos"
-  | "visita_propiedad"
-  | "reunion_equipo"
-  | "personalizado";
+type TipoEvento = 'cita' | 'llamada' | 'email' | 'visita' | 'seguimiento' | 'recordatorio' | 'tarea';
+type Prioridad = 'baja' | 'media' | 'alta' | 'urgente';
+type EstadoEvento = 'programado' | 'completado' | 'cancelado' | 'reprogramado';
 
-interface RecordatorioQuery {
-  id: string;
-  titulo: string;
-  descripcion: string | null;
-  tipo: string;
-  prioridad: Prioridad | null;
-  fecha_recordatorio: string;
-  fecha_completado: string | null;
-  completado: boolean | null;
-  leido: boolean | null;
-  notificar_email: boolean | null;
-  notificar_push: boolean | null;
-  created_at: string;
-  cliente: { id: string; nombre: string | null } | null;
-  propiedad: { id: string; identificacion_interna: string | null; tipo: string | null } | null;
-}
-
-interface Recordatorio {
+interface EventoRecordatorio {
   id: string;
   titulo: string;
   descripcion?: string;
-  tipo: TipoRecordatorioKey;
+  tipo: TipoEvento;
   prioridad: Prioridad;
-  fecha_recordatorio: string;
+  estado: EstadoEvento;
+  fecha_inicio: string;
+  fecha_fin?: string;
+  recordar_antes_minutos: number;
+  cliente_id?: string;
   cliente_nombre?: string;
-  propiedad_nombre?: string;
-  completado: boolean;
-  leido: boolean;
-  notificar_email: boolean;
-  notificar_push: boolean;
-  created_at: string;
-  fecha_completado?: string | null;
+  cliente_telefono?: string;
 }
 
-const TIPOS_RECORDATORIO: Record<TipoRecordatorioKey, { label: string; icon: string; color: string }> = {
-  seguimiento_cliente: { label: "Seguimiento Cliente", icon: "👥", color: "bg-blue-100 text-blue-800" },
-  llamada_prospecto: { label: "Llamada Prospecto", icon: "📞", color: "bg-green-100 text-green-800" },
-  envio_documentos: { label: "Envío Documentos", icon: "📄", color: "bg-purple-100 text-purple-800" },
-  visita_propiedad: { label: "Visita Propiedad", icon: "🏠", color: "bg-orange-100 text-orange-800" },
-  reunion_equipo: { label: "Reunión Equipo", icon: "👨‍💼", color: "bg-indigo-100 text-indigo-800" },
-  personalizado: { label: "Personalizado", icon: "⏰", color: "bg-gray-100 text-gray-800" },
+const TIPOS_EVENTO: Record<TipoEvento, { label: string; icon: string; color: string }> = {
+  cita: { label: "Cita", icon: "📅", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  llamada: { label: "Llamada", icon: "📞", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  email: { label: "Email", icon: "✉️", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
+  visita: { label: "Visita", icon: "🏠", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+  seguimiento: { label: "Seguimiento", icon: "👥", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" },
+  recordatorio: { label: "Recordatorio", icon: "⏰", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  tarea: { label: "Tarea", icon: "✅", color: "bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-300" },
 };
 
 const PRIORIDADES: Record<Prioridad, { label: string; color: string; bg: string }> = {
-  baja: { label: "Baja", color: "text-gray-600", bg: "bg-gray-100" },
-  media: { label: "Media", color: "text-blue-600", bg: "bg-blue-100" },
-  alta: { label: "Alta", color: "text-orange-600", bg: "bg-orange-100" },
-  urgente: { label: "Urgente", color: "text-red-600", bg: "bg-red-100" },
+  baja: { label: "Baja", color: "text-gray-600 dark:text-gray-400", bg: "bg-gray-100 dark:bg-gray-800" },
+  media: { label: "Media", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/30" },
+  alta: { label: "Alta", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/30" },
+  urgente: { label: "Urgente", color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/30" },
 };
 
-export default function RecordatoriosPanel() {
-  const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState<"todos" | "hoy" | "pendientes" | "completados">("todos");
-  const supabase = useMemo(() => supabaseBrowser(), []);
-  const [accionEnProgreso, setAccionEnProgreso] = useState<string | null>(null);
+function obtenerTiempoRestante(fechaEvento: string): string {
+  const ahora = new Date();
+  const fecha = new Date(fechaEvento);
+  
+  if (isPast(fecha)) {
+    return "Pasado";
+  }
+  
+  const minutos = differenceInMinutes(fecha, ahora);
+  const horas = differenceInHours(fecha, ahora);
+  const dias = differenceInDays(fecha, ahora);
+  
+  if (minutos < 60) {
+    return `En ${minutos} min`;
+  } else if (horas < 24) {
+    return `En ${horas}h`;
+  } else if (dias === 1) {
+    return "Mañana";
+  } else {
+    return `En ${dias} días`;
+  }
+}
 
-  const cargarRecordatorios = useCallback(async () => {
+function obtenerUrgencia(fechaEvento: string, recordarAntesMinutos: number): 'inminente' | 'proximo' | 'futuro' | 'pasado' {
+  const ahora = new Date();
+  const fecha = new Date(fechaEvento);
+  const fechaRecordatorio = addMinutes(fecha, -recordarAntesMinutos);
+  
+  if (isPast(fecha)) return 'pasado';
+  if (isPast(fechaRecordatorio)) return 'inminente'; // Ya debería haberse recordado
+  
+  const minutosParaEvento = differenceInMinutes(fecha, ahora);
+  if (minutosParaEvento <= 60) return 'inminente';
+  if (minutosParaEvento <= 24 * 60) return 'proximo';
+  return 'futuro';
+}
+
+export default function RecordatoriosPanel() {
+  const [eventos, setEventos] = useState<EventoRecordatorio[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtro, setFiltro] = useState<"todos" | "hoy" | "inminentes" | "completados">("todos");
+  const supabase = useMemo(() => supabaseBrowser(), []);
+
+  const cargarEventos = useCallback(async () => {
     try {
       setCargando(true);
       const {
@@ -80,60 +93,60 @@ export default function RecordatoriosPanel() {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError) throw userError;
-      if (!user) {
-        setRecordatorios([]);
+      if (userError || !user) {
+        setEventos([]);
         return;
       }
 
+      // Obtener eventos: últimos 7 días + próximos 30 días
+      const fechaInicio = new Date();
+      fechaInicio.setDate(fechaInicio.getDate() - 7); // Incluir últimos 7 días
+      const fechaFin = new Date();
+      fechaFin.setDate(fechaFin.getDate() + 30);
+
       const { data, error } = await supabase
-        .from("recordatorio")
+        .schema('crm')
+        .from("evento")
         .select(`
           id,
           titulo,
           descripcion,
           tipo,
           prioridad,
-          fecha_recordatorio,
-          fecha_completado,
-          completado,
-          leido,
-          notificar_email,
-          notificar_push,
-          created_at,
-          cliente:cliente_id ( id, nombre ),
-          propiedad:propiedad_id ( id, identificacion_interna, tipo )
+          estado,
+          fecha_inicio,
+          fecha_fin,
+          recordar_antes_minutos,
+          cliente_id,
+          cliente:cliente_id (id, nombre, telefono)
         `)
         .eq("vendedor_id", user.id)
-        .order("fecha_recordatorio", { ascending: true });
+        .neq("estado", "cancelado")
+        .gte("fecha_inicio", fechaInicio.toISOString())
+        .lte("fecha_inicio", fechaFin.toISOString())
+        .order("fecha_inicio", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error cargando eventos:", error);
+        throw error;
+      }
 
-      const normalizados: Recordatorio[] = ((data ?? []) as any[]).map((item: any) => {
-        const prioridad = (item.prioridad ?? "media") as Prioridad;
-        const tipoNormalizado = (Object.keys(TIPOS_RECORDATORIO).includes(item.tipo)
-          ? item.tipo
-          : "personalizado") as TipoRecordatorioKey;
+      const eventosNormalizados: EventoRecordatorio[] = (data ?? []).map((item: any) => ({
+        id: item.id,
+        titulo: item.titulo,
+        descripcion: item.descripcion ?? undefined,
+        tipo: item.tipo as TipoEvento,
+        prioridad: (item.prioridad ?? 'media') as Prioridad,
+        estado: item.estado as EstadoEvento,
+        fecha_inicio: item.fecha_inicio,
+        fecha_fin: item.fecha_fin ?? undefined,
+        recordar_antes_minutos: item.recordar_antes_minutos ?? 15,
+        cliente_id: item.cliente_id ?? undefined,
+        cliente_nombre: item.cliente?.nombre ?? undefined,
+        cliente_telefono: item.cliente?.telefono ?? undefined,
+      }));
 
-        return {
-          id: item.id,
-          titulo: item.titulo,
-          descripcion: item.descripcion ?? undefined,
-          tipo: tipoNormalizado,
-          prioridad,
-          fecha_recordatorio: item.fecha_recordatorio,
-          cliente_nombre: item.cliente?.[0]?.nombre ?? undefined,
-          propiedad_nombre: item.propiedad?.[0]?.identificacion_interna ?? undefined,
-          completado: Boolean(item.completado),
-          leido: Boolean(item.leido),
-          notificar_email: Boolean(item.notificar_email ?? true),
-          notificar_push: Boolean(item.notificar_push),
-          created_at: item.created_at,
-          fecha_completado: item.fecha_completado,
-        };
-      });
-
-      setRecordatorios(normalizados);
+      setEventos(eventosNormalizados);
     } catch (error) {
       console.error("Error cargando recordatorios:", error);
       toast.error("Error cargando recordatorios");
@@ -143,146 +156,83 @@ export default function RecordatoriosPanel() {
   }, [supabase]);
 
   useEffect(() => {
-    cargarRecordatorios();
-  }, [cargarRecordatorios]);
-
-  const obtenerUsuarioId = useCallback(async () => {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error) throw error;
-    if (!user) throw new Error("Sesión inválida");
-    return user.id;
-  }, [supabase]);
+    cargarEventos();
+    // Recargar cada 5 minutos
+    const interval = setInterval(cargarEventos, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [cargarEventos]);
 
   const marcarCompletado = async (id: string) => {
     try {
-      setAccionEnProgreso(id);
-      const userId = await obtenerUsuarioId();
       const { error } = await supabase
-        .from("recordatorio")
-        .update({
-          completado: true,
-          fecha_completado: new Date().toISOString(),
-          leido: true,
-        })
-        .eq("id", id)
-        .eq("vendedor_id", userId);
+        .schema('crm')
+        .from("evento")
+        .update({ estado: 'completado' })
+        .eq("id", id);
 
       if (error) throw error;
 
-      setRecordatorios((prev) =>
-        prev.map((recordatorio) =>
-          recordatorio.id === id
-            ? { ...recordatorio, completado: true, leido: true, fecha_completado: new Date().toISOString() }
-            : recordatorio
-        )
-      );
-      toast.success("Recordatorio marcado como completado");
+      setEventos((prev) => prev.filter((e) => e.id !== id));
+      toast.success("Evento marcado como completado");
     } catch (error) {
-      console.error("Error marcando recordatorio:", error);
-      toast.error("Error marcando recordatorio");
-    } finally {
-      setAccionEnProgreso(null);
+      console.error("Error:", error);
+      toast.error("Error al marcar como completado");
     }
   };
 
-  const marcarLeido = async (id: string) => {
-    try {
-      setAccionEnProgreso(id);
-      const userId = await obtenerUsuarioId();
-      const { error } = await supabase
-        .from("recordatorio")
-        .update({ leido: true })
-        .eq("id", id)
-        .eq("vendedor_id", userId);
-
-      if (error) throw error;
-
-      setRecordatorios((prev) =>
-        prev.map((recordatorio) =>
-          recordatorio.id === id ? { ...recordatorio, leido: true } : recordatorio
-        )
-      );
-    } catch (error) {
-      console.error("Error marcando recordatorio:", error);
-      toast.error("Error marcando recordatorio");
-    } finally {
-      setAccionEnProgreso(null);
-    }
+  const llamarCliente = (telefono: string) => {
+    window.open(`tel:${telefono}`, '_self');
   };
 
-  const eliminarRecordatorio = async (id: string) => {
-    try {
-      setAccionEnProgreso(id);
-      const userId = await obtenerUsuarioId();
-      const { error } = await supabase
-        .from("recordatorio")
-        .delete()
-        .eq("id", id)
-        .eq("vendedor_id", userId);
-
-      if (error) throw error;
-
-      setRecordatorios((prev) => prev.filter((recordatorio) => recordatorio.id !== id));
-      toast.success("Recordatorio eliminado");
-    } catch (error) {
-      console.error("Error eliminando recordatorio:", error);
-      toast.error("Error eliminando recordatorio");
-    } finally {
-      setAccionEnProgreso(null);
-    }
+  const enviarWhatsApp = (telefono: string, titulo: string) => {
+    const telefonoLimpio = telefono.replace(/\D/g, '');
+    const mensaje = encodeURIComponent(`Hola, te contacto sobre: ${titulo}`);
+    window.open(`https://wa.me/${telefonoLimpio}?text=${mensaje}`, '_blank');
   };
 
-  const obtenerFechaRelativa = (fecha: string) => {
-    const fechaRecordatorio = new Date(fecha);
+  // Filtrar eventos
+  const eventosFiltrados = useMemo(() => {
+    return eventos.filter((evento) => {
+      const urgencia = obtenerUrgencia(evento.fecha_inicio, evento.recordar_antes_minutos);
+      
+      switch (filtro) {
+        case "hoy":
+          return isToday(new Date(evento.fecha_inicio));
+        case "inminentes":
+          return urgencia === 'inminente' || urgencia === 'proximo';
+        case "completados":
+          return evento.estado === 'completado';
+        default:
+          return true;
+      }
+    });
+  }, [eventos, filtro]);
 
-    if (isToday(fechaRecordatorio)) {
-      return { texto: "Hoy", color: "text-blue-600", bg: "bg-blue-100" };
-    }
-    if (isTomorrow(fechaRecordatorio)) {
-      return { texto: "Mañana", color: "text-orange-600", bg: "bg-orange-100" };
-    }
-    if (isYesterday(fechaRecordatorio)) {
-      return { texto: "Ayer", color: "text-gray-600", bg: "bg-gray-100" };
-    }
-
+  // Estadísticas
+  const estadisticas = useMemo(() => {
+    const hoy = eventos.filter(e => isToday(new Date(e.fecha_inicio))).length;
+    const inminentes = eventos.filter(e => {
+      const urgencia = obtenerUrgencia(e.fecha_inicio, e.recordar_antes_minutos);
+      return urgencia === 'inminente';
+    }).length;
+    const manana = eventos.filter(e => isTomorrow(new Date(e.fecha_inicio))).length;
+    
     return {
-      texto: format(fechaRecordatorio, "dd/MM", { locale: es }),
-      color: "text-gray-600",
-      bg: "bg-gray-100",
+      total: eventos.length,
+      hoy,
+      inminentes,
+      manana,
     };
-  };
-
-  const recordatoriosFiltrados = recordatorios.filter((recordatorio) => {
-    switch (filtro) {
-      case "hoy":
-        return isToday(new Date(recordatorio.fecha_recordatorio));
-      case "pendientes":
-        return !recordatorio.completado;
-      case "completados":
-        return recordatorio.completado;
-      default:
-        return true;
-    }
-  });
-
-  const estadisticas = {
-    total: recordatorios.length,
-    pendientes: recordatorios.filter((r) => !r.completado).length,
-    completados: recordatorios.filter((r) => r.completado).length,
-    hoy: recordatorios.filter((r) => isToday(new Date(r.fecha_recordatorio))).length,
-  };
+  }, [eventos]);
 
   if (cargando) {
     return (
       <div className="crm-card p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-crm-border rounded"></div>
+          <div className="h-6 bg-crm-border rounded w-48"></div>
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-crm-border rounded"></div>
+              <div key={i} className="h-24 bg-crm-border rounded-xl"></div>
             ))}
           </div>
         </div>
@@ -292,170 +242,170 @@ export default function RecordatoriosPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
-          <div className="text-xl sm:text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
-          <div className="text-xs sm:text-sm text-crm-text-muted">Total</div>
+      {/* Estadísticas */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="crm-card p-4 text-center">
+          <div className="text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
+          <div className="text-sm text-crm-text-muted">Próximos 30 días</div>
         </div>
-        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
-          <div className="text-xl sm:text-2xl font-bold text-orange-600">{estadisticas.pendientes}</div>
-          <div className="text-xs sm:text-sm text-crm-text-muted">Pendientes</div>
+        <div className="crm-card p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600">{estadisticas.hoy}</div>
+          <div className="text-sm text-crm-text-muted">Hoy</div>
         </div>
-        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
-          <div className="text-xl sm:text-2xl font-bold text-green-600">{estadisticas.completados}</div>
-          <div className="text-xs sm:text-sm text-crm-text-muted">Completados</div>
+        <div className="crm-card p-4 text-center">
+          <div className="text-2xl font-bold text-orange-600">{estadisticas.inminentes}</div>
+          <div className="text-sm text-crm-text-muted">Inminentes</div>
         </div>
-        <div className="crm-card p-3 sm:p-4 text-center hover:shadow-lg transition-all duration-200">
-          <div className="text-xl sm:text-2xl font-bold text-blue-600">{estadisticas.hoy}</div>
-          <div className="text-xs sm:text-sm text-crm-text-muted">Hoy</div>
+        <div className="crm-card p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">{estadisticas.manana}</div>
+          <div className="text-sm text-crm-text-muted">Mañana</div>
         </div>
       </div>
 
-      <div className="crm-card p-3 sm:p-4">
+      {/* Filtros */}
+      <div className="crm-card p-3">
         <div className="flex flex-wrap gap-2">
           {[
             { key: "todos", label: "Todos", icon: "📋" },
             { key: "hoy", label: "Hoy", icon: "📅" },
-            { key: "pendientes", label: "Pendientes", icon: "⏳" },
-            { key: "completados", label: "Completados", icon: "✅" },
+            { key: "inminentes", label: "Inminentes", icon: "🔔" },
           ].map((f) => (
             <button
               key={f.key}
               onClick={() => setFiltro(f.key as typeof filtro)}
-              className={`px-2 sm:px-3 py-1.5 sm:py-1 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 filtro === f.key
                   ? "bg-crm-primary text-white shadow-md"
                   : "bg-crm-border text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
               }`}
             >
-              <span className="hidden sm:inline">{f.label}</span>
-              <span className="sm:hidden">{f.icon}</span>
+              <span className="mr-1">{f.icon}</span>
+              {f.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="space-y-2 sm:space-y-3">
-        {recordatoriosFiltrados.length === 0 ? (
-          <div className="crm-card p-6 sm:p-8 text-center">
+      {/* Lista de recordatorios */}
+      <div className="space-y-3">
+        {eventosFiltrados.length === 0 ? (
+          <div className="crm-card p-8 text-center">
             <div className="text-crm-text-muted">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
-              <p className="text-sm sm:text-base">No hay recordatorios para mostrar</p>
+              <p className="text-base font-medium">No hay eventos próximos</p>
+              <p className="text-sm mt-1">Los recordatorios aparecerán aquí cuando tengas eventos programados</p>
             </div>
           </div>
         ) : (
-          recordatoriosFiltrados.map((recordatorio) => {
-            const fechaRelativa = obtenerFechaRelativa(recordatorio.fecha_recordatorio);
-            const tipoInfo =
-              TIPOS_RECORDATORIO[recordatorio.tipo] ?? TIPOS_RECORDATORIO.personalizado;
-            const prioridadInfo = PRIORIDADES[recordatorio.prioridad] ?? PRIORIDADES.media;
+          eventosFiltrados.map((evento) => {
+            const tipoInfo = TIPOS_EVENTO[evento.tipo] ?? TIPOS_EVENTO.tarea;
+            const prioridadInfo = PRIORIDADES[evento.prioridad] ?? PRIORIDADES.media;
+            const urgencia = obtenerUrgencia(evento.fecha_inicio, evento.recordar_antes_minutos);
+            const tiempoRestante = obtenerTiempoRestante(evento.fecha_inicio);
+            
+            const urgenciaClasses = {
+              inminente: "border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-900/10",
+              proximo: "border-l-4 border-l-orange-500 bg-orange-50/50 dark:bg-orange-900/10",
+              futuro: "border-l-4 border-l-blue-500",
+              pasado: "border-l-4 border-l-gray-400 opacity-60",
+            };
 
             return (
               <div
-                key={recordatorio.id}
-                className={`crm-card p-3 sm:p-4 hover:shadow-lg transition-all duration-200 ${
-                  recordatorio.completado ? "opacity-60" : ""
-                }`}
+                key={evento.id}
+                className={`crm-card p-4 transition-all hover:shadow-lg ${urgenciaClasses[urgencia]}`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-base sm:text-lg">{tipoInfo.icon}</span>
-                        <h3
-                          className={`text-sm font-medium ${
-                            recordatorio.completado
-                              ? "line-through text-crm-text-muted"
-                              : "text-crm-text-primary"
-                          }`}
-                        >
-                          {recordatorio.titulo}
-                        </h3>
-                      </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full w-fit ${tipoInfo.color}`}>
-                        <span className="hidden sm:inline">{tipoInfo.label}</span>
-                        <span className="sm:hidden">{tipoInfo.label.charAt(0).toUpperCase()}</span>
+                    {/* Header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">{tipoInfo.icon}</span>
+                      <h3 className="font-semibold text-crm-text-primary truncate">
+                        {evento.titulo}
+                      </h3>
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${tipoInfo.color}`}>
+                        {tipoInfo.label}
                       </span>
                     </div>
 
-                    {recordatorio.descripcion && (
-                      <p className="text-sm text-crm-text-secondary mb-2">
-                        {recordatorio.descripcion}
+                    {/* Descripción */}
+                    {evento.descripcion && (
+                      <p className="text-sm text-crm-text-secondary mb-2 line-clamp-2">
+                        {evento.descripcion}
                       </p>
                     )}
 
-                    <div className="flex items-center flex-wrap gap-3 text-xs text-crm-text-muted">
-                      <div className="flex items-center space-x-1">
+                    {/* Info */}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-crm-text-muted">
+                      {/* Fecha y hora */}
+                      <div className="flex items-center gap-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className={`px-2 py-1 rounded-full ${fechaRelativa.bg} ${fechaRelativa.color}`}>
-                          {fechaRelativa.texto} {format(new Date(recordatorio.fecha_recordatorio), "HH:mm")}
+                        <span className="font-medium">
+                          {format(new Date(evento.fecha_inicio), "dd/MM HH:mm", { locale: es })}
                         </span>
                       </div>
 
-                      {recordatorio.cliente_nombre && (
-                        <div className="flex items-center space-x-1">
+                      {/* Tiempo restante */}
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${
+                        urgencia === 'inminente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                        urgencia === 'proximo' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      }`}>
+                        {tiempoRestante}
+                      </span>
+
+                      {/* Cliente */}
+                      {evento.cliente_nombre && (
+                        <div className="flex items-center gap-1">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
-                          <span>{recordatorio.cliente_nombre}</span>
+                          <span>{evento.cliente_nombre}</span>
                         </div>
                       )}
 
-                      {recordatorio.propiedad_nombre && (
-                        <div className="flex items-center space-x-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                          </svg>
-                          <span>{recordatorio.propiedad_nombre}</span>
-                        </div>
-                      )}
-
-                      <span className={`px-2 py-1 rounded-full ${prioridadInfo.bg} ${prioridadInfo.color}`}>
+                      {/* Prioridad */}
+                      <span className={`px-2 py-0.5 rounded-full ${prioridadInfo.bg} ${prioridadInfo.color}`}>
                         {prioridadInfo.label}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 ml-4">
-                    {!recordatorio.completado && (
+                  {/* Acciones */}
+                  <div className="flex items-center gap-1">
+                    {evento.cliente_telefono && (
                       <>
-                        {!recordatorio.leido && (
-                          <button
-                            onClick={() => marcarLeido(recordatorio.id)}
-                            disabled={accionEnProgreso === recordatorio.id}
-                            className="p-2 text-crm-text-muted hover:text-crm-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Marcar como leído"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          </button>
-                        )}
                         <button
-                          onClick={() => marcarCompletado(recordatorio.id)}
-                          disabled={accionEnProgreso === recordatorio.id}
-                          className="p-2 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Marcar como completado"
+                          onClick={() => llamarCliente(evento.cliente_telefono!)}
+                          className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition"
+                          title="Llamar"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => enviarWhatsApp(evento.cliente_telefono!, evento.titulo)}
+                          className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition"
+                          title="WhatsApp"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                           </svg>
                         </button>
                       </>
                     )}
                     <button
-                      onClick={() => eliminarRecordatorio(recordatorio.id)}
-                      disabled={accionEnProgreso === recordatorio.id}
-                      className="p-2 text-red-600 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Eliminar"
+                      onClick={() => marcarCompletado(evento.id)}
+                      className="p-2 text-crm-primary hover:bg-crm-primary/10 rounded-lg transition"
+                      title="Marcar completado"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </button>
                   </div>
@@ -465,6 +415,13 @@ export default function RecordatoriosPanel() {
           })
         )}
       </div>
+
+      {/* Footer */}
+      {eventos.length > 0 && (
+        <div className="text-center text-sm text-crm-text-muted">
+          <p>Los recordatorios se actualizan automáticamente cada 5 minutos</p>
+        </div>
+      )}
     </div>
   );
 }

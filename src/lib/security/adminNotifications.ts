@@ -17,7 +17,7 @@ export async function notifyAdminsOfSecurityEvent(
       .from("usuario_perfil")
       .select("id, email, nombre_completo")
       .eq("activo", true)
-      .eq("rol:rol!usuario_perfil_rol_fk(nombre)", "ROL_ADMIN");
+      .eq("rol:rol!usuario_perfil_rol_id_fkey(nombre)", "ROL_ADMIN");
 
     if (error) {
       console.error("No se pudieron obtener administradores para la alerta de seguridad:", error);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Building, Calendar, Download, Loader2 } from "lucide-react";
+import { Building, Loader2 } from "lucide-react";
 import { obtenerReportePropiedades } from "../_actions";
 import toast from "react-hot-toast";
 

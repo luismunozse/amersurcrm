@@ -22,6 +22,9 @@ export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail
   const [telefono, setTelefono] = useState(perfil.telefono || '');
   const [email, setEmail] = useState(currentEmail);
 
+  // Trackear campos editados
+  const [camposEditados, setCamposEditados] = useState<Set<string>>(new Set());
+
   // Errores de validación
   const [errors, setErrors] = useState<{
     nombreCompleto?: string;
@@ -82,6 +85,22 @@ export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail
       return;
     }
 
+    // Detectar si el email cambió (cambio importante que requiere confirmación)
+    const emailChanged = email.trim() !== currentEmail;
+    
+    // Si el email cambió, mostrar confirmación
+    if (emailChanged) {
+      const confirmar = window.confirm(
+        "¿Estás seguro de que deseas cambiar tu email?\n\n" +
+        "Se enviará un correo de confirmación al nuevo email. " +
+        "Tu email actual no cambiará hasta que confirmes desde el correo."
+      );
+      
+      if (!confirmar) {
+        return;
+      }
+    }
+
     startTransition(async () => {
       try {
         // Detectar si el email cambió
@@ -120,6 +139,8 @@ export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail
           } else {
             toast.success("Perfil actualizado exitosamente");
           }
+          // Limpiar campos editados después de guardar
+          setCamposEditados(new Set());
           router.refresh();
         } else {
           toast.error(result.error || "Error al actualizar perfil");
@@ -136,79 +157,150 @@ export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail
       {/* Grid de campos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Nombre Completo */}
-        <FormInput
-          id="nombreCompleto"
-          label="Nombre Completo"
-          type="text"
-          required
-          value={nombreCompleto}
+        <div className="relative">
+          {camposEditados.has('nombreCompleto') && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 dark:bg-yellow-400 rounded-full border-2 border-crm-card dark:border-crm-bg-primary" title="Campo modificado" />
+          )}
+          <FormInput
+            id="nombreCompleto"
+            label="Nombre Completo"
+            type="text"
+            required
+            value={nombreCompleto}
           onChange={(e) => {
-            setNombreCompleto(e.target.value);
+            const nuevoValor = e.target.value;
+            setNombreCompleto(nuevoValor);
             if (errors.nombreCompleto) {
               setErrors({ ...errors, nombreCompleto: undefined });
             }
+            // Marcar como editado si cambió
+            if (nuevoValor !== (perfil.nombre_completo || '')) {
+              setCamposEditados(prev => new Set(prev).add('nombreCompleto'));
+            } else {
+              setCamposEditados(prev => {
+                const nuevo = new Set(prev);
+                nuevo.delete('nombreCompleto');
+                return nuevo;
+              });
+            }
           }}
-          error={errors.nombreCompleto}
-          placeholder="Ej: Juan Pérez García"
-          disabled={isPending}
-        />
+            error={errors.nombreCompleto}
+            placeholder="Ej: Juan Pérez García"
+            disabled={isPending}
+          />
+        </div>
 
         {/* DNI */}
-        <FormInput
-          id="dni"
-          label="DNI"
-          type="text"
-          maxLength={8}
-          value={dni}
+        <div className="relative">
+          {camposEditados.has('dni') && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 dark:bg-yellow-400 rounded-full border-2 border-crm-card dark:border-crm-bg-primary" title="Campo modificado" />
+          )}
+          <FormInput
+            id="dni"
+            label="DNI"
+            type="text"
+            maxLength={8}
+            value={dni}
           onChange={(e) => {
             const value = e.target.value.replace(/\D/g, ''); // Solo números
             setDni(value);
             if (errors.dni) {
               setErrors({ ...errors, dni: undefined });
             }
+            // Marcar como editado si cambió
+            if (value !== (perfil.dni || '')) {
+              setCamposEditados(prev => new Set(prev).add('dni'));
+            } else {
+              setCamposEditados(prev => {
+                const nuevo = new Set(prev);
+                nuevo.delete('dni');
+                return nuevo;
+              });
+            }
           }}
-          error={errors.dni}
-          placeholder="Ej: 12345678"
-          disabled={isPending}
-          helperText="8 dígitos"
-        />
+            error={errors.dni}
+            placeholder="Ej: 12345678"
+            disabled={isPending}
+            helperText="8 dígitos"
+          />
+        </div>
 
         {/* Teléfono */}
-        <FormInput
-          id="telefono"
-          label="Teléfono"
-          type="tel"
-          value={telefono}
+        <div className="relative">
+          {camposEditados.has('telefono') && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 dark:bg-yellow-400 rounded-full border-2 border-crm-card dark:border-crm-bg-primary" title="Campo modificado" />
+          )}
+          <FormInput
+            id="telefono"
+            label="Teléfono"
+            type="tel"
+            value={telefono}
           onChange={(e) => {
             setTelefono(e.target.value);
             if (errors.telefono) {
               setErrors({ ...errors, telefono: undefined });
             }
+            // Marcar como editado si cambió
+            if (e.target.value !== (perfil.telefono || '')) {
+              setCamposEditados(prev => new Set(prev).add('telefono'));
+            } else {
+              setCamposEditados(prev => {
+                const nuevo = new Set(prev);
+                nuevo.delete('telefono');
+                return nuevo;
+              });
+            }
           }}
-          error={errors.telefono}
-          placeholder="Ej: 987654321"
-          disabled={isPending}
-          helperText="Visible para otros miembros del equipo"
-        />
+            error={errors.telefono}
+            placeholder="Ej: 987654321"
+            disabled={isPending}
+            helperText="Visible para otros miembros del equipo"
+          />
+        </div>
 
         {/* Email */}
-        <FormInput
-          id="email"
-          label="Correo Electrónico"
-          type="email"
-          value={email}
+        <div className="relative">
+          {camposEditados.has('email') && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 dark:bg-yellow-400 rounded-full border-2 border-crm-card dark:border-crm-bg-primary" title="Campo modificado" />
+          )}
+          <FormInput
+            id="email"
+            label="Correo Electrónico"
+            type="email"
+            value={email}
           onChange={(e) => {
             setEmail(e.target.value);
             if (errors.email) {
               setErrors({ ...errors, email: undefined });
             }
+            // Marcar como editado si cambió
+            if (e.target.value !== currentEmail) {
+              setCamposEditados(prev => new Set(prev).add('email'));
+            } else {
+              setCamposEditados(prev => {
+                const nuevo = new Set(prev);
+                nuevo.delete('email');
+                return nuevo;
+              });
+            }
           }}
-          error={errors.email}
-          placeholder="Ej: usuario@ejemplo.com"
-          disabled={isPending}
-          helperText="Se enviará un correo de confirmación si cambias tu email"
-        />
+            error={errors.email}
+            placeholder="Ej: usuario@ejemplo.com"
+            disabled={isPending}
+            helperText="Se enviará un correo de confirmación si cambias tu email"
+          />
+        </div>
       </div>
+
+      {/* Indicador de campos editados */}
+      {camposEditados.size > 0 && (
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center gap-2">
+          <div className="w-2 h-2 bg-yellow-500 dark:bg-yellow-400 rounded-full"></div>
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            Tienes {camposEditados.size} campo{camposEditados.size > 1 ? 's' : ''} modificado{camposEditados.size > 1 ? 's' : ''}. No olvides guardar los cambios.
+          </p>
+        </div>
+      )}
 
       {/* Nota informativa */}
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">

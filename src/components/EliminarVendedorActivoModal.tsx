@@ -1,7 +1,5 @@
 "use client";
 
-import { Fragment } from "react";
-
 interface EliminarVendedorActivoModalProps {
   open: boolean;
   onClose: () => void;

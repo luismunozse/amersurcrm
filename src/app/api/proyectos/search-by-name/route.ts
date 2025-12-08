@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     if (keywords.length > 0) {
       // Construir query para buscar proyectos que contengan alguna de las palabras
-      let query = supabase
+      const query = supabase
         .from("proyecto")
         .select("id, nombre, descripcion, estado");
 

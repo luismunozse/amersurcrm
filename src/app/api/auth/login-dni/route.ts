@@ -8,7 +8,6 @@ const DNI_REGEX = /^\d{6,12}$/;
 
 interface PerfilConRol {
   id: string;
-  email: string | null;
   rol: {
     nombre: string | null;
   } | null;
@@ -176,10 +175,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Buscar perfil por DNI (solo para validar que existe y es vendedor activo)
     const { data: perfil, error: perfilError } = await supabase
       .from("usuario_perfil")
       .select(
-        `id, email, rol:rol!usuario_perfil_rol_id_fkey(nombre)`
+        `id, rol:rol!usuario_perfil_rol_id_fkey(nombre)`
       )
       .eq("dni", dniSanitized)
       .eq("activo", true)
@@ -193,8 +193,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!perfil.email) {
-      await logAttempt(false, "perfil_sin_email");
+    // Obtener el email DIRECTAMENTE de Supabase Auth (no del perfil)
+    // Esto desliga el email del perfil del login
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(perfil.id);
+    
+    if (authError || !authUser?.user?.email) {
+      await logAttempt(false, "usuario_auth_no_encontrado");
       return NextResponse.json(
         { error: "Credenciales inválidas" },
         { status: 401 }
@@ -205,7 +209,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      email: perfil.email,
+      email: authUser.user.email, // Email de Auth, no del perfil
     });
   } catch (error) {
     console.error("Error en login con DNI:", error);

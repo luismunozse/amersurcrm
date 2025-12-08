@@ -3,7 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { createPortal } from "react-dom";
-import { X, AlertTriangle, FileText } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 import { cancelarReserva } from "@/app/dashboard/clientes/_actions_crm";
 import toast from "react-hot-toast";
 

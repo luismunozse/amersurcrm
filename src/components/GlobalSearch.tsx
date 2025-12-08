@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { SearchResult, PropiedadSearchResult, ProyectoSearchResult, EventoSearchResult } from "@/types/search";
+import { SearchResult, PropiedadSearchResult, EventoSearchResult } from "@/types/search";
 import { globalSearch } from "@/app/dashboard/actions/search";
 
 interface GlobalSearchProps {

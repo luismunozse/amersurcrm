@@ -4,8 +4,7 @@
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
-import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { esAdmin } from "@/lib/auth/roles";
 
 /**
  * Genera una contraseña temporal aleatoria segura
@@ -39,27 +38,42 @@ function generarPasswordTemporal(): string {
  * Resetea la contraseña de un usuario y marca que requiere cambio
  */
 export async function resetearPasswordUsuario(userId: string) {
-  await requierePermiso(PERMISOS.USUARIOS.EDITAR, {
-    accion: 'resetear_password_usuario',
-    recurso_tipo: 'usuario',
-    recurso_id: userId,
-  });
+  // Solo admin puede resetear contraseñas
+  const isAdmin = await esAdmin();
+  
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para resetear contraseñas de usuarios");
+  }
   const supabase = await createServerActionClient();
   const serviceRole = createServiceRoleClient();
 
   try {
+    // Verificar que el usuario existe en Supabase Auth
+    const { data: authUser, error: getUserError } = await serviceRole.auth.admin.getUserById(userId);
+    
+    if (getUserError || !authUser?.user) {
+      console.error('Error obteniendo usuario de Auth:', getUserError);
+      throw new Error(`Usuario no encontrado en Auth: ${getUserError?.message || 'No existe'}`);
+    }
+
+    console.log(`[Reset Password] Usuario encontrado: ${authUser.user.email}`);
+
     // Generar nueva contraseña temporal
     const passwordTemporal = generarPasswordTemporal();
+    console.log(`[Reset Password] Contraseña generada para ${userId}`);
 
     // Actualizar contraseña en Supabase Auth usando service role (requiere permisos admin)
-    const { error: authError } = await serviceRole.auth.admin.updateUserById(
+    const { data: updateData, error: authError } = await serviceRole.auth.admin.updateUserById(
       userId,
       { password: passwordTemporal }
     );
 
     if (authError) {
+      console.error('[Reset Password] Error en updateUserById:', authError);
       throw new Error(`Error actualizando contraseña: ${authError.message}`);
     }
+
+    console.log(`[Reset Password] Contraseña actualizada exitosamente para ${updateData?.user?.email}`);
 
     // Marcar que requiere cambio de contraseña en el perfil
     const { error: profileError } = await supabase
@@ -99,12 +113,13 @@ export async function cambiarEstadoUsuario(
   activo: boolean,
   motivo: string
 ) {
-  await requierePermiso(PERMISOS.USUARIOS.ACTIVAR_DESACTIVAR, {
-    accion: activo ? 'activar_usuario' : 'desactivar_usuario',
-    recurso_tipo: 'usuario',
-    recurso_id: userId,
-    motivo,
-  });
+  // Solo admin puede cambiar estado de usuarios
+  const isAdmin = await esAdmin();
+  
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para cambiar el estado de usuarios");
+  }
+  
   const supabase = await createServerActionClient();
 
   if (!motivo || motivo.trim().length < 10) {
@@ -237,11 +252,13 @@ export async function cambiarPasswordPerfil(
  * Elimina un usuario del sistema
  */
 export async function eliminarUsuario(userId: string) {
-  await requierePermiso(PERMISOS.USUARIOS.ELIMINAR, {
-    accion: 'eliminar_usuario',
-    recurso_tipo: 'usuario',
-    recurso_id: userId,
-  });
+  // Solo admin puede eliminar usuarios
+  const isAdmin = await esAdmin();
+  
+  if (!isAdmin) {
+    throw new Error("Solo administradores pueden eliminar usuarios");
+  }
+  
   const supabase = await createServerActionClient();
   const serviceRole = createServiceRoleClient();
 

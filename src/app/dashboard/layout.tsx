@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       username,
       avatar_url,
       requiere_cambio_password,
-      rol:rol!usuario_perfil_rol_fk (
+      rol:rol!usuario_perfil_rol_id_fkey (
         nombre
       )
     `)
@@ -32,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     .single();
 
   // Si el usuario requiere cambio de contraseña, redirigir a la página de cambio
-  if (perfil?.requiere_cambio_password) {
+  if (perfil?.requiere_cambio_password === true) {
     redirect("/auth/cambiar-password");
   }
 

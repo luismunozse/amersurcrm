@@ -130,7 +130,7 @@ export default function CambiarPasswordPage() {
                   onChange={(e) => setPasswordActual(e.target.value)}
                   placeholder="Ingresa tu contraseña actual"
                   disabled={isPending}
-                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-background text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
+                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
                   required
                 />
               </div>
@@ -146,7 +146,7 @@ export default function CambiarPasswordPage() {
                   onChange={(e) => setPasswordNueva(e.target.value)}
                   placeholder="Ingresa tu nueva contraseña"
                   disabled={isPending}
-                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-background text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
+                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
                   required
                 />
               </div>
@@ -162,20 +162,20 @@ export default function CambiarPasswordPage() {
                   onChange={(e) => setPasswordConfirmar(e.target.value)}
                   placeholder="Confirma tu nueva contraseña"
                   disabled={isPending}
-                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-background text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
+                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
                   required
                 />
                 {passwordConfirmar.length > 0 && (
                   <div className="mt-2 flex items-center gap-2">
                     {passwordsCoinciden ? (
                       <>
-                        <Check className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-green-600">Las contraseñas coinciden</span>
+                        <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <span className="text-sm text-green-600 dark:text-green-400">Las contraseñas coinciden</span>
                       </>
                     ) : (
                       <>
-                        <X className="w-4 h-4 text-red-600" />
-                        <span className="text-sm text-red-600">Las contraseñas no coinciden</span>
+                        <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        <span className="text-sm text-red-600 dark:text-red-400">Las contraseñas no coinciden</span>
                       </>
                     )}
                   </div>

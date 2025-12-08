@@ -6,7 +6,6 @@ import { eliminarPropiedad, cambiarEstadoPropiedad } from "@/app/dashboard/propi
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import ConfirmDialog from "./ConfirmDialog";
-import StorageImagePreview from "./StorageImagePreview";
 
 type Propiedad = {
   id: string;

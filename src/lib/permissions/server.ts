@@ -28,7 +28,7 @@ export async function obtenerPermisosUsuario(): Promise<UsuarioConPermisos | nul
         nombre_completo,
         username,
         activo,
-        rol:rol!usuario_perfil_rol_fk (
+        rol:rol!usuario_perfil_rol_id_fkey (
           nombre,
           permisos
         )

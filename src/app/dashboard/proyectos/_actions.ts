@@ -5,7 +5,6 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
-import { redirect } from "next/navigation";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import type { ProyectoMediaItem } from "@/types/proyectos";
 

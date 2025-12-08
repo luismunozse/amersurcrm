@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -47,10 +47,37 @@ export default function LoginForm() {
     }
   }, [searchParams]);
 
-  const remainingLockSeconds = useMemo(() => {
-    if (!lockUntil) return 0;
-    const diff = Math.ceil((lockUntil - Date.now()) / 1000);
-    return diff > 0 ? diff : 0;
+  // Estado para el contador de segundos restantes (se actualiza cada segundo)
+  const [remainingLockSeconds, setRemainingLockSeconds] = useState(0);
+
+  // Efecto para actualizar el contador cada segundo mientras esté bloqueado
+  useEffect(() => {
+    if (!lockUntil) {
+      setRemainingLockSeconds(0);
+      return;
+    }
+
+    // Calcular segundos restantes iniciales
+    const calculateRemaining = () => {
+      const diff = Math.ceil((lockUntil - Date.now()) / 1000);
+      return diff > 0 ? diff : 0;
+    };
+
+    setRemainingLockSeconds(calculateRemaining());
+
+    // Actualizar cada segundo
+    const interval = setInterval(() => {
+      const remaining = calculateRemaining();
+      setRemainingLockSeconds(remaining);
+      
+      // Si llegó a 0, limpiar el bloqueo
+      if (remaining <= 0) {
+        setLockUntil(null);
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, [lockUntil]);
 
   const validateForm = () => {
@@ -203,7 +230,7 @@ export default function LoginForm() {
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (lockUntil && Date.now() < lockUntil) {
+    if (remainingLockSeconds > 0) {
       toast.error(`Demasiados intentos fallidos. Intenta de nuevo en ${remainingLockSeconds}s.`);
       return;
     }
@@ -307,7 +334,7 @@ export default function LoginForm() {
     }
   }, [attempts]);
 
-  const disableSubmit = pending || (lockUntil !== null && Date.now() < lockUntil);
+  const disableSubmit = pending || remainingLockSeconds > 0;
 
   return (
     <>
@@ -498,7 +525,7 @@ export default function LoginForm() {
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
-                  {lockUntil && Date.now() < lockUntil ? `Bloqueado (${remainingLockSeconds}s)` : "Iniciar Sesión"}
+                  {remainingLockSeconds > 0 ? `Bloqueado (${remainingLockSeconds}s)` : "Iniciar Sesión"}
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>

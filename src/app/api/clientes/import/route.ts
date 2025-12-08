@@ -147,11 +147,11 @@ export async function POST(request: NextRequest) {
       rol?: { nombre?: string | null } | Array<{ nombre?: string | null }>;
     };
 
-    let vendedoresMap = new Map<string, { username: string }>();
+    const vendedoresMap = new Map<string, { username: string }>();
     if (vendorInputs.size > 0) {
       const { data: vendedoresData, error: vendedoresError } = await serviceSupabase
         .from("usuario_perfil")
-        .select("id, username, nombre_completo, activo, rol:rol!usuario_perfil_rol_fk(nombre)");
+        .select("id, username, nombre_completo, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)");
 
       if (vendedoresError) {
         console.error("Error obteniendo vendedores:", vendedoresError);

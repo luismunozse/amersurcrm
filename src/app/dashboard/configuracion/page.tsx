@@ -15,7 +15,7 @@ export default async function ConfiguracionPage() {
 
   const { data: perfil } = await supabase
     .from("usuario_perfil")
-    .select("*, rol:rol!usuario_perfil_rol_fk(id, nombre, descripcion)")
+    .select("*, rol:rol!usuario_perfil_rol_id_fkey(id, nombre, descripcion)")
     .eq("id", user.id)
     .single();
 

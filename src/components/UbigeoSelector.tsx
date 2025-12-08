@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useUbigeo, Departamento, Provincia, Distrito } from '@/hooks/useUbigeo';
+import { useUbigeo, Provincia, Distrito } from '@/hooks/useUbigeo';
 
 interface UbigeoSelectorProps {
   value?: {

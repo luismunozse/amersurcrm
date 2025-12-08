@@ -182,10 +182,12 @@ export default function AvatarUpload({ currentAvatarUrl, userName }: AvatarUploa
       />
 
       {/* Ayuda */}
-      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        <div className="bg-crm-text-primary text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap">
+      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+        <div className="bg-neutral-900 dark:bg-neutral-700 text-white dark:text-neutral-100 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg border border-neutral-700 dark:border-neutral-600">
           {currentAvatarUrl ? "Cambiar o eliminar foto" : "Subir foto de perfil"}
         </div>
+        {/* Flecha del tooltip */}
+        <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-neutral-900 dark:bg-neutral-700 border-l border-t border-neutral-700 dark:border-neutral-600 rotate-45"></div>
       </div>
 
       <ConfirmDialog

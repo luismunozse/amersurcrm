@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, memo, useMemo, useEffect, useCallback } from "react";
+import { useState, useTransition, memo, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   eliminarCliente,
@@ -19,7 +19,6 @@ import { Pagination } from "@/components/Pagination";
 import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
-import ExportButton from "@/components/export/ExportButton";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
 import { Download, Loader2 } from "lucide-react";
 import { usePermissions, PERMISOS } from "@/lib/permissions";

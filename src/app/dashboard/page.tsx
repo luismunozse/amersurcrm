@@ -10,6 +10,7 @@ import { getCachedClientes, getCachedProyectos, getCachedNotificacionesNoLeidas,
 import SecondaryPanelDrawer from "@/components/dashboard/SecondaryPanelDrawer";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { PERMISOS } from "@/lib/permissions";
+import { obtenerMetricasAgenda } from "@/app/dashboard/agenda/actions";
 
 type ClienteLite = {
   ultimo_contacto?: string | null;
@@ -30,9 +31,14 @@ interface DashboardMetrics {
   proyectosActivos: number;
   proyectosSinPlanos: number;
   notificacionesPendientes: number;
+  // Métricas de agenda real
+  eventosPendientes: number;
+  eventosHoy: number;
+  eventosSemana: number;
   hasError: boolean;
   puedeCrearProyectos: boolean;
   puedeEditarProyectos: boolean;
+  esAdminOGerente: boolean;
 }
 
 const initialMetrics: DashboardMetrics = {
@@ -43,9 +49,13 @@ const initialMetrics: DashboardMetrics = {
   proyectosActivos: 0,
   proyectosSinPlanos: 0,
   notificacionesPendientes: 0,
+  eventosPendientes: 0,
+  eventosHoy: 0,
+  eventosSemana: 0,
   hasError: false,
   puedeCrearProyectos: false,
   puedeEditarProyectos: false,
+  esAdminOGerente: false,
 };
 
 async function loadDashboardMetrics(): Promise<DashboardMetrics> {
@@ -53,7 +63,7 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     const startTime = Date.now();
     
     // Ejecutar queries en paralelo con timing individual
-    const [clientesResult, proyectosData, notificacionesData, clienteServerMetrics, permisosUsuario] = await Promise.all([
+    const [clientesResult, proyectosData, notificacionesData, clienteServerMetrics, permisosUsuario, agendaMetrics] = await Promise.all([
       (async () => {
         const t = Date.now();
         const result = await getCachedClientes({ mode: "dashboard", pageSize: 12, withTotal: false });
@@ -82,6 +92,12 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
         const t = Date.now();
         const result = await obtenerPermisosUsuario();
         console.log(`[Dashboard] obtenerPermisosUsuario: ${Date.now() - t}ms`);
+        return result;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const result = await obtenerMetricasAgenda();
+        console.log(`[Dashboard] obtenerMetricasAgenda: ${Date.now() - t}ms`);
         return result;
       })(),
     ]);
@@ -132,9 +148,13 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       proyectosActivos: proyectoMetrics.activos,
       proyectosSinPlanos: proyectoMetrics.sinPlanos,
       notificacionesPendientes: notificaciones.length,
+      eventosPendientes: agendaMetrics.eventosPendientes,
+      eventosHoy: agendaMetrics.eventosHoy,
+      eventosSemana: agendaMetrics.eventosSemana,
       hasError: false,
       puedeCrearProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.CREAR) ?? false,
       puedeEditarProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.EDITAR) ?? false,
+      esAdminOGerente: permisosUsuario?.rol === 'ROL_ADMIN' || permisosUsuario?.rol === 'ROL_GERENTE',
     } satisfies DashboardMetrics;
   } catch (error) {
     // Mejorar el logging del error
@@ -165,7 +185,7 @@ function buildHeroHighlights(metrics: DashboardMetrics) {
     },
     {
       label: "Agenda coordinada",
-      description: `${metrics.clientesConAccion} recordatorios asignados • ${metrics.notificacionesPendientes} alertas nuevas`,
+      description: `${metrics.eventosPendientes} eventos pendientes • ${metrics.eventosHoy} para hoy`,
       href: "/dashboard/agenda",
       icon: (
         <svg className="w-5 h-5" role="img" aria-label="Ir a agenda" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -201,7 +221,7 @@ function buildQuickActions(metrics: DashboardMetrics) {
     },
     {
       title: "Planificar agenda",
-      description: `${metrics.clientesConAccion} recordatorios listos para asignar`,
+      description: `${metrics.eventosPendientes} eventos programados • ${metrics.eventosHoy} hoy`,
       href: "/dashboard/agenda",
       color: "info" as const,
       icon: (
@@ -214,7 +234,7 @@ function buildQuickActions(metrics: DashboardMetrics) {
     {
       title: "Analizar reportes",
       description: `${metrics.notificacionesPendientes} indicadores pendientes de revisar`,
-      href: "/dashboard/admin/reportes",
+      href: metrics.esAdminOGerente ? "/dashboard/admin/reportes" : "/dashboard/vendedor/reportes",
       color: "warning" as const,
       icon: (
         <svg className="w-6 h-6" role="img" aria-label="Analizar reportes" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,7 +270,7 @@ function buildFocusAreas(metrics: DashboardMetrics) {
     },
     {
       title: "Confirmar visitas de la semana",
-      description: `${metrics.clientesConAccion} reuniones y recordatorios en agenda`,
+      description: `${metrics.eventosSemana} eventos programados en los próximos 7 días`,
       href: "/dashboard/agenda",
     },
   ];
@@ -351,7 +371,7 @@ async function DashboardContent() {
     },
     {
       label: "Visitas programadas",
-      value: `${metrics.clientesConAccion} recordatorios con fecha asignada`,
+      value: `${metrics.eventosSemana} eventos en los próximos 7 días`,
       tone: "success" as const,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

@@ -104,11 +104,11 @@ export default async function VendedorDashboardPage() {
     { count: totalReservasActivas },
     { count: totalVentasEnProceso }
   ] = await Promise.all([
-    // Total de clientes asignados
+    // Total de clientes asignados (usar vendedor_username que es el campo correcto)
     supabase
       .from('cliente')
       .select('*', { count: 'exact', head: true })
-      .eq('vendedor_asignado', perfil.username),
+      .eq('vendedor_username', perfil.username),
 
     // Total de acciones pendientes
     supabase
@@ -138,7 +138,7 @@ export default async function VendedorDashboardPage() {
   const { data: clientesAsignados } = await supabase
     .from('cliente')
     .select('id, codigo_cliente, nombre, telefono, estado_cliente, ultimo_contacto, proxima_accion')
-    .eq('vendedor_asignado', perfil.username)
+    .eq('vendedor_username', perfil.username)
     .order('ultimo_contacto', { ascending: false, nullsFirst: false })
     .limit(10);
 

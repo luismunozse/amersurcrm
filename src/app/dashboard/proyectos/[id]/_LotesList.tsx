@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Edit, Trash2, Eye, MapPin, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
+import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { actualizarLote, eliminarLote, duplicarLote, eliminarTodosLosLotes } from "./_actions";
 import LoteEditModal from "./LoteEditModal";

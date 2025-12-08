@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     // Buscar el email asociado al username (o email directamente para compatibilidad)
     const { data: usuario, error: usuarioError } = await supabase
       .from('usuario_perfil')
-      .select('email, activo, username, rol:rol!usuario_perfil_rol_fk(nombre)')
+      .select('email, activo, username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
       .or(`username.eq.${identifier},email.eq.${identifier}`)
       .single<UsuarioConRol>();
 

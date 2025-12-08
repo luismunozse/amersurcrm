@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AlertCircle, Filter, Download, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, Download, RefreshCw, Search } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface ExtensionLog {

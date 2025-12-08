@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         username,
         nombre_completo,
         activo,
-        rol:rol!usuario_perfil_rol_fk(nombre)
+        rol:rol!usuario_perfil_rol_id_fkey(nombre)
       `)
       .eq("id", vendedor_id)
       .single();

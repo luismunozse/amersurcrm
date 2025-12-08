@@ -23,7 +23,7 @@ export async function GET() {
         requiere_cambio_password,
         activo,
         created_at,
-        rol:rol!usuario_perfil_rol_fk (
+        rol:rol!usuario_perfil_rol_id_fkey (
           nombre,
           descripcion
         )

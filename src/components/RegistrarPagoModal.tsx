@@ -3,7 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { createPortal } from "react-dom";
-import { X, CreditCard, DollarSign, Calendar, FileText } from "lucide-react";
+import { X, CreditCard, DollarSign, Calendar } from "lucide-react";
 import { registrarPago } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, METODOS_PAGO, formatearMoneda, type Moneda } from "@/lib/types/crm-flujo";
 import toast from "react-hot-toast";

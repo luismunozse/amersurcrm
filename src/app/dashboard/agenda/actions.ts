@@ -15,7 +15,68 @@ import {
   endOfWeek,
   startOfDay,
   endOfDay,
+  addDays,
 } from "date-fns";
+
+// =====================================================
+// MÉTRICAS DE AGENDA
+// =====================================================
+
+export async function obtenerMetricasAgenda(): Promise<{
+  eventosPendientes: number;
+  eventosHoy: number;
+  eventosSemana: number;
+}> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { eventosPendientes: 0, eventosHoy: 0, eventosSemana: 0 };
+    }
+
+    const ahora = new Date();
+    const finHoy = endOfDay(ahora);
+    const finSemana = endOfDay(addDays(ahora, 7));
+
+    // Eventos pendientes (programados que aún no han pasado)
+    const [pendientesRes, hoyRes, semanaRes] = await Promise.all([
+      supabase
+        .from('evento')
+        .select('id', { count: 'exact', head: true })
+        .eq('vendedor_id', user.id)
+        .eq('estado', 'programado')
+        .gte('fecha_inicio', ahora.toISOString()),
+      
+      supabase
+        .from('evento')
+        .select('id', { count: 'exact', head: true })
+        .eq('vendedor_id', user.id)
+        .eq('estado', 'programado')
+        .gte('fecha_inicio', startOfDay(ahora).toISOString())
+        .lte('fecha_inicio', finHoy.toISOString()),
+      
+      supabase
+        .from('evento')
+        .select('id', { count: 'exact', head: true })
+        .eq('vendedor_id', user.id)
+        .eq('estado', 'programado')
+        .gte('fecha_inicio', ahora.toISOString())
+        .lte('fecha_inicio', finSemana.toISOString()),
+    ]);
+
+    return {
+      eventosPendientes: pendientesRes.count ?? 0,
+      eventosHoy: hoyRes.count ?? 0,
+      eventosSemana: semanaRes.count ?? 0,
+    };
+  } catch (error) {
+    console.error('Error obteniendo métricas de agenda:', error);
+    return { eventosPendientes: 0, eventosHoy: 0, eventosSemana: 0 };
+  }
+}
 
 // =====================================================
 // SCHEMAS DE VALIDACIÓN

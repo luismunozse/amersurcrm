@@ -37,7 +37,7 @@ export async function GET() {
         requiere_cambio_password,
         motivo_estado,
         created_at,
-        rol:rol!usuario_perfil_rol_fk (
+        rol:rol!usuario_perfil_rol_id_fkey (
           id,
           nombre,
           descripcion
@@ -236,7 +236,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar y generar email según el tipo de usuario
-    let emailFinal: string;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Validar que el email sea proporcionado y tenga un formato válido
@@ -266,7 +265,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    emailFinal = emailTrimmed;
+    const emailFinal = emailTrimmed;
     
     // Verificar si el email ya existe
     const { data: existingEmail } = await supabase
@@ -349,7 +348,7 @@ export async function POST(request: NextRequest) {
       const { data: admins, error: adminsError } = await supabase
         .schema('crm')
         .from('usuario_perfil')
-        .select('id, rol:rol!usuario_perfil_rol_fk(nombre)')
+        .select('id, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
         .eq('activo', true);
 
       if (!adminsError && admins) {
@@ -423,6 +422,7 @@ export async function PATCH(request: NextRequest) {
       nombre_completo,
       dni,
       telefono,
+      email, // nuevo: permitir actualizar email
       rol_id,
       meta_mensual,
       comision_porcentaje,
@@ -431,6 +431,42 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
+    }
+
+    // Si se proporciona email, actualizar en Supabase Auth primero
+    if (typeof email === 'string' && email.trim()) {
+      const newEmail = email.trim().toLowerCase();
+      
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newEmail)) {
+        return NextResponse.json({ error: "El formato del email no es válido" }, { status: 400 });
+      }
+      
+      // Validar que no sea un dominio local/inválido
+      const domain = newEmail.split('@')[1];
+      const invalidDomains = ['.local', '.admin', '.test', '.localhost'];
+      if (invalidDomains.some(inv => domain.endsWith(inv))) {
+        return NextResponse.json({ 
+          error: "El email debe tener un dominio válido de internet" 
+        }, { status: 400 });
+      }
+
+      // Actualizar email en Supabase Auth usando service role
+      const serviceRole = createServiceRoleClient();
+      const { error: authError } = await serviceRole.auth.admin.updateUserById(
+        id,
+        { email: newEmail, email_confirm: true }
+      );
+
+      if (authError) {
+        console.error('Error actualizando email en Auth:', authError);
+        return NextResponse.json({ 
+          error: `Error actualizando email: ${authError.message}` 
+        }, { status: 500 });
+      }
+      
+      console.log(`[Admin] Email actualizado en Auth para usuario ${id}: ${newEmail}`);
     }
 
     // Validar username si se proporciona
@@ -462,6 +498,7 @@ export async function PATCH(request: NextRequest) {
     if (typeof nombre_completo === 'string') updatePayload.nombre_completo = nombre_completo;
     if (typeof dni === 'string') updatePayload.dni = dni;
     if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;
+    if (typeof email === 'string' && email.trim()) updatePayload.email = email.trim().toLowerCase();
     if (typeof rol_id === 'string') updatePayload.rol_id = rol_id;
     // Mapear meta_mensual (frontend) -> meta_mensual_ventas (BD)
     if (typeof meta_mensual !== 'undefined') updatePayload.meta_mensual_ventas = meta_mensual === null ? null : parseInt(String(meta_mensual), 10);

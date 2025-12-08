@@ -9,11 +9,7 @@ import UbicacionSelector from "./UbicacionSelector";
 import { 
   TipoPropiedad, 
   TipoOperacion,
-  PropiedadWizardData,
-  ESQUEMAS_CARACTERISTICAS,
-  ETIQUETAS_PREDEFINIDAS,
-  AMENITIES_PREDEFINIDOS,
-  GARANTIAS_ALQUILER
+  PropiedadWizardData
 } from "@/types/propiedades";
 
 interface PropiedadWizardProps {

@@ -26,7 +26,7 @@ export async function GET() {
 
     const { data, error } = await serviceSupabase
       .from("usuario_perfil")
-      .select("id, username, nombre_completo, telefono, email, activo, rol:rol!usuario_perfil_rol_fk(nombre)");
+      .select("id, username, nombre_completo, telefono, email, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)");
 
     if (error) {
       console.error("[ImportarClientes] Error obteniendo vendedores:", error);
