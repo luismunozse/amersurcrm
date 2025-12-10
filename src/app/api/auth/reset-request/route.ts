@@ -38,11 +38,13 @@ export async function POST(request: NextRequest) {
     const [{ data: perfil, error: perfilError }, { data: adminRole, error: adminRoleError }] =
       await Promise.all([
         supabase
+          .schema('crm')
           .from("usuario_perfil")
           .select("id, nombre_completo, email, username, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
           .eq("dni", dniSanitized)
           .maybeSingle<PerfilConRol>(),
         supabase
+          .schema('crm')
           .from("rol")
           .select("id")
           .eq("nombre", "ROL_ADMIN")
@@ -74,6 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: adminUsers, error: adminError } = await supabase
+      .schema('crm')
       .from("usuario_perfil")
       .select("id, email, nombre_completo")
       .eq("activo", true)
@@ -125,7 +128,12 @@ export async function POST(request: NextRequest) {
       ? `Se solicitó restablecer la contraseña del usuario ${displayName} (DNI ${dniSanitized}).`
       : `Se solicitó restablecer la contraseña para el DNI ${dniSanitized}.`;
 
-    const { error: insertError } = await supabase.from("notificacion").insert(
+    // URL para que el admin pueda gestionar el usuario
+    const urlDestino = perfil?.id
+      ? `/dashboard/admin/usuarios?highlight=${perfil.id}`
+      : `/dashboard/admin/usuarios`;
+
+    const { error: insertError } = await supabase.schema('crm').from("notificacion").insert(
       admins.map((admin) => ({
         usuario_id: admin.id,
         tipo: "sistema",
@@ -133,6 +141,7 @@ export async function POST(request: NextRequest) {
         mensaje,
         data: {
           ...metadata,
+          url: urlDestino,
           admin: {
             id: admin.id,
             nombre: admin.nombre_completo ?? null,

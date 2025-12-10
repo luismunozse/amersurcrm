@@ -95,8 +95,9 @@ export async function POST(request: NextRequest) {
 
     // Actualizar el flag requiere_cambio_password a false si existe
     const { error: flagError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
-      .update({ 
+      .update({
         requiere_cambio_password: false,
         updated_at: new Date().toISOString()
       })

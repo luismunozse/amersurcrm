@@ -1,7 +1,8 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/clientes/[id]/proyecto-interes
@@ -13,47 +14,48 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: clienteId } = await params;
 
     console.log('[API /clientes/[id]/proyecto-interes] GET - Cliente ID:', clienteId);
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      );
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAuth = createServiceRoleClient();
+
+      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[ProyectoInteres] Error de autenticación con token:", authError);
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = authUser;
+      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
+      supabase = createServiceRoleClient();
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      }
+
+      user = sessionUser;
     }
 
-    // Obtener proyectos de interés con información del proyecto
-    const { data: intereses, error } = await supabase
+    // Obtener proyectos de interés usando RPC (bypasea RLS)
+    const { data: interesesRaw, error } = await supabase
       .schema("crm")
-      .from("cliente_propiedad_interes")
-      .select(`
-        id,
-        lote_id,
-        propiedad_id,
-        prioridad,
-        notas,
-        fecha_agregado,
-        lote:lote_id (
-          id,
-          numero_lote,
-          codigo,
-          estado,
-          moneda,
-          precio,
-          proyecto:proyecto_id (
-            id,
-            nombre
-          )
-        )
-      `)
-      .eq("cliente_id", clienteId)
-      .order("fecha_agregado", { ascending: false });
+      .rpc("get_cliente_proyectos_interes", { p_cliente_id: clienteId });
+
+    const intereses = interesesRaw || [];
 
     if (error) {
       console.error("[API] Error obteniendo proyectos de interés:", error);
@@ -86,19 +88,40 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: clienteId } = await params;
 
     console.log('[API /clientes/[id]/proyecto-interes] POST - Cliente ID:', clienteId);
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      );
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAuth = createServiceRoleClient();
+
+      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[ProyectoInteres] Error de autenticación con token:", authError);
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = authUser;
+      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
+      supabase = createServiceRoleClient();
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      }
+
+      user = sessionUser;
     }
 
     // Obtener datos del body
@@ -122,35 +145,33 @@ export async function POST(
 
     const username = perfil?.username || "usuario";
 
-    // Insertar proyecto de interés
+    // Agregar proyecto de interés usando RPC (bypasea RLS)
     const { data: nuevoInteres, error: insertError } = await supabase
       .schema("crm")
-      .from("cliente_propiedad_interes")
-      .insert({
-        cliente_id: clienteId,
-        lote_id: loteId || null,
-        propiedad_id: proyectoId || null,
-        prioridad,
-        notas,
-        agregado_por: username,
-      })
-      .select()
-      .single();
+      .rpc("add_proyecto_interes", {
+        p_cliente_id: clienteId,
+        p_lote_id: loteId || null,
+        p_propiedad_id: proyectoId || null,
+        p_prioridad: prioridad,
+        p_notas: notas || null,
+        p_agregado_por: username,
+      });
 
     if (insertError) {
-      // Si es error de duplicado, ignorar
-      if (insertError.code === '23505') {
-        return NextResponse.json({
-          success: true,
-          message: "Ya existe este interés",
-        });
-      }
-
       console.error("[API] Error agregando proyecto de interés:", insertError);
       return NextResponse.json(
         { error: "Error agregando proyecto de interés" },
         { status: 500 }
       );
+    }
+
+    // Verificar si ya existía
+    if (nuevoInteres?.already_exists) {
+      return NextResponse.json({
+        success: true,
+        message: "Ya existe este interés",
+        proyectoInteres: nuevoInteres,
+      });
     }
 
     return NextResponse.json({
@@ -176,19 +197,40 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: clienteId } = await params;
 
     console.log('[API /clientes/[id]/proyecto-interes] DELETE - Cliente ID:', clienteId);
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      );
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAuth = createServiceRoleClient();
+
+      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[ProyectoInteres] Error de autenticación con token:", authError);
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = authUser;
+      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
+      supabase = createServiceRoleClient();
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      }
+
+      user = sessionUser;
     }
 
     // Obtener ID del proyecto de interés desde query params

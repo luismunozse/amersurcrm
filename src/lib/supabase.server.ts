@@ -76,12 +76,12 @@ export async function createRouteHandlerClient() {
 
 // Cliente de servicio (service role) - USO EXCLUSIVO EN SERVIDOR
 // Permite usar métodos admin como auth.admin.createUser
+// IMPORTANTE: NO especificamos schema para evitar restricciones RLS
 export function createServiceRoleClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
-      db: { schema: "crm" },
       auth: {
         autoRefreshToken: false,
         persistSession: false,

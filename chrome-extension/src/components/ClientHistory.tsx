@@ -72,7 +72,7 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-700 transition"
+        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition"
       >
         <div className="flex items-center gap-3">
           <svg
@@ -88,7 +88,7 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span className="font-semibold text-gray-900">Historial de interacciones</span>
+          <span className="font-semibold text-gray-900 dark:text-white">Historial de interacciones</span>
           {interacciones.length > 0 && (
             <span className="bg-crm-primary text-white text-xs px-2 py-0.5 rounded-full">
               {interacciones.length}
@@ -106,7 +106,7 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
       </button>
 
       {isExpanded && (
-        <div className="border-t border-gray-200">
+        <div className="border-t border-gray-200 dark:border-gray-700">
           {loading && (
             <div className="p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crm-primary mx-auto"></div>
@@ -115,15 +115,15 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
           )}
 
           {error && (
-            <div className="p-4 bg-red-50 border-l-4 border-red-500">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-700">
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
             </div>
           )}
 
           {!loading && !error && interacciones.length === 0 && (
             <div className="p-6 text-center">
               <svg
-                className="w-12 h-12 text-gray-400 mx-auto mb-2"
+                className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-2"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -141,9 +141,9 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
 
           {!loading && !error && interacciones.length > 0 && (
             <div className="max-h-80 overflow-y-auto">
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {interacciones.map((interaccion) => (
-                  <div key={interaccion.id} className="p-4 hover:bg-gray-50">
+                  <div key={interaccion.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
                     <div className="flex gap-3">
                       <div className="flex-shrink-0">
                         <span
@@ -155,9 +155,9 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900">{interaccion.descripcion}</p>
+                        <p className="text-sm text-gray-900 dark:text-gray-100">{interaccion.descripcion}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             {new Date(interaccion.fecha).toLocaleDateString('es-PE', {
                               day: 'numeric',
                               month: 'short',
@@ -165,8 +165,8 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
                               minute: '2-digit',
                             })}
                           </span>
-                          <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-500">{interaccion.usuario}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-600">•</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{interaccion.usuario}</span>
                         </div>
                       </div>
                     </div>
@@ -176,8 +176,8 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
             </div>
           )}
 
-          <div className="p-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
+          <div className="p-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Las interacciones se sincronizan automáticamente desde el CRM
             </p>
           </div>

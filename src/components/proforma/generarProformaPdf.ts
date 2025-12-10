@@ -23,44 +23,44 @@ const COLOR_TEXT = rgb(29 / 255, 41 / 255, 59 / 255);
 
 const CELLS = {
   cliente: {
-    nombre: bounds(103, 358, 411, 396),
-    dni: bounds(103, 396, 411, 434),
-    telefono: bounds(103, 434, 411, 473),
-    email: bounds(103, 473, 411, 512),
+    nombre: bounds(413, 397, 701, 432),
+    dni: bounds(413, 435, 701, 471),
+    telefono: bounds(413, 476, 701, 509),
+    email: bounds(413, 513, 701, 548),
   },
   asesor: {
-    nombre: bounds(704, 358, 1131, 396),
-    celular: bounds(704, 396, 1131, 434),
+    nombre: bounds(995, 397, 1128, 432),
+    celular: bounds(995, 435, 1128, 470),
   },
   terreno: {
-    proyecto: bounds(103, 646, 318, 683),
-    lote: bounds(318, 646, 418, 683),
-    etapa: bounds(418, 646, 828, 683),
-    area: bounds(828, 646, 1009, 683),
-    precioLista: bounds(1009, 646, 1131, 683),
+    proyecto: bounds(105, 649, 316, 682),
+    lote: bounds(321, 649, 416, 682),
+    etapa: bounds(421, 649, 826, 682),
+    area: bounds(831, 649, 1006, 682),
+    precioLista: bounds(1006, 649, 1131, 682),
   },
   precios: {
-    lista: bounds(103, 799, 561, 839),
-    descuento: bounds(103, 839, 561, 878),
-    final: bounds(103, 878, 561, 917),
+    lista: bounds(354, 841, 558, 877),
+    descuento: bounds(354, 881, 558, 915),
+    final: bounds(354, 919, 558, 957),
   },
   formaPago: {
-    separacion: bounds(704, 799, 1131, 839),
-    abonoPrincipal: bounds(704, 839, 1131, 878),
-    cuotas: bounds(704, 878, 1131, 917),
+    separacion: bounds(805, 842, 906, 877),
+    abonoPrincipal: bounds(805, 881, 906, 916),
+    cuotas: bounds(805, 920, 906, 954),
   },
   mediosPago: {
-    soles: bounds(103, 955, 411, 990),
-    dolares: bounds(704, 955, 1131, 990),
+    soles: bounds(618, 1035, 656, 1073),
+    dolares: bounds(618, 1035, 656, 1073),
   },
   firmas: {
-    cliente: bounds(103, 1338, 320, 1387),
-    asesor: bounds(420, 1338, 820, 1387),
+    cliente: bounds(145, 1455, 457, 1501),
+    asesor: bounds(709, 1455, 1022, 1501),
   },
-  comentarios: bounds(103, 1188, 1131, 1265),
-  numeroProforma: bounds(940, 300, 1131, 335),
-  fechaEmision: bounds(940, 330, 1131, 365),
-  cuentas: bounds(103, 1100, 1131, 1180),
+  comentarios: bounds(105, 1260, 1131, 1340),
+  numeroProforma: bounds(1000, 345, 1131, 375),
+  fechaEmision: bounds(1000, 375, 1131, 405),
+  cuentas: bounds(584, 1339, 1129, 1438),
 };
 
 const DEFAULT_DATOS: ProformaDatos = {
@@ -117,13 +117,7 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
       });
     }
   });
-  fillField(fields, "fecha_emision", fechaEmision, () => {
-    drawTextInBounds(page, regularFont, `Emitida el ${fechaEmision}`, CELLS.fechaEmision, {
-      fontSize: 9,
-      paddingPx: 6,
-      maxLines: 1,
-    });
-  });
+  // fecha_emision: no se dibuja manualmente, ya está en el template
 
   fillField(fields, "cliente_nombre", datos.cliente.nombre, () => {
     drawTextInBounds(page, regularFont, textOrDash(datos.cliente.nombre), CELLS.cliente.nombre, {
@@ -211,16 +205,22 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
     drawTextInBounds(page, regularFont, textOrDash(cuotas), CELLS.formaPago.cuotas, { verticalAlign: "center" });
   }
 
-  if (!setFieldText(fields, "medios_soles", datos.mediosPago.soles)) {
-    drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.soles), CELLS.mediosPago.soles, {
-      verticalAlign: "center",
-    });
-  }
-  if (!setFieldText(fields, "medios_dolares", datos.mediosPago.dolares)) {
-    drawTextInBounds(page, regularFont, textOrDash(datos.mediosPago.dolares), CELLS.mediosPago.dolares, {
-      verticalAlign: "center",
-    });
-  }
+  // Etiquetas de medios de pago junto a los checkboxes
+  // Checkbox Soles en x=297, Checkbox Dólares en x=348 (coords PDF)
+  page.drawText("S/.", {
+    x: 283,
+    y: 333,
+    font: regularFont,
+    size: 8,
+    color: COLOR_TEXT,
+  });
+  page.drawText("US$", {
+    x: 368,
+    y: 333,
+    font: regularFont,
+    size: 8,
+    color: COLOR_TEXT,
+  });
 
   // Extraer y configurar cuentas bancarias
   const cuentasBancarias = extraerCuentasBancarias(datos.cuentasEmpresa);
@@ -259,8 +259,7 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
     });
   }
 
-  const nota = `Oferta válida por ${datos.validezDias ?? 3} día(s) hábil(es) desde la fecha de emisión.`;
-  drawText(page, regularFont, nota, px(103), pxY(1275), { fontSize: 8 });
+  // Nota de validez: no se dibuja manualmente, ya está en el template
 
   form.updateFieldAppearances(regularFont);
 

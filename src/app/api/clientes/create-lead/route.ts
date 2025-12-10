@@ -103,26 +103,32 @@ export async function POST(request: NextRequest) {
       pais: "Perú",
     };
 
-    // Crear el lead
+    // Crear el lead directamente sin usar la función problemática
+    // No asignamos vendedor aquí para evitar problemas de tipo UUID
     const { data: nuevoCliente, error: insertError } = await supabaseAdmin
-      .rpc("create_whatsapp_lead", {
-        p_nombre: nombreLead,
-        p_telefono: telefonoLimpio,
-        p_telefono_whatsapp: telefonoLimpio,
-        p_origen_lead: "whatsapp_web",
-        // Enviar NULL para forzar la asignación automática usando la lista de vendedores activos
-        p_vendedor_asignado: null,
-        p_created_by: user.id,
-        p_notas: notas,
-        p_direccion: direccion,
+      .from("cliente")
+      .insert({
+        nombre: nombreLead,
+        tipo_cliente: "persona",
+        telefono: telefonoLimpio,
+        telefono_whatsapp: telefonoLimpio,
+        origen_lead: "whatsapp_web",
+        estado_cliente: "contactado", // Cliente ya contactó via WhatsApp
+        vendedor_asignado: null, // Dejar que el sistema lo asigne o NULL
+        created_by: user.id, // ID del usuario que crea el lead
+        proxima_accion: "Responder mensaje del cliente",
+        notas,
+        direccion,
       })
+      .select("id")
       .single();
 
     if (insertError) {
       console.error("[CreateLead] Error creando lead:", insertError);
+      console.error("[CreateLead] Detalles del error:", JSON.stringify(insertError, null, 2));
 
       const message = String(insertError.message ?? "");
-      if (message.includes("duplicate key value")) {
+      if (message.includes("duplicate key value") || message.includes("duplicate")) {
         return NextResponse.json({
           success: false,
           message: "El cliente ya existe (duplicado)",
@@ -137,36 +143,40 @@ export async function POST(request: NextRequest) {
       throw new Error("No se pudo crear el lead");
     }
 
-    const clienteData = nuevoCliente as { id: string; nombre: string; telefono: string };
+    const clienteData = {
+      id: nuevoCliente.id,
+      nombre: nombreLead,
+      telefono: telefonoLimpio,
+    };
 
-    // Consultar el vendedor asignado para informar a la extensión y dejar trazabilidad
-    const { data: leadDetalle } = await supabaseAdmin
-      .schema("crm")
-      .from("cliente")
-      .select("vendedor_asignado")
-      .eq("id", clienteData.id)
-      .single();
-
-    const vendedorAsignado = leadDetalle?.vendedor_asignado || null;
-
-    console.log(`✅ [CreateLead] Lead creado: ${clienteData.id} | Vendedor asignado: ${vendedorAsignado ?? "sin_vendedor"}`);
+    console.log(`✅ [CreateLead] Lead creado: ${clienteData.id}`);
 
     return NextResponse.json({
       success: true,
       message: "Lead creado exitosamente",
       clienteId: clienteData.id,
       cliente: clienteData,
-      vendedor: vendedorAsignado || undefined,
       existente: false,
     });
 
   } catch (error) {
-    console.error("[CreateLead] Error:", error);
+    console.error("[CreateLead] Error completo:", error);
+    
+    // Log detallado del error
+    if (error instanceof Error) {
+      console.error("[CreateLead] Error message:", error.message);
+      console.error("[CreateLead] Error stack:", error.stack);
+    } else {
+      console.error("[CreateLead] Error object:", JSON.stringify(error, null, 2));
+    }
 
     return NextResponse.json(
       {
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
+        details: process.env.NODE_ENV === 'development' 
+          ? (error instanceof Error ? error.stack : String(error))
+          : undefined,
       },
       { status: 500 }
     );

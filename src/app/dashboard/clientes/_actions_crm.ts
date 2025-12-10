@@ -619,7 +619,7 @@ export async function crearReserva(data: {
       }
 
       // Reservar el lote usando RPC (valida estado y hace la transición de forma segura)
-      const { error: rpcError } = await supabase.rpc('crm.reservar_lote', {
+      const { error: rpcError } = await supabase.rpc('reservar_lote', {
         p_lote: data.loteId
       });
 

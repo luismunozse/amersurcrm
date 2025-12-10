@@ -44,6 +44,12 @@ async function generarNumeroProforma(
 }
 
 export async function crearProformaAction(input: CrearProformaInput): Promise<CrearProformaResult> {
+  console.log("crearProformaAction input:", {
+    tipoOperacion: input.tipoOperacion,
+    loteId: input.loteId,
+    clienteId: input.clienteId,
+  });
+
   try {
     const supabase = await createServerActionClient();
     const {
@@ -92,6 +98,26 @@ export async function crearProformaAction(input: CrearProformaInput): Promise<Cr
       return { success: false, error: "No se pudo guardar la proforma" };
     }
 
+    // Si es tipo reserva y tiene lote, cambiar estado del lote a reservado
+    if (input.tipoOperacion === "reserva" && input.loteId) {
+      console.log("Actualizando lote a reservado:", input.loteId);
+
+      const { data: loteData, error: loteError } = await supabase
+        .schema("crm")
+        .from("lote")
+        .update({ estado: "reservado" })
+        .eq("id", input.loteId)
+        .select("id, estado");
+
+      if (loteError) {
+        console.error("Error actualizando estado del lote:", loteError);
+      } else {
+        console.log("Lote actualizado:", loteData);
+      }
+    } else {
+      console.log("No se actualiza lote. tipoOperacion:", input.tipoOperacion, "loteId:", input.loteId);
+    }
+
     revalidatePath(`/dashboard/clientes/${input.clienteId}`);
 
     return {
@@ -101,6 +127,55 @@ export async function crearProformaAction(input: CrearProformaInput): Promise<Cr
   } catch (error) {
     console.error("crearProformaAction error", error);
     return { success: false, error: "Error inesperado al crear la proforma" };
+  }
+}
+
+export interface EliminarProformaResult {
+  success: boolean;
+  error?: string;
+}
+
+export async function eliminarProformaAction(
+  proformaId: string,
+  clienteId: string
+): Promise<EliminarProformaResult> {
+  try {
+    const supabase = await createServerActionClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Sesión expirada" };
+    }
+
+    // Verificar si es admin
+    const { data: perfil } = await supabase
+      .from("usuario_perfil")
+      .select("rol")
+      .eq("id", user.id)
+      .single();
+
+    if (!perfil || perfil.rol !== "admin") {
+      return { success: false, error: "Solo los administradores pueden eliminar cotizaciones" };
+    }
+
+    const { error } = await supabase
+      .from("proforma")
+      .delete()
+      .eq("id", proformaId);
+
+    if (error) {
+      console.error("eliminarProformaAction error", error);
+      return { success: false, error: "No se pudo eliminar la cotización" };
+    }
+
+    revalidatePath(`/dashboard/clientes/${clienteId}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error("eliminarProformaAction exception", error);
+    return { success: false, error: "Error inesperado al eliminar la cotización" };
   }
 }
 
@@ -147,6 +222,19 @@ export async function actualizarProformaAction(
     if (error || !data) {
       console.error("actualizarProformaAction error", error);
       return { success: false, error: "No se pudo actualizar la proforma" };
+    }
+
+    // Si es tipo reserva y tiene lote, cambiar estado del lote a reservado
+    if (input.tipoOperacion === "reserva" && input.loteId) {
+      const { error: loteError } = await supabase
+        .schema("crm")
+        .from("lote")
+        .update({ estado: "reservado" })
+        .eq("id", input.loteId);
+
+      if (loteError) {
+        console.error("Error actualizando estado del lote:", loteError);
+      }
     }
 
     revalidatePath(`/dashboard/clientes/${input.clienteId}`);

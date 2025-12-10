@@ -69,10 +69,10 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
 
   if (success) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+      <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-800 rounded-full mb-4">
           <svg
-            className="w-8 h-8 text-green-600"
+            className="w-8 h-8 text-green-600 dark:text-green-300"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -85,10 +85,10 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-green-900 mb-2">
+        <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-2">
           ¡Lead creado con éxito!
         </h3>
-        <p className="text-sm text-green-700">
+        <p className="text-sm text-green-700 dark:text-green-200">
           El contacto ha sido registrado en el CRM
         </p>
       </div>
@@ -96,54 +96,54 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         Crear nuevo lead
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Nombre del contacto
           </label>
           <input
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
             placeholder="Nombre del lead"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Teléfono
           </label>
           <input
             type="text"
             value={contact.phone}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
             disabled
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Mensaje inicial (opcional)
           </label>
           <textarea
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
             rows={4}
             placeholder="Primer mensaje del contacto..."
           />
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
+            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
           </div>
         )}
 
@@ -163,8 +163,8 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         </button>
       </form>
 
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <p className="text-xs text-gray-500">
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           El lead será asignado automáticamente a un vendedor disponible
         </p>
       </div>

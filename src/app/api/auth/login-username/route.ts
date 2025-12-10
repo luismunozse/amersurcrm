@@ -17,6 +17,7 @@ interface RolRelacion {
 type RolData = RolRelacion | RolRelacion[] | null;
 
 interface UsuarioConRol {
+  id: string;
   email: string | null;
   activo: boolean | null;
   username: string | null;
@@ -156,10 +157,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar el email asociado al username (o email directamente para compatibilidad)
+    // Buscar el perfil por username (o email para compatibilidad)
     const { data: usuario, error: usuarioError } = await supabase
+      .schema('crm')
       .from('usuario_perfil')
-      .select('email, activo, username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+      .select('id, email, activo, username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
       .or(`username.eq.${identifier},email.eq.${identifier}`)
       .single<UsuarioConRol>();
 
@@ -182,21 +184,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!usuario.email) {
-      await logAttempt(false, "usuario_sin_email");
+    // Obtener el email DIRECTAMENTE de Supabase Auth (no del perfil)
+    // Esto desliga el email del perfil del login
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(usuario.id);
+
+    if (authError || !authUser?.user?.email) {
+      await logAttempt(false, "usuario_auth_no_encontrado");
       return NextResponse.json(
-        { error: "El usuario no tiene un email configurado. Contacta al administrador." },
-        { status: 409 }
+        { error: "Usuario no encontrado en el sistema de autenticación" },
+        { status: 401 }
       );
     }
 
     const rol = usuario.rol;
     const rolNombre = Array.isArray(rol) ? rol[0]?.nombre : rol?.nombre;
 
-    // Retornar el email para que el cliente pueda hacer signInWithPassword
+    // Retornar el email de Auth para que el cliente pueda hacer signInWithPassword
     return NextResponse.json({
       success: true,
-      email: usuario.email,
+      email: authUser.user.email,
       rol: rolNombre
     });
 

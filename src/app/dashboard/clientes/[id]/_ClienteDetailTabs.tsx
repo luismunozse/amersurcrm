@@ -20,6 +20,7 @@ interface Props {
   asesorActual: any | null;
   defaultTab?: ClienteTabType;
   vendedores: Array<{ id: string; username: string; nombre_completo?: string | null; telefono?: string | null; email?: string | null }>;
+  isAdmin?: boolean;
 }
 
 export type ClienteTabType =
@@ -41,6 +42,7 @@ export default function ClienteDetailTabs({
   asesorActual,
   vendedores,
   defaultTab = 'info',
+  isAdmin = false,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ClienteTabType>(defaultTab);
 
@@ -156,6 +158,7 @@ export default function ClienteDetailTabs({
             reservas={reservas}
             ventas={ventas}
             asesorActual={asesorActual}
+            isAdmin={isAdmin}
           />
         )}
       </div>

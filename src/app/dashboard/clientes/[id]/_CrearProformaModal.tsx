@@ -951,43 +951,6 @@ export default function CrearProformaModal({
             </div>
           </div>
 
-          {/* Medios de pago */}
-          <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
-            <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-2">
-              Medios de pago
-            </label>
-            <div className="space-y-3">
-              <FormInput
-                id="cuentaSoles"
-                label="Cuenta en soles"
-                value={form.datos.mediosPago?.soles ?? ""}
-                onChange={(e) =>
-                  updateDatos((prev) => ({
-                    ...prev,
-                    mediosPago: {
-                      ...prev.mediosPago,
-                      soles: e.target.value,
-                    },
-                  }))
-                }
-              />
-              <FormInput
-                id="cuentaDolares"
-                label="Cuenta en dólares"
-                value={form.datos.mediosPago?.dolares ?? ""}
-                onChange={(e) =>
-                  updateDatos((prev) => ({
-                    ...prev,
-                    mediosPago: {
-                      ...prev.mediosPago,
-                      dolares: e.target.value,
-                    },
-                  }))
-                }
-              />
-            </div>
-          </div>
-
           {/* Cuentas y comentarios */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-crm-background rounded-xl border border-crm-border">

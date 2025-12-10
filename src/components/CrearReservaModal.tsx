@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { crearReserva } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, type Moneda } from "@/lib/types/crm-flujo";
@@ -45,6 +46,7 @@ export default function CrearReservaModal({
   loteId,
   loteNombre,
 }: Props) {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
@@ -225,6 +227,7 @@ export default function CrearReservaModal({
         toast.success(`Reserva ${result.data?.codigo_reserva} creada exitosamente`);
         resetForm();
         onClose();
+        router.refresh();
       } else {
         toast.error(result.error || "Error al crear reserva");
       }

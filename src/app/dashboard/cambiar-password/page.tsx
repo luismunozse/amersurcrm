@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Check, X } from "lucide-react";
+import { Check, X, Eye, EyeOff } from "lucide-react";
 
 export default function CambiarPasswordPage() {
   const router = useRouter();
@@ -12,6 +12,10 @@ export default function CambiarPasswordPage() {
   const [passwordActual, setPasswordActual] = useState("");
   const [passwordNueva, setPasswordNueva] = useState("");
   const [passwordConfirmar, setPasswordConfirmar] = useState("");
+
+  const [showPasswordActual, setShowPasswordActual] = useState(false);
+  const [showPasswordNueva, setShowPasswordNueva] = useState(false);
+  const [showPasswordConfirmar, setShowPasswordConfirmar] = useState(false);
 
   // Validación de requisitos de contraseña
   const requisitos = {
@@ -66,7 +70,7 @@ export default function CambiarPasswordPage() {
 
     startTransition(async () => {
       try {
-        const response = await fetch("/api/auth/cambiar-password", {
+        const response = await fetch("/api/perfil/cambiar-password", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -124,15 +128,24 @@ export default function CambiarPasswordPage() {
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Contraseña Actual
                 </label>
-                <input
-                  type="password"
-                  value={passwordActual}
-                  onChange={(e) => setPasswordActual(e.target.value)}
-                  placeholder="Ingresa tu contraseña actual"
-                  disabled={isPending}
-                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswordActual ? "text" : "password"}
+                    value={passwordActual}
+                    onChange={(e) => setPasswordActual(e.target.value)}
+                    placeholder="Ingresa tu contraseña actual"
+                    disabled={isPending}
+                    className="w-full px-4 py-2.5 pr-12 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordActual(!showPasswordActual)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary transition-colors"
+                  >
+                    {showPasswordActual ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
 
               {/* Nueva Contraseña */}
@@ -140,15 +153,24 @@ export default function CambiarPasswordPage() {
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Nueva Contraseña
                 </label>
-                <input
-                  type="password"
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  placeholder="Ingresa tu nueva contraseña"
-                  disabled={isPending}
-                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswordNueva ? "text" : "password"}
+                    value={passwordNueva}
+                    onChange={(e) => setPasswordNueva(e.target.value)}
+                    placeholder="Ingresa tu nueva contraseña"
+                    disabled={isPending}
+                    className="w-full px-4 py-2.5 pr-12 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordNueva(!showPasswordNueva)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary transition-colors"
+                  >
+                    {showPasswordNueva ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
 
               {/* Confirmar Nueva Contraseña */}
@@ -156,15 +178,24 @@ export default function CambiarPasswordPage() {
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Confirmar Nueva Contraseña
                 </label>
-                <input
-                  type="password"
-                  value={passwordConfirmar}
-                  onChange={(e) => setPasswordConfirmar(e.target.value)}
-                  placeholder="Confirma tu nueva contraseña"
-                  disabled={isPending}
-                  className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswordConfirmar ? "text" : "password"}
+                    value={passwordConfirmar}
+                    onChange={(e) => setPasswordConfirmar(e.target.value)}
+                    placeholder="Confirma tu nueva contraseña"
+                    disabled={isPending}
+                    className="w-full px-4 py-2.5 pr-12 border border-crm-border rounded-lg bg-crm-card dark:bg-crm-sidebar text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent disabled:opacity-50"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordConfirmar(!showPasswordConfirmar)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary transition-colors"
+                  >
+                    {showPasswordConfirmar ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 {passwordConfirmar.length > 0 && (
                   <div className="mt-2 flex items-center gap-2">
                     {passwordsCoinciden ? (

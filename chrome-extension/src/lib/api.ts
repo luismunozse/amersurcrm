@@ -308,6 +308,19 @@ export class CRMApiClient {
   }
 
   /**
+   * Obtener lotes disponibles de un proyecto
+   */
+  async getLotes(proyectoId: string): Promise<any[]> {
+    try {
+      const response = await this.request<{ lotes: any[] }>(`/api/proyectos/${proyectoId}/lotes`);
+      return response.lotes || [];
+    } catch (error) {
+      console.error('[CRMApiClient] Error obteniendo lotes:', error);
+      return [];
+    }
+  }
+
+  /**
    * Obtener proyectos de interés de un cliente
    */
   async getProyectosInteres(clienteId: string): Promise<any[]> {
@@ -323,13 +336,13 @@ export class CRMApiClient {
   }
 
   /**
-   * Agregar proyecto de interés para un cliente
+   * Agregar lote de interés para un cliente
    */
-  async addProyectoInteres(clienteId: string, proyectoId: string, notas?: string): Promise<any> {
+  async addProyectoInteres(clienteId: string, loteId: string, notas?: string): Promise<any> {
     return this.request(`/api/clientes/${clienteId}/proyecto-interes`, {
       method: 'POST',
       body: JSON.stringify({
-        loteId: proyectoId, // Por ahora usamos loteId genérico
+        loteId: loteId,
         notas,
       }),
     });

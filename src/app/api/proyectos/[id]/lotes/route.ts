@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 
+export const dynamic = "force-dynamic";
+
 /**
- * GET /api/proyectos/list
+ * GET /api/proyectos/[id]/lotes
  *
- * Obtiene lista de proyectos activos
+ * Obtiene lista de lotes disponibles de un proyecto específico
  */
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id: proyectoId } = await params;
+
+    console.log('[API /proyectos/[id]/lotes] GET - Proyecto ID:', proyectoId);
+
     // Intentar obtener el token del header Authorization (para extensión)
     const authHeader = request.headers.get("authorization");
     let supabase;
@@ -21,7 +30,7 @@ export async function GET(request: NextRequest) {
 
       const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
 
-      console.log('[API /proyectos/list] User (token):', authUser?.id, 'Error:', authError);
+      console.log('[API /proyectos/[id]/lotes] User (token):', authUser?.id, 'Error:', authError);
 
       if (authError || !authUser) {
         return NextResponse.json(
@@ -38,7 +47,7 @@ export async function GET(request: NextRequest) {
       supabase = await createClient();
       const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
 
-      console.log('[API /proyectos/list] User (session):', sessionUser?.id, 'Error:', authError);
+      console.log('[API /proyectos/[id]/lotes] User (session):', sessionUser?.id, 'Error:', authError);
 
       if (authError || !sessionUser) {
         return NextResponse.json(
@@ -50,25 +59,27 @@ export async function GET(request: NextRequest) {
       user = sessionUser;
     }
 
-    // Obtener proyectos activos usando RPC (bypasea RLS)
-    const { data: proyectos, error } = await supabase
+    // Obtener lotes del proyecto usando RPC (bypasea RLS)
+    const { data: lotes, error } = await supabase
       .schema("crm")
-      .rpc("get_proyectos_activos");
+      .rpc("get_lotes_by_proyecto_v2", { p_proyecto_id: proyectoId });
 
     if (error) {
-      console.error("[API] Error obteniendo proyectos:", error);
+      console.error("[API] Error obteniendo lotes:", error);
       return NextResponse.json(
-        { error: "Error obteniendo proyectos" },
+        { error: "Error obteniendo lotes" },
         { status: 500 }
       );
     }
 
+    console.log(`[API /proyectos/[id]/lotes] Found ${lotes?.length || 0} lotes for proyecto ${proyectoId}`);
+
     return NextResponse.json({
       success: true,
-      proyectos: proyectos || [],
+      lotes: lotes || [],
     });
   } catch (error) {
-    console.error("[API] Error en /api/proyectos/list:", error);
+    console.error("[API] Error en /api/proyectos/[id]/lotes:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
       { status: 500 }

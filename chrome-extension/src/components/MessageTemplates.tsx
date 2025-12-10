@@ -94,7 +94,7 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-700 transition"
+        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition"
       >
         <div className="flex items-center gap-3">
           <svg
@@ -110,7 +110,7 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
               d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
             />
           </svg>
-          <span className="font-semibold text-gray-900">Plantillas de mensajes</span>
+          <span className="font-semibold text-gray-900 dark:text-white">Plantillas de mensajes</span>
         </div>
         <svg
           className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -123,9 +123,9 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
       </button>
 
       {isExpanded && (
-        <div className="border-t border-gray-200">
+        <div className="border-t border-gray-200 dark:border-gray-700">
           {/* Filtros por categoría */}
-          <div className="p-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200">
+          <div className="p-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
             <div className="flex flex-wrap gap-2">
               {categorias.map((cat) => (
                 <button
@@ -134,7 +134,7 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
                   className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                     selectedCategoria === cat.value
                       ? 'bg-crm-primary text-white'
-                      : 'bg-white text-gray-700 dark:text-gray-300 hover:bg-gray-100'
+                      : 'bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-500'
                   }`}
                 >
                   {cat.icon} {cat.label}
@@ -150,16 +150,16 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
                 No hay plantillas en esta categoría
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredTemplates.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => handleSelectTemplate(template)}
-                    className="w-full p-4 text-left hover:bg-blue-50 transition group"
+                    className="w-full p-4 text-left hover:bg-blue-50 dark:hover:bg-gray-700 transition group"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
-                        <h4 className="text-sm font-medium text-gray-900 group-hover:text-crm-primary transition">
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-crm-primary dark:group-hover:text-crm-secondary transition">
                           {template.titulo}
                         </h4>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
@@ -187,8 +187,8 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
           </div>
 
           {/* Footer con tip */}
-          <div className="p-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
+          <div className="p-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               💡 Tip: Las plantillas se copiarán directamente. Puedes editarlas antes de enviar.
             </p>
           </div>

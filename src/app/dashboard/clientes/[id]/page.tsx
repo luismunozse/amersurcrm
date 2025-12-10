@@ -1,4 +1,4 @@
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { PERMISOS } from "@/lib/permissions";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { redirect, notFound } from "next/navigation";
@@ -133,20 +133,46 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     };
   });
 
-  // Obtener reservas
-  const { data: reservas } = await supabase
+  // Obtener reservas usando service role para bypass RLS
+  // (Las políticas RLS de reserva requieren permisos específicos)
+  const serviceClient = createServiceRoleClient();
+  const { data: reservasRaw, error: reservasError } = await serviceClient
+    .schema('crm')
     .from('reserva')
-    .select(`
-      *,
-      lote:lote!lote_id(
-        id,
-        codigo,
-        proyecto:proyecto!proyecto_id(nombre)
-      ),
-      vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
-    `)
+    .select('*')
     .eq('cliente_id', id)
     .order('created_at', { ascending: false });
+
+  // Enriquecer reservas con datos de lote/proyecto/vendedor
+  let reservas: any[] = [];
+  if (reservasRaw && reservasRaw.length > 0) {
+    const loteIds = reservasRaw.map(r => r.lote_id).filter(Boolean);
+    const { data: lotes } = loteIds.length > 0
+      ? await serviceClient.schema('crm').from('lote').select('id, codigo, proyecto_id').in('id', loteIds)
+      : { data: [] };
+
+    const proyectoIds = (lotes || []).map(l => l.proyecto_id).filter(Boolean);
+    const { data: proyectos } = proyectoIds.length > 0
+      ? await serviceClient.schema('crm').from('proyecto').select('id, nombre').in('id', proyectoIds)
+      : { data: [] };
+
+    const vendedorUsernames = reservasRaw.map(r => r.vendedor_username).filter(Boolean);
+    const { data: vendedoresReserva } = vendedorUsernames.length > 0
+      ? await serviceClient.schema('crm').from('usuario_perfil').select('username, nombre_completo').in('username', vendedorUsernames)
+      : { data: [] };
+
+    reservas = reservasRaw.map(r => {
+      const lote = (lotes || []).find(l => l.id === r.lote_id);
+      const proyecto = lote ? (proyectos || []).find(p => p.id === lote.proyecto_id) : null;
+      const vendedor = (vendedoresReserva || []).find(v => v.username === r.vendedor_username);
+
+      return {
+        ...r,
+        lote: lote ? { ...lote, proyecto: proyecto || null } : null,
+        vendedor: vendedor || null
+      };
+    });
+  }
 
   // Obtener ventas y pagos
   const { data: ventas } = await supabase
@@ -262,6 +288,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           asesorActual={asesorActual || null}
           vendedores={vendedores || []}
           defaultTab={defaultTab}
+          isAdmin={usuarioActual.rol === "ROL_ADMIN"}
         />
       </div>
     </div>

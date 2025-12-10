@@ -51,7 +51,7 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-700 transition"
+        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition"
       >
         <div className="flex items-center gap-3">
           <svg
@@ -68,7 +68,7 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
             />
           </svg>
           <div className="flex-1 text-left">
-            <span className="font-semibold text-gray-900 block">Cambiar estado</span>
+            <span className="font-semibold text-gray-900 dark:text-white block">Cambiar estado</span>
             {currentEstado && (
               <span className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${currentEstado.color}`}>
                 {currentEstado.icon} {currentEstado.label}
@@ -102,12 +102,12 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
                     disabled={updating || estado.value === cliente.estado_cliente}
                     className={`p-3 rounded-lg border-2 text-left transition ${
                       estado.value === cliente.estado_cliente
-                        ? 'border-crm-primary bg-blue-50'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-crm-primary hover:bg-gray-50'
+                        ? 'border-crm-primary bg-blue-50 dark:bg-blue-900/30'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-crm-primary hover:bg-gray-50 dark:hover:bg-gray-700'
                     } ${updating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="text-lg mb-1">{estado.icon}</div>
-                    <div className="text-xs font-medium text-gray-900">{estado.label}</div>
+                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">{estado.label}</div>
                   </button>
                 ))}
               </div>
@@ -122,14 +122,14 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
                 value={nota}
                 onChange={(e) => setNota(e.target.value)}
                 placeholder="Ej: Cliente interesado en terreno Villa Sol, solicita visita..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
                 rows={3}
               />
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                <p className="text-sm text-red-800">{error}</p>
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
+                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
               </div>
             )}
 
@@ -141,8 +141,8 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
             )}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Los cambios se reflejarán inmediatamente en el CRM
             </p>
           </div>

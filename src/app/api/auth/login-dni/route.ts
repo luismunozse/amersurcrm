@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
 
     // Buscar perfil por DNI (solo para validar que existe y es vendedor activo)
     const { data: perfil, error: perfilError } = await supabase
+      .schema('crm')
       .from("usuario_perfil")
       .select(
         `id, rol:rol!usuario_perfil_rol_id_fkey(nombre)`

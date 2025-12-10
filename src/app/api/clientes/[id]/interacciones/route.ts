@@ -14,26 +14,44 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: clienteId } = await params;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Intentar obtener el token del header Authorization (para extensión)
+    const authHeader = request.headers.get("authorization");
+    let supabase;
+    let user;
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      );
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token desde header (extensión de Chrome)
+      const token = authHeader.substring(7);
+      const supabaseAuth = createServiceRoleClient();
+
+      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+      if (authError || !authUser) {
+        console.error("[Interacciones] Error de autenticación con token:", authError);
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+
+      user = authUser;
+      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
+      supabase = createServiceRoleClient();
+    } else {
+      // Token desde cookies (sesión web normal)
+      supabase = await createServerOnlyClient();
+      const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      }
+
+      user = sessionUser;
     }
 
-    // Obtener interacciones del cliente ordenadas por fecha (más recientes primero)
+    // Obtener interacciones del cliente usando RPC (bypasea RLS)
     const { data: interacciones, error } = await supabase
-      .from("cliente_interaccion")
-      .select("*")
-      .eq("cliente_id", clienteId)
-      .order("fecha_interaccion", { ascending: false })
-      .limit(50); // Limitar a las últimas 50 interacciones
+      .schema("crm")
+      .rpc("get_cliente_interacciones", { p_cliente_id: clienteId });
 
     if (error) {
       console.error("[API] Error obteniendo interacciones:", error);
@@ -90,9 +108,9 @@ export async function POST(
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome)
       const token = authHeader.substring(7);
-      const supabaseAdmin = createServiceRoleClient();
+      const supabaseAuth = createServiceRoleClient();
 
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
 
       if (authError || !authUser) {
         console.error("[CreateInteraccion] Error de autenticación con token:", authError);
@@ -100,7 +118,8 @@ export async function POST(
       }
 
       user = authUser;
-      supabase = supabaseAdmin;
+      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
+      supabase = createServiceRoleClient();
     } else {
       // Token desde cookies (sesión web normal)
       supabase = await createServerOnlyClient();
@@ -137,7 +156,7 @@ export async function POST(
     // Crear interacción
     const { data: interaccion, error } = await supabase
       .schema("crm")
-      .from("interaccion")
+      .from("cliente_interaccion")
       .insert({
         cliente_id: clienteId,
         tipo,
@@ -145,7 +164,6 @@ export async function POST(
         vendedor_id: user.id,
         vendedor_username: vendedorUsername,
         fecha_interaccion: new Date().toISOString(),
-        medio: direccion === 'enviado' ? 'whatsapp_enviado' : 'whatsapp_recibido',
         resultado: direccion === 'enviado' ? 'enviado' : 'recibido',
       })
       .select()

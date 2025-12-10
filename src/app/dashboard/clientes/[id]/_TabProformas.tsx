@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Download, FilePlus2, FileText, PenSquare } from "lucide-react";
+import { Download, FilePlus2, FileText, PenSquare, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import type { ProformaRecord } from "@/types/proforma";
 import CrearProformaModal from "./_CrearProformaModal";
 import { generarProformaPdf } from "@/components/proforma/generarProformaPdf";
+import { eliminarProformaAction } from "./proformas/_actions";
 import { useSearchParams } from "next/navigation";
 
 interface TabProformasProps {
@@ -15,6 +16,7 @@ interface TabProformasProps {
   reservas: any[];
   ventas: any[];
   asesorActual: any | null;
+  isAdmin?: boolean;
 }
 
 function formatearFecha(fecha: string) {
@@ -49,12 +51,14 @@ export default function TabProformas({
   reservas,
   ventas,
   asesorActual,
+  isAdmin = false,
 }: TabProformasProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [proformaSeleccionada, setProformaSeleccionada] = useState<ProformaRecord | null>(null);
   const [isGenerating, startTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const proformasOrdenadas = useMemo(
     () =>
@@ -74,6 +78,28 @@ export default function TabProformas({
         toast.error("No se pudo generar la proforma");
       }
     });
+  };
+
+  const handleEliminar = async (proforma: ProformaRecord) => {
+    if (!confirm(`¿Estás seguro de eliminar la cotización ${proforma.numero || ""}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    setIsDeleting(proforma.id);
+    try {
+      const result = await eliminarProformaAction(proforma.id, cliente.id);
+      if (result.success) {
+        toast.success("Cotización eliminada");
+        router.refresh();
+      } else {
+        toast.error(result.error || "No se pudo eliminar");
+      }
+    } catch (error) {
+      console.error("Error eliminando cotización", error);
+      toast.error("Error al eliminar la cotización");
+    } finally {
+      setIsDeleting(null);
+    }
   };
 
   useEffect(() => {
@@ -192,6 +218,16 @@ export default function TabProformas({
                       <Download className="w-4 h-4" />
                       Descargar
                     </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleEliminar(proforma)}
+                        disabled={isDeleting === proforma.id}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors disabled:opacity-60"
+                        title="Eliminar cotización"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
