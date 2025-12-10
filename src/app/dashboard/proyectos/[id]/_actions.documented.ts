@@ -12,7 +12,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { obtenerPerfilUsuario } from "@/lib/auth/roles";
-import type { ProyectoActionResponse, LoteActionResponse } from "@/types/proyectos";
+import type { ProyectoActionResponse as _ProyectoActionResponse, LoteActionResponse as _LoteActionResponse } from "@/types/proyectos";
 
 // ============================================================================
 // PLANOS (BLUEPRINTS) MANAGEMENT
@@ -361,8 +361,8 @@ export async function crearLote(
  * - Revalidates project detail page cache
  */
 export async function actualizarLote(
-  loteId: string,
-  fd: FormData
+  _loteId: string,
+  _fd: FormData
 ): Promise<{ success: boolean }> {
   // Implementation continues...
   // (Same as original but with JSDoc added)
@@ -415,8 +415,8 @@ export async function actualizarLote(
  * - Revalidates project pages
  */
 export async function guardarCoordenadasLote(
-  loteId: string,
-  coordenadas: { type: 'polygon'; coordinates: number[][][] }
+  _loteId: string,
+  _coordenadas: { type: 'polygon'; coordinates: number[][][] }
 ): Promise<{ success: boolean; lote?: any }> {
   // Implementation...
   return { success: true };
@@ -461,7 +461,7 @@ export async function guardarCoordenadasLote(
  * - Revalidates project pages
  */
 export async function actualizarCoordenadasBatch(
-  updates: Array<{
+  _updates: Array<{
     lote_id: string;
     coordenadas: { type: 'polygon'; coordinates: number[][][] };
   }>
@@ -518,7 +518,7 @@ export async function actualizarCoordenadasBatch(
  * - Revalidates multiple pages
  */
 export async function crearReserva(
-  fd: FormData
+  _fd: FormData
 ): Promise<{ success: boolean; reserva: any; proforma?: any }> {
   // Implementation...
   return { success: true, reserva: {} };
@@ -550,8 +550,8 @@ export async function crearReserva(
  * - Revalidates pages
  */
 export async function cancelarReserva(
-  reservaId: string,
-  motivo: string
+  _reservaId: string,
+  _motivo: string
 ): Promise<{ success: boolean }> {
   // Implementation...
   return { success: true };

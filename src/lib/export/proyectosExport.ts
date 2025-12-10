@@ -330,8 +330,8 @@ export function exportProyectoStats(proyecto: Proyecto, lotes: Lote[]): void {
  * Prepares data for export based on filters
  */
 export async function prepareExportData(
-  proyectoId?: string,
-  includeStats: boolean = true
+  _proyectoId?: string,
+  _includeStats: boolean = true
 ): Promise<ExportData> {
   // This would typically fetch data from the server
   // For now, return a structure that can be filled by the calling code

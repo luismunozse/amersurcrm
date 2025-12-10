@@ -11,7 +11,7 @@ interface ValidationErrors {
 export function useProformaValidation() {
   const [errors, setErrors] = useState<ValidationErrors>({});
 
-  const validateForm = useCallback((datos: ProformaDatos, precioFinal: number): boolean => {
+  const validateForm = useCallback((datos: ProformaDatos, _precioFinal: number): boolean => {
     const newErrors: ValidationErrors = {};
 
     // Validar nombre del cliente (obligatorio)

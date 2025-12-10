@@ -136,7 +136,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
   // Obtener reservas usando service role para bypass RLS
   // (Las políticas RLS de reserva requieren permisos específicos)
   const serviceClient = createServiceRoleClient();
-  const { data: reservasRaw, error: reservasError } = await serviceClient
+  const { data: reservasRaw, error: _reservasError } = await serviceClient
     .schema('crm')
     .from('reserva')
     .select('*')

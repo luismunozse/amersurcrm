@@ -219,7 +219,7 @@ export async function actualizarLote(loteId: string, fd: FormData) {
       throw new Error("Estado destino no permitido");
     }
 
-    const { data: ok, error: rpcError } = await supabase.rpc(rpcName as any, { p_lote: loteId });
+    const { data: _ok, error: rpcError } = await supabase.rpc(rpcName as any, { p_lote: loteId });
     if (rpcError) {
       throw new Error(`No se pudo cambiar el estado: ${rpcError.message}`);
     }

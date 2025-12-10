@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import type {
   Lote,
   LoteFormData,
-  LoteActionResponse,
+  LoteActionResponse as _LoteActionResponse,
   LoteCoordenadas,
 } from '@/types/proyectos';
 import { loteFormSchema, loteCoordinatesSchema, validateWithSchema, getZodErrorMessages } from '@/lib/validations/proyectos';

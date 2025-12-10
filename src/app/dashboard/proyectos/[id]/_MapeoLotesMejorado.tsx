@@ -29,7 +29,7 @@ import {
 } from './_actions';
 import type { OverlayLayerConfig } from '@/types/overlay-layers';
 
-interface LatLngLiteral {
+interface _LatLngLiteral {
   lat: number;
   lng: number;
 }
@@ -776,7 +776,7 @@ export default function MapeoLotesMejorado({
     await upsertLotePin(loteId, lat, lng, false);
   }, [upsertLotePin]);
 
-  const handleLoteDragStart = useCallback((event: DragEvent, loteId: string) => {
+  const _handleLoteDragStart = useCallback((event: DragEvent, loteId: string) => {
     if (!primaryOverlay?.url) {
       toast.error('Primero sube la capa principal del plano');
       event.preventDefault();
@@ -792,7 +792,7 @@ export default function MapeoLotesMejorado({
     }
   }, [primaryOverlay?.url]);
 
-  const handleLoteDragEnd = useCallback(() => {
+  const _handleLoteDragEnd = useCallback(() => {
     setDraggingLoteId(null);
   }, []);
 
@@ -807,7 +807,7 @@ export default function MapeoLotesMejorado({
     setSelectedLoteId(loteId);
   }, []);
 
-  const handleLotePolygonComplete = useCallback(async (vertices: [number, number][]) => {
+  const _handleLotePolygonComplete = useCallback(async (vertices: [number, number][]) => {
     if (!drawingLoteId) return;
 
     setSavingLotePolygon(true);

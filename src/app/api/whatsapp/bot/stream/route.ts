@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
         try {
           const data = `data: ${JSON.stringify(state)}\n\n`;
           controller.enqueue(encoder.encode(data));
-        } catch (error) {
-          console.error('[WhatsAppBotStream] Error enviando estado:', error);
+        } catch {
+          console.error('[WhatsAppBotStream] Error enviando estado');
         }
       };
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       const heartbeat = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(': heartbeat\n\n'));
-        } catch (error) {
+        } catch {
           clearInterval(heartbeat);
         }
       }, 30000);
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         removeStateListener(listener);
         try {
           controller.close();
-        } catch (error) {
+        } catch {
           // Ya cerrado
         }
       });

@@ -28,7 +28,7 @@ export default function PhoneNormalizationTool({ clientes, onUpdate }: PhoneNorm
     errors: number;
   } | null>(null);
 
-  function normalizePhoneNumber(phone: string | null): string | null {
+  function _normalizePhoneNumber(phone: string | null): string | null {
     if (!phone) return null;
     
     // Si ya tiene código de país, devolverlo tal como está

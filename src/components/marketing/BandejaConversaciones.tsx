@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MessageSquare, User, Clock, CheckCircle, Archive, Send } from "lucide-react";
-import { obtenerConversaciones, asignarVendedorConversacion } from "@/app/dashboard/admin/marketing/_actions";
+import { obtenerConversaciones, asignarVendedorConversacion as _asignarVendedorConversacion } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingConversacion } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
 

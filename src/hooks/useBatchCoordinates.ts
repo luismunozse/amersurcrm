@@ -8,7 +8,7 @@
 import { useState, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import type { LoteCoordenadas, BatchCoordinateUpdate } from '@/types/proyectos';
+import type { LoteCoordenadas as _LoteCoordenadas, BatchCoordinateUpdate } from '@/types/proyectos';
 import { batchCoordinatesSchema, validateWithSchema, getZodErrorMessages } from '@/lib/validations/proyectos';
 
 interface UseBatchCoordinatesOptions {
@@ -36,7 +36,7 @@ interface UseBatchCoordinatesReturn {
  * Hook for managing batch coordinate updates
  */
 export function useBatchCoordinates(options: UseBatchCoordinatesOptions): UseBatchCoordinatesReturn {
-  const { proyectoId, onSuccess, onError, onProgress } = options;
+  const { proyectoId: _proyectoId, onSuccess, onError, onProgress } = options;
   const [isPending, startTransition] = useTransition();
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [isCancelled, setIsCancelled] = useState(false);

@@ -108,7 +108,7 @@ const DireccionSchema = z.object({
   }).optional()
 });
 
-const ClienteSchema = z.object({
+const _ClienteSchema = z.object({
   id: z.string().uuid(),
   nombre: z.string().min(1, "Nombre requerido"),
   email: z.string().email().optional().or(z.literal("")),

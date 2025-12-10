@@ -354,7 +354,7 @@ export async function obtenerReporteVentas(
     }
 
     // Ventas totales
-    const { data: ventasTotales } = await supabase
+    const { data: _ventasTotales } = await supabase
       .schema('crm')
       .from('venta')
       .select('precio_total, moneda');

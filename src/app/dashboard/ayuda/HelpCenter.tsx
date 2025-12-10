@@ -283,14 +283,14 @@ export default function HelpCenter({
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      h2: ({ node, ...props }) => (
+                      h2: ({ node: _node, ...props }) => (
                         <h2 className="flex items-center gap-3 group" {...props}>
                           <span className="inline-block w-1 h-6 bg-crm-primary rounded-full" />
                           {props.children}
                         </h2>
                       ),
                       // Checkmarks mejorados
-                      li: ({ node, children, ...props }) => {
+                      li: ({ node: _node, children, ...props }) => {
                         const content = String(children);
                         if (content.startsWith('✅') || content.startsWith('✓')) {
                           return (

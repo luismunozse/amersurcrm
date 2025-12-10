@@ -20,7 +20,7 @@ type DriveStep = {
   };
 };
 
-type DriverConfig = {
+type _DriverConfig = {
   showProgress?: boolean;
   showButtons?: string[];
   steps: DriveStep[];

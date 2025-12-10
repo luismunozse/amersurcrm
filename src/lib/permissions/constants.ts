@@ -54,6 +54,7 @@ export const PERMISOS = {
     RECHAZAR: 'reservas.rechazar' as const,
     CANCELAR: 'reservas.cancelar' as const,
     CANCELAR_PROPIAS: 'reservas.cancelar_propias' as const,
+    ELIMINAR: 'reservas.eliminar' as const,
   },
 
   // ========== VENTAS ==========

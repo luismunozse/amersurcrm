@@ -72,7 +72,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     if (typeof data === 'string') {
       try {
         return JSON.parse(data);
-      } catch (e) {
+      } catch {
         return null;
       }
     }
@@ -129,7 +129,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     }
   };
 
-  const formatPrecio = (precio: number | null, moneda: string | null) => {
+  const formatPrecio = (precio: number | null, _moneda: string | null) => {
     if (!precio) return 'No especificado';
     const formatter = new Intl.NumberFormat('es-PE', {
       style: 'currency',
@@ -730,7 +730,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
             estado: (payload.estado as any) ?? it.estado,
           } : it));
           return true;
-        } catch (e) {
+        } catch {
           toast.error('No se pudo actualizar');
           return false;
         }

@@ -12,7 +12,7 @@ interface SimpleModalProps {
 }
 
 export default function SimpleModal({ isOpen, onClose, cliente }: SimpleModalProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  const [_isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     if (isOpen) {

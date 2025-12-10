@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
     // Intentar obtener el token del header Authorization (para extensión)
     const authHeader = request.headers.get("authorization");
     let supabase;
-    let user;
 
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome)
@@ -30,7 +29,6 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      user = authUser;
       // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
       supabase = createServiceRoleClient();
     } else {
@@ -46,8 +44,6 @@ export async function GET(request: NextRequest) {
           { status: 401 }
         );
       }
-
-      user = sessionUser;
     }
 
     // Obtener proyectos activos usando RPC (bypasea RLS)

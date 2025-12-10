@@ -20,7 +20,6 @@ import {
 } from "./proformas/_actions";
 import { buildProformaPdf } from "@/components/proforma/generarProformaPdf";
 import { FormInput } from "@/components/form/FormInput";
-import { FormSelect } from "@/components/form/FormSelect";
 import { FormTextarea } from "@/components/form/FormTextarea";
 import { LoadingButton } from "@/components/form/LoadingButton";
 import { useProformaValidation } from "./proformas/useProformaValidation";
@@ -109,7 +108,6 @@ export default function CrearProformaModal({
   const [lotes, setLotes] = useState<any[]>([]);
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>("");
   const [loadingProyectos, setLoadingProyectos] = useState(false);
-  const [loadingLotes, setLoadingLotes] = useState(false);
 
   useEffect(() => {
     setMounted(true);

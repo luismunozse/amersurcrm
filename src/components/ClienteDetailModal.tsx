@@ -35,7 +35,7 @@ interface ClienteDetailModalProps {
 }
 
 export default function ClienteDetailModal({ isOpen, onClose, cliente }: ClienteDetailModalProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  const [_isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     if (isOpen) {

@@ -13,7 +13,7 @@ interface Props {
   currentEmail: string;
 }
 
-export default function EditarPerfilForm({ perfil, isAdmin = false, currentEmail }: Props) {
+export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, currentEmail }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 

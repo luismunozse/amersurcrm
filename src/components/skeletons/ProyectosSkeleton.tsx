@@ -409,7 +409,7 @@ export function TimelineSkeleton({ items = 5 }: { items?: number }) {
 /**
  * All skeleton components exported as a namespace
  */
-export default {
+const ProyectosSkeleton = {
   Box: SkeletonBox,
   Text: SkeletonText,
   Circle: SkeletonCircle,
@@ -425,3 +425,5 @@ export default {
   Chart: ChartSkeleton,
   Timeline: TimelineSkeleton,
 };
+
+export default ProyectosSkeleton;

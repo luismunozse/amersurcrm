@@ -107,7 +107,7 @@ export async function buildProformaPdf(proforma: ProformaPdfInput): Promise<Prof
   const fields = collectTextFields(form);
   const datos = mergeDatos(DEFAULT_DATOS, proforma.datos);
 
-  const fechaEmision = formatFecha(proforma.created_at ?? proforma.updated_at ?? new Date());
+  const _fechaEmision = formatFecha(proforma.created_at ?? proforma.updated_at ?? new Date());
   fillField(fields, "numero_proforma", proforma.numero ?? "", () => {
     if (proforma.numero) {
       drawTextInBounds(page, regularFont, `N° ${proforma.numero}`, CELLS.numeroProforma, {
@@ -290,7 +290,7 @@ function px(value: number) {
   return value * SCALE;
 }
 
-function pxY(pixelY: number) {
+function _pxY(pixelY: number) {
   return PAGE_HEIGHT - pixelY * SCALE;
 }
 
@@ -377,7 +377,7 @@ function drawParagraph(
   });
 }
 
-function drawText(
+function _drawText(
   page: PDFPage,
   font: PDFFont,
   text: string,

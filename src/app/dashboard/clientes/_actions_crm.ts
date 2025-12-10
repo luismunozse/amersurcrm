@@ -268,7 +268,7 @@ export async function obtenerInteracciones(
     const limit = options?.limit ?? 100;
 
     // Obtener interacciones sin el join problemático
-    let { data, error } = await supabase
+    const { data: rawData, error } = await supabase
       .from('cliente_interaccion')
       .select('*')
       .eq('cliente_id', clienteId)
@@ -278,6 +278,8 @@ export async function obtenerInteracciones(
     if (error) {
       throw error;
     }
+
+    let data = rawData;
 
     // Si hay datos, obtener la información del vendedor por separado
     if (data && data.length > 0) {
@@ -735,6 +737,55 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
         // No fallar la cancelación si el lote ya está liberado
       }
     }
+
+    revalidarCliente(reserva.cliente_id);
+    revalidatePath('/dashboard/proyectos');
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function eliminarReserva(reservaId: string) {
+  const supabase = await createServerActionClient();
+
+  try {
+    // Verificar permiso de administrador
+    await requierePermiso(PERMISOS.RESERVAS.ELIMINAR);
+
+    // Obtener datos de la reserva antes de eliminar
+    const { data: reserva } = await supabase
+      .schema('crm')
+      .from('reserva')
+      .select('lote_id, estado, cliente_id, codigo_reserva')
+      .eq('id', reservaId)
+      .single();
+
+    if (!reserva) {
+      return { success: false, error: 'Reserva no encontrada' };
+    }
+
+    // Si la reserva está activa y tiene un lote, liberar el lote primero
+    if (reserva.estado === 'activa' && reserva.lote_id) {
+      const { error: rpcError } = await supabase.rpc('crm.liberar_lote', {
+        p_lote: reserva.lote_id
+      });
+
+      if (rpcError) {
+        console.warn(`Error liberando lote ${reserva.lote_id}:`, rpcError);
+        // Continuar con la eliminación aunque falle la liberación del lote
+      }
+    }
+
+    // Eliminar la reserva
+    const { error } = await supabase
+      .schema('crm')
+      .from('reserva')
+      .delete()
+      .eq('id', reservaId);
+
+    if (error) throw error;
 
     revalidarCliente(reserva.cliente_id);
     revalidatePath('/dashboard/proyectos');

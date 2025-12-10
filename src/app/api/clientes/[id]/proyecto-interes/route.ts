@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +20,6 @@ export async function GET(
     // Intentar obtener el token del header Authorization (para extensión)
     const authHeader = request.headers.get("authorization");
     let supabase;
-    let user;
 
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome)
@@ -35,7 +33,6 @@ export async function GET(
         return NextResponse.json({ error: "No autenticado" }, { status: 401 });
       }
 
-      user = authUser;
       // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
       supabase = createServiceRoleClient();
     } else {
@@ -46,8 +43,6 @@ export async function GET(
       if (authError || !sessionUser) {
         return NextResponse.json({ error: "No autorizado" }, { status: 401 });
       }
-
-      user = sessionUser;
     }
 
     // Obtener proyectos de interés usando RPC (bypasea RLS)
@@ -204,7 +199,6 @@ export async function DELETE(
     // Intentar obtener el token del header Authorization (para extensión)
     const authHeader = request.headers.get("authorization");
     let supabase;
-    let user;
 
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome)
@@ -218,7 +212,6 @@ export async function DELETE(
         return NextResponse.json({ error: "No autenticado" }, { status: 401 });
       }
 
-      user = authUser;
       // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
       supabase = createServiceRoleClient();
     } else {
@@ -229,8 +222,6 @@ export async function DELETE(
       if (authError || !sessionUser) {
         return NextResponse.json({ error: "No autorizado" }, { status: 401 });
       }
-
-      user = sessionUser;
     }
 
     // Obtener ID del proyecto de interés desde query params

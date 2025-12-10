@@ -171,7 +171,7 @@ export default async function ProyLotesPage({
         typeof (point as { lng?: unknown }).lng === 'number'
     );
 
-  const proyectoPolygon = isLatLngObjectArray((proyecto as { poligono?: unknown } | null)?.poligono)
+  const _proyectoPolygon = isLatLngObjectArray((proyecto as { poligono?: unknown } | null)?.poligono)
     ? (proyecto as { poligono: { lat: number; lng: number }[] }).poligono
     : undefined;
 
@@ -353,7 +353,7 @@ export default async function ProyLotesPage({
   });
 
   // Helper de URLs
-  const makeHref = (p: number) => {
+  const _makeHref = (p: number) => {
     const usp = new URLSearchParams();
     if (q) usp.set("q", q);
     if (estado && estado !== "all") usp.set("estado", estado);

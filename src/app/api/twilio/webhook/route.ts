@@ -15,7 +15,6 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ServiceSupabaseClient = SupabaseClient<any, any, any>;
 
 // Tipos de eventos que puede enviar Twilio

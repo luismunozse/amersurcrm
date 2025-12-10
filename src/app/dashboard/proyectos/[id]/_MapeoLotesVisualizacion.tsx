@@ -55,7 +55,7 @@ export default function MapeoLotesVisualizacion({
   proyectoLatitud,
   proyectoLongitud,
   overlayBounds,
-  overlayRotation,
+  overlayRotation: _overlayRotation,
   overlayLayers,
   lotes = [],
 }: MapeoLotesVisualizacionProps) {

@@ -63,7 +63,7 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
   useEffect(() => {
     if (plantillaSeleccionada && plantillaSeleccionada.variables) {
       const nuevasVariables: Record<string, string> = {};
-      plantillaSeleccionada.variables.forEach((variable, index) => {
+      plantillaSeleccionada.variables.forEach((variable, _index) => {
         nuevasVariables[variable] = "";
       });
       setVariables(nuevasVariables);

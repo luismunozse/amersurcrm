@@ -55,7 +55,7 @@ const WhatsAppIcon = ({ className, ...props }: SVGProps<SVGSVGElement>) => (
 );
 
 export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }: ClienteDetailModalCompleteProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  const [_isVisible, setIsVisible] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const router = useRouter();
 
@@ -79,7 +79,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
       setCopiedField(field);
       toast.success(`${field} copiado al portapapeles`);
       setTimeout(() => setCopiedField(null), 2000);
-    } catch (error) {
+    } catch {
       toast('Error al copiar', { icon: '❌' });
     }
   };

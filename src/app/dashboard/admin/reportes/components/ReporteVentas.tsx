@@ -68,7 +68,7 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
     );
   }
 
-  const { resumen, salesData, topProjects, formasPago } = data;
+  const { resumen, salesData, topProjects, formasPago: _formasPago } = data;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-PE', {

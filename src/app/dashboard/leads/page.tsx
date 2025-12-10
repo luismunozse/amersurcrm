@@ -23,7 +23,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Search
   // Permitir acceso a administradores y vendedores
   const isAdmin = await esAdmin();
   const isVendedor = await esVendedor();
-  const perfil = await obtenerPerfilUsuario();
+  const _perfil = await obtenerPerfilUsuario();
 
   if (!isAdmin && !isVendedor) {
     redirect("/dashboard");

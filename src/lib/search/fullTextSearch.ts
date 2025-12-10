@@ -335,7 +335,7 @@ export async function isFullTextSearchAvailable(): Promise<boolean> {
 
     // Si no hay error, la función existe y está disponible
     return !error;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

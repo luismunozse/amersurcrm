@@ -9,7 +9,7 @@ import { useNotificationPermission } from '@/hooks/useNotificationPermission';
  * permisos de notificaciones del navegador
  */
 export default function NotificationPermissionPrompt() {
-  const { permission, requestPermission, isDefault, isUnsupported } = useNotificationPermission();
+  const { permission: _permission, requestPermission, isDefault, isUnsupported } = useNotificationPermission();
   const [dismissed, setDismissed] = useState(false);
 
   // No mostrar si ya se otorgó permiso, se denegó, no está soportado, o fue descartado

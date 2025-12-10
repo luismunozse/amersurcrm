@@ -24,7 +24,7 @@ export async function createClient() {
             // En Server Components no se pueden establecer cookies
           }
         },
-        remove(name: string, options: any) {
+        remove(name: string, _options: any) {
           try {
             cookieStore.delete(name);
           } catch {

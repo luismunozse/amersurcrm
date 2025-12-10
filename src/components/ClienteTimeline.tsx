@@ -85,7 +85,7 @@ export default function ClienteTimeline({ eventos }: Props) {
       <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-crm-border" />
 
       <div className="space-y-6">
-        {eventos.map((evento, index) => {
+        {eventos.map((evento, _index) => {
           const color = getColorEvento(evento.type);
           const icono = getIconoEvento(evento.type, evento.metadata);
 

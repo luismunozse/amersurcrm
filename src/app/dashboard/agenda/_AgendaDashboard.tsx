@@ -252,7 +252,7 @@ export default function AgendaDashboard() {
       } else {
         toast.error(result.message);
       }
-    } catch (error) {
+    } catch {
       toast.error('Error al completar evento');
     } finally {
       setProcesandoAccion(false);
@@ -281,7 +281,7 @@ export default function AgendaDashboard() {
       } else {
         toast.error(result.message);
       }
-    } catch (error) {
+    } catch {
       toast.error('Error al reprogramar evento');
     } finally {
       setProcesandoAccion(false);
@@ -416,8 +416,6 @@ export default function AgendaDashboard() {
                 <p className="text-xs text-crm-text-muted">Sin eventos</p>
               ) : (
                 eventosDia.map((evento) => {
-                  const eventoAny = evento as any;
-                  const tieneTelefono = eventoAny.cliente?.telefono;
                   return (
                     <div
                       key={evento.id}

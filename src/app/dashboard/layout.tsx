@@ -16,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!user) redirect("/auth/login");
 
   // Obtener el perfil del usuario para nombre, username, rol, avatar y verificar si requiere cambio de password
-  const { data: perfil, error: perfilError } = await s
+  const { data: perfil, error: _perfilError } = await s
     .schema('crm')
     .from('usuario_perfil')
     .select(`

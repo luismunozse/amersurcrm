@@ -72,7 +72,7 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
     }
   };
 
-  const formatPrecio = (precio: number | null, moneda: string | null) => {
+  const formatPrecio = (precio: number | null, _moneda: string | null) => {
     if (!precio) return "No especificado";
     return `S/ ${precio.toLocaleString('es-PE')}`;
   };

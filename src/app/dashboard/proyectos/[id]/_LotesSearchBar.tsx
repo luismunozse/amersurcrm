@@ -36,7 +36,7 @@ export default function LotesSearchBar({ proyectoId, totalLotes, lotesCount }: L
   const currentAreaMin = searchParams.get('area_min') || '';
   const currentAreaMax = searchParams.get('area_max') || '';
   const currentSort = searchParams.get('sort') || 'codigo-asc';
-  const currentPage = searchParams.get('page') || '1';
+  const _currentPage = searchParams.get('page') || '1';
 
   const handleSearch = (formData: FormData) => {
     const q = formData.get('q') as string;

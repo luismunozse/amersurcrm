@@ -42,7 +42,7 @@ export function useGoogleMaps(options: UseGoogleMapsOptions = {}): UseGoogleMaps
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
       existingScript.addEventListener('load', () => setIsLoaded(true));
-      existingScript.addEventListener('error', (e) => setLoadError(new Error('Failed to load Google Maps')));
+      existingScript.addEventListener('error', () => setLoadError(new Error('Failed to load Google Maps')));
       return;
     }
 
@@ -122,7 +122,7 @@ export function useGroundOverlay(map: google.maps.Map | null) {
   const [overlay, setOverlay] = useState<google.maps.GroundOverlay | null>(null);
 
   const createOverlay = useCallback(
-    (imageUrl: string, bounds: OverlayBounds, rotation: number = 0) => {
+    (imageUrl: string, bounds: OverlayBounds, _rotation: number = 0) => {
       if (!map || !window.google?.maps) return null;
 
       // Remove existing overlay

@@ -42,7 +42,7 @@ export async function protegerRuta(opciones: ProtegerRutaOpciones = {}): Promise
     rol,
     roles,
     redirectTo = '/dashboard',
-    mensajeError,
+    mensajeError: _mensajeError,
   } = opciones;
 
   const usuario = await obtenerPermisosUsuario();

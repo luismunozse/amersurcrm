@@ -19,7 +19,6 @@ export async function POST(
     // Intentar obtener el token del header Authorization (para extensión)
     const authHeader = request.headers.get("authorization");
     let supabase;
-    let user;
 
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome)
@@ -33,7 +32,6 @@ export async function POST(
         return NextResponse.json({ error: "No autenticado" }, { status: 401 });
       }
 
-      user = authUser;
       supabase = supabaseAdmin;
     } else {
       // Token desde cookies (sesión web normal)
@@ -43,8 +41,6 @@ export async function POST(
       if (!sessionUser) {
         return NextResponse.json({ error: "No autenticado" }, { status: 401 });
       }
-
-      user = sessionUser;
     }
 
     // Parsear body

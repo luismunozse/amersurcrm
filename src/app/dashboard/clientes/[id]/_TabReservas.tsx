@@ -1,21 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Clock, CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import CrearReservaModal from "@/components/CrearReservaModal";
+import CancelarReservaModal from "@/components/CancelarReservaModal";
+import EliminarReservaModal from "@/components/EliminarReservaModal";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
   clienteId: string;
   clienteNombre: string;
   reservas: any[];
+  isAdmin?: boolean;
 }
 
-export default function TabReservas({ clienteId, clienteNombre, reservas }: Props) {
+export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmin = false }: Props) {
   const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<{ id: string; nombre: string } | null>(null);
+
+  // Estado para modal de cancelar reserva
+  const [cancelarModalOpen, setCancelarModalOpen] = useState(false);
+  const [reservaACancelar, setReservaACancelar] = useState<any>(null);
+
+  // Estado para modal de eliminar reserva (solo admin)
+  const [eliminarModalOpen, setEliminarModalOpen] = useState(false);
+  const [reservaAEliminar, setReservaAEliminar] = useState<any>(null);
 
   const getEstadoColor = (estado: string) => {
     const colores = {
@@ -156,8 +167,41 @@ export default function TabReservas({ clienteId, clienteNombre, reservas }: Prop
                   </div>
                 )}
 
-                <div className="mt-3 text-xs text-crm-text-muted">
-                  Vendedor: {reserva.vendedor?.username || 'desconocido'}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-crm-border">
+                  <div className="text-xs text-crm-text-muted">
+                    Vendedor: {reserva.vendedor?.username || 'desconocido'}
+                  </div>
+
+                  {/* Botones de accion */}
+                  <div className="flex gap-2">
+                    {/* Boton Cancelar - solo para reservas activas */}
+                    {reserva.estado === 'activa' && (
+                      <button
+                        onClick={() => {
+                          setReservaACancelar(reserva);
+                          setCancelarModalOpen(true);
+                        }}
+                        className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
+                        title="Cancelar reserva"
+                      >
+                        <Ban className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    {/* Boton Eliminar - solo para admin */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setReservaAEliminar(reserva);
+                          setEliminarModalOpen(true);
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                        title="Eliminar reserva"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -177,6 +221,37 @@ export default function TabReservas({ clienteId, clienteNombre, reservas }: Prop
         loteId={selectedLote?.id}
         loteNombre={selectedLote?.nombre}
       />
+
+      {/* Modal Cancelar Reserva */}
+      {reservaACancelar && (
+        <CancelarReservaModal
+          isOpen={cancelarModalOpen}
+          onClose={() => {
+            setCancelarModalOpen(false);
+            setReservaACancelar(null);
+          }}
+          reservaId={reservaACancelar.id}
+          reservaCodigo={reservaACancelar.codigo_reserva}
+          clienteNombre={clienteNombre}
+          loteNombre={reservaACancelar.lote?.numero_lote}
+        />
+      )}
+
+      {/* Modal Eliminar Reserva (solo admin) */}
+      {reservaAEliminar && (
+        <EliminarReservaModal
+          isOpen={eliminarModalOpen}
+          onClose={() => {
+            setEliminarModalOpen(false);
+            setReservaAEliminar(null);
+          }}
+          reservaId={reservaAEliminar.id}
+          reservaCodigo={reservaAEliminar.codigo_reserva}
+          clienteNombre={clienteNombre}
+          loteNombre={reservaAEliminar.lote?.numero_lote}
+          estado={reservaAEliminar.estado}
+        />
+      )}
     </div>
   );
 }

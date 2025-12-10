@@ -44,7 +44,7 @@ type Propiedad = {
 };
 
 export default function PropiedadesList({ propiedades }: { propiedades: Propiedad[] }) {
-  const [isPending, startTransition] = useTransition();
+  const [_isPending, startTransition] = useTransition();
   const router = useRouter();
 
   // Estados para modales
@@ -167,7 +167,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
     }
   };
 
-  const getTipoLabel = (tipo: string) => {
+  const _getTipoLabel = (tipo: string) => {
     switch (tipo) {
       case 'lote': return 'Lote';
       case 'casa': return 'Casa';
@@ -178,7 +178,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
     }
   };
 
-  const getEstadoColor = (estado: string) => {
+  const _getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'disponible': return 'bg-green-100 text-green-700';
       case 'reservado': return 'bg-yellow-100 text-yellow-700';

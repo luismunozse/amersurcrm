@@ -149,7 +149,7 @@ export default function ClienteDetailTabs({
             clienteId={cliente.id}
           />
         )}
-        {activeTab === 'reservas' && <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} />}
+        {activeTab === 'reservas' && <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} isAdmin={isAdmin} />}
         {activeTab === 'ventas' && <TabVentas ventas={ventas} />}
         {activeTab === 'proformas' && (
           <TabProformas

@@ -467,7 +467,7 @@ function Step2({ data, updateData, proyectoNombre, proyectoUbicacion }: {
 }
 
 // Paso 3: Precio y condiciones de venta
-function Step3({ data, onConfirm, isPending, proyectoNombre, hasRequiredData, proyectos = [] }: { 
+function Step3({ data, onConfirm: _onConfirm, isPending: _isPending, proyectoNombre, hasRequiredData, proyectos = [] }: { 
   data: LoteData; 
   onConfirm: () => void; 
   isPending: boolean;

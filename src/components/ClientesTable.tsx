@@ -169,7 +169,8 @@ export default function ClientesTable({
     }, 500); // Espera 500ms después de que el usuario deja de escribir
 
     return () => clearTimeout(timer);
-  }, [localSearchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSearchQuery]);
 
   const sortBy = initialSortBy as keyof Cliente;
   const sortOrder = initialSortOrder;

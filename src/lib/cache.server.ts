@@ -98,7 +98,6 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     .eq('id', userId)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rolData = perfil?.rol as any;
   const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
   const esAdmin = rolNombre === 'ROL_ADMIN';
@@ -216,7 +215,6 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
   }
 
   // Deduplicar resultados por ID (puede haber duplicados si hay múltiples condiciones OR)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dataArray = data as any[];
   const uniqueData = dataArray ? Array.from(
     new Map(dataArray.map(item => [item.id, item])).values()
@@ -248,7 +246,6 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
     .eq('id', userId)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rolData = perfil?.rol as any;
   const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
   const esAdmin = rolNombre === 'ROL_ADMIN';
@@ -283,7 +280,6 @@ export const getCachedClientesDashboardMetrics = cache(async (): Promise<Cliente
     .eq('id', userId)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rolData = perfil?.rol as any;
   const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
   const esAdmin = rolNombre === 'ROL_ADMIN';
@@ -305,7 +301,6 @@ export const getCachedClientesDashboardMetrics = cache(async (): Promise<Cliente
     throw error;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metricas = data as any;
   return {
     total: metricas?.total ?? 0,
@@ -401,7 +396,6 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
     .eq('id', userId)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rolData = perfil?.rol as any;
   const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
   const esAdmin = rolNombre === 'ROL_ADMIN';
@@ -419,7 +413,6 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
     })
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let totalClientes = (clienteMetrics as any)?.total ?? 0;
 
   // Fallback: si la RPC falla, contar manualmente usando la vista accesible para vendedores
