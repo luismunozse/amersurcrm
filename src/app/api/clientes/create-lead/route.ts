@@ -103,25 +103,24 @@ export async function POST(request: NextRequest) {
       pais: "Perú",
     };
 
-    // Crear el lead directamente sin usar la función problemática
-    // No asignamos vendedor aquí para evitar problemas de tipo UUID
-    const { data: nuevoCliente, error: insertError } = await supabaseAdmin
-      .from("cliente")
-      .insert({
-        nombre: nombreLead,
-        tipo_cliente: "persona",
-        telefono: telefonoLimpio,
-        telefono_whatsapp: telefonoLimpio,
-        origen_lead: "whatsapp_web",
-        estado_cliente: "contactado", // Cliente ya contactó via WhatsApp
-        vendedor_asignado: null, // Dejar que el sistema lo asigne o NULL
-        created_by: user.id, // ID del usuario que crea el lead
-        proxima_accion: "Responder mensaje del cliente",
-        notas,
-        direccion,
+    // Crear el lead usando la función RPC que incluye asignación automática round-robin
+    // Si vendedor_asignado es NULL, la función asigna automáticamente al siguiente vendedor activo
+    const rpcResult = await supabaseAdmin
+      .schema("crm")
+      .rpc("create_whatsapp_lead", {
+        p_nombre: nombreLead,
+        p_telefono: telefonoLimpio,
+        p_telefono_whatsapp: telefonoLimpio,
+        p_origen_lead: "whatsapp_web",
+        p_vendedor_asignado: null, // NULL = asignación automática round-robin
+        p_created_by: user.id,
+        p_notas: notas,
+        p_direccion: direccion,
       })
-      .select("id")
       .single();
+
+    const nuevoCliente = rpcResult.data as { id: string } | null;
+    const insertError = rpcResult.error;
 
     if (insertError) {
       console.error("[CreateLead] Error creando lead:", insertError);

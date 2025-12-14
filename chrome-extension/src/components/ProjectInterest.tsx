@@ -57,11 +57,26 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
       console.log('[ProjectInterest] Proyectos recibidos:', proyectosData);
       console.log('[ProjectInterest] Proyectos de interés recibidos:', interesesData);
 
+      // Validar respuestas
+      if (!Array.isArray(proyectosData)) {
+        console.error('[ProjectInterest] Proyectos no es un array:', proyectosData);
+        setError('Error: respuesta de proyectos inválida');
+        return;
+      }
+
+      // interesesData puede ser un array o null/undefined
+      const intereses = Array.isArray(interesesData) ? interesesData : [];
+
       setProyectos(proyectosData);
-      setProyectosInteres(interesesData);
+      setProyectosInteres(intereses);
+      console.log('[ProjectInterest] Datos cargados correctamente:', {
+        proyectos: proyectosData.length,
+        intereses: intereses.length
+      });
     } catch (err) {
-      console.error('[ProjectInterest] Error:', err);
-      setError('Error cargando datos');
+      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
+      console.error('[ProjectInterest] Error cargando datos:', errorMsg, err);
+      setError(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -75,10 +90,21 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
       console.log('[ProjectInterest] Cargando lotes para proyecto:', proyectoId);
       const lotesData = await apiClient.getLotes(proyectoId);
       console.log('[ProjectInterest] Lotes recibidos:', lotesData);
+
+      // Validar respuesta
+      if (!Array.isArray(lotesData)) {
+        console.error('[ProjectInterest] Lotes no es un array:', lotesData);
+        setError('Error: respuesta de lotes inválida');
+        setLotes([]);
+        return;
+      }
+
       setLotes(lotesData);
+      console.log('[ProjectInterest] Lotes cargados:', lotesData.length);
     } catch (err) {
-      console.error('[ProjectInterest] Error cargando lotes:', err);
-      setError('Error cargando lotes del proyecto');
+      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
+      console.error('[ProjectInterest] Error cargando lotes:', errorMsg, err);
+      setError(`Error cargando lotes: ${errorMsg}`);
       setLotes([]);
     } finally {
       setLoadingLotes(false);

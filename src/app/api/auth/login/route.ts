@@ -78,11 +78,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener información adicional del usuario desde usuario_perfil
-    const { data: perfil, error: perfilError } = await supabase
+    // Obtener información adicional del usuario desde usuario_perfil con JOIN a rol
+    // Usar el nombre explícito de la FK para evitar ambigüedad
+    const { data: perfil, error: perfilError } = await supabaseAdmin
       .schema("crm")
       .from("usuario_perfil")
-      .select("username, rol")
+      .select(`
+        username,
+        nombre_completo,
+        activo,
+        rol_id,
+        rol:rol!usuario_perfil_rol_id_fkey (
+          id,
+          nombre
+        )
+      `)
       .eq("id", authData.user.id)
       .maybeSingle();
 
@@ -90,7 +100,15 @@ export async function POST(request: NextRequest) {
       console.error("[Login] Error obteniendo perfil:", perfilError);
     }
 
-    console.log(`[Login] Usuario autenticado: ${emailToUse} (${authData.user.id})`);
+    // Extraer el nombre del rol (convertir ROL_ADMIN -> admin, ROL_VENDEDOR -> vendedor)
+    const rolData = perfil?.rol as { id?: string; nombre?: string } | null;
+    let rolNombre = rolData?.nombre || "vendedor";
+    // Normalizar: ROL_ADMIN -> admin, ROL_VENDEDOR -> vendedor
+    if (rolNombre.startsWith("ROL_")) {
+      rolNombre = rolNombre.replace("ROL_", "").toLowerCase();
+    }
+
+    console.log(`[Login] Usuario autenticado: ${emailToUse} (${authData.user.id}) - Rol: ${rolNombre}`);
 
     return NextResponse.json({
       success: true,
@@ -98,7 +116,9 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         email: authData.user.email || emailToUse,
         username: perfil?.username || (authData.user.email || emailToUse).split("@")[0],
-        rol: perfil?.rol || "vendedor",
+        nombre_completo: perfil?.nombre_completo,
+        rol: rolNombre,
+        activo: perfil?.activo ?? true,
       },
       token: authData.session.access_token,
       refreshToken: authData.session.refresh_token, // Para renovación automática

@@ -148,22 +148,77 @@ export function extractChatId(): string | null {
 
 /**
  * Obtiene el último mensaje recibido del contacto
+ * Evita capturar timestamps, estados de mensaje, etc.
  */
 export function getLastReceivedMessage(): string | null {
-  // Buscar mensajes entrantes (no enviados por nosotros)
+  console.log('[WhatsApp] Buscando último mensaje recibido...');
+
+  // Selectores específicos para el texto del mensaje (no timestamps)
+  // WhatsApp estructura: .message-in > div > div > div > span.selectable-text > span
   const messageSelectors = [
-    '.message-in .copyable-text span',
-    '[data-pre-plain-text]:not([data-id*="true"]) .copyable-text span',
+    // Selector más específico: texto seleccionable dentro de mensajes entrantes
+    '.message-in span.selectable-text.copyable-text span[dir="ltr"]',
+    '.message-in span.selectable-text span[dir="ltr"]',
+    // Fallback: copyable-text con clase específica
+    '.message-in ._ao3e.selectable-text.copyable-text span',
+    // Otro fallback para diferentes versiones de WhatsApp
+    '.message-in div[data-pre-plain-text] span.selectable-text span',
   ];
 
   for (const selector of messageSelectors) {
     const messages = document.querySelectorAll(selector);
+    console.log(`[WhatsApp] Selector "${selector}": ${messages.length} elementos`);
+
     if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      return lastMessage?.textContent || null;
+      // Recorrer desde el último hacia atrás buscando texto real
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const element = messages[i];
+        const text = element.textContent?.trim();
+
+        if (text && text.length > 0) {
+          // Filtrar timestamps (formato: "HH:MM" o "H:MM p. m.")
+          const isTimestamp = /^\d{1,2}:\d{2}(\s*(a\.\s*m\.|p\.\s*m\.|AM|PM))?\.?$/.test(text);
+          // Filtrar estados de mensaje como "Enviado", "Entregado", "Leído"
+          const isStatus = /^(Enviado|Entregado|Le[íi]do|Visto)$/i.test(text);
+          // Filtrar textos muy cortos que podrían ser emojis únicos o iconos
+          const isTooShort = text.length < 2 && !/[a-zA-Z0-9]/.test(text);
+
+          if (!isTimestamp && !isStatus && !isTooShort) {
+            console.log('[WhatsApp] Mensaje encontrado:', text.substring(0, 100));
+            return text;
+          } else {
+            console.log('[WhatsApp] Texto filtrado (timestamp/status):', text);
+          }
+        }
+      }
     }
   }
 
+  // Último intento: buscar cualquier mensaje entrante con contenido sustancial
+  console.log('[WhatsApp] Intentando método alternativo...');
+  const allIncomingMessages = document.querySelectorAll('.message-in');
+
+  for (let i = allIncomingMessages.length - 1; i >= 0; i--) {
+    const messageContainer = allIncomingMessages[i];
+
+    // Buscar el span con el texto real (evitando el contenedor de hora)
+    const textSpans = messageContainer.querySelectorAll('span[dir="ltr"]');
+
+    for (const span of textSpans) {
+      const text = span.textContent?.trim();
+
+      if (text && text.length > 3) {
+        // Verificar que no sea timestamp
+        const isTimestamp = /^\d{1,2}:\d{2}/.test(text);
+        if (!isTimestamp) {
+          console.log('[WhatsApp] Mensaje encontrado (alternativo):', text.substring(0, 100));
+          return text;
+        }
+      }
+    }
+  }
+
+  console.log('[WhatsApp] No se encontró mensaje válido');
   return null;
 }
 

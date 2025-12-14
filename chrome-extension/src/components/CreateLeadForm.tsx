@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WhatsAppContact } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
@@ -16,8 +16,23 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Intentar obtener el último mensaje del chat
+  // Ref para controlar que solo se capture el mensaje una vez por contacto
+  const mensajeCapturedRef = useRef(false);
+  const lastContactIdRef = useRef<string | null>(null);
+
+  // Intentar obtener el último mensaje del chat (solo una vez por contacto)
   useEffect(() => {
+    // Si cambió el contacto, resetear el flag
+    if (lastContactIdRef.current !== contact.chatId) {
+      mensajeCapturedRef.current = false;
+      lastContactIdRef.current = contact.chatId;
+    }
+
+    // Si ya capturamos el mensaje para este contacto, no hacer nada
+    if (mensajeCapturedRef.current) {
+      return;
+    }
+
     // Solicitar al content script el último mensaje
     window.parent.postMessage({ type: 'AMERSURCHAT_GET_LAST_MESSAGE' }, WHATSAPP_WEB_ORIGIN);
 
@@ -25,15 +40,17 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
       if (event.origin !== WHATSAPP_WEB_ORIGIN) return;
       if (!event.data || typeof event.data !== 'object') return;
       if (event.data.type === 'AMERSURCHAT_LAST_MESSAGE') {
-        if (event.data.message) {
+        // Solo setear si aún no hemos capturado el mensaje
+        if (!mensajeCapturedRef.current && event.data.message) {
           setMensaje(event.data.message.substring(0, 500));
+          mensajeCapturedRef.current = true; // Marcar como capturado
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [contact]);
+  }, [contact.chatId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

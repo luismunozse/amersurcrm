@@ -31,22 +31,34 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
     setError(null);
 
     try {
+      console.log('[ClientHistory] Cargando interacciones para cliente:', clienteId);
+
       // Obtener interacciones reales del CRM
       const data = await apiClient.getInteracciones(clienteId);
+
+      console.log('[ClientHistory] Datos recibidos:', data);
+
+      if (!Array.isArray(data)) {
+        console.error('[ClientHistory] Respuesta no es un array:', data);
+        setError('Respuesta inválida del servidor');
+        return;
+      }
 
       // Convertir al formato esperado
       const interaccionesFormateadas: Interaccion[] = data.map((int: any) => ({
         id: int.id,
         tipo: int.tipo as Interaccion['tipo'],
         fecha: int.fecha,
-        descripcion: int.descripcion,
-        usuario: int.usuario,
+        descripcion: int.descripcion || int.notas || `${int.tipo} - ${int.resultado || 'sin resultado'}`,
+        usuario: int.usuario || int.vendedor_username || 'Sistema',
       }));
 
+      console.log('[ClientHistory] Interacciones formateadas:', interaccionesFormateadas.length);
       setInteracciones(interaccionesFormateadas);
     } catch (err) {
-      console.error('[ClientHistory] Error:', err);
-      setError('Error cargando historial');
+      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
+      console.error('[ClientHistory] Error cargando historial:', errorMsg, err);
+      setError(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
     }

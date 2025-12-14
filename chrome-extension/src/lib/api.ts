@@ -229,18 +229,19 @@ export class CRMApiClient {
 
   /**
    * Buscar cliente por teléfono
+   * @returns Cliente encontrado, null si no existe, o objeto con asignadoAOtro si está asignado a otro vendedor
    */
-  async searchClienteByPhone(phone: string): Promise<Cliente | null> {
+  async searchClienteByPhone(phone: string): Promise<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string }> {
     try {
       // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
       const cleanPhone = phone.replace(/[^\d]/g, '');
-      const response = await this.request<{ cliente: Cliente | null }>(
+      const response = await this.request<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string }>(
         `/api/clientes/search?phone=${encodeURIComponent(cleanPhone)}`
       );
-      return response.cliente;
+      return response;
     } catch (error) {
       console.error('[CRMApiClient] Error buscando cliente:', error);
-      return null;
+      return { cliente: null };
     }
   }
 

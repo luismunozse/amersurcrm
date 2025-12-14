@@ -78,11 +78,18 @@ export async function GET(request: NextRequest) {
     const { data: perfil } = await supabase
       .schema('crm')
       .from('usuario_perfil')
-      .select('rol')
+      .select(`
+        rol_id,
+        rol:rol!usuario_perfil_rol_id_fkey (
+          nombre
+        )
+      `)
       .eq('id', user.id)
       .maybeSingle();
 
-    const isAdmin = perfil?.rol === 'admin';
+    const rolData = perfil?.rol as { nombre?: string } | null;
+    const rolNombre = rolData?.nombre || '';
+    const isAdmin = rolNombre === 'admin' || rolNombre === 'ROL_ADMIN';
 
     const searchParams = request.nextUrl.searchParams;
     const metric_type = searchParams.get('metric_type');

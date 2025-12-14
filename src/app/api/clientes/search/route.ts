@@ -8,12 +8,17 @@ export const dynamic = "force-dynamic";
  *
  * Busca un cliente por número de teléfono
  * Usado por AmersurChat Chrome Extension
+ *
+ * Restricción de visibilidad:
+ * - Admins: Pueden ver todos los clientes
+ * - Vendedores: Solo ven clientes asignados a ellos
  */
 export async function GET(request: NextRequest) {
   try {
     // Intentar obtener el token del header Authorization (para extensión)
     const authHeader = request.headers.get("authorization");
     let supabase;
+    let userId: string;
 
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome)
@@ -27,6 +32,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "No autenticado" }, { status: 401 });
       }
 
+      userId = authUser.id;
       supabase = supabaseAdmin;
     } else {
       // Token desde cookies (sesión web normal)
@@ -36,7 +42,31 @@ export async function GET(request: NextRequest) {
       if (!sessionUser) {
         return NextResponse.json({ error: "No autenticado" }, { status: 401 });
       }
+
+      userId = sessionUser.id;
     }
+
+    // Obtener perfil del usuario para verificar rol y username
+    const { data: perfilData } = await supabase
+      .schema("crm")
+      .from("usuario_perfil")
+      .select(`
+        username,
+        rol:rol!usuario_perfil_rol_id_fkey (
+          nombre
+        )
+      `)
+      .eq("id", userId)
+      .single();
+
+    // El join puede devolver un array o un objeto, normalizar
+    const perfil = perfilData as { username: string; rol: { nombre: string } | { nombre: string }[] | null } | null;
+    const rolData = perfil?.rol;
+    const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+    const esAdmin = rolNombre === "admin";
+    const vendedorUsername = perfil?.username;
+
+    console.log(`[ClienteSearch] Usuario: ${vendedorUsername}, Rol: ${rolNombre}, EsAdmin: ${esAdmin}`);
 
     // Obtener parámetro de búsqueda
     const searchParams = request.nextUrl.searchParams;
@@ -55,8 +85,8 @@ export async function GET(request: NextRequest) {
 
     console.log(`[ClienteSearch] Buscando cliente con teléfono: ${cleanPhone} o ${cleanPhoneWithPlus}`);
 
-    // Buscar cliente por teléfono o whatsapp (probando con y sin el +)
-    const { data: cliente, error } = await supabase
+    // Construir query base
+    let query = supabase
       .schema("crm")
       .from("cliente")
       .select(
@@ -74,7 +104,16 @@ export async function GET(request: NextRequest) {
         notas
       `
       )
-      .or(`telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`)
+      .or(`telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`);
+
+    // Si NO es admin, filtrar solo clientes asignados al vendedor
+    if (!esAdmin && vendedorUsername) {
+      console.log(`[ClienteSearch] Filtrando por vendedor_asignado: ${vendedorUsername}`);
+      query = query.eq("vendedor_asignado", vendedorUsername);
+    }
+
+    // Ejecutar query
+    const { data: cliente, error } = await query
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -88,11 +127,31 @@ export async function GET(request: NextRequest) {
     }
 
     if (!cliente) {
+      // Si es vendedor y no encontró cliente, verificar si existe pero está asignado a otro
+      if (!esAdmin && vendedorUsername) {
+        const { data: clienteExiste } = await supabase
+          .schema("crm")
+          .from("cliente")
+          .select("id, vendedor_asignado")
+          .or(`telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (clienteExiste) {
+          console.log(`[ClienteSearch] Cliente existe pero está asignado a: ${clienteExiste.vendedor_asignado}`);
+          return NextResponse.json({
+            cliente: null,
+            asignadoAOtro: true,
+            mensaje: `Este cliente está asignado a otro vendedor (${clienteExiste.vendedor_asignado || 'sin asignar'})`,
+          });
+        }
+      }
+
       console.log(`[ClienteSearch] Cliente no encontrado`);
       return NextResponse.json({ cliente: null });
     }
 
-    console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}`);
+    console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}, vendedor: ${cliente.vendedor_asignado}`);
 
     return NextResponse.json({
       cliente: {

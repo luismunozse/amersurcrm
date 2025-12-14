@@ -149,17 +149,19 @@ export async function POST(
     const vendedorUsername = perfil?.username || "Sistema";
 
     // Crear interacción
+    // NOTA: La tabla NO tiene columna vendedor_id, solo vendedor_username
+    // NOTA: El CHECK constraint de resultado solo permite:
+    //       'contesto', 'no_contesto', 'reagendo', 'interesado', 'no_interesado', 'cerrado', 'pendiente'
     const { data: interaccion, error } = await supabase
       .schema("crm")
       .from("cliente_interaccion")
       .insert({
         cliente_id: clienteId,
         tipo,
-        notas: mensaje,
-        vendedor_id: user.id,
+        notas: `[${direccion === 'enviado' ? 'Enviado' : 'Recibido'}] ${mensaje}`,
         vendedor_username: vendedorUsername,
         fecha_interaccion: new Date().toISOString(),
-        resultado: direccion === 'enviado' ? 'enviado' : 'recibido',
+        resultado: 'pendiente', // Valor válido del CHECK constraint
       })
       .select()
       .single();

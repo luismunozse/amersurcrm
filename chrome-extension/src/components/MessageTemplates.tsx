@@ -11,13 +11,13 @@ const TEMPLATES_DEFAULT: MessageTemplate[] = [
   {
     id: '1',
     titulo: 'Saludo inicial',
-    mensaje: 'Hola! Gracias por contactarnos. Soy {nombre} de Amersur Inmobiliaria. ¿En qué puedo ayudarte hoy?',
+    mensaje: 'Hola {cliente}! Gracias por contactarnos. Soy {vendedor} de Amersur Inmobiliaria. ¿En qué puedo ayudarte hoy?',
     categoria: 'saludo',
   },
   {
     id: '2',
     titulo: 'Información de terreno',
-    mensaje: 'Tenemos excelentes terrenos disponibles. ¿Te interesa alguna zona en particular? Puedo enviarte información detallada sobre ubicación, precios y facilidades de pago.',
+    mensaje: 'Hola {cliente}! Tenemos excelentes terrenos disponibles. ¿Te interesa alguna zona en particular? Puedo enviarte información detallada sobre ubicación, precios y facilidades de pago.',
     categoria: 'consulta',
   },
   {
@@ -29,41 +29,51 @@ const TEMPLATES_DEFAULT: MessageTemplate[] = [
   {
     id: '4',
     titulo: 'Agendar visita',
-    mensaje: 'Perfecto! ¿Te gustaría agendar una visita al terreno? Tengo disponibilidad esta semana. ¿Qué día te viene mejor?',
+    mensaje: 'Perfecto {cliente}! ¿Te gustaría agendar una visita al terreno? Tengo disponibilidad esta semana. ¿Qué día te viene mejor?',
     categoria: 'seguimiento',
   },
   {
     id: '5',
     titulo: 'Envío de información',
-    mensaje: 'Te acabo de enviar la información detallada del proyecto por WhatsApp. Cualquier duda que tengas, estoy a tu disposición.',
+    mensaje: 'Hola {cliente}! Te acabo de enviar la información detallada del proyecto por WhatsApp. Cualquier duda que tengas, estoy a tu disposición. Soy {vendedor}.',
     categoria: 'seguimiento',
   },
   {
     id: '6',
     titulo: 'Seguimiento post-visita',
-    mensaje: '¿Qué te pareció el terreno que visitamos? ¿Te gustaría que conversemos sobre las opciones de financiamiento?',
+    mensaje: 'Hola {cliente}! ¿Qué te pareció el terreno que visitamos? ¿Te gustaría que conversemos sobre las opciones de financiamiento?',
     categoria: 'seguimiento',
   },
   {
     id: '7',
     titulo: 'Propuesta comercial',
-    mensaje: 'Tengo una excelente propuesta para ti. El terreno que te interesa tiene una promoción especial este mes con facilidades de pago. ¿Conversamos los detalles?',
+    mensaje: 'Hola {cliente}! Tengo una excelente propuesta para ti. El terreno que te interesa tiene una promoción especial este mes con facilidades de pago. ¿Conversamos los detalles?',
     categoria: 'cierre',
   },
   {
     id: '8',
     titulo: 'Despedida',
-    mensaje: 'Gracias por tu tiempo! Cualquier consulta adicional, no dudes en escribirme. Estoy disponible de Lunes a Sábado de 9am a 6pm. Saludos!',
+    mensaje: 'Gracias por tu tiempo {cliente}! Cualquier consulta adicional, no dudes en escribirme. Soy {vendedor}, estoy disponible de Lunes a Sábado de 9am a 6pm. ¡Saludos!',
     categoria: 'cierre',
   },
 ];
 
+// Variables disponibles para reemplazo automático
+interface TemplateVariables {
+  vendedor?: string;      // Nombre del vendedor logueado
+  cliente?: string;       // Nombre del cliente
+  proyecto?: string;      // Nombre del proyecto de interés
+  lote?: string;          // Código del lote de interés
+}
+
 interface MessageTemplatesProps {
   onSelectTemplate: (mensaje: string) => void;
   userName?: string;
+  clientName?: string;
+  proyectoInteres?: { nombre?: string; lote?: string };
 }
 
-export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplatesProps) {
+export function MessageTemplates({ onSelectTemplate, userName, clientName, proyectoInteres }: MessageTemplatesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategoria, setSelectedCategoria] = useState<string>('todas');
 
@@ -72,12 +82,55 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
     return TEMPLATES_DEFAULT.filter((t) => t.categoria === selectedCategoria);
   }, [selectedCategoria]);
 
-  const handleSelectTemplate = (template: MessageTemplate) => {
-    // Reemplazar variables
-    let mensaje = template.mensaje;
+  // Función para reemplazar todas las variables en el mensaje
+  const replaceVariables = (mensaje: string): string => {
+    let result = mensaje;
+
+    // Reemplazar {vendedor} con el nombre del vendedor
     if (userName) {
-      mensaje = mensaje.replace('{nombre}', userName);
+      result = result.replace(/{vendedor}/g, userName);
+      result = result.replace(/{nombre}/g, userName); // Compatibilidad con formato anterior
     }
+
+    // Reemplazar {cliente} con el nombre del cliente
+    if (clientName) {
+      result = result.replace(/{cliente}/g, clientName);
+    } else {
+      // Si no hay nombre, quitar la variable y el espacio extra
+      result = result.replace(/{cliente}!\s?/g, '');
+      result = result.replace(/{cliente}\s?/g, '');
+    }
+
+    // Reemplazar {proyecto} con el nombre del proyecto de interés
+    if (proyectoInteres?.nombre) {
+      result = result.replace(/{proyecto}/g, proyectoInteres.nombre);
+    }
+
+    // Reemplazar {lote} con el código del lote
+    if (proyectoInteres?.lote) {
+      result = result.replace(/{lote}/g, proyectoInteres.lote);
+    }
+
+    return result;
+  };
+
+  // Vista previa del mensaje con variables reemplazadas
+  const getPreviewMessage = (mensaje: string): string => {
+    let preview = mensaje;
+
+    // Mostrar valores reales si están disponibles, sino mostrar placeholder
+    preview = preview.replace(/{vendedor}/g, userName || '[Tu nombre]');
+    preview = preview.replace(/{nombre}/g, userName || '[Tu nombre]');
+    preview = preview.replace(/{cliente}/g, clientName || '[Cliente]');
+    preview = preview.replace(/{proyecto}/g, proyectoInteres?.nombre || '[Proyecto]');
+    preview = preview.replace(/{lote}/g, proyectoInteres?.lote || '[Lote]');
+
+    return preview;
+  };
+
+  const handleSelectTemplate = (template: MessageTemplate) => {
+    // Reemplazar todas las variables automáticamente
+    const mensaje = replaceVariables(template.mensaje);
     onSelectTemplate(mensaje);
     setIsExpanded(false);
   };
@@ -163,7 +216,7 @@ export function MessageTemplates({ onSelectTemplate, userName }: MessageTemplate
                           {template.titulo}
                         </h4>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                          {template.mensaje.replace('{nombre}', userName || '[Tu nombre]')}
+                          {getPreviewMessage(template.mensaje)}
                         </p>
                       </div>
                       <svg

@@ -1,16 +1,40 @@
-import React, { useState } from 'react';
-import { CRMApiClient, saveCRMConfig } from '@/lib/api';
+import React, { useState, useEffect } from 'react';
+import { CRMApiClient, saveCRMConfig, getCRMConfig } from '@/lib/api';
+
+// URL de producción por defecto
+const PRODUCTION_URL = 'https://crm.amersursac.com';
+const LOCAL_URL = 'http://localhost:3000';
 
 interface LoginFormProps {
   onLogin: (crmUrl: string, token: string) => void;
 }
 
 export function LoginForm({ onLogin }: LoginFormProps) {
-  const [crmUrl, setCrmUrl] = useState('https://crm.amersursac.com');
+  const [crmUrl, setCrmUrl] = useState(PRODUCTION_URL);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDevMode, setShowDevMode] = useState(false);
+  const [isLocalMode, setIsLocalMode] = useState(false);
+
+  // Cargar la última URL usada al iniciar
+  useEffect(() => {
+    getCRMConfig().then((config) => {
+      if (config.url && config.url !== PRODUCTION_URL) {
+        setCrmUrl(config.url);
+        setShowDevMode(true);
+        setIsLocalMode(config.url === LOCAL_URL);
+      }
+    });
+  }, []);
+
+  // Cambiar entre local y producción
+  function toggleLocalMode() {
+    const newIsLocal = !isLocalMode;
+    setIsLocalMode(newIsLocal);
+    setCrmUrl(newIsLocal ? LOCAL_URL : PRODUCTION_URL);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,19 +67,48 @@ export function LoginForm({ onLogin }: LoginFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              URL del CRM
-            </label>
-            <input
-              type="url"
-              value={crmUrl}
-              onChange={(e) => setCrmUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary"
-              placeholder="https://crm.amersur.com"
-              required
-            />
+          {/* Toggle para modo desarrollo */}
+          <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                {isLocalMode ? '🔧 Modo Local' : '🌐 Producción'}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[180px]">
+                {crmUrl}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={toggleLocalMode}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                isLocalMode
+                  ? 'bg-orange-500 focus:ring-orange-500'
+                  : 'bg-green-600 focus:ring-green-500'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                  isLocalMode ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
+
+          {/* Campo URL personalizada (oculto por defecto) */}
+          {showDevMode && !isLocalMode && crmUrl !== PRODUCTION_URL && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                URL personalizada
+              </label>
+              <input
+                type="url"
+                value={crmUrl}
+                onChange={(e) => setCrmUrl(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+                placeholder="https://..."
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

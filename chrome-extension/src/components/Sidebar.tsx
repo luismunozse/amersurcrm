@@ -24,6 +24,7 @@ export function Sidebar() {
   const [apiClient, setApiClient] = useState<CRMApiClient | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [lastProcessedPhone, setLastProcessedPhone] = useState<string | null>(null); // Último teléfono procesado
+  const [clienteAsignadoAOtro, setClienteAsignadoAOtro] = useState<string | null>(null); // Mensaje si cliente está asignado a otro
 
   // Inicializar autenticación
   useEffect(() => {
@@ -58,6 +59,7 @@ export function Sidebar() {
       // Si no hay contacto, limpiar estado
       setCliente(null);
       setLastProcessedPhone(null);
+      setClienteAsignadoAOtro(null);
     }
   }, [contact, apiClient, lastProcessedPhone]);
 
@@ -121,21 +123,28 @@ export function Sidebar() {
 
     logger.info('Buscando cliente', { phone });
     setSearchingCliente(true);
-    try {
-      const found = await apiClient.searchClienteByPhone(phone);
+    setClienteAsignadoAOtro(null); // Limpiar mensaje anterior
 
-      if (found) {
-        // Cliente existe en el CRM
-        setCliente(found);
-        logger.info('Cliente encontrado en CRM', { clienteId: found.id, nombre: found.nombre });
-        
+    try {
+      const result = await apiClient.searchClienteByPhone(phone);
+
+      if (result.cliente) {
+        // Cliente existe en el CRM y está asignado a este vendedor (o es admin)
+        setCliente(result.cliente);
+        logger.info('Cliente encontrado en CRM', { clienteId: result.cliente.id, nombre: result.cliente.nombre });
+
         // Reflejar nombre del CRM en el contacto para mostrarlo en el encabezado
         setContact((prev) => {
           if (!prev) return prev;
-          const normalizedName = (found.nombre || '').trim();
+          const normalizedName = (result.cliente?.nombre || '').trim();
           if (!normalizedName) return prev;
           return { ...prev, name: normalizedName };
         });
+      } else if (result.asignadoAOtro) {
+        // Cliente existe pero está asignado a otro vendedor
+        logger.info('Cliente asignado a otro vendedor', { phone, mensaje: result.mensaje });
+        setCliente(null);
+        setClienteAsignadoAOtro(result.mensaje || 'Cliente asignado a otro vendedor');
       } else {
         // Cliente NO existe - mostrar formulario para crear lead manualmente
         logger.info('Cliente no encontrado. Mostrar formulario de creación manual.', { phone });
@@ -170,7 +179,8 @@ export function Sidebar() {
     try {
       // Obtener información del usuario
       const user = await client.getCurrentUser();
-      setUserName(user.username || user.email?.split('@')[0] || 'Usuario');
+      // Preferir nombre completo para las plantillas, sino usar username
+      setUserName(user.nombre_completo || user.username || user.email?.split('@')[0] || 'Usuario');
     } catch (error) {
       logger.error('Error obteniendo usuario', error instanceof Error ? error : undefined);
       setUserName('Usuario');
@@ -273,7 +283,27 @@ export function Sidebar() {
               apiClient={apiClient!}
             />
 
-            {!cliente && (
+            {/* Cliente asignado a otro vendedor */}
+            {clienteAsignadoAOtro && (
+              <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-orange-600 dark:text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                      Cliente no disponible
+                    </p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                      {clienteAsignadoAOtro}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Formulario para crear lead (solo si no existe y no está asignado a otro) */}
+            {!cliente && !clienteAsignadoAOtro && (
               <CreateLeadForm
                 contact={contact}
                 apiClient={apiClient!}
@@ -312,6 +342,7 @@ export function Sidebar() {
             <MessageTemplates
               onSelectTemplate={handleSelectTemplate}
               userName={userName || undefined}
+              clientName={cliente?.nombre || contact?.name || undefined}
             />
           </>
         )}

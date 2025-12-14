@@ -131,11 +131,20 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
                 <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-2">
                   🏠 Proyectos de interés ({proyectosInteres.length}):
                 </p>
-                <div className="space-y-1">
-                  {proyectosInteres.slice(0, 3).map((proyecto: any, idx: number) => (
-                    <p key={idx} className="text-xs text-purple-600 dark:text-purple-400">
-                      • {proyecto.proyecto_nombre || proyecto.lote_nombre || 'Proyecto'}
-                    </p>
+                <div className="space-y-2">
+                  {proyectosInteres.slice(0, 3).map((interes: any, idx: number) => (
+                    <div key={idx} className="text-xs text-purple-600 dark:text-purple-400">
+                      <p className="font-medium">
+                        • {interes.lote?.proyecto?.nombre || 'Proyecto'}
+                      </p>
+                      {interes.lote?.codigo && (
+                        <p className="ml-3 text-purple-500 dark:text-purple-500">
+                          Lote {interes.lote.codigo}
+                          {interes.lote.sup_m2 && ` • ${interes.lote.sup_m2} m²`}
+                          {interes.lote.precio && ` • ${interes.lote.moneda || '$'} ${interes.lote.precio.toLocaleString()}`}
+                        </p>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
