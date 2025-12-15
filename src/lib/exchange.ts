@@ -56,13 +56,21 @@ async function fetchSunatRate(currency: 'USD' | 'EUR'): Promise<ExchangeRate> {
 
   try {
     const url = `${SUNAT_ENDPOINT}?moneda=${currency}`;
+
+    // Timeout de 3 segundos para no bloquear el render del dashboard
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
     const res = await fetch(url, {
       // Datos cambian diariamente; revalidamos cada 6 horas
       next: { revalidate: 60 * 60 * 6 },
       headers: {
         'User-Agent': 'AMERSUR-CRM/1.0',
       },
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     // Si es 429, usar caché o valores por defecto
     if (res.status === 429) {

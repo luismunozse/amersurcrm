@@ -1,5 +1,5 @@
 import 'server-only';
-import { createServerOnlyClient } from '@/lib/supabase.server';
+import { createServerOnlyClient, getCachedAuthUser } from '@/lib/supabase.server';
 import type {
   PermisoCodigo,
   UsuarioConPermisos,
@@ -15,7 +15,8 @@ import type {
 export async function obtenerPermisosUsuario(): Promise<UsuarioConPermisos | null> {
   try {
     const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Usar función cacheada para evitar rate limits
+    const { user } = await getCachedAuthUser();
 
     if (!user) return null;
 

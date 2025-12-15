@@ -9,6 +9,7 @@ import CrearProformaModal from "./_CrearProformaModal";
 import { generarProformaPdf } from "@/components/proforma/generarProformaPdf";
 import { eliminarProformaAction } from "./proformas/_actions";
 import { useSearchParams } from "next/navigation";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface TabProformasProps {
   cliente: any;
@@ -59,6 +60,7 @@ export default function TabProformas({
   const [proformaSeleccionada, setProformaSeleccionada] = useState<ProformaRecord | null>(null);
   const [isGenerating, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [proformaAEliminar, setProformaAEliminar] = useState<ProformaRecord | null>(null);
 
   const proformasOrdenadas = useMemo(
     () =>
@@ -80,14 +82,16 @@ export default function TabProformas({
     });
   };
 
-  const handleEliminar = async (proforma: ProformaRecord) => {
-    if (!confirm(`¿Estás seguro de eliminar la cotización ${proforma.numero || ""}? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+  const handleEliminar = (proforma: ProformaRecord) => {
+    setProformaAEliminar(proforma);
+  };
 
-    setIsDeleting(proforma.id);
+  const confirmarEliminar = async () => {
+    if (!proformaAEliminar) return;
+
+    setIsDeleting(proformaAEliminar.id);
     try {
-      const result = await eliminarProformaAction(proforma.id, cliente.id);
+      const result = await eliminarProformaAction(proformaAEliminar.id, cliente.id);
       if (result.success) {
         toast.success("Cotización eliminada");
         router.refresh();
@@ -99,6 +103,7 @@ export default function TabProformas({
       toast.error("Error al eliminar la cotización");
     } finally {
       setIsDeleting(null);
+      setProformaAEliminar(null);
     }
   };
 
@@ -264,6 +269,24 @@ export default function TabProformas({
           }
           router.refresh();
         }}
+      />
+
+      <ConfirmDialog
+        open={!!proformaAEliminar}
+        title="Eliminar cotización"
+        description={
+          <>
+            ¿Estás seguro de eliminar la cotización{" "}
+            <strong>{proformaAEliminar?.numero || ""}</strong>?
+            <br />
+            <span className="text-red-500">Esta acción no se puede deshacer.</span>
+          </>
+        }
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        disabled={!!isDeleting}
+        onConfirm={confirmarEliminar}
+        onClose={() => setProformaAEliminar(null)}
       />
     </div>
   );

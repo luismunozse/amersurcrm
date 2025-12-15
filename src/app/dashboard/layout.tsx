@@ -5,14 +5,15 @@ export const fetchCache = "force-no-store";
 
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, getCachedAuthUser } from "@/lib/supabase.server";
 import DashboardClient from "./DashboardClient";
 import { getCachedNotificacionesNoLeidas, getCachedNotificacionesCount } from "@/lib/cache.server";
 import { getSunatExchangeRates } from "@/lib/exchange";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const s = await createServerOnlyClient();
-  const { data: { user } } = await s.auth.getUser();
+  // Usar función cacheada para evitar rate limits
+  const { user } = await getCachedAuthUser();
   if (!user) redirect("/auth/login");
 
   // Obtener el perfil del usuario para nombre, username, rol, avatar y verificar si requiere cambio de password
@@ -36,17 +37,24 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect("/auth/cambiar-password");
   }
 
-  const [notifications, notificationsCount, exchangeRates, configuracionResult] = await Promise.all([
-    getCachedNotificacionesNoLeidas(),
-    getCachedNotificacionesCount(),
-    getSunatExchangeRates(),
+  // Separar queries críticas (configuración) de no-críticas (notificaciones, exchange)
+  // Las no-críticas usan catch para no bloquear si fallan
+  const [
+    configuracionResult,
+    notifications,
+    notificationsCount,
+    exchangeRates,
+  ] = await Promise.all([
+    // CRÍTICA: configuración del sistema (necesaria para push)
     s
       .from("configuracion_sistema")
-      .select(
-        "notificaciones_push, push_vapid_public, push_provider",
-      )
+      .select("notificaciones_push, push_vapid_public, push_provider")
       .eq("id", 1)
       .maybeSingle(),
+    // NO-CRÍTICAS: si fallan, usamos valores por defecto
+    getCachedNotificacionesNoLeidas().catch(() => []),
+    getCachedNotificacionesCount().catch(() => 0),
+    getSunatExchangeRates().catch(() => []),
   ]);
 
   const configuracion = configuracionResult?.data ?? null;

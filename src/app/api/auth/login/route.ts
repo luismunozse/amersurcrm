@@ -3,6 +3,18 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 
 export const dynamic = "force-dynamic";
 
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * POST /api/auth/login
  *
@@ -20,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!loginIdentifier || !password) {
       return NextResponse.json(
         { error: "Usuario/Email y contraseña son requeridos" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -50,14 +62,14 @@ export async function POST(request: NextRequest) {
           console.error("[Login] No se encontró email para username:", loginIdentifier);
           return NextResponse.json(
             { error: "Usuario no encontrado" },
-            { status: 404 }
+            { status: 404, headers: corsHeaders }
           );
         }
       } else {
         console.error("[Login] No se encontró perfil para username:", loginIdentifier);
         return NextResponse.json(
           { error: "Usuario no encontrado" },
-          { status: 404 }
+          { status: 404, headers: corsHeaders }
         );
       }
     }
@@ -74,7 +86,7 @@ export async function POST(request: NextRequest) {
       console.error("[Login] Error de autenticación:", authError.message);
       return NextResponse.json(
         { error: "Credenciales inválidas" },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -122,7 +134,7 @@ export async function POST(request: NextRequest) {
       },
       token: authData.session.access_token,
       refreshToken: authData.session.refresh_token, // Para renovación automática
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[Login] Error:", error);
     return NextResponse.json(
@@ -130,7 +142,7 @@ export async function POST(request: NextRequest) {
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

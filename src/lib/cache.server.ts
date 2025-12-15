@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { createOptimizedServerClient } from "./supabase.server";
+import { createOptimizedServerClient, getCachedUserId } from "./supabase.server";
 import type {
   ClienteCached,
   ProyectoCached,
@@ -9,9 +9,10 @@ import type {
   NotificacionNoLeida,
 } from "@/types/crm";
 
-async function getUserIdOrNull(s: Awaited<ReturnType<typeof createOptimizedServerClient>>) {
-  const { data } = await s.auth.getUser();
-  return data.user?.id ?? null;
+// DEPRECATED: Usar getCachedUserId() directamente en su lugar
+// Mantener por compatibilidad temporal
+async function getUserIdOrNull(_s: Awaited<ReturnType<typeof createOptimizedServerClient>>) {
+  return getCachedUserId();
 }
 
 /* ========= Clientes ========= */

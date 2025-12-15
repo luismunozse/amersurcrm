@@ -41,6 +41,20 @@ export async function createOptimizedServerClient() {
 // Alias para compatibilidad
 export const createServerOnlyClient = createOptimizedServerClient;
 
+// Cache de auth.getUser() - evita múltiples llamadas a Supabase Auth por request
+// Esto es CRÍTICO para evitar rate limits (429 errors)
+export const getCachedAuthUser = cache(async () => {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.auth.getUser();
+  return { user: data.user, error };
+});
+
+// Helper para obtener solo el userId (usado frecuentemente)
+export const getCachedUserId = cache(async (): Promise<string | null> => {
+  const { user } = await getCachedAuthUser();
+  return user?.id ?? null;
+});
+
 // Cliente para Route Handlers que necesitan modificar cookies (como auth callbacks)
 export async function createRouteHandlerClient() {
   const cookieStore = await cookies();

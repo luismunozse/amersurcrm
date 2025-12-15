@@ -62,47 +62,19 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   try {
     const startTime = Date.now();
     
-    // Ejecutar queries en paralelo con timing individual
+    // Ejecutar queries en paralelo con fallbacks para no bloquear si alguna falla
     const [clientesResult, proyectosData, notificacionesData, clienteServerMetrics, permisosUsuario, agendaMetrics] = await Promise.all([
-      (async () => {
-        const t = Date.now();
-        const result = await getCachedClientes({ mode: "dashboard", pageSize: 12, withTotal: false });
-        console.log(`[Dashboard] getCachedClientes: ${Date.now() - t}ms`);
-        return result;
-      })(),
-      (async () => {
-        const t = Date.now();
-        const result = await getCachedProyectos();
-        console.log(`[Dashboard] getCachedProyectos: ${Date.now() - t}ms`);
-        return result;
-      })(),
-      (async () => {
-        const t = Date.now();
-        const result = await getCachedNotificacionesNoLeidas();
-        console.log(`[Dashboard] getCachedNotificacionesNoLeidas: ${Date.now() - t}ms`);
-        return result;
-      })(),
-      (async () => {
-        const t = Date.now();
-        const result = await getCachedClientesDashboardMetrics();
-        console.log(`[Dashboard] getCachedClientesDashboardMetrics: ${Date.now() - t}ms`);
-        return result;
-      })(),
-      (async () => {
-        const t = Date.now();
-        const result = await obtenerPermisosUsuario();
-        console.log(`[Dashboard] obtenerPermisosUsuario: ${Date.now() - t}ms`);
-        return result;
-      })(),
-      (async () => {
-        const t = Date.now();
-        const result = await obtenerMetricasAgenda();
-        console.log(`[Dashboard] obtenerMetricasAgenda: ${Date.now() - t}ms`);
-        return result;
-      })(),
+      getCachedClientes({ mode: "dashboard", pageSize: 12, withTotal: false }).catch(() => ({ data: [] })),
+      getCachedProyectos().catch(() => []),
+      getCachedNotificacionesNoLeidas().catch(() => []),
+      getCachedClientesDashboardMetrics().catch(() => ({ total: 0, sinSeguimiento: 0, conAccion: 0, fueraDeRango: 0 })),
+      obtenerPermisosUsuario().catch(() => null),
+      obtenerMetricasAgenda().catch(() => ({ eventosPendientes: 0, eventosHoy: 0, eventosSemana: 0 })),
     ]);
-    
-    console.log(`[Dashboard] Total parallel queries: ${Date.now() - startTime}ms`);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Dashboard] Total parallel queries: ${Date.now() - startTime}ms`);
+    }
 
     const clientes = Array.isArray(clientesResult?.data)
       ? (clientesResult.data as ClienteLite[])

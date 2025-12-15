@@ -656,7 +656,7 @@ export async function crearReserva(data: {
     if (error) {
       // Si falla la creación de la reserva, liberar el lote
       if (data.loteId) {
-        await supabase.rpc('crm.liberar_lote', { p_lote: data.loteId });
+        await supabase.rpc('liberar_lote', { p_lote: data.loteId });
       }
       throw error;
     }
@@ -728,7 +728,7 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
 
     // Liberar lote usando RPC (valida estado y hace la transición de forma segura)
     if (reserva.lote_id) {
-      const { error: rpcError } = await supabase.rpc('crm.liberar_lote', {
+      const { error: rpcError } = await supabase.rpc('liberar_lote', {
         p_lote: reserva.lote_id
       });
 
@@ -768,7 +768,7 @@ export async function eliminarReserva(reservaId: string) {
 
     // Si la reserva está activa y tiene un lote, liberar el lote primero
     if (reserva.estado === 'activa' && reserva.lote_id) {
-      const { error: rpcError } = await supabase.rpc('crm.liberar_lote', {
+      const { error: rpcError } = await supabase.rpc('liberar_lote', {
         p_lote: reserva.lote_id
       });
 

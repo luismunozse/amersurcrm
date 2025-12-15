@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
 import type { ProformaDatos, ProformaMoneda, ProformaRecord, ProformaTipoOperacion } from "@/types/proforma";
 
@@ -149,21 +150,34 @@ export async function eliminarProformaAction(
       return { success: false, error: "Sesión expirada" };
     }
 
-    // Verificar si es admin
+    // Verificar si es admin - obtener el nombre del rol
     const { data: perfil } = await supabase
+      .schema("crm")
       .from("usuario_perfil")
-      .select("rol")
+      .select("rol:rol!usuario_perfil_rol_id_fkey(nombre)")
       .eq("id", user.id)
       .single();
 
-    if (!perfil || perfil.rol !== "admin") {
-      return { success: false, error: "Solo los administradores pueden eliminar cotizaciones" };
+    const rolNombre = perfil?.rol
+      ? (Array.isArray(perfil.rol) ? perfil.rol[0]?.nombre : (perfil.rol as { nombre: string })?.nombre)
+      : null;
+
+    if (!rolNombre || !['ROL_ADMIN', 'ROL_GERENTE'].includes(rolNombre)) {
+      return { success: false, error: `Solo los administradores pueden eliminar cotizaciones (rol detectado: ${rolNombre})` };
     }
 
-    const { error } = await supabase
+    // Usar service role para bypasear RLS
+    const serviceClient = createServiceRoleClient();
+    const { data: deleted, error } = await serviceClient
+      .schema("crm")
       .from("proforma")
       .delete()
-      .eq("id", proformaId);
+      .eq("id", proformaId)
+      .select("id");
+
+    console.log("[eliminarProforma] proformaId:", proformaId);
+    console.log("[eliminarProforma] deleted:", deleted);
+    console.log("[eliminarProforma] error:", error);
 
     if (error) {
       console.error("eliminarProformaAction error", error);

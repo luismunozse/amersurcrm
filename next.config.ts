@@ -7,7 +7,14 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 const nextConfig: NextConfig = {
   // Optimizaciones de rendimiento
   experimental: {
-    optimizePackageImports: ['@supabase/supabase-js', 'react-hot-toast'],
+    optimizePackageImports: [
+      '@supabase/supabase-js',
+      'react-hot-toast',
+      'recharts',        // Gráficos - tree-shake componentes no usados
+      'date-fns',        // Utilidades de fecha - importar solo funciones usadas
+      'lucide-react',    // Iconos - importar solo los usados
+      'papaparse',       // CSV parsing
+    ],
     serverActions: {
       bodySizeLimit: '50mb', // Límite aumentado para subida de múltiples imágenes (logo + galería)
     },

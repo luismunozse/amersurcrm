@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, getCachedAuthUser } from "@/lib/supabase.server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import {
@@ -29,9 +29,8 @@ export async function obtenerMetricasAgenda(): Promise<{
 }> {
   try {
     const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Usar función cacheada para evitar rate limits
+    const { user } = await getCachedAuthUser();
 
     if (!user) {
       return { eventosPendientes: 0, eventosHoy: 0, eventosSemana: 0 };
