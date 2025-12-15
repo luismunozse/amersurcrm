@@ -179,7 +179,15 @@ async function verificarCondicionPermiso(
       return { permitido: true }; // Por defecto, permitir si no se puede verificar
     }
 
-    return data as PermisoVerificacion;
+    // La función SQL retorna TABLE, así que data es un array
+    const resultado = Array.isArray(data) ? data[0] : data;
+
+    // Si no hay resultado, permitir por defecto
+    if (!resultado) {
+      return { permitido: true };
+    }
+
+    return resultado as PermisoVerificacion;
   } catch (error) {
     console.error('Error en verificarCondicionPermiso:', error);
     return { permitido: true };

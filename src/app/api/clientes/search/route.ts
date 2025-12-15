@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     const perfil = perfilData as { username: string; rol: { nombre: string } | { nombre: string }[] | null } | null;
     const rolData = perfil?.rol;
     const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-    const esAdmin = rolNombre === "admin";
+    const esAdmin = rolNombre === "admin" || rolNombre === "ROL_ADMIN";
     const vendedorUsername = perfil?.username;
 
     console.log(`[ClienteSearch] Usuario: ${vendedorUsername}, Rol: ${rolNombre}, EsAdmin: ${esAdmin}`);
