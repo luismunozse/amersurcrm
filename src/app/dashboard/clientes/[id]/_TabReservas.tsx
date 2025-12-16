@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban, Eye } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import CrearReservaModal from "@/components/CrearReservaModal";
 import CancelarReservaModal from "@/components/CancelarReservaModal";
 import EliminarReservaModal from "@/components/EliminarReservaModal";
+import DetalleReservaModal from "@/components/DetalleReservaModal";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
@@ -27,6 +28,10 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
   // Estado para modal de eliminar reserva (solo admin)
   const [eliminarModalOpen, setEliminarModalOpen] = useState(false);
   const [reservaAEliminar, setReservaAEliminar] = useState<any>(null);
+
+  // Estado para modal de detalle de reserva
+  const [detalleModalOpen, setDetalleModalOpen] = useState(false);
+  const [reservaDetalle, setReservaDetalle] = useState<any>(null);
 
   const getEstadoColor = (estado: string) => {
     const colores = {
@@ -174,6 +179,18 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
 
                   {/* Botones de accion */}
                   <div className="flex gap-2">
+                    {/* Boton Ver Detalle */}
+                    <button
+                      onClick={() => {
+                        setReservaDetalle(reserva);
+                        setDetalleModalOpen(true);
+                      }}
+                      className="p-1.5 text-crm-primary hover:bg-crm-primary/10 rounded transition-colors"
+                      title="Ver detalle"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+
                     {/* Boton Cancelar - solo para reservas activas */}
                     {reserva.estado === 'activa' && (
                       <button
@@ -252,6 +269,17 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
           estado={reservaAEliminar.estado}
         />
       )}
+
+      {/* Modal Detalle Reserva */}
+      <DetalleReservaModal
+        isOpen={detalleModalOpen}
+        onClose={() => {
+          setDetalleModalOpen(false);
+          setReservaDetalle(null);
+        }}
+        reserva={reservaDetalle}
+        clienteNombre={clienteNombre}
+      />
     </div>
   );
 }

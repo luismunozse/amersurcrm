@@ -168,16 +168,11 @@ export async function eliminarProformaAction(
 
     // Usar service role para bypasear RLS
     const serviceClient = createServiceRoleClient();
-    const { data: deleted, error } = await serviceClient
+    const { error } = await serviceClient
       .schema("crm")
       .from("proforma")
       .delete()
-      .eq("id", proformaId)
-      .select("id");
-
-    console.log("[eliminarProforma] proformaId:", proformaId);
-    console.log("[eliminarProforma] deleted:", deleted);
-    console.log("[eliminarProforma] error:", error);
+      .eq("id", proformaId);
 
     if (error) {
       console.error("eliminarProformaAction error", error);

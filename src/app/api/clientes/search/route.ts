@@ -3,6 +3,18 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 
 export const dynamic = "force-dynamic";
 
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * GET /api/clientes/search?phone=+51999999999
  *
@@ -29,7 +41,7 @@ export async function GET(request: NextRequest) {
 
       if (authError || !authUser) {
         console.error("[ClienteSearch] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
 
       userId = authUser.id;
@@ -40,7 +52,7 @@ export async function GET(request: NextRequest) {
       const { data: { user: sessionUser } } = await supabase.auth.getUser();
 
       if (!sessionUser) {
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
 
       userId = sessionUser.id;
@@ -75,7 +87,7 @@ export async function GET(request: NextRequest) {
     if (!phone) {
       return NextResponse.json(
         { error: "Parámetro 'phone' requerido" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -122,7 +134,7 @@ export async function GET(request: NextRequest) {
       console.error("[ClienteSearch] Error en query:", error);
       return NextResponse.json(
         { error: "Error buscando cliente", details: error.message },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -143,12 +155,12 @@ export async function GET(request: NextRequest) {
             cliente: null,
             asignadoAOtro: true,
             mensaje: `Este cliente está asignado a otro vendedor (${clienteExiste.vendedor_asignado || 'sin asignar'})`,
-          });
+          }, { headers: corsHeaders });
         }
       }
 
       console.log(`[ClienteSearch] Cliente no encontrado`);
-      return NextResponse.json({ cliente: null });
+      return NextResponse.json({ cliente: null }, { headers: corsHeaders });
     }
 
     console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}, vendedor: ${cliente.vendedor_asignado}`);
@@ -167,7 +179,7 @@ export async function GET(request: NextRequest) {
         created_at: cliente.created_at,
         notas: cliente.notas,
       },
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[ClienteSearch] Error:", error);
     return NextResponse.json(
@@ -175,7 +187,7 @@ export async function GET(request: NextRequest) {
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

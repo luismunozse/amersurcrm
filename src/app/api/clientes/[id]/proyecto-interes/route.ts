@@ -3,6 +3,18 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 
 export const dynamic = "force-dynamic";
 
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * GET /api/clientes/[id]/proyecto-interes
  *
@@ -30,7 +42,7 @@ export async function GET(
 
       if (authError || !authUser) {
         console.error("[ProyectoInteres] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
 
       // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
@@ -41,7 +53,7 @@ export async function GET(
       const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !sessionUser) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+        return NextResponse.json({ error: "No autorizado" }, { status: 401, headers: corsHeaders });
       }
     }
 
@@ -56,19 +68,19 @@ export async function GET(
       console.error("[API] Error obteniendo proyectos de interés:", error);
       return NextResponse.json(
         { error: "Error obteniendo proyectos de interés" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
     return NextResponse.json({
       success: true,
       proyectosInteres: intereses || [],
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[API] Error en /api/clientes/[id]/proyecto-interes:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -101,7 +113,7 @@ export async function POST(
 
       if (authError || !authUser) {
         console.error("[ProyectoInteres] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
 
       user = authUser;
@@ -113,7 +125,7 @@ export async function POST(
       const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !sessionUser) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+        return NextResponse.json({ error: "No autorizado" }, { status: 401, headers: corsHeaders });
       }
 
       user = sessionUser;
@@ -126,7 +138,7 @@ export async function POST(
     if (!loteId && !proyectoId) {
       return NextResponse.json(
         { error: "Debe especificar loteId o proyectoId" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -156,7 +168,7 @@ export async function POST(
       console.error("[API] Error agregando proyecto de interés:", insertError);
       return NextResponse.json(
         { error: "Error agregando proyecto de interés" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -166,18 +178,18 @@ export async function POST(
         success: true,
         message: "Ya existe este interés",
         proyectoInteres: nuevoInteres,
-      });
+      }, { headers: corsHeaders });
     }
 
     return NextResponse.json({
       success: true,
       proyectoInteres: nuevoInteres,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[API] Error en POST /api/clientes/[id]/proyecto-interes:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -209,7 +221,7 @@ export async function DELETE(
 
       if (authError || !authUser) {
         console.error("[ProyectoInteres] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
 
       // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
@@ -220,7 +232,7 @@ export async function DELETE(
       const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !sessionUser) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+        return NextResponse.json({ error: "No autorizado" }, { status: 401, headers: corsHeaders });
       }
     }
 
@@ -231,7 +243,7 @@ export async function DELETE(
     if (!interesId) {
       return NextResponse.json(
         { error: "Falta parámetro interesId" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -246,19 +258,19 @@ export async function DELETE(
       console.error("[API] Error eliminando proyecto de interés:", deleteError);
       return NextResponse.json(
         { error: "Error eliminando proyecto de interés" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
     return NextResponse.json({
       success: true,
       message: "Proyecto de interés eliminado",
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[API] Error en DELETE /api/clientes/[id]/proyecto-interes:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

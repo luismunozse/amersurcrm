@@ -197,9 +197,16 @@ export function Sidebar() {
     setCliente(null);
   }
 
-  async function handleLeadCreated() {
-    // Refrescar información del cliente
-    if (contact && apiClient) {
+  async function handleLeadCreated(nuevoCliente?: Cliente) {
+    // Si se proporcionan datos del cliente, setearlos directamente
+    if (nuevoCliente) {
+      logger.info('Lead creado, seteando cliente directamente', { clienteId: nuevoCliente.id });
+      setCliente(nuevoCliente);
+      setClienteAsignadoAOtro(null);
+    } else if (contact && apiClient) {
+      // Fallback: buscar el cliente
+      logger.info('Lead creado, buscando cliente...');
+      await new Promise(resolve => setTimeout(resolve, 500));
       await searchCliente(contact.phone);
     }
   }

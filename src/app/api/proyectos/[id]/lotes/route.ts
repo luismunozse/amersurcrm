@@ -4,6 +4,18 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 
 export const dynamic = "force-dynamic";
 
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * GET /api/proyectos/[id]/lotes
  *
@@ -34,7 +46,7 @@ export async function GET(
       if (authError || !authUser) {
         return NextResponse.json(
           { error: "No autorizado" },
-          { status: 401 }
+          { status: 401, headers: corsHeaders }
         );
       }
 
@@ -50,7 +62,7 @@ export async function GET(
       if (authError || !sessionUser) {
         return NextResponse.json(
           { error: "No autorizado" },
-          { status: 401 }
+          { status: 401, headers: corsHeaders }
         );
       }
     }
@@ -64,7 +76,7 @@ export async function GET(
       console.error("[API] Error obteniendo lotes:", error);
       return NextResponse.json(
         { error: "Error obteniendo lotes" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -73,12 +85,12 @@ export async function GET(
     return NextResponse.json({
       success: true,
       lotes: lotes || [],
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[API] Error en /api/proyectos/[id]/lotes:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

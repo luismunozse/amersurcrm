@@ -3,6 +3,18 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 
 export const dynamic = "force-dynamic";
 
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * POST /api/clientes/create-lead
  *
@@ -27,7 +39,7 @@ export async function POST(request: NextRequest) {
         console.error("[CreateLead] Error de autenticación con token:", authError);
         return NextResponse.json(
           { error: "No autenticado" },
-          { status: 401 }
+          { status: 401, headers: corsHeaders }
         );
       }
 
@@ -42,7 +54,7 @@ export async function POST(request: NextRequest) {
         console.error("[CreateLead] Error de autenticación:", authError);
         return NextResponse.json(
           { error: "No autenticado" },
-          { status: 401 }
+          { status: 401, headers: corsHeaders }
         );
       }
 
@@ -56,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (!telefono) {
       return NextResponse.json(
         { error: "El campo 'telefono' es requerido" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -83,7 +95,7 @@ export async function POST(request: NextRequest) {
         clienteId: clienteExistente.id,
         existente: true,
         cliente: clienteExistente,
-      });
+      }, { headers: corsHeaders });
     }
 
     // Preparar datos del lead
@@ -103,7 +115,7 @@ export async function POST(request: NextRequest) {
       pais: "Perú",
     };
 
-    // Crear el lead usando la función RPC que incluye asignación automática round-robin
+    // Crear el lead usando la función RPC con asignación automática round-robin
     // Si vendedor_asignado es NULL, la función asigna automáticamente al siguiente vendedor activo
     const rpcResult = await supabaseAdmin
       .schema("crm")
@@ -132,7 +144,7 @@ export async function POST(request: NextRequest) {
           success: false,
           message: "El cliente ya existe (duplicado)",
           existente: true,
-        });
+        }, { headers: corsHeaders });
       }
 
       throw insertError;
@@ -156,7 +168,7 @@ export async function POST(request: NextRequest) {
       clienteId: clienteData.id,
       cliente: clienteData,
       existente: false,
-    });
+    }, { headers: corsHeaders });
 
   } catch (error) {
     console.error("[CreateLead] Error completo:", error);
@@ -173,11 +185,11 @@ export async function POST(request: NextRequest) {
       {
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
-        details: process.env.NODE_ENV === 'development' 
+        details: process.env.NODE_ENV === 'development'
           ? (error instanceof Error ? error.stack : String(error))
           : undefined,
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

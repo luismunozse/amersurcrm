@@ -112,13 +112,9 @@ export async function POST(request: NextRequest) {
       console.error("[Login] Error obteniendo perfil:", perfilError);
     }
 
-    // Extraer el nombre del rol (convertir ROL_ADMIN -> admin, ROL_VENDEDOR -> vendedor)
+    // Extraer el nombre del rol - mantener formato original (ROL_ADMIN, ROL_VENDEDOR, etc.)
     const rolData = perfil?.rol as { id?: string; nombre?: string } | null;
-    let rolNombre = rolData?.nombre || "vendedor";
-    // Normalizar: ROL_ADMIN -> admin, ROL_VENDEDOR -> vendedor
-    if (rolNombre.startsWith("ROL_")) {
-      rolNombre = rolNombre.replace("ROL_", "").toLowerCase();
-    }
+    const rolNombre = rolData?.nombre || "ROL_VENDEDOR";
 
     console.log(`[Login] Usuario autenticado: ${emailToUse} (${authData.user.id}) - Rol: ${rolNombre}`);
 

@@ -1,12 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { WhatsAppContact } from '@/types/crm';
+import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
+
+interface Proyecto {
+  id: string;
+  nombre: string;
+  ubicacion?: string;
+}
+
+interface Lote {
+  id: string;
+  codigo: string;
+  estado: string;
+  precio?: number;
+  moneda?: string;
+  sup_m2?: number;
+}
 
 interface CreateLeadFormProps {
   contact: WhatsAppContact;
   apiClient: CRMApiClient;
-  onLeadCreated: () => void;
+  onLeadCreated: (cliente?: Cliente) => void;
 }
 
 export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLeadFormProps) {
@@ -16,9 +31,32 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Estado para proyecto de interés
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
+  const [selectedProyecto, setSelectedProyecto] = useState<string>('');
+  const [selectedLote, setSelectedLote] = useState<string>('');
+  const [loadingProyectos, setLoadingProyectos] = useState(false);
+  const [loadingLotes, setLoadingLotes] = useState(false);
+
   // Ref para controlar que solo se capture el mensaje una vez por contacto
   const mensajeCapturedRef = useRef(false);
   const lastContactIdRef = useRef<string | null>(null);
+
+  // Cargar proyectos al montar
+  useEffect(() => {
+    loadProyectos();
+  }, []);
+
+  // Cargar lotes cuando cambia el proyecto
+  useEffect(() => {
+    if (selectedProyecto) {
+      loadLotes(selectedProyecto);
+    } else {
+      setLotes([]);
+      setSelectedLote('');
+    }
+  }, [selectedProyecto]);
 
   // Intentar obtener el último mensaje del chat (solo una vez por contacto)
   useEffect(() => {
@@ -52,6 +90,30 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
     return () => window.removeEventListener('message', handleMessage);
   }, [contact.chatId]);
 
+  async function loadProyectos() {
+    setLoadingProyectos(true);
+    try {
+      const data = await apiClient.getProyectos();
+      setProyectos(data);
+    } catch (err) {
+      console.error('[CreateLeadForm] Error cargando proyectos:', err);
+    } finally {
+      setLoadingProyectos(false);
+    }
+  }
+
+  async function loadLotes(proyectoId: string) {
+    setLoadingLotes(true);
+    try {
+      const data = await apiClient.getLotes(proyectoId);
+      setLotes(data);
+    } catch (err) {
+      console.error('[CreateLeadForm] Error cargando lotes:', err);
+    } finally {
+      setLoadingLotes(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -69,10 +131,37 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
       });
 
       if (result.success) {
+        // Si se seleccionó un lote, agregarlo como proyecto de interés
+        if (selectedLote && result.clienteId) {
+          try {
+            await apiClient.addProyectoInteres(result.clienteId, selectedLote);
+            console.log('[CreateLeadForm] Proyecto de interés agregado');
+          } catch (err) {
+            console.error('[CreateLeadForm] Error agregando proyecto de interés:', err);
+            // No fallar la creación del lead por esto
+          }
+        }
+
+        // Construir objeto cliente con los datos disponibles
+        const clienteCreado: Cliente = {
+          id: result.clienteId!,
+          nombre: nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`,
+          telefono: contact.phone,
+          telefono_whatsapp: contact.phone,
+          estado_cliente: 'lead',
+          origen_lead: 'whatsapp_web',
+        };
+
+        // Mostrar mensaje de éxito brevemente
         setSuccess(true);
+
+        // Después de 1 segundo, pasar los datos del cliente al Sidebar
         setTimeout(() => {
-          onLeadCreated();
-        }, 1500);
+          onLeadCreated(clienteCreado);
+        }, 1000);
+      } else if (result.existente) {
+        // El cliente ya existe
+        setError(`El cliente ya existe en el CRM con el nombre: "${result.cliente?.nombre || 'Desconocido'}"`);
       } else {
         setError(result.message || 'Error al crear lead');
       }
@@ -103,11 +192,17 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           </svg>
         </div>
         <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-2">
-          ¡Lead creado con éxito!
+          Lead creado exitosamente
         </h3>
-        <p className="text-sm text-green-700 dark:text-green-200">
-          El contacto ha sido registrado en el CRM
+        <p className="text-sm text-green-700 dark:text-green-200 mb-2">
+          {nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`}
         </p>
+        <p className="text-xs text-green-600 dark:text-green-300">
+          Cargando datos del cliente...
+        </p>
+        <div className="mt-3">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600 dark:border-green-300 mx-auto"></div>
+        </div>
       </div>
     );
   }
@@ -145,6 +240,57 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           />
         </div>
 
+        {/* Selector de Proyecto de Interés */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Proyecto de interés (opcional)
+          </label>
+          <select
+            value={selectedProyecto}
+            onChange={(e) => setSelectedProyecto(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+            disabled={loadingProyectos}
+          >
+            <option value="">-- Seleccionar proyecto --</option>
+            {proyectos.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+          {loadingProyectos && (
+            <p className="text-xs text-gray-500 mt-1">Cargando proyectos...</p>
+          )}
+        </div>
+
+        {/* Selector de Lote */}
+        {selectedProyecto && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Lote de interés
+            </label>
+            <select
+              value={selectedLote}
+              onChange={(e) => setSelectedLote(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+              disabled={loadingLotes}
+            >
+              <option value="">-- Seleccionar lote --</option>
+              {lotes.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.codigo} - {l.estado} {l.precio ? `(${l.moneda || '$'} ${l.precio.toLocaleString()})` : ''}
+                </option>
+              ))}
+            </select>
+            {loadingLotes && (
+              <p className="text-xs text-gray-500 mt-1">Cargando lotes...</p>
+            )}
+            {!loadingLotes && lotes.length === 0 && (
+              <p className="text-xs text-yellow-600 mt-1">No hay lotes disponibles para este proyecto</p>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Mensaje inicial (opcional)
@@ -153,7 +299,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
-            rows={4}
+            rows={3}
             placeholder="Primer mensaje del contacto..."
           />
         </div>
