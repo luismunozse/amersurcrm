@@ -3,9 +3,8 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { requierePermiso, esAdmin, esAdminOCoordinador, obtenerPermisosUsuario, tieneRol } from "@/lib/permissions/server";
 import type { LoteCoordenadas } from "@/types/proyectos";
 import type { OverlayLayerConfig } from "@/types/overlay-layers";
 
@@ -127,9 +126,8 @@ export async function crearLote(fd: FormData) {
   if (!user) throw new Error("No autenticado");
 
   await requierePermiso(PERMISOS.LOTES.CREAR);
-  const perfil = await obtenerPerfilUsuario();
-  const rolNombre = perfil?.rol?.nombre;
-  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+  const puedeCrear = await esAdminOCoordinador();
+  if (!puedeCrear) {
     throw new Error("Solo administradores o coordinadores pueden crear lotes");
   }
 
@@ -190,13 +188,10 @@ export async function actualizarLote(loteId: string, fd: FormData) {
   await requierePermiso(PERMISOS.LOTES.EDITAR);
 
   // Verificar permisos y ruta según rol
-  const perfil = await obtenerPerfilUsuario();
-  if (!perfil) {
-    throw new Error("Perfil no encontrado");
-  }
+  const esVendedorRol = await tieneRol('ROL_VENDEDOR');
 
   // Si es vendedor: solo puede cambiar estado mediante RPC seguras
-  if (perfil.rol?.nombre === 'ROL_VENDEDOR') {
+  if (esVendedorRol) {
     // Validar que no intente modificar otros campos
     const quiereCambiarOtrosCampos = Boolean(
       (codigo && codigo.trim() !== "") ||
@@ -321,13 +316,9 @@ export async function guardarPoligonoProyecto(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
-      throw new Error("No tienes permisos para actualizar el perímetro del proyecto");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para actualizar el perímetro del proyecto");
   }
 
   const sanitized = (vertices || []).map((v) => ({
@@ -353,13 +344,9 @@ export async function eliminarPoligonoProyecto(proyectoId: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
-      throw new Error("No tienes permisos para eliminar el perímetro del proyecto");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para eliminar el perímetro del proyecto");
   }
 
   const { error } = await supabase
@@ -384,13 +371,9 @@ export async function guardarPoligonoLote(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== "ROL_ADMIN") {
-      throw new Error("No tienes permisos para actualizar lotes");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para actualizar lotes");
   }
 
   const sanitized = (vertices || [])
@@ -419,9 +402,8 @@ export async function eliminarLote(loteId: string, proyectoId: string) {
 
   // Verificar permisos de administrador
   await requierePermiso(PERMISOS.LOTES.ELIMINAR);
-  const perfil = await obtenerPerfilUsuario();
-  const rolNombre = perfil?.rol?.nombre;
-  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+  const puedeEliminar = await esAdminOCoordinador();
+  if (!puedeEliminar) {
     throw new Error("Solo administradores o coordinadores pueden eliminar lotes");
   }
 
@@ -444,9 +426,8 @@ export async function eliminarTodosLosLotes(proyectoId: string) {
   if (!user) throw new Error("No autenticado");
 
   await requierePermiso(PERMISOS.LOTES.ELIMINAR);
-  const perfil = await obtenerPerfilUsuario();
-  const rolNombre = perfil?.rol?.nombre;
-  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+  const puedeEliminar = await esAdminOCoordinador();
+  if (!puedeEliminar) {
     throw new Error("Solo administradores o coordinadores pueden eliminar lotes");
   }
 
@@ -482,9 +463,8 @@ export async function duplicarLote(loteId: string, proyectoId: string) {
   if (!user) throw new Error("No autenticado");
 
   await requierePermiso(PERMISOS.LOTES.CREAR);
-  const perfil = await obtenerPerfilUsuario();
-  const rolNombre = perfil?.rol?.nombre;
-  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+  const puedeDuplicar = await esAdminOCoordinador();
+  if (!puedeDuplicar) {
     throw new Error("Solo administradores o coordinadores pueden duplicar lotes");
   }
 
@@ -550,13 +530,9 @@ export async function guardarCoordenadasLote(loteId: string, coordenadas: LoteCo
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
   }
 
   const { data: loteInfo } = await supabase
@@ -588,13 +564,9 @@ export async function guardarCoordenadasMultiples(proyectoId: string, coordenada
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para guardar coordenadas. Solo los administradores pueden realizar esta acción.");
   }
 
   // Crear lotes si no existen, o actualizar si existen
@@ -633,13 +605,9 @@ export async function guardarOverlayBounds(
   if (!user) throw new Error("No autenticado");
 
   // Solo admin
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para calibrar el plano");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para calibrar el plano");
   }
 
   const payload: any = { overlay_bounds: bounds as any };
@@ -677,13 +645,9 @@ export async function guardarOverlayLayers(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para actualizar las capas del plano");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para actualizar las capas del plano");
   }
 
   const sanitizedLayers = (layers || [])
@@ -742,13 +706,9 @@ export async function eliminarProyecto(proyectoId: string) {
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
   }
 
   try {
@@ -1003,8 +963,8 @@ export async function crearReservaConVinculacion(datos: {
     }
 
     // Obtener perfil del vendedor
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || !perfil.id) {
+    const usuario = await obtenerPermisosUsuario();
+    if (!usuario || !usuario.id) {
       return { data: null, error: "No se pudo obtener el perfil del vendedor" };
     }
 
@@ -1049,7 +1009,7 @@ export async function crearReservaConVinculacion(datos: {
         codigo_reserva: codigoReserva,
         cliente_id: datos.clienteId,
         lote_id: datos.loteId,
-        vendedor_username: perfil.email,
+        vendedor_username: usuario.email,
         monto_reserva: datos.montoInicial,
         moneda: 'PEN',
         fecha_vencimiento: datos.fechaVencimiento,
@@ -1089,7 +1049,7 @@ export async function crearReservaConVinculacion(datos: {
       await supabase
         .schema('crm')
         .from('cliente')
-        .update({ vendedor_asignado: perfil.email })
+        .update({ vendedor_asignado: usuario.email })
         .eq('id', datos.clienteId);
     }
 

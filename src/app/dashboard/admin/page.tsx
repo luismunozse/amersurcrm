@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";

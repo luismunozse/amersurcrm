@@ -150,6 +150,8 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           telefono_whatsapp: contact.phone,
           estado_cliente: 'lead',
           origen_lead: 'whatsapp_web',
+          vendedor_asignado: result.vendedor || null,
+          created_at: new Date().toISOString(),
         };
 
         // Mostrar mensaje de éxito brevemente
@@ -313,7 +315,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium text-sm"
+          className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium text-sm"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">

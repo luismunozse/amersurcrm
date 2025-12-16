@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 
 export type ConfiguracionFormState = {
   status: "idle" | "success" | "error";

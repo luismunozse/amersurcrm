@@ -65,7 +65,7 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
         onChange={(e) => setNota(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Cliente prefiere 2 habitaciones... (Ctrl+Enter para guardar)"
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm resize-none"
+        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent dark:bg-gray-700 dark:text-white text-sm resize-none"
         rows={3}
         disabled={saving}
       />
@@ -77,7 +77,7 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
         <button
           onClick={handleAddNota}
           disabled={!nota.trim() || saving || nota.length > 200}
-          className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 bg-crm-primary text-white text-sm rounded-lg hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {saving ? 'Guardando...' : 'Agregar'}
         </button>

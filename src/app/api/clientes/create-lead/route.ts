@@ -154,19 +154,41 @@ export async function POST(request: NextRequest) {
       throw new Error("No se pudo crear el lead");
     }
 
+    // Obtener el cliente creado con el vendedor asignado
+    const { data: clienteCreado } = await supabaseAdmin
+      .schema("crm")
+      .from("cliente")
+      .select("id, nombre, telefono, vendedor_asignado")
+      .eq("id", nuevoCliente.id)
+      .single();
+
+    // Obtener el nombre del vendedor si hay uno asignado
+    let vendedorNombre: string | null = null;
+    if (clienteCreado?.vendedor_asignado) {
+      const { data: vendedor } = await supabaseAdmin
+        .schema("crm")
+        .from("usuario_perfil")
+        .select("nombre_completo, username")
+        .eq("id", clienteCreado.vendedor_asignado)
+        .single();
+
+      vendedorNombre = vendedor?.nombre_completo || vendedor?.username || null;
+    }
+
     const clienteData = {
       id: nuevoCliente.id,
       nombre: nombreLead,
       telefono: telefonoLimpio,
     };
 
-    console.log(`✅ [CreateLead] Lead creado: ${clienteData.id}`);
+    console.log(`✅ [CreateLead] Lead creado: ${clienteData.id}, vendedor: ${vendedorNombre}`);
 
     return NextResponse.json({
       success: true,
       message: "Lead creado exitosamente",
       clienteId: clienteData.id,
       cliente: clienteData,
+      vendedor: vendedorNombre,
       existente: false,
     }, { headers: corsHeaders });
 

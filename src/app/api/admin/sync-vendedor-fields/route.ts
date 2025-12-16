@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 
 // GET - Verificar inconsistencias (solo lectura)
 export async function GET(_request: NextRequest) {

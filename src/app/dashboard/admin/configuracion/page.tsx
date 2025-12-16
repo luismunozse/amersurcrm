@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import { ConfiguracionForm, type ConfiguracionInicial } from "./ConfiguracionForm";
 
 export const dynamic = "force-dynamic";

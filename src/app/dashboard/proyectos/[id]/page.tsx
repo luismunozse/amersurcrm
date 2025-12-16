@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
 import MapeoLotesMejorado from "./_MapeoLotesMejorado";

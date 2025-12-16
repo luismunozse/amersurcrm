@@ -9,9 +9,10 @@ interface UpdateLeadStatusProps {
 }
 
 const ESTADOS = [
+  { value: 'lead', label: 'Nuevo Lead', color: 'bg-crm-accent/20 text-crm-primary', icon: '🌱' },
   { value: 'por_contactar', label: 'Por Contactar', color: 'bg-yellow-100 text-yellow-800', icon: '📋' },
   { value: 'contactado', label: 'Contactado', color: 'bg-blue-100 text-blue-800', icon: '📞' },
-  { value: 'interesado', label: 'Interesado', color: 'bg-purple-100 text-purple-800', icon: '⭐' },
+  { value: 'interesado', label: 'Interesado', color: 'bg-crm-accent/30 text-crm-primary', icon: '⭐' },
   { value: 'negociacion', label: 'En Negociación', color: 'bg-orange-100 text-orange-800', icon: '💼' },
   { value: 'cerrado', label: 'Cerrado', color: 'bg-green-100 text-green-800', icon: '✅' },
   { value: 'perdido', label: 'Perdido', color: 'bg-red-100 text-red-800', icon: '❌' },
@@ -102,7 +103,7 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
                     disabled={updating || estado.value === cliente.estado_cliente}
                     className={`p-3 rounded-lg border-2 text-left transition ${
                       estado.value === cliente.estado_cliente
-                        ? 'border-crm-primary bg-blue-50 dark:bg-blue-900/30'
+                        ? 'border-crm-primary bg-crm-accent/10 dark:bg-crm-secondary/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-crm-primary hover:bg-gray-50 dark:hover:bg-gray-700'
                     } ${updating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import { generarUsername, generarUsernameConNumero, validarUsername } from "@/lib/utils/username-generator";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 

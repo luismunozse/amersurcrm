@@ -11,7 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import type { ProyectoActionResponse as _ProyectoActionResponse, LoteActionResponse as _LoteActionResponse } from "@/types/proyectos";
 
 // ============================================================================
@@ -59,13 +59,9 @@ export async function subirPlanos(
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para subir planos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para subir planos. Solo los administradores pueden realizar esta acción.");
   }
 
   if (!planosFile || planosFile.size === 0) {
@@ -139,13 +135,9 @@ export async function eliminarPlanos(
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar planos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para eliminar planos. Solo los administradores pueden realizar esta acción.");
   }
 
   try {
@@ -252,13 +244,9 @@ export async function crearLote(
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para crear lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para crear lotes. Solo los administradores pueden realizar esta acción.");
   }
 
   // Validar que el código sea único dentro del proyecto

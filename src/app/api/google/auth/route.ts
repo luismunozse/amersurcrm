@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 
 export async function GET() {
   try {

@@ -126,7 +126,7 @@ export default function ClienteDetailModal({ isOpen, onClose, cliente }: Cliente
             >
               <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 px-6 py-6">
+                <div className="bg-crm-primary px-6 py-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">

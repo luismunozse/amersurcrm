@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { getCachedClientes } from "@/lib/cache.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
 import {

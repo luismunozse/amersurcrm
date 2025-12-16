@@ -208,7 +208,7 @@ export function MessageTemplates({ onSelectTemplate, userName, clientName, proye
                   <button
                     key={template.id}
                     onClick={() => handleSelectTemplate(template)}
-                    className="w-full p-4 text-left hover:bg-blue-50 dark:hover:bg-gray-700 transition group"
+                    className="w-full p-4 text-left hover:bg-crm-accent/10 dark:hover:bg-gray-700 transition group"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">

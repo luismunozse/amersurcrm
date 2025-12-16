@@ -59,7 +59,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-crm-bg-primary to-crm-accent/20 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">AmersurChat</h1>
@@ -83,7 +83,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                 isLocalMode
                   ? 'bg-orange-500 focus:ring-orange-500'
-                  : 'bg-green-600 focus:ring-green-500'
+                  : 'bg-crm-primary focus:ring-crm-primary'
               }`}
             >
               <span
@@ -148,7 +148,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium"
+            className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium"
           >
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>

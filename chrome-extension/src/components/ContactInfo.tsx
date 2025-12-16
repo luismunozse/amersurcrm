@@ -14,15 +14,17 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
 
   const estadoColors: Record<string, string> = {
+    lead: 'bg-crm-accent/20 text-crm-primary border-crm-accent',
     por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
     contactado: 'bg-blue-100 text-blue-800 border-blue-300',
-    interesado: 'bg-purple-100 text-purple-800 border-purple-300',
+    interesado: 'bg-crm-accent/30 text-crm-primary border-crm-primary',
     negociacion: 'bg-orange-100 text-orange-800 border-orange-300',
     cerrado: 'bg-green-100 text-green-800 border-green-300',
     perdido: 'bg-red-100 text-red-800 border-red-300',
   };
 
   const estadoIcons: Record<string, string> = {
+    lead: '🌱',
     por_contactar: '📋',
     contactado: '📞',
     interesado: '👀',
@@ -32,6 +34,7 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   };
 
   const estadoLabels: Record<string, string> = {
+    lead: 'Nuevo Lead',
     por_contactar: 'Por Contactar',
     contactado: 'Contactado',
     interesado: 'Interesado',
@@ -63,7 +66,7 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-500 to-green-600 p-4 text-white">
+      <div className="bg-gradient-to-r from-crm-primary to-crm-primary-hover p-4 text-white">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
             <svg
@@ -127,18 +130,18 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
 
             {/* Proyectos de interés */}
             {proyectosInteres.length > 0 && (
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
-                <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-2">
+              <div className="bg-crm-accent/10 dark:bg-crm-secondary/20 p-3 rounded-lg border border-crm-accent/30">
+                <p className="text-xs font-medium text-crm-primary dark:text-crm-secondary mb-2">
                   🏠 Proyectos de interés ({proyectosInteres.length}):
                 </p>
                 <div className="space-y-2">
                   {proyectosInteres.slice(0, 3).map((interes: any, idx: number) => (
-                    <div key={idx} className="text-xs text-purple-600 dark:text-purple-400">
+                    <div key={idx} className="text-xs text-crm-primary dark:text-crm-accent">
                       <p className="font-medium">
                         • {interes.lote?.proyecto?.nombre || 'Proyecto'}
                       </p>
                       {interes.lote?.codigo && (
-                        <p className="ml-3 text-purple-500 dark:text-purple-500">
+                        <p className="ml-3 text-crm-text-secondary dark:text-crm-text-muted">
                           Lote {interes.lote.codigo}
                           {interes.lote.sup_m2 && ` • ${interes.lote.sup_m2} m²`}
                           {interes.lote.precio && ` • ${interes.lote.moneda || '$'} ${interes.lote.precio.toLocaleString()}`}

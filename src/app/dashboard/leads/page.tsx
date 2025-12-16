@@ -1,7 +1,7 @@
 import { getCachedClientes, getCachedLeadsStatsByOrigen } from "@/lib/cache.server";
 import ClientesTable from "@/components/ClientesTable";
 import ExportButton from "@/components/export/ExportButton";
-import { esAdmin, esVendedor, obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { esAdmin, esVendedor } from "@/lib/permissions/server";
 import { redirect } from "next/navigation";
 import { getOrigenLeadLabel } from "@/lib/types/clientes";
 import Link from "next/link";
@@ -23,7 +23,6 @@ export default async function LeadsPage({ searchParams }: { searchParams: Search
   // Permitir acceso a administradores y vendedores
   const isAdmin = await esAdmin();
   const isVendedor = await esVendedor();
-  const _perfil = await obtenerPerfilUsuario();
 
   if (!isAdmin && !isVendedor) {
     redirect("/dashboard");

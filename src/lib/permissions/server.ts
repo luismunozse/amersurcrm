@@ -322,3 +322,17 @@ export async function esVendedor(): Promise<boolean> {
 export async function esAdminOCoordinador(): Promise<boolean> {
   return tieneAlgunoDeRoles(['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS']);
 }
+
+/**
+ * Helper para verificar si es gerente
+ */
+export async function esGerente(): Promise<boolean> {
+  return tieneRol('ROL_GERENTE');
+}
+
+/**
+ * Helper para verificar si es admin o gerente
+ */
+export async function esAdminOGerente(): Promise<boolean> {
+  return tieneAlgunoDeRoles(['ROL_ADMIN', 'ROL_GERENTE']);
+}

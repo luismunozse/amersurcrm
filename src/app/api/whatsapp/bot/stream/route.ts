@@ -2,7 +2,7 @@
 
 import { NextRequest } from "next/server";
 import { getBotState, addStateListener, removeStateListener } from "@/lib/whatsapp-bot-state";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 
 /**
  * GET /api/whatsapp/bot/stream

@@ -2,9 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { requierePermiso, esAdmin } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import type { ProyectoMediaItem } from "@/types/proyectos";
 
@@ -280,13 +279,9 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para actualizar proyectos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para actualizar proyectos. Solo los administradores pueden realizar esta acción.");
   }
 
   try {
@@ -473,13 +468,9 @@ export async function eliminarProyecto(proyectoId: string) {
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
   }
 
   try {

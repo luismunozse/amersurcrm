@@ -8,9 +8,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import { obtenerPerfilUsuario } from "@/lib/auth/roles";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { requierePermiso, esAdmin, esAdminOCoordinador } from "@/lib/permissions/server";
 import type { LoteCoordenadas } from "@/types/proyectos";
 
 /**
@@ -33,13 +32,9 @@ export async function actualizarCoordenadasBatch(
   }
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para actualizar coordenadas por lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para actualizar coordenadas por lotes. Solo los administradores pueden realizar esta acción.");
   }
 
   if (!updates || updates.length === 0) {
@@ -146,9 +141,8 @@ export async function crearLotesBatch(
   }
 
   await requierePermiso(PERMISOS.LOTES.CREAR);
-  const perfil = await obtenerPerfilUsuario();
-  const rolNombre = perfil?.rol?.nombre;
-  if (rolNombre !== 'ROL_ADMIN' && rolNombre !== 'ROL_COORDINADOR_VENTAS') {
+  const puedeCrear = await esAdminOCoordinador();
+  if (!puedeCrear) {
     throw new Error("Solo administradores o coordinadores pueden crear lotes por lotes");
   }
 
@@ -252,13 +246,9 @@ export async function actualizarLotesBatch(
   }
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para actualizar lotes por lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para actualizar lotes por lotes. Solo los administradores pueden realizar esta acción.");
   }
 
   if (!updates || updates.length === 0) {
@@ -355,13 +345,9 @@ export async function eliminarLotesBatch(
   }
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar lotes por lotes. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para eliminar lotes por lotes. Solo los administradores pueden realizar esta acción.");
   }
 
   if (!loteIds || loteIds.length === 0) {

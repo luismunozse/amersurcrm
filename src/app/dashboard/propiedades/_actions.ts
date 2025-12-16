@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
-import { obtenerPerfilUsuario } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 
 export async function crearPropiedad(formData: FormData) {
@@ -11,13 +11,9 @@ export async function crearPropiedad(formData: FormData) {
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para crear propiedades. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para crear propiedades. Solo los administradores pueden realizar esta acción.");
   }
 
   try {
@@ -102,13 +98,9 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para cambiar el estado de propiedades. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para cambiar el estado de propiedades. Solo los administradores pueden realizar esta acción.");
   }
 
   try {
@@ -187,13 +179,9 @@ export async function eliminarPropiedad(propiedadId: string) {
   if (!user) throw new Error("No autenticado");
 
   // Verificar permisos de administrador
-  try {
-    const perfil = await obtenerPerfilUsuario();
-    if (!perfil || perfil.rol?.nombre !== 'ROL_ADMIN') {
-      throw new Error("No tienes permisos para eliminar propiedades. Solo los administradores pueden realizar esta acción.");
-    }
-  } catch (error) {
-    throw new Error("Error verificando permisos: " + (error as Error).message);
+  const isAdmin = await esAdmin();
+  if (!isAdmin) {
+    throw new Error("No tienes permisos para eliminar propiedades. Solo los administradores pueden realizar esta acción.");
   }
 
   try {

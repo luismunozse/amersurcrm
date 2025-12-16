@@ -165,6 +165,19 @@ export async function GET(request: NextRequest) {
 
     console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}, vendedor: ${cliente.vendedor_asignado}`);
 
+    // Obtener el nombre del vendedor si hay uno asignado
+    let vendedorNombre: string | null = null;
+    if (cliente.vendedor_asignado) {
+      const { data: vendedorData } = await supabase
+        .schema("crm")
+        .from("usuario_perfil")
+        .select("nombre_completo, username")
+        .eq("username", cliente.vendedor_asignado)
+        .single();
+
+      vendedorNombre = vendedorData?.nombre_completo || vendedorData?.username || cliente.vendedor_asignado;
+    }
+
     return NextResponse.json({
       cliente: {
         id: cliente.id,
@@ -175,7 +188,7 @@ export async function GET(request: NextRequest) {
         tipo_cliente: cliente.tipo_cliente,
         estado_cliente: cliente.estado_cliente,
         origen_lead: cliente.origen_lead,
-        vendedor_asignado: cliente.vendedor_asignado,
+        vendedor_asignado: vendedorNombre,
         created_at: cliente.created_at,
         notas: cliente.notas,
       },

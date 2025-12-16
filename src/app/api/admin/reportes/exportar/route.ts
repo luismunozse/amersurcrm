@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 
 type ReporteTipo = "ventas" | "clientes" | "propiedades" | "rendimiento" | "general";
 

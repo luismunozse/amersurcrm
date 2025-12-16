@@ -4,7 +4,7 @@
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
-import { esAdmin } from "@/lib/auth/roles";
+import { esAdmin } from "@/lib/permissions/server";
 
 /**
  * Genera una contraseña temporal aleatoria segura
