@@ -25,6 +25,7 @@ const tipoIcons: Record<string, string> = {
   recordatorio: "⏰",
   venta: "💰",
   reserva: "🔒",
+  lead_asignado: "🌱",
 };
 
 const tipoColors: Record<string, string> = {
@@ -36,6 +37,7 @@ const tipoColors: Record<string, string> = {
   recordatorio: "text-orange-600",
   venta: "text-green-600",
   reserva: "text-purple-600",
+  lead_asignado: "text-crm-primary",
 };
 
 interface NotificationsDropdownProps {
@@ -297,8 +299,12 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   const handleNotificationClick = async (notificacion: NotificacionNoLeida) => {
     await handleMarkAsRead(notificacion.id);
     setIsOpen(false);
+
+    // Navegar según el tipo de notificación
     if (notificacion.data?.url) {
       router.push(notificacion.data.url as string);
+    } else if (notificacion.tipo === "lead_asignado" && notificacion.data?.cliente_id) {
+      router.push(`/dashboard/clientes/${notificacion.data.cliente_id}`);
     }
   };
 

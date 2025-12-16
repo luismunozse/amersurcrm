@@ -3,9 +3,30 @@
 import { Fragment, useEffect, useState } from 'react';
 import type { SVGProps } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, DocumentTextIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, HomeModernIcon, DocumentTextIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+
+interface PropiedadInteres {
+  id: string;
+  lote_id: string | null;
+  propiedad_id: string | null;
+  prioridad: number;
+  notas: string | null;
+  fecha_agregado: string;
+  lote: {
+    id: string;
+    codigo: string;
+    estado: string;
+    moneda: string;
+    precio: number;
+    sup_m2: number;
+    proyecto: {
+      id: string;
+      nombre: string;
+    };
+  } | null;
+}
 
 interface ClienteDetailModalCompleteProps {
   isOpen: boolean;
@@ -25,12 +46,8 @@ interface ClienteDetailModalCompleteProps {
     fecha_alta: string;
     ultimo_contacto: string | null;
     proxima_accion: string | null;
-    interes_principal: string | null;
     capacidad_compra_estimada: number | null;
     forma_pago_preferida: string | null;
-    propiedades_reservadas: number;
-    propiedades_compradas: number;
-    propiedades_alquiladas: number;
     saldo_pendiente: number;
     notas: string | null;
     direccion: any;
@@ -57,6 +74,8 @@ const WhatsAppIcon = ({ className, ...props }: SVGProps<SVGSVGElement>) => (
 export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }: ClienteDetailModalCompleteProps) {
   const [_isVisible, setIsVisible] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [propiedadesInteres, setPropiedadesInteres] = useState<PropiedadInteres[]>([]);
+  const [loadingPropiedades, setLoadingPropiedades] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -67,6 +86,28 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  // Cargar propiedades de interés cuando se abre el modal
+  useEffect(() => {
+    if (isOpen && cliente?.id) {
+      setLoadingPropiedades(true);
+      fetch(`/api/clientes/${cliente.id}/proyecto-interes`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.proyectosInteres) {
+            setPropiedadesInteres(data.proyectosInteres);
+          }
+        })
+        .catch(err => {
+          console.error('Error cargando propiedades de interés:', err);
+        })
+        .finally(() => {
+          setLoadingPropiedades(false);
+        });
+    } else {
+      setPropiedadesInteres([]);
+    }
+  }, [isOpen, cliente?.id]);
 
   if (!isOpen || !cliente) {
     return null;
@@ -221,7 +262,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
             >
               <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-crm-card border-2 border-gray-200 dark:border-crm-border text-left align-middle shadow-2xl transition-all">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 px-6 py-6">
+                <div className="bg-crm-primary px-6 py-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
@@ -436,13 +477,6 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       </h4>
                       
                       <div className="space-y-3">
-                        {cliente.interes_principal && (
-                          <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
-                            <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Interés Principal</p>
-                            <p className="text-sm text-gray-600 dark:text-crm-text-secondary capitalize">{cliente.interes_principal}</p>
-                          </div>
-                        )}
-
                         {cliente.origen_lead && (
                           <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
                             <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Origen del Lead</p>
@@ -515,32 +549,64 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                     </div>
                   </div>
 
-                  {/* Estadísticas de Propiedades */}
+                  {/* Propiedades de Interés */}
                   <div className="mt-6 pt-6 border-t-2 border-gray-200 dark:border-crm-border">
                     <h4 className="text-lg font-semibold text-gray-900 dark:text-crm-text-primary mb-4 flex items-center">
-                      <CurrencyDollarIcon className="w-5 h-5 mr-2 text-crm-primary" />
-                      Estadísticas de Propiedades
+                      <HomeModernIcon className="w-5 h-5 mr-2 text-crm-primary" />
+                      Propiedades de Interés
                     </h4>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cliente.propiedades_reservadas}</div>
-                        <div className="text-sm font-medium text-blue-800 dark:text-blue-300">Reservadas</div>
+                    {loadingPropiedades ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-crm-primary"></div>
+                        <span className="ml-2 text-sm text-gray-500">Cargando...</span>
                       </div>
-                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{cliente.propiedades_compradas}</div>
-                        <div className="text-sm font-medium text-green-800 dark:text-green-300">Compradas</div>
+                    ) : propiedadesInteres.length > 0 ? (
+                      <div className="space-y-3">
+                        {propiedadesInteres.map((propiedad) => (
+                          <div
+                            key={propiedad.id}
+                            className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg hover:border-crm-primary transition-all"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-gray-900 dark:text-crm-text-primary">
+                                  {propiedad.lote?.proyecto?.nombre || 'Proyecto sin nombre'}
+                                </p>
+                                {propiedad.lote?.codigo && (
+                                  <p className="text-xs text-crm-primary font-medium mt-0.5">
+                                    Lote: {propiedad.lote.codigo}
+                                    {propiedad.lote.sup_m2 && ` • ${propiedad.lote.sup_m2} m²`}
+                                  </p>
+                                )}
+                                {propiedad.lote?.precio && (
+                                  <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-0.5">
+                                    {propiedad.lote.moneda === 'USD' ? 'US$' : 'S/'} {propiedad.lote.precio.toLocaleString()}
+                                  </p>
+                                )}
+                                {propiedad.notas && (
+                                  <p className="text-xs text-gray-500 dark:text-crm-text-muted mt-1 line-clamp-2">
+                                    {propiedad.notas}
+                                  </p>
+                                )}
+                              </div>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                propiedad.prioridad === 1
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                  : propiedad.prioridad === 2
+                                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                              }`}>
+                                {propiedad.prioridad === 1 ? 'Alta' : propiedad.prioridad === 2 ? 'Media' : 'Baja'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-800 rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{cliente.propiedades_alquiladas}</div>
-                        <div className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Alquiladas</div>
-                      </div>
-                    </div>
-
-                    {cliente.saldo_pendiente > 0 && (
-                      <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg">
-                        <p className="text-sm font-medium text-gray-900 dark:text-red-300">Saldo Pendiente</p>
-                        <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatCapacidad(cliente.saldo_pendiente)}</p>
+                    ) : (
+                      <div className="text-center py-6 text-gray-500 dark:text-crm-text-muted">
+                        <HomeModernIcon className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No hay propiedades de interés registradas</p>
                       </div>
                     )}
                   </div>

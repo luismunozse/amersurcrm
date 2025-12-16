@@ -392,7 +392,7 @@ async function DashboardContent() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
         <Card
           variant="elevated"
-          className="relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br from-crm-primary via-crm-primary/90 to-crm-accent/80 text-white shadow-crm-xl"
+          className="relative overflow-hidden rounded-3xl border-0 bg-crm-primary text-white shadow-crm-xl"
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),transparent_60%)] opacity-40" aria-hidden="true"></div>
           <div className="relative z-10 flex h-full flex-col gap-8 p-6 sm:p-8">

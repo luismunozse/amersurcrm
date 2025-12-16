@@ -68,7 +68,8 @@ export type ClienteCached = {
     | 'evento'
     | 'recordatorio'
     | 'venta'
-    | 'reserva';
+    | 'reserva'
+    | 'lead_asignado';
 
   export type Notificacion = {
     id: string;

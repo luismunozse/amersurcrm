@@ -9,6 +9,7 @@ import type { ExchangeRate } from "@/lib/exchange";
 import { UserProfileProvider } from "./UserProfileContext";
 import { registerPushSubscription } from "@/lib/pushClient";
 import NotificationPermissionPrompt from "@/components/NotificationPermissionPrompt";
+import ChangelogModal, { useChangelog } from "@/components/ChangelogModal";
 
 export default function DashboardClient({
   children,
@@ -42,6 +43,7 @@ export default function DashboardClient({
   const [collapsed, setCollapsed] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userAvatarUrl ?? null);
   const hasRegisteredPush = useRef(false);
+  const { isOpen: isChangelogOpen, hasNewVersion, openChangelog, closeChangelog } = useChangelog();
 
   useEffect(() => {
     setAvatarUrl(userAvatarUrl ?? null);
@@ -111,6 +113,8 @@ export default function DashboardClient({
             notifications={notifications}
             notificationsCount={notificationsCount}
             exchangeRates={exchangeRates}
+            onOpenChangelog={openChangelog}
+            hasNewChangelog={hasNewVersion}
           />
 
           {/* Main content */}
@@ -118,6 +122,7 @@ export default function DashboardClient({
         </div>
       </div>
       <NotificationPermissionPrompt />
+      <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
     </UserProfileProvider>
   );
 }

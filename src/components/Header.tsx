@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Bars3Icon } from "@heroicons/react/24/outline";
+import { Gift } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import UserAvatarMenu from "./UserAvatarMenu";
@@ -24,6 +25,8 @@ type HeaderProps = {
   notifications?: NotificacionNoLeida[];
   notificationsCount?: number;
   exchangeRates?: ExchangeRate[];
+  onOpenChangelog?: () => void;
+  hasNewChangelog?: boolean;
 };
 
 export default function Header({
@@ -38,6 +41,8 @@ export default function Header({
   notifications = [],
   notificationsCount = 0,
   exchangeRates = [],
+  onOpenChangelog,
+  hasNewChangelog = false,
 }: HeaderProps) {
   const profileCtx = useOptionalUserProfileContext();
   const effectiveAvatarUrl =
@@ -109,6 +114,22 @@ export default function Header({
             )}
 
             <CurrencyConverter exchangeRates={exchangeRates} />
+
+            {/* Botón de Novedades/Changelog */}
+            {onOpenChangelog && (
+              <button
+                type="button"
+                onClick={onOpenChangelog}
+                className="relative p-2 text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover rounded-lg transition-colors"
+                aria-label="Ver novedades"
+                title="Ver novedades del sistema"
+              >
+                <Gift className="h-5 w-5" />
+                {hasNewChangelog && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                )}
+              </button>
+            )}
 
             <ThemeToggle />
 

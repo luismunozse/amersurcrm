@@ -6,7 +6,8 @@ export type NotificacionTipo =
   | "reserva"
   | "cliente"
   | "proyecto"
-  | "lote";
+  | "lote"
+  | "lead_asignado";
 
 export type NotificacionPrioridad = "baja" | "media" | "alta" | "urgente";
 

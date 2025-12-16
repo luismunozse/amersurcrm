@@ -24,6 +24,7 @@ const TIPOS_NOTIFICACION: Record<
   cliente: { label: "Cliente", icon: "👤", color: "bg-indigo-100 text-indigo-800" },
   proyecto: { label: "Proyecto", icon: "🏢", color: "bg-green-100 text-green-800" },
   lote: { label: "Lote", icon: "🏠", color: "bg-orange-100 text-orange-800" },
+  lead_asignado: { label: "Lead Asignado", icon: "🌱", color: "bg-crm-accent/20 text-crm-primary" },
 };
 
 const PRIORIDADES: Record<
