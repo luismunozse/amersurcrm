@@ -63,6 +63,11 @@ export default function DashboardClient({
       return;
     }
 
+    // Safari iOS no soporta Web Push Notifications
+    if (typeof Notification === "undefined") {
+      return;
+    }
+
     if (Notification.permission === "denied") {
       hasRegisteredPush.current = true;
       return;
