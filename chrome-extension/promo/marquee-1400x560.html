@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1400px;
+      height: 560px;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 60px 80px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    .bg-accent {
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(134,144,31,0.3) 0%, transparent 70%);
+    }
+    .bg-accent-2 {
+      position: absolute;
+      bottom: -150px;
+      left: -150px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(176,183,109,0.2) 0%, transparent 70%);
+    }
+    .left {
+      position: relative;
+      z-index: 1;
+      max-width: 550px;
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .whatsapp-badge {
+      background: #25D366;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .crm-badge {
+      background: linear-gradient(135deg, #86901F, #B0B76D);
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    h1 {
+      font-size: 56px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #ffffff, #B0B76D);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 22px;
+      color: #aaa;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.1);
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .feature-icon {
+      font-size: 18px;
+    }
+    .right {
+      position: relative;
+      z-index: 1;
+    }
+    .mockup {
+      width: 500px;
+      height: 380px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      display: flex;
+      overflow: hidden;
+    }
+    .wa-side {
+      width: 180px;
+      background: #111b21;
+      padding: 16px;
+    }
+    .wa-header {
+      color: #aaa;
+      font-size: 11px;
+      margin-bottom: 12px;
+    }
+    .wa-chat {
+      background: #202c33;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .wa-name {
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .wa-msg {
+      color: #8696a0;
+      font-size: 10px;
+      margin-top: 4px;
+    }
+    .sidebar-mock {
+      flex: 1;
+      background: linear-gradient(180deg, #86901F 0%, #9EA64C 100%);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-header {
+      text-align: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      margin-bottom: 12px;
+    }
+    .sidebar-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .sidebar-phone {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+    .sidebar-card {
+      background: rgba(255,255,255,0.95);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .card-label {
+      font-size: 9px;
+      color: #666;
+      text-transform: uppercase;
+    }
+    .card-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #86901F;
+    }
+    .status-badge {
+      display: inline-block;
+      background: #86901F;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-accent"></div>
+  <div class="bg-accent-2"></div>
+
+  <div class="left">
+    <div class="logo-row">
+      <div class="whatsapp-badge">💬 WhatsApp Web</div>
+      <div class="crm-badge">Amersur CRM</div>
+    </div>
+    <h1>AmersurChat</h1>
+    <p class="subtitle">Captura y gestiona leads de WhatsApp Web directamente en tu CRM. Sin cambiar de ventana.</p>
+    <div class="features">
+      <div class="feature"><span class="feature-icon">🌱</span> Captura automática</div>
+      <div class="feature"><span class="feature-icon">📊</span> Estados en tiempo real</div>
+      <div class="feature"><span class="feature-icon">👤</span> Info del cliente</div>
+      <div class="feature"><span class="feature-icon">📝</span> Notas rápidas</div>
+      <div class="feature"><span class="feature-icon">🔔</span> Notificaciones</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="mockup">
+      <div class="wa-side">
+        <div class="wa-header">CHATS</div>
+        <div class="wa-chat">
+          <div class="wa-name">Juan Pérez</div>
+          <div class="wa-msg">Hola, me interesa el lote...</div>
+        </div>
+        <div class="wa-chat">
+          <div class="wa-name">María García</div>
+          <div class="wa-msg">¿Cuál es el precio?</div>
+        </div>
+        <div class="wa-chat">
+          <div class="wa-name">Carlos López</div>
+          <div class="wa-msg">Gracias por la info</div>
+        </div>
+      </div>
+      <div class="sidebar-mock">
+        <div class="sidebar-header">
+          <div class="sidebar-title">👤 Juan Pérez</div>
+          <div class="sidebar-phone">+51 999 888 777</div>
+        </div>
+        <div class="sidebar-card">
+          <div class="card-label">Estado del Lead</div>
+          <div style="margin-top: 4px;">
+            <span class="status-badge">🌱 Nuevo Lead</span>
+          </div>
+        </div>
+        <div class="sidebar-card">
+          <div class="card-label">Vendedor Asignado</div>
+          <div class="card-value">Pedro Rodríguez</div>
+        </div>
+        <div class="sidebar-card">
+          <div class="card-label">Proyecto de Interés</div>
+          <div class="card-value">Los Jardines - Lote A12</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

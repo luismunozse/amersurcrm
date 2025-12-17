@@ -9,8 +9,7 @@
   ],
   "host_permissions": [
     "https://web.whatsapp.com/*",
-    "https://crm.amersursac.com/*",
-    "http://localhost:3000/*"
+    "https://crm.amersursac.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
