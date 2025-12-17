@@ -1,5 +1,3 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { dispatchNotificationChannels } from "@/lib/notificationsDelivery";
@@ -10,7 +8,7 @@ function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-export async function POST(req: NextRequest) {
+async function handleRequest(req: NextRequest) {
   const cronHeader = req.headers.get("x-vercel-cron") === "1";
 
   if (CRON_SECRET) {
@@ -138,4 +136,14 @@ export async function POST(req: NextRequest) {
     success: successCount,
     failures,
   });
+}
+
+// Vercel Cron usa GET
+export async function GET(req: NextRequest) {
+  return handleRequest(req);
+}
+
+// Mantener POST para llamadas manuales
+export async function POST(req: NextRequest) {
+  return handleRequest(req);
 }
