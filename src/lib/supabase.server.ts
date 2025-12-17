@@ -44,9 +44,22 @@ export const createServerOnlyClient = createOptimizedServerClient;
 // Cache de auth.getUser() - evita múltiples llamadas a Supabase Auth por request
 // Esto es CRÍTICO para evitar rate limits (429 errors)
 export const getCachedAuthUser = cache(async () => {
-  const supabase = await getSupabaseClient();
-  const { data, error } = await supabase.auth.getUser();
-  return { user: data.user, error };
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase.auth.getUser();
+
+    // Si hay error de refresh token, tratar como sesión inválida
+    if (error?.code === 'refresh_token_not_found' || error?.code === 'session_not_found') {
+      console.warn('[auth] Sesión inválida, redirigiendo a login');
+      return { user: null, error };
+    }
+
+    return { user: data.user, error };
+  } catch (err) {
+    // Capturar errores de conexión (timeout, network) y tratar como sesión inválida
+    console.error('[auth] Error al obtener usuario:', err);
+    return { user: null, error: err as Error };
+  }
 });
 
 // Helper para obtener solo el userId (usado frecuentemente)
