@@ -189,6 +189,8 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
     let isMounted = true;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+    const maxRetryDelay = 60000; // Máximo 60 segundos
     const errorNotifiedRef = { current: false };
 
     const cleanupChannel = () => {
@@ -198,15 +200,23 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
       }
     };
 
+    // Exponential backoff: 2^n * 1000ms, máximo 60 segundos
+    const getRetryDelay = () => {
+      const delay = Math.min(Math.pow(2, retryCount) * 1000, maxRetryDelay);
+      retryCount++;
+      return delay;
+    };
+
     const scheduleRetry = () => {
       if (retryTimeout) {
         clearTimeout(retryTimeout);
       }
+      const delay = getRetryDelay();
       retryTimeout = setTimeout(() => {
         if (isMounted) {
           void setupRealtime();
         }
-      }, 5000);
+      }, delay);
     };
 
     const handleStatusChange = (status: string) => {
@@ -220,6 +230,17 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
       if (status === "SUBSCRIBED") {
         errorNotifiedRef.current = false;
+        retryCount = 0; // Reset retry count on successful connection
+      }
+    };
+
+    const handleRealtimeDelete = (payload: { old: NotificacionRow }) => {
+      if (!payload.old) return;
+      const deletedId = payload.old.id;
+      const existed = itemsRef.current.some((item) => item.id === deletedId);
+      setItems((prev) => prev.filter((item) => item.id !== deletedId));
+      if (existed && !payload.old.leida) {
+        setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
       }
     };
 
@@ -255,6 +276,16 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
             filter: `usuario_id=eq.${user.id}`,
           },
           (event) => handleRealtimeUpdate(event.new as NotificacionRow, user.id),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "crm",
+            table: "notificacion",
+            filter: `usuario_id=eq.${user.id}`,
+          },
+          (event) => handleRealtimeDelete(event as unknown as { old: NotificacionRow }),
         )
         .subscribe(handleStatusChange);
     };

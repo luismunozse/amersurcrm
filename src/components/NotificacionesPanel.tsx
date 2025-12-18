@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
 import { useRouter } from "next/navigation";
@@ -156,25 +156,29 @@ export default function NotificacionesPanel({ initialNotificaciones = [] }: Noti
     };
   };
 
-  const notificacionesFiltradas = notificaciones.filter((noti) => {
-    switch (filtro) {
-      case "no_leidas":
-        return !noti.leida;
-      case "hoy":
-        return isToday(new Date(noti.createdAt));
-      case "sistema":
-        return noti.tipo === "sistema";
-      default:
-        return true;
-    }
-  });
+  // OPTIMIZADO: Memoizar filtrado para evitar recálculos en cada render
+  const notificacionesFiltradas = useMemo(() => {
+    return notificaciones.filter((noti) => {
+      switch (filtro) {
+        case "no_leidas":
+          return !noti.leida;
+        case "hoy":
+          return isToday(new Date(noti.createdAt));
+        case "sistema":
+          return noti.tipo === "sistema";
+        default:
+          return true;
+      }
+    });
+  }, [notificaciones, filtro]);
 
-  const estadisticas = {
+  // OPTIMIZADO: Memoizar estadísticas para evitar recálculos en cada render
+  const estadisticas = useMemo(() => ({
     total: notificaciones.length,
     noLeidas: notificaciones.filter((n) => !n.leida).length,
     hoy: notificaciones.filter((n) => isToday(new Date(n.createdAt))).length,
     urgentes: notificaciones.filter((n) => n.prioridad === "urgente" && !n.leida).length,
-  };
+  }), [notificaciones]);
 
   if (cargando) {
     return (

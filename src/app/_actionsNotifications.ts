@@ -15,6 +15,7 @@ export async function marcarNotificacionLeida(notificacionId: string) {
   if (!user) throw new Error("No autenticado");
 
   const { error } = await supabase
+    .schema("crm")
     .from("notificacion")
     .update({ leida: true, updated_at: new Date().toISOString() })
     .eq("id", notificacionId)
@@ -31,6 +32,7 @@ export async function marcarTodasLeidas() {
   if (!user) throw new Error("No autenticado");
 
   const { error } = await supabase
+    .schema("crm")
     .from("notificacion")
     .update({ leida: true, updated_at: new Date().toISOString() })
     .eq("usuario_id", user.id)
@@ -53,6 +55,7 @@ export async function crearNotificacion(
   const [{ data: { user } }, configResult] = await Promise.all([
     supabase.auth.getUser(),
     supabase
+      .schema("crm")
       .from("configuracion_sistema")
       .select(
         "notificaciones_email, notificaciones_push, notificaciones_recordatorios, push_provider, push_vapid_public, push_vapid_private, push_vapid_subject",
@@ -66,6 +69,7 @@ export async function crearNotificacion(
   }
 
   const { data: inserted, error } = await supabase
+    .schema("crm")
     .from("notificacion")
     .insert({
       usuario_id: usuarioId,
@@ -129,6 +133,7 @@ export async function eliminarNotificacion(notificacionId: string) {
   if (!user) throw new Error("No autenticado");
 
   const { error } = await supabase
+    .schema("crm")
     .from("notificacion")
     .delete()
     .eq("id", notificacionId)

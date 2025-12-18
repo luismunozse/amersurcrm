@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const since = url.searchParams.get("since");
     const unreadOnly = url.searchParams.get("unread") === "true";
 
-    let query = supabase
+    // OPTIMIZADO: Ejecutar ambas queries en paralelo (~100ms vs ~200ms secuencial)
+    let dataQuery = supabase
       .schema("crm")
       .from("notificacion")
       .select("id, tipo, titulo, mensaje, leida, data, created_at, updated_at")
@@ -30,28 +31,28 @@ export async function GET(request: NextRequest) {
       .limit(100);
 
     if (unreadOnly) {
-      query = query.eq("leida", false);
+      dataQuery = dataQuery.eq("leida", false);
     }
 
     if (since) {
-      query = query.gt("created_at", since);
+      dataQuery = dataQuery.gt("created_at", since);
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Contar no leídas
-    const { count: unreadCount } = await supabase
+    const countQuery = supabase
       .schema("crm")
       .from("notificacion")
       .select("id", { count: "exact", head: true })
       .eq("usuario_id", user.id)
       .eq("leida", false);
 
-    const normalized = normalizeNotifications((data ?? []) as NotificacionDbRecord[]);
+    const [dataResult, countResult] = await Promise.all([dataQuery, countQuery]);
+
+    if (dataResult.error) {
+      return NextResponse.json({ error: dataResult.error.message }, { status: 500 });
+    }
+
+    const normalized = normalizeNotifications((dataResult.data ?? []) as NotificacionDbRecord[]);
+    const unreadCount = countResult.count ?? 0;
 
     return NextResponse.json({
       data: normalized,
