@@ -148,7 +148,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           nombre: nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`,
           telefono: contact.phone,
           telefono_whatsapp: contact.phone,
-          estado_cliente: 'lead',
+          estado_cliente: 'por_contactar',
           origen_lead: 'whatsapp_web',
           vendedor_asignado: result.vendedor || null,
           created_at: new Date().toISOString(),

@@ -9,7 +9,6 @@ interface UpdateLeadStatusProps {
 }
 
 const ESTADOS = [
-  { value: 'lead', label: 'Nuevo Lead', color: 'bg-crm-accent/20 text-crm-primary', icon: '🌱' },
   { value: 'por_contactar', label: 'Por Contactar', color: 'bg-yellow-100 text-yellow-800', icon: '📋' },
   { value: 'contactado', label: 'Contactado', color: 'bg-blue-100 text-blue-800', icon: '📞' },
   { value: 'interesado', label: 'Interesado', color: 'bg-crm-accent/30 text-crm-primary', icon: '⭐' },

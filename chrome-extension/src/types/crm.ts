@@ -23,7 +23,7 @@ export interface Cliente {
   telefono_whatsapp: string | null;
   email?: string | null;
   tipo_cliente?: 'persona' | 'empresa';
-  estado_cliente: 'lead' | 'por_contactar' | 'contactado' | 'interesado' | 'negociacion' | 'cerrado' | 'perdido';
+  estado_cliente: 'por_contactar' | 'contactado' | 'interesado' | 'negociacion' | 'cerrado' | 'perdido';
   origen_lead: string;
   vendedor_asignado?: string | null;
   created_at?: string;

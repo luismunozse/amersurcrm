@@ -37,7 +37,7 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.1.3
+                Descargar AmersurChat v1.1.4
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
                 Última actualización: Diciembre 2025

@@ -14,7 +14,6 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
 
   const estadoColors: Record<string, string> = {
-    lead: 'bg-crm-accent/20 text-crm-primary border-crm-accent',
     por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
     contactado: 'bg-blue-100 text-blue-800 border-blue-300',
     interesado: 'bg-crm-accent/30 text-crm-primary border-crm-primary',
@@ -24,7 +23,6 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   };
 
   const estadoIcons: Record<string, string> = {
-    lead: '🌱',
     por_contactar: '📋',
     contactado: '📞',
     interesado: '👀',
@@ -34,7 +32,6 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   };
 
   const estadoLabels: Record<string, string> = {
-    lead: 'Nuevo Lead',
     por_contactar: 'Por Contactar',
     contactado: 'Contactado',
     interesado: 'Interesado',
