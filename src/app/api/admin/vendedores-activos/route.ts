@@ -121,12 +121,23 @@ export async function POST(request: NextRequest) {
         username,
         nombre_completo,
         activo,
-        rol:rol!usuario_perfil_rol_id_fkey(nombre)
+        rol:rol!usuario_perfil_rol_id_fkey (
+          id,
+          nombre
+        )
       `)
       .eq("id", vendedor_id)
       .single();
 
-    if (vendedorError || !vendedor) {
+    if (vendedorError) {
+      console.error("[VendedoresActivos] Error buscando vendedor:", vendedorError);
+      return NextResponse.json(
+        { error: "Error al buscar vendedor" },
+        { status: 500 }
+      );
+    }
+
+    if (!vendedor) {
       return NextResponse.json(
         { error: "Vendedor no encontrado" },
         { status: 404 }
@@ -148,9 +159,17 @@ export async function POST(request: NextRequest) {
       ? vendedorData.rol[0]?.nombre
       : vendedorData.rol?.nombre;
 
+    console.log("[VendedoresActivos] Vendedor encontrado:", {
+      id: vendedorData.id,
+      username: vendedorData.username,
+      activo: vendedorData.activo,
+      rol: vendedorData.rol,
+      rolNombre,
+    });
+
     if (rolNombre !== "ROL_VENDEDOR") {
       return NextResponse.json(
-        { error: "El usuario debe tener rol de vendedor" },
+        { error: `El usuario debe tener rol de vendedor (rol actual: ${rolNombre || "sin rol"})` },
         { status: 400 }
       );
     }
