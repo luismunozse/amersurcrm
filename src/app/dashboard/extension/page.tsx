@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.1.4
+                Descargar AmersurChat v1.1.5
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: Diciembre 2025
+                Última actualización: 18 Diciembre 2025
               </p>
             </div>
           </li>
@@ -123,6 +123,34 @@ export default function ExtensionPage() {
             </div>
           </li>
         </ol>
+      </div>
+
+      {/* Novedades v1.1.5 */}
+      <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
+        <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
+          🎉 Novedades v1.1.5
+        </h3>
+        <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Estados sincronizados con el CRM:</strong> Por Contactar, Contactado, Intermedio, Potencial, Desestimado, Transferido</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Cambio de estado desde la extensión:</strong> Ahora puedes actualizar el estado del lead directamente desde WhatsApp Web</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Leads se crean como "Por Contactar":</strong> Estado inicial correcto para nuevos leads</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Mejoras de conexión:</strong> Solucionado error de conexión para usuarios admin</span>
+          </li>
+        </ul>
+        <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
+          Si ya tienes la extensión instalada, descarga la nueva versión y reemplaza la carpeta anterior.
+        </p>
       </div>
 
       {/* Video tutorial (opcional) */}
