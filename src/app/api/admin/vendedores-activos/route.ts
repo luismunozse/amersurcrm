@@ -31,24 +31,11 @@ export async function GET() {
       );
     }
 
-    // Obtener vendedores activos con JOIN (una sola query)
+    // Obtener vendedores activos (sin relación anidada porque FK apunta a auth.users)
     const { data: vendedoresActivos, error } = await supabase
       .schema("crm")
       .from("vendedor_activo")
-      .select(`
-        id,
-        vendedor_id,
-        orden,
-        activo,
-        fecha_configuracion,
-        usuario_perfil:vendedor_id (
-          id,
-          username,
-          nombre_completo,
-          telefono,
-          email
-        )
-      `)
+      .select("id, vendedor_id, orden, activo, fecha_configuracion")
       .order("orden", { ascending: true });
 
     if (error) {
@@ -61,6 +48,38 @@ export async function GET() {
 
     console.log(`[VendedoresActivos] GET: ${vendedoresActivos?.length || 0} vendedores encontrados`);
 
+    // Obtener datos de usuario_perfil para cada vendedor
+    type VendedorConPerfil = {
+      id: string;
+      vendedor_id: string;
+      orden: number;
+      activo: boolean;
+      fecha_configuracion: string;
+      usuario_perfil: {
+        id: string;
+        username: string;
+        nombre_completo: string;
+        telefono: string;
+        email: string;
+      } | null;
+    };
+    let vendedoresConPerfil: VendedorConPerfil[] = [];
+    if (vendedoresActivos && vendedoresActivos.length > 0) {
+      const vendedorIds = vendedoresActivos.map((v) => v.vendedor_id);
+      const { data: perfiles } = await supabase
+        .schema("crm")
+        .from("usuario_perfil")
+        .select("id, username, nombre_completo, telefono, email")
+        .in("id", vendedorIds);
+
+      const perfilesMap = new Map(perfiles?.map((p) => [p.id, p]) || []);
+
+      vendedoresConPerfil = vendedoresActivos.map((v) => ({
+        ...v,
+        usuario_perfil: perfilesMap.get(v.vendedor_id) || null,
+      }));
+    }
+
     // Obtener configuración actual (próximo índice)
     const { data: config } = await supabase
       .schema("crm")
@@ -71,7 +90,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      vendedores: vendedoresActivos,
+      vendedores: vendedoresConPerfil,
       proximo_indice: config?.ultimo_indice ?? 0,
     });
   } catch (error) {
