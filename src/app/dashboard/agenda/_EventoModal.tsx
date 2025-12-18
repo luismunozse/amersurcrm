@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Evento } from "@/lib/types/agenda";
 import { crearEvento, actualizarEvento } from "./actions";
 import toast from "react-hot-toast";
@@ -11,8 +11,6 @@ interface EventoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  clientes?: Array<{ id: string; nombre: string; telefono?: string; email?: string }>;
-  propiedades?: Array<{ id: string; identificacion_interna: string; tipo: string }>;
 }
 
 const TIPOS_EVENTO = [
@@ -49,27 +47,65 @@ interface FormValues {
   notas: string;
 }
 
-// Componente de búsqueda de clientes
+// Componente de búsqueda de clientes con búsqueda en servidor
 function ClienteSearch({
-  clientes,
   value,
-  onChange
+  onChange,
+  clienteInicial
 }: {
-  clientes: Array<{ id: string; nombre: string; telefono?: string }>;
   value: string;
-  onChange: (id: string) => void;
+  onChange: (id: string, nombre: string) => void;
+  clienteInicial?: { id: string; nombre: string; telefono?: string };
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState(false);
+  const [resultados, setResultados] = useState<Array<{ id: string; nombre: string; telefono?: string }>>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<{ id: string; nombre: string } | null>(
+    clienteInicial ? { id: clienteInicial.id, nombre: clienteInicial.nombre } : null
+  );
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const clientesFiltrados = busqueda.trim()
-    ? clientes.filter(c =>
-        c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        (c.telefono && c.telefono.includes(busqueda))
-      )
-    : clientes;
+  // Búsqueda en servidor con debounce
+  useEffect(() => {
+    if (!abierto) return;
 
-  const clienteSeleccionado = clientes.find(c => c.id === value);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    if (busqueda.trim().length < 2) {
+      setResultados([]);
+      return;
+    }
+
+    setBuscando(true);
+    timeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/agenda/clientes?search=${encodeURIComponent(busqueda.trim())}`);
+        const data = await res.json();
+        setResultados(data.clientes || []);
+      } catch (error) {
+        console.error("Error buscando clientes:", error);
+        setResultados([]);
+      } finally {
+        setBuscando(false);
+      }
+    }, 300);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [busqueda, abierto]);
+
+  // Actualizar cliente seleccionado si viene de props
+  useEffect(() => {
+    if (clienteInicial && !clienteSeleccionado) {
+      setClienteSeleccionado({ id: clienteInicial.id, nombre: clienteInicial.nombre });
+    }
+  }, [clienteInicial, clienteSeleccionado]);
 
   return (
     <div className="relative">
@@ -84,7 +120,7 @@ function ClienteSearch({
           setAbierto(true);
           setBusqueda("");
         }}
-        placeholder="Buscar cliente por nombre o teléfono..."
+        placeholder="Escribe para buscar cliente..."
         className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
       />
       {abierto && (
@@ -93,18 +129,27 @@ function ClienteSearch({
             className="fixed inset-0 z-10"
             onClick={() => setAbierto(false)}
           />
-          <div className="absolute z-20 w-full mt-1 bg-white dark:bg-slate-700 border border-crm-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-            {clientesFiltrados.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-crm-text-muted">
-                {clientes.length === 0 ? "Cargando clientes..." : "No se encontraron clientes"}
+          <div className="absolute z-20 w-full mt-1 bg-white dark:bg-slate-700 border border-crm-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+            {busqueda.trim().length < 2 ? (
+              <div className="px-3 py-3 text-sm text-crm-text-muted text-center">
+                Escribe al menos 2 caracteres para buscar
+              </div>
+            ) : buscando ? (
+              <div className="px-3 py-3 text-sm text-crm-text-muted text-center">
+                Buscando...
+              </div>
+            ) : resultados.length === 0 ? (
+              <div className="px-3 py-3 text-sm text-crm-text-muted text-center">
+                No se encontraron clientes
               </div>
             ) : (
-              clientesFiltrados.slice(0, 50).map((cliente) => (
+              resultados.map((cliente) => (
                 <button
                   key={cliente.id}
                   type="button"
                   onClick={() => {
-                    onChange(cliente.id);
+                    onChange(cliente.id, cliente.nombre);
+                    setClienteSeleccionado({ id: cliente.id, nombre: cliente.nombre });
                     setBusqueda("");
                     setAbierto(false);
                   }}
@@ -119,11 +164,6 @@ function ClienteSearch({
                 </button>
               ))
             )}
-            {clientesFiltrados.length > 50 && (
-              <div className="px-3 py-2 text-xs text-crm-text-muted border-t border-crm-border">
-                Escribe para filtrar ({clientesFiltrados.length - 50} más)
-              </div>
-            )}
           </div>
         </>
       )}
@@ -131,7 +171,7 @@ function ClienteSearch({
   );
 }
 
-export default function EventoModal({ evento, isOpen, onClose, onSuccess, clientes = [] }: EventoModalProps) {
+export default function EventoModal({ evento, isOpen, onClose, onSuccess }: EventoModalProps) {
   const [formData, setFormData] = useState<FormValues>({
     titulo: "",
     tipo: "llamada",
@@ -241,22 +281,23 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-crm-text-primary">
-              {evento ? "Editar evento" : "Nuevo evento"}
-            </h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-crm-border rounded-lg transition-colors"
-            >
-              <XMarkIcon className="w-5 h-5 text-crm-text-muted" />
-            </button>
-          </div>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* Header fijo */}
+        <div className="flex items-center justify-between p-5 pb-4 border-b border-crm-border flex-shrink-0">
+          <h2 className="text-xl font-bold text-crm-text-primary">
+            {evento ? "Editar evento" : "Nuevo evento"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-crm-border rounded-lg transition-colors"
+          >
+            <XMarkIcon className="w-5 h-5 text-crm-text-muted" />
+          </button>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Contenido scrolleable */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="p-5 space-y-5 overflow-y-auto flex-1">
             {/* Tipo de evento */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
@@ -288,15 +329,9 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                 Cliente *
               </label>
               <ClienteSearch
-                clientes={clientes}
                 value={formData.cliente_id}
                 onChange={(id) => setFormData(prev => ({ ...prev, cliente_id: id }))}
               />
-              {clientes.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Cargando clientes...
-                </p>
-              )}
             </div>
 
             {/* Título */}
@@ -392,26 +427,26 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, client
                 className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary resize-none"
               />
             </div>
+          </div>
 
-            {/* Botones */}
-            <div className="flex justify-end space-x-3 pt-4 border-t border-crm-border">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 text-sm font-medium text-crm-text-secondary bg-crm-border hover:bg-crm-border-hover rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2.5 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary-hover rounded-lg transition-colors disabled:opacity-50"
-              >
-                {isSubmitting ? "Guardando..." : evento ? "Actualizar" : "Crear evento"}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Footer fijo con botones */}
+          <div className="flex justify-end space-x-3 p-5 pt-4 border-t border-crm-border flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 text-sm font-medium text-crm-text-secondary bg-crm-border hover:bg-crm-border-hover rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary-hover rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? "Guardando..." : evento ? "Actualizar" : "Crear evento"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -38,15 +38,11 @@ export default function AgendaDashboard() {
   const [vistaActualTab, setVistaActualTab] = useState<VistaTab>("calendario");
   const [mostrarModalEvento, setMostrarModalEvento] = useState(false);
   const [eventoActivo, setEventoActivo] = useState<Evento | null>(null);
-  const [clientes, setClientes] = useState<Array<{ id: string; nombre: string; telefono?: string; email?: string }>>([]);
-  const [propiedades, setPropiedades] = useState<Array<{ id: string; identificacion_interna: string; tipo: string }>>([]);
-  const [cargandoDatos, setCargandoDatos] = useState(false);
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('');
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
-  const [filtroCliente, setFiltroCliente] = useState<string>('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // Modal de reprogramar
@@ -72,25 +68,6 @@ export default function AgendaDashboard() {
     cargarEventos();
   }, [cargarEventos]);
 
-  // Cargar clientes y propiedades cuando se abre el modal
-  useEffect(() => {
-    if (mostrarModalEvento && clientes.length === 0 && propiedades.length === 0 && !cargandoDatos) {
-      setCargandoDatos(true);
-      Promise.all([
-        fetch('/api/agenda/clientes').then(r => r.json()),
-        fetch('/api/agenda/propiedades').then(r => r.json())
-      ])
-      .then(([clientesData, propiedadesData]) => {
-        setClientes(clientesData.clientes || []);
-        setPropiedades(propiedadesData.propiedades || []);
-      })
-      .catch(error => {
-        console.error('Error cargando datos para formulario:', error);
-        toast.error('Error cargando datos para el formulario');
-      })
-      .finally(() => setCargandoDatos(false));
-    }
-  }, [mostrarModalEvento, clientes.length, propiedades.length, cargandoDatos]);
 
   const navegarPeriodo = (direccion: "anterior" | "siguiente") => {
     setFechaActual((prev) => {
@@ -151,12 +128,9 @@ export default function AgendaDashboard() {
     if (filtroEstado) {
       filtered = filtered.filter(evt => evt.estado === filtroEstado);
     }
-    if (filtroCliente) {
-      filtered = filtered.filter(evt => evt.cliente_id === filtroCliente);
-    }
 
     return filtered;
-  }, [eventos, filtroTipo, filtroPrioridad, filtroEstado, filtroCliente]);
+  }, [eventos, filtroTipo, filtroPrioridad, filtroEstado]);
 
   const obtenerEventosDia = useCallback(
     (fecha: Date) =>
@@ -756,7 +730,7 @@ export default function AgendaDashboard() {
             <button
               onClick={() => setMostrarFiltros(!mostrarFiltros)}
               className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors w-full sm:w-auto ${
-                mostrarFiltros || filtroTipo || filtroPrioridad || filtroEstado || filtroCliente
+                mostrarFiltros || filtroTipo || filtroPrioridad || filtroEstado
                   ? 'crm-button-primary'
                   : 'text-crm-text-secondary bg-crm-bg-secondary hover:bg-crm-border'
               }`}
@@ -765,9 +739,9 @@ export default function AgendaDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               <span>Filtros</span>
-              {(filtroTipo || filtroPrioridad || filtroEstado || filtroCliente) && (
+              {(filtroTipo || filtroPrioridad || filtroEstado) && (
                 <span className="ml-1 px-2 py-0.5 bg-white rounded-full text-xs">
-                  {[filtroTipo, filtroPrioridad, filtroEstado, filtroCliente].filter(Boolean).length}
+                  {[filtroTipo, filtroPrioridad, filtroEstado].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -776,7 +750,7 @@ export default function AgendaDashboard() {
           {/* Panel de Filtros */}
           {mostrarFiltros && (
             <div className="mt-4 p-4 bg-crm-bg-secondary rounded-lg border border-crm-border">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium text-crm-text-primary block mb-2">Tipo</label>
                   <select
@@ -825,32 +799,15 @@ export default function AgendaDashboard() {
                     <option value="cancelado">Cancelada</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium text-crm-text-primary block mb-2">Cliente</label>
-                  <select
-                    value={filtroCliente}
-                    onChange={(e) => setFiltroCliente(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
-                  >
-                    <option value="">Todos</option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
-              {(filtroTipo || filtroPrioridad || filtroEstado || filtroCliente) && (
+              {(filtroTipo || filtroPrioridad || filtroEstado) && (
                 <div className="mt-4 flex justify-end">
                   <button
                     onClick={() => {
                       setFiltroTipo('');
                       setFiltroPrioridad('');
                       setFiltroEstado('');
-                      setFiltroCliente('');
                     }}
                     className="px-4 py-2 text-sm text-crm-text-secondary hover:text-crm-text-primary transition-colors"
                   >
@@ -942,8 +899,6 @@ export default function AgendaDashboard() {
         isOpen={mostrarModalEvento}
         onClose={handleCerrarModal}
         onSuccess={handleEventoGuardado}
-        clientes={clientes}
-        propiedades={propiedades}
       />
     </div>
   );
