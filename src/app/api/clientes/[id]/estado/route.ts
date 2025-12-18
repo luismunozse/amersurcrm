@@ -3,6 +3,18 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 
 export const dynamic = "force-dynamic";
 
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "PATCH, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * PATCH /api/clientes/[id]/estado
  *
@@ -29,7 +41,7 @@ export async function PATCH(
 
       if (authError || !authUser) {
         console.error("[UpdateEstado] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
 
       supabase = supabaseAdmin;
@@ -39,7 +51,7 @@ export async function PATCH(
       const { data: { user: sessionUser } } = await supabase.auth.getUser();
 
       if (!sessionUser) {
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: corsHeaders });
       }
     }
 
@@ -49,7 +61,7 @@ export async function PATCH(
     if (!estado_cliente) {
       return NextResponse.json(
         { error: "estado_cliente es requerido" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -66,16 +78,15 @@ export async function PATCH(
     if (!estadosValidos.includes(estado_cliente)) {
       return NextResponse.json(
         { error: "Estado inválido" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
     console.log(`[UpdateEstado] Actualizando cliente ${id} a estado: ${estado_cliente}`);
 
     // Actualizar estado
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       estado_cliente,
-      updated_at: new Date().toISOString(),
     };
 
     // Si hay nota, agregarla o concatenarla
@@ -108,7 +119,7 @@ export async function PATCH(
       console.error("[UpdateEstado] Error en query:", error);
       return NextResponse.json(
         { error: "Error actualizando cliente", details: error.message },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -121,7 +132,7 @@ export async function PATCH(
         estado_cliente: cliente.estado_cliente,
         notas: cliente.notas,
       },
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("[UpdateEstado] Error:", error);
     return NextResponse.json(
@@ -129,7 +140,7 @@ export async function PATCH(
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
