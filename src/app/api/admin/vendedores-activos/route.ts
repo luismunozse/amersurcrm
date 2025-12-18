@@ -52,12 +52,14 @@ export async function GET() {
       .order("orden", { ascending: true });
 
     if (error) {
-      console.error("Error obteniendo vendedores activos:", error);
+      console.error("[VendedoresActivos] Error en GET:", error);
       return NextResponse.json(
-        { error: "Error al obtener vendedores activos" },
+        { error: `Error al obtener vendedores activos: ${error.message}` },
         { status: 500 }
       );
     }
+
+    console.log(`[VendedoresActivos] GET: ${vendedoresActivos?.length || 0} vendedores encontrados`);
 
     // Obtener configuración actual (próximo índice)
     const { data: config } = await supabase
@@ -198,6 +200,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
+      console.error("[VendedoresActivos] Error insertando:", insertError);
+
       // Si ya existe, retornar error específico
       if (insertError.code === "23505") {
         return NextResponse.json(
@@ -206,9 +210,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.error("Error agregando vendedor:", insertError);
       return NextResponse.json(
-        { error: "Error al agregar vendedor" },
+        { error: `Error al agregar vendedor: ${insertError.message}` },
         { status: 500 }
       );
     }
