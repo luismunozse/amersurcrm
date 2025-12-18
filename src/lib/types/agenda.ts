@@ -100,7 +100,6 @@ export interface EventoFormState {
   todo_el_dia: boolean;
   cliente_id: string;
   propiedad_id: string;
-  oportunidad_id: string;
   ubicacion: string;
   direccion: string;
   recordar_antes_minutos: number;
@@ -116,17 +115,6 @@ export interface EventoFormState {
   notas: string;
   etiquetas: string[];
   color: string;
-  // Campos de disciplina comercial
-  objetivo: string;
-  resultado_id: string;
-  resultado_notas: string;
-  proximo_paso_objetivo: string;
-  proximo_paso_fecha: string;
-  sla_tipo: string;
-  sla_vencimiento: string;
-  recordatorio_canal: string;
-  snooze_motivo_id: string;
-  snooze_hasta: string;
 }
 
 export interface RecordatorioFormState {

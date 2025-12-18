@@ -40,7 +40,6 @@ export default function AgendaDashboard() {
   const [eventoActivo, setEventoActivo] = useState<Evento | null>(null);
   const [clientes, setClientes] = useState<Array<{ id: string; nombre: string; telefono?: string; email?: string }>>([]);
   const [propiedades, setPropiedades] = useState<Array<{ id: string; identificacion_interna: string; tipo: string }>>([]);
-  const [oportunidades, setOportunidades] = useState<Array<{ id: string; cliente_nombre: string; etapa: string; label: string }>>([]);
   const [cargandoDatos, setCargandoDatos] = useState(false);
 
   // Filtros
@@ -73,19 +72,17 @@ export default function AgendaDashboard() {
     cargarEventos();
   }, [cargarEventos]);
 
-  // Cargar clientes, propiedades y oportunidades cuando se abre el modal
+  // Cargar clientes y propiedades cuando se abre el modal
   useEffect(() => {
-    if (mostrarModalEvento && clientes.length === 0 && propiedades.length === 0 && oportunidades.length === 0 && !cargandoDatos) {
+    if (mostrarModalEvento && clientes.length === 0 && propiedades.length === 0 && !cargandoDatos) {
       setCargandoDatos(true);
       Promise.all([
         fetch('/api/agenda/clientes').then(r => r.json()),
-        fetch('/api/agenda/propiedades').then(r => r.json()),
-        fetch('/api/agenda/oportunidades').then(r => r.json())
+        fetch('/api/agenda/propiedades').then(r => r.json())
       ])
-      .then(([clientesData, propiedadesData, oportunidadesData]) => {
+      .then(([clientesData, propiedadesData]) => {
         setClientes(clientesData.clientes || []);
         setPropiedades(propiedadesData.propiedades || []);
-        setOportunidades(oportunidadesData.oportunidades || []);
       })
       .catch(error => {
         console.error('Error cargando datos para formulario:', error);
@@ -93,7 +90,7 @@ export default function AgendaDashboard() {
       })
       .finally(() => setCargandoDatos(false));
     }
-  }, [mostrarModalEvento, clientes.length, propiedades.length, oportunidades.length, cargandoDatos]);
+  }, [mostrarModalEvento, clientes.length, propiedades.length, cargandoDatos]);
 
   const navegarPeriodo = (direccion: "anterior" | "siguiente") => {
     setFechaActual((prev) => {
@@ -947,7 +944,6 @@ export default function AgendaDashboard() {
         onSuccess={handleEventoGuardado}
         clientes={clientes}
         propiedades={propiedades}
-        oportunidades={oportunidades}
       />
     </div>
   );
