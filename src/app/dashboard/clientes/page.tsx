@@ -17,7 +17,13 @@ type SP = Promise<{
 }>;
 
 export default async function ClientesPage({ searchParams }: { searchParams: SP }) {
-  const sp = await searchParams;
+  let sp;
+  try {
+    sp = await searchParams;
+  } catch (e) {
+    console.error("[ClientesPage] Error parseando searchParams:", e);
+    sp = {};
+  }
 
   const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q ?? "").trim();
   const telefono = (Array.isArray(sp.telefono) ? sp.telefono[0] : sp.telefono ?? "").trim();
@@ -29,10 +35,16 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
   const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "fecha_alta").trim();
   const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
 
+  let permisosUsuario;
+  let clientesResult;
+
   try {
     // OPTIMIZADO: Ejecutar ambas queries en paralelo (~200ms vs ~400ms secuencial)
-    const [permisosUsuario, clientesResult] = await Promise.all([
-      obtenerPermisosUsuario(),
+    [permisosUsuario, clientesResult] = await Promise.all([
+      obtenerPermisosUsuario().catch(e => {
+        console.error("[ClientesPage] Error obteniendo permisos:", e);
+        return null;
+      }),
       getCachedClientes({
         page,
         pageSize: 20,
@@ -44,27 +56,35 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
         vendedor,
         sortBy,
         sortOrder
+      }).catch(e => {
+        console.error("[ClientesPage] Error obteniendo clientes:", e);
+        return { data: [], total: 0 };
       })
     ]);
+  } catch (e) {
+    console.error("[ClientesPage] Error en Promise.all:", e);
+    permisosUsuario = null;
+    clientesResult = { data: [], total: 0 };
+  }
 
-    const rol = permisosUsuario?.rol;
-    const puedeExportar = rol === 'ROL_ADMIN' || rol === 'ROL_COORDINADOR_VENTAS';
-    const { data: clientes, total } = clientesResult;
+  const rol = permisosUsuario?.rol;
+  const puedeExportar = rol === 'ROL_ADMIN' || rol === 'ROL_COORDINADOR_VENTAS';
+  const { data: clientes, total } = clientesResult;
 
-    const totalPages = Math.ceil(total / 20);
+  const totalPages = Math.ceil(total / 20);
 
-    const exportFilters = {
-      q,
-      telefono,
-      dni,
-      estado,
-      tipo,
-      vendedor,
-      sortBy,
-      sortOrder,
-    };
+  const exportFilters = {
+    q,
+    telefono,
+    dni,
+    estado,
+    tipo,
+    vendedor,
+    sortBy,
+    sortOrder,
+  };
 
-    return (
+  return (
       <div className="w-full px-4 py-6 space-y-6 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
@@ -118,7 +138,4 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
         />
       </div>
     );
-  } catch (error) {
-    return <pre className="text-red-600">Error cargando clientes: {String(error)}</pre>;
-  }
 }

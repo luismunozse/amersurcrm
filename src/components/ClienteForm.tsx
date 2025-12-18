@@ -227,15 +227,14 @@ export default function ClienteForm({
                 />
               </div>
 
-              {/* Documento en grid */}
+              {/* Documento en grid (opcional) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-medium text-crm-text-primary">
-                    Tipo Doc <span className="text-red-500">*</span>
+                    Tipo Doc
                   </label>
                   <select
                     name="tipo_documento"
-                    required
                     value={tipoDocumento}
                     onChange={(e) => setTipoDocumento(e.target.value)}
                     className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
@@ -249,24 +248,21 @@ export default function ClienteForm({
 
                 <div className="space-y-1.5">
                   <label className="block text-xs font-medium text-crm-text-primary">
-                    Número <span className="text-red-500">*</span>
+                    Número
                   </label>
                   <input
                     name="documento_identidad"
-                    required
                     defaultValue={cliente?.documento_identidad || ""}
                     className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                     disabled={pending}
-                    placeholder={tipoDocumento === 'DNI' ? '12345678' : tipoDocumento === 'RUC' ? '20123456789' : 'AB123456'}
+                    placeholder={tipoDocumento === 'DNI' ? '12345678 (opcional)' : tipoDocumento === 'RUC' ? '20123456789 (opcional)' : 'AB123456 (opcional)'}
                     minLength={tipoDocumento === 'DNI' ? 8 : tipoDocumento === 'RUC' ? 11 : 8}
                     maxLength={tipoDocumento === 'DNI' ? 8 : tipoDocumento === 'RUC' ? 11 : 15}
                     pattern={tipoDocumento === 'DNI' ? '[0-9]{8}' : tipoDocumento === 'RUC' ? '[0-9]{11}' : tipoDocumento === 'PAS' ? '[A-Z0-9]{6,15}' : '[A-Z0-9]{8,15}'}
                     title={tipoDocumento === 'DNI' ? 'Debe tener exactamente 8 dígitos' : tipoDocumento === 'RUC' ? 'Debe tener exactamente 11 dígitos' : 'Ingrese un documento válido'}
                     onInvalid={(e) => {
                       const target = e.target as HTMLInputElement;
-                      if (target.validity.valueMissing) {
-                        target.setCustomValidity('El número de documento es obligatorio');
-                      } else if (target.validity.patternMismatch) {
+                      if (target.validity.patternMismatch && target.value.trim()) {
                         if (tipoDocumento === 'DNI') {
                           target.setCustomValidity('El DNI debe tener exactamente 8 dígitos');
                         } else if (tipoDocumento === 'RUC') {
@@ -274,7 +270,7 @@ export default function ClienteForm({
                         } else {
                           target.setCustomValidity('Formato de documento inválido');
                         }
-                      } else if (target.validity.tooShort || target.validity.tooLong) {
+                      } else if ((target.validity.tooShort || target.validity.tooLong) && target.value.trim()) {
                         if (tipoDocumento === 'DNI') {
                           target.setCustomValidity('El DNI debe tener exactamente 8 dígitos');
                         } else if (tipoDocumento === 'RUC') {
