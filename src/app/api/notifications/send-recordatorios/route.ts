@@ -23,9 +23,10 @@ async function handleRequest(req: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
+  const supabaseCrm = supabase.schema("crm");
   const nowIso = new Date().toISOString();
 
-  const { data: configData, error: configError } = await supabase
+  const { data: configData, error: configError } = await supabaseCrm
     .from("configuracion_sistema")
     .select(
       "notificaciones_push, notificaciones_recordatorios, push_provider, push_vapid_public, push_vapid_private, push_vapid_subject",
@@ -47,7 +48,7 @@ async function handleRequest(req: NextRequest) {
     return NextResponse.json({ processed: 0, skipped: "Push notifications disabled" });
   }
 
-  const { data: pendientes, error } = await supabase
+  const { data: pendientes, error } = await supabaseCrm
     .from("recordatorio")
     .select(
       "id, titulo, descripcion, prioridad, fecha_recordatorio, vendedor_id, notificar_push, data",
@@ -84,7 +85,7 @@ async function handleRequest(req: NextRequest) {
         Object.assign(dataPayload, recordatorio.data as Record<string, unknown>);
       }
 
-      await supabase.from("notificacion").insert({
+      await supabaseCrm.from("notificacion").insert({
         usuario_id: recordatorio.vendedor_id,
         tipo: "sistema",
         titulo: recordatorio.titulo,
@@ -117,7 +118,7 @@ async function handleRequest(req: NextRequest) {
         { supabaseClient: supabase },
       );
 
-      await supabase
+      await supabaseCrm
         .from("recordatorio")
         .update({ enviado: true, updated_at: new Date().toISOString() })
         .eq("id", recordatorio.id);
