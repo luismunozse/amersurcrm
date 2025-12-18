@@ -76,92 +76,100 @@ export async function POST(request: NextRequest) {
       errors: [],
     };
 
-    // Eliminar cada lote
+    // OPTIMIZADO: Obtener todos los datos en 3 queries paralelas en lugar de N*4 queries
+    const [lotesResult, reservasResult, ventasResult] = await Promise.all([
+      // Query 1: Obtener todos los lotes de una vez
+      supabase
+        .from("lote")
+        .select("id, codigo, proyecto_id")
+        .in("id", lote_ids),
+
+      // Query 2: Obtener todas las reservas de esos lotes
+      supabase
+        .from("reserva")
+        .select("lote_id")
+        .in("lote_id", lote_ids),
+
+      // Query 3: Obtener todas las ventas de esos lotes
+      supabase
+        .from("venta")
+        .select("lote_id")
+        .in("lote_id", lote_ids),
+    ]);
+
+    // Crear mapas para búsqueda rápida O(1)
+    const lotesMap = new Map<string, { id: string; codigo: string; proyecto_id: string }>();
+    (lotesResult.data || []).forEach(lote => lotesMap.set(lote.id, lote));
+
+    const lotesConReservas = new Set<string>();
+    (reservasResult.data || []).forEach(r => lotesConReservas.add(r.lote_id));
+
+    const lotesConVentas = new Set<string>();
+    (ventasResult.data || []).forEach(v => lotesConVentas.add(v.lote_id));
+
+    // Procesar cada lote y determinar cuáles se pueden eliminar
+    const lotesAEliminar: string[] = [];
+
     for (const loteId of lote_ids) {
-      try {
-        // Verificar que el lote pertenece al proyecto
-        const { data: lote, error: fetchError } = await supabase
-          .from("lote")
-          .select("id, codigo, proyecto_id")
-          .eq("id", loteId)
-          .single();
+      const lote = lotesMap.get(loteId);
 
-        if (fetchError) {
-          result.errors.push({
-            lote_id: loteId,
-            error: `Error obteniendo lote: ${fetchError.message}`,
-          });
-          continue;
-        }
-
-        if (!lote) {
-          result.errors.push({
-            lote_id: loteId,
-            error: "Lote no encontrado",
-          });
-          continue;
-        }
-
-        if (lote.proyecto_id !== proyecto_id) {
-          result.errors.push({
-            lote_id: loteId,
-            codigo: lote.codigo,
-            error: "El lote no pertenece a este proyecto",
-          });
-          continue;
-        }
-
-        // Verificar si el lote tiene reservas o ventas
-        const { data: reservas } = await supabase
-          .from("reserva")
-          .select("id")
-          .eq("lote_id", loteId)
-          .limit(1);
-
-        const { data: ventas } = await supabase
-          .from("venta")
-          .select("id")
-          .eq("lote_id", loteId)
-          .limit(1);
-
-        if (reservas && reservas.length > 0) {
-          result.errors.push({
-            lote_id: loteId,
-            codigo: lote.codigo,
-            error: "No se puede eliminar porque tiene reservas asociadas",
-          });
-          continue;
-        }
-
-        if (ventas && ventas.length > 0) {
-          result.errors.push({
-            lote_id: loteId,
-            codigo: lote.codigo,
-            error: "No se puede eliminar porque tiene ventas asociadas",
-          });
-          continue;
-        }
-
-        // Eliminar el lote
-        const { error: deleteError } = await supabase
-          .from("lote")
-          .delete()
-          .eq("id", loteId);
-
-        if (deleteError) {
-          result.errors.push({
-            lote_id: loteId,
-            codigo: lote.codigo,
-            error: deleteError.message,
-          });
-        } else {
-          result.deleted++;
-        }
-      } catch (error) {
+      if (!lote) {
         result.errors.push({
           lote_id: loteId,
-          error: error instanceof Error ? error.message : "Error desconocido",
+          error: "Lote no encontrado",
         });
+        continue;
+      }
+
+      if (lote.proyecto_id !== proyecto_id) {
+        result.errors.push({
+          lote_id: loteId,
+          codigo: lote.codigo,
+          error: "El lote no pertenece a este proyecto",
+        });
+        continue;
+      }
+
+      if (lotesConReservas.has(loteId)) {
+        result.errors.push({
+          lote_id: loteId,
+          codigo: lote.codigo,
+          error: "No se puede eliminar porque tiene reservas asociadas",
+        });
+        continue;
+      }
+
+      if (lotesConVentas.has(loteId)) {
+        result.errors.push({
+          lote_id: loteId,
+          codigo: lote.codigo,
+          error: "No se puede eliminar porque tiene ventas asociadas",
+        });
+        continue;
+      }
+
+      lotesAEliminar.push(loteId);
+    }
+
+    // Query 4: Eliminar todos los lotes válidos de una vez
+    if (lotesAEliminar.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("lote")
+        .delete()
+        .in("id", lotesAEliminar);
+
+      if (deleteError) {
+        // Si falla el batch, agregar error para cada lote
+        lotesAEliminar.forEach(loteId => {
+          const lote = lotesMap.get(loteId);
+          result.errors.push({
+            lote_id: loteId,
+            codigo: lote?.codigo,
+            error: deleteError.message,
+          });
+        });
+      } else {
+        result.deleted = lotesAEliminar.length;
       }
     }
 

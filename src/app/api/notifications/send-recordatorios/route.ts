@@ -2,23 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
 import { dispatchNotificationChannels } from "@/lib/notificationsDelivery";
 
-const CRON_SECRET = process.env.NOTIFICATIONS_CRON_SECRET;
-
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 async function handleRequest(req: NextRequest) {
-  const cronHeader = req.headers.get("x-vercel-cron") === "1";
+  // Vercel envía automáticamente Authorization: Bearer <CRON_SECRET>
+  // cuando CRON_SECRET está configurado en las variables de entorno
+  const authHeader = req.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
 
-  if (CRON_SECRET) {
-    const authHeader = req.headers.get("authorization");
-    const hasBearer = authHeader === `Bearer ${CRON_SECRET}`;
-    if (!hasBearer && !cronHeader) {
-      return unauthorizedResponse();
-    }
-  } else if (!cronHeader) {
-    // Sin secreto y sin cabecera de Vercel Cron no permitimos la invocación
+  if (!cronSecret) {
+    // Si no hay CRON_SECRET configurado, rechazar por seguridad
+    console.error("CRON_SECRET no está configurado en las variables de entorno");
+    return unauthorizedResponse();
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return unauthorizedResponse();
   }
 

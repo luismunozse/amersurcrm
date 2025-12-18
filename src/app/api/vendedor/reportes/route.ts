@@ -155,29 +155,37 @@ export async function GET(request: NextRequest) {
 }
 
 async function obtenerVentasPorMes(supabase: any, username: string) {
-  const meses: { mes: string; cantidad: number; monto: number }[] = [];
   const now = new Date();
+  const fechaInicio = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  // Una sola query para obtener todas las ventas de los últimos 6 meses
+  const { data } = await supabase
+    .schema('crm')
+    .from('venta')
+    .select('precio_total, created_at')
+    .eq('vendedor_username', username)
+    .eq('estado', 'completada')
+    .gte('created_at', fechaInicio.toISOString());
+
+  const ventas = data || [];
+
+  // Agrupar por mes en JavaScript
+  const meses: { mes: string; cantidad: number; monto: number }[] = [];
 
   for (let i = 5; i >= 0; i--) {
     const fecha = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const fechaFin = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-    
     const mesNombre = fecha.toLocaleDateString('es-PE', { month: 'short' });
 
-    const { data } = await supabase
-      .schema('crm')
-      .from('venta')
-      .select('precio_total')
-      .eq('vendedor_username', username)
-      .eq('estado', 'completada')
-      .gte('created_at', fecha.toISOString())
-      .lte('created_at', fechaFin.toISOString());
+    const ventasDelMes = ventas.filter((v: any) => {
+      const ventaFecha = new Date(v.created_at);
+      return ventaFecha >= fecha && ventaFecha <= fechaFin;
+    });
 
-    const ventas = data || [];
     meses.push({
       mes: mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1),
-      cantidad: ventas.length,
-      monto: ventas.reduce((sum: number, v: any) => sum + (v.precio_total || 0), 0),
+      cantidad: ventasDelMes.length,
+      monto: ventasDelMes.reduce((sum: number, v: any) => sum + (v.precio_total || 0), 0),
     });
   }
 
@@ -185,26 +193,35 @@ async function obtenerVentasPorMes(supabase: any, username: string) {
 }
 
 async function obtenerClientesPorMes(supabase: any, username: string) {
-  const meses: { mes: string; nuevos: number }[] = [];
   const now = new Date();
+  const fechaInicio = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  // Una sola query para obtener todos los clientes de los últimos 6 meses
+  const { data } = await supabase
+    .schema('crm')
+    .from('cliente')
+    .select('created_at')
+    .eq('vendedor_username', username)
+    .gte('created_at', fechaInicio.toISOString());
+
+  const clientes = data || [];
+
+  // Agrupar por mes en JavaScript
+  const meses: { mes: string; nuevos: number }[] = [];
 
   for (let i = 5; i >= 0; i--) {
     const fecha = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const fechaFin = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-    
     const mesNombre = fecha.toLocaleDateString('es-PE', { month: 'short' });
 
-    const { count } = await supabase
-      .schema('crm')
-      .from('cliente')
-      .select('*', { count: 'exact', head: true })
-      .eq('vendedor_username', username)
-      .gte('created_at', fecha.toISOString())
-      .lte('created_at', fechaFin.toISOString());
+    const clientesDelMes = clientes.filter((c: any) => {
+      const clienteFecha = new Date(c.created_at);
+      return clienteFecha >= fecha && clienteFecha <= fechaFin;
+    });
 
     meses.push({
       mes: mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1),
-      nuevos: count || 0,
+      nuevos: clientesDelMes.length,
     });
   }
 
