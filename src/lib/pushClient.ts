@@ -42,8 +42,15 @@ export async function registerPushSubscription({
     return;
   }
 
+  // Si el permiso fue denegado, no continuar
   if (Notification.permission === "denied") {
     onPermissionDenied?.();
+    return;
+  }
+
+  // Si el permiso aún no se ha otorgado, no solicitar aquí
+  // Dejar que NotificationPermissionPrompt lo maneje primero
+  if (Notification.permission !== "granted") {
     return;
   }
 
@@ -55,7 +62,8 @@ export async function registerPushSubscription({
   // Asegurarnos de que el Service Worker esté activo/controlando la página
   const controllingRegistration = await navigator.serviceWorker.ready;
 
-  const permission = await Notification.requestPermission();
+  // El permiso ya está granted, no necesitamos solicitarlo
+  const permission = Notification.permission;
 
   if (permission !== "granted") {
     onPermissionDenied?.();

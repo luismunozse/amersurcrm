@@ -61,21 +61,14 @@ function showBrowserNotification(notificacion: NotificacionNoLeida) {
     return;
   }
 
-  const display = () =>
+  // Solo mostrar si el permiso ya fue otorgado
+  // No solicitar permiso aquí - eso lo maneja NotificationPermissionPrompt
+  if (Notification.permission === "granted") {
     new Notification(notificacion.titulo, {
       body: notificacion.mensaje,
       icon: "/logo-amersur.png",
       badge: "/logo-amersur.png",
       tag: notificacion.id,
-    });
-
-  if (Notification.permission === "granted") {
-    display();
-  } else if (Notification.permission === "default") {
-    Notification.requestPermission().then((permission) => {
-      if (permission === "granted") {
-        display();
-      }
     });
   }
 }

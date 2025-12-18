@@ -92,6 +92,7 @@ const EventoSchema = z.object({
   todo_el_dia: z.boolean().default(false),
   cliente_id: z.string().uuid().optional(),
   propiedad_id: z.string().uuid().optional(),
+  oportunidad_id: z.string().uuid().optional(), // Relación con oportunidad
   ubicacion: z.string().optional(),
   direccion: z.string().optional(),
   recordar_antes_minutos: z.number().min(0).max(10080), // Máximo 7 días
@@ -107,6 +108,17 @@ const EventoSchema = z.object({
   notas: z.string().optional(),
   etiquetas: z.array(z.string()).default([]),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color inválido").default('#3B82F6'),
+  // Campos de disciplina comercial
+  objetivo: z.string().optional(),
+  resultado_id: z.string().optional(),
+  resultado_notas: z.string().optional(),
+  proximo_paso_objetivo: z.string().optional(),
+  proximo_paso_fecha: z.string().optional(),
+  sla_tipo: z.string().optional(),
+  sla_vencimiento: z.string().optional(),
+  recordatorio_canal: z.string().optional(),
+  snooze_motivo_id: z.string().optional(),
+  snooze_hasta: z.string().optional(),
 });
 
 const RecordatorioSchema = z.object({
@@ -181,6 +193,7 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
         vendedor_id,
         cliente_id,
         propiedad_id,
+        oportunidad_id,
         ubicacion,
         direccion,
         recordar_antes_minutos,
@@ -191,6 +204,16 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
         notas,
         etiquetas,
         color,
+        objetivo,
+        resultado_id,
+        resultado_notas,
+        proximo_paso_objetivo,
+        proximo_paso_fecha,
+        sla_tipo,
+        sla_vencimiento,
+        recordatorio_canal,
+        snooze_motivo_id,
+        snooze_hasta,
         created_by,
         created_at,
         updated_at,
@@ -249,6 +272,7 @@ export async function crearEvento(formData: FormData) {
       todo_el_dia: formData.get("todo_el_dia") === "true",
       cliente_id: formData.get("cliente_id") || undefined,
       propiedad_id: formData.get("propiedad_id") || undefined,
+      oportunidad_id: formData.get("oportunidad_id") || undefined,
       ubicacion: formData.get("ubicacion") || undefined,
       direccion: formData.get("direccion") || undefined,
       recordar_antes_minutos: Number(formData.get("recordar_antes_minutos")) || 15,
@@ -259,6 +283,17 @@ export async function crearEvento(formData: FormData) {
       notas: formData.get("notas") || undefined,
       etiquetas: formData.get("etiquetas") ? JSON.parse(formData.get("etiquetas") as string) : [],
       color: formData.get("color") || '#3B82F6',
+      // Campos de disciplina comercial
+      objetivo: formData.get("objetivo") || undefined,
+      resultado_id: formData.get("resultado_id") || undefined,
+      resultado_notas: formData.get("resultado_notas") || undefined,
+      proximo_paso_objetivo: formData.get("proximo_paso_objetivo") || undefined,
+      proximo_paso_fecha: formData.get("proximo_paso_fecha") || undefined,
+      sla_tipo: formData.get("sla_tipo") || undefined,
+      sla_vencimiento: formData.get("sla_vencimiento") || undefined,
+      recordatorio_canal: formData.get("recordatorio_canal") || undefined,
+      snooze_motivo_id: formData.get("snooze_motivo_id") || undefined,
+      snooze_hasta: formData.get("snooze_hasta") || undefined,
     });
 
     // Crear evento
@@ -334,6 +369,7 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
       todo_el_dia: formData.get("todo_el_dia") === "true",
       cliente_id: formData.get("cliente_id") || undefined,
       propiedad_id: formData.get("propiedad_id") || undefined,
+      oportunidad_id: formData.get("oportunidad_id") || undefined,
       ubicacion: formData.get("ubicacion") || undefined,
       direccion: formData.get("direccion") || undefined,
       recordar_antes_minutos: Number(formData.get("recordar_antes_minutos")) || 15,
@@ -344,6 +380,17 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
       notas: formData.get("notas") || undefined,
       etiquetas: formData.get("etiquetas") ? JSON.parse(formData.get("etiquetas") as string) : [],
       color: formData.get("color") || '#3B82F6',
+      // Campos de disciplina comercial
+      objetivo: formData.get("objetivo") || undefined,
+      resultado_id: formData.get("resultado_id") || undefined,
+      resultado_notas: formData.get("resultado_notas") || undefined,
+      proximo_paso_objetivo: formData.get("proximo_paso_objetivo") || undefined,
+      proximo_paso_fecha: formData.get("proximo_paso_fecha") || undefined,
+      sla_tipo: formData.get("sla_tipo") || undefined,
+      sla_vencimiento: formData.get("sla_vencimiento") || undefined,
+      recordatorio_canal: formData.get("recordatorio_canal") || undefined,
+      snooze_motivo_id: formData.get("snooze_motivo_id") || undefined,
+      snooze_hasta: formData.get("snooze_hasta") || undefined,
     });
 
     // Actualizar evento

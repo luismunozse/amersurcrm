@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
@@ -53,27 +53,16 @@ export default function DashboardClient({
     setAvatarUrl(url);
   };
 
-  useEffect(() => {
+  // Función para registrar push subscription
+  const tryRegisterPush = useCallback(() => {
     if (
-      hasRegisteredPush.current ||
       !pushConfig?.enabled ||
       !pushConfig.vapidPublicKey ||
-      typeof window === "undefined"
+      typeof window === "undefined" ||
+      typeof Notification === "undefined"
     ) {
       return;
     }
-
-    // Safari iOS no soporta Web Push Notifications
-    if (typeof Notification === "undefined") {
-      return;
-    }
-
-    if (Notification.permission === "denied") {
-      hasRegisteredPush.current = true;
-      return;
-    }
-
-    hasRegisteredPush.current = true;
 
     void registerPushSubscription({
       vapidPublicKey: pushConfig.vapidPublicKey,
@@ -85,6 +74,31 @@ export default function DashboardClient({
       hasRegisteredPush.current = false;
     });
   }, [pushConfig?.enabled, pushConfig?.vapidPublicKey]);
+
+  // Intentar registrar push al montar (solo funcionará si ya tiene permiso)
+  useEffect(() => {
+    if (hasRegisteredPush.current) return;
+
+    // Safari iOS no soporta Web Push Notifications
+    if (typeof Notification === "undefined") return;
+
+    if (Notification.permission === "denied") {
+      hasRegisteredPush.current = true;
+      return;
+    }
+
+    // Solo registrar si ya tiene permiso (no solicitar aquí)
+    if (Notification.permission === "granted") {
+      hasRegisteredPush.current = true;
+      tryRegisterPush();
+    }
+  }, [tryRegisterPush]);
+
+  // Callback cuando el usuario otorga permiso via el prompt
+  const handlePermissionGranted = useCallback(() => {
+    hasRegisteredPush.current = true;
+    tryRegisterPush();
+  }, [tryRegisterPush]);
 
   return (
     <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>
@@ -126,7 +140,7 @@ export default function DashboardClient({
           <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
         </div>
       </div>
-      <NotificationPermissionPrompt />
+      <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />
       <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
     </UserProfileProvider>
   );

@@ -32,7 +32,7 @@ export const logLoginAudit = async (
   payload: Record<string, unknown>,
   context: string
 ) => {
-  const { error } = await supabase.from(LOGIN_AUDIT_TABLE).insert(payload);
+  const { error } = await supabase.schema("crm").from(LOGIN_AUDIT_TABLE).insert(payload);
   handleLoginAuditError(error, context);
 };
 

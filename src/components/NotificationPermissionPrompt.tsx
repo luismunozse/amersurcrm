@@ -1,19 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, X } from 'lucide-react';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
+
+const STORAGE_KEY = 'notification-prompt-dismissed';
+
+interface NotificationPermissionPromptProps {
+  /** Callback cuando el usuario otorga permiso */
+  onPermissionGranted?: () => void;
+}
 
 /**
  * Componente que muestra un prompt amigable para solicitar
  * permisos de notificaciones del navegador
  */
-export default function NotificationPermissionPrompt() {
+export default function NotificationPermissionPrompt({ onPermissionGranted }: NotificationPermissionPromptProps) {
   const { permission: _permission, requestPermission, isDefault, isUnsupported } = useNotificationPermission();
-  const [dismissed, setDismissed] = useState(false);
+  // Inicializar como null para evitar flash durante hidratación
+  const [dismissed, setDismissed] = useState<boolean | null>(null);
 
-  // No mostrar si ya se otorgó permiso, se denegó, no está soportado, o fue descartado
-  if (!isDefault || dismissed || isUnsupported) {
+  // Verificar localStorage solo en el cliente después del mount
+  useEffect(() => {
+    const wasDismissed = localStorage.getItem(STORAGE_KEY) === 'true';
+    setDismissed(wasDismissed);
+  }, []);
+
+  // No mostrar hasta que se verifique localStorage (dismissed === null)
+  // o si ya fue descartado, permiso otorgado/denegado, o no soportado
+  if (dismissed === null || dismissed || !isDefault || isUnsupported) {
     return null;
   }
 
@@ -21,19 +36,14 @@ export default function NotificationPermissionPrompt() {
     const result = await requestPermission();
     if (result === 'granted') {
       setDismissed(true);
+      onPermissionGranted?.();
     }
   };
 
   const handleDismiss = () => {
     setDismissed(true);
-    // Guardar en localStorage para no mostrar de nuevo en esta sesión
-    localStorage.setItem('notification-prompt-dismissed', 'true');
+    localStorage.setItem(STORAGE_KEY, 'true');
   };
-
-  // Verificar si fue descartado anteriormente
-  if (typeof window !== 'undefined' && localStorage.getItem('notification-prompt-dismissed')) {
-    return null;
-  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-sm animate-slide-up">

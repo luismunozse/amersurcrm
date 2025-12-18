@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
     const [identifierResult, ipResult] = await Promise.all([
       identifier
         ? supabase
+            .schema("crm")
             .from("login_audit")
             .select("id", { count: "exact", head: true })
             .eq("username", identifier)
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
         : Promise.resolve({ count: 0, error: null }),
       ipAddress
         ? supabase
+            .schema("crm")
             .from("login_audit")
             .select("id", { count: "exact", head: true })
             .eq("ip_address", ipAddress)

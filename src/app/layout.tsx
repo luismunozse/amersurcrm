@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import AppToaster from "@/components/Toaster";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import DevErrorFilter from "@/components/DevErrorFilter";
 
 const inter = localFont({
   src: [
@@ -85,6 +86,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${mont.variable} font-sans bg-bg text-text`}>
         <ThemeProvider>
+          <DevErrorFilter />
           <ErrorBoundary>
             {children}
             <AppToaster />

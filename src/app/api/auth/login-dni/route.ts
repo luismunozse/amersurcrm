@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
 
     const [dniResult, ipResult] = await Promise.all([
       supabase
+        .schema("crm")
         .from("login_audit")
         .select("id", { count: "exact", head: true })
         .eq("dni", dniSanitized)
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
         .gte("created_at", windowStartIso),
       ipAddress
         ? supabase
+            .schema("crm")
             .from("login_audit")
             .select("id", { count: "exact", head: true })
             .eq("ip_address", ipAddress)

@@ -1,7 +1,17 @@
 "use client";
+import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 
 export default function AppToaster() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Evitar hidratación mismatch - Toaster solo se renderiza en cliente
+  if (!mounted) return null;
+
   return (
     <Toaster
       position="top-right"
