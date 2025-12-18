@@ -16,7 +16,7 @@ interface NotificationPermissionPromptProps {
  * permisos de notificaciones del navegador
  */
 export default function NotificationPermissionPrompt({ onPermissionGranted }: NotificationPermissionPromptProps) {
-  const { permission: _permission, requestPermission, isDefault, isUnsupported } = useNotificationPermission();
+  const { requestPermission, isDefault, isUnsupported, isReady } = useNotificationPermission();
   // Inicializar como null para evitar flash durante hidratación
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
@@ -26,9 +26,13 @@ export default function NotificationPermissionPrompt({ onPermissionGranted }: No
     setDismissed(wasDismissed);
   }, []);
 
-  // No mostrar hasta que se verifique localStorage (dismissed === null)
-  // o si ya fue descartado, permiso otorgado/denegado, o no soportado
-  if (dismissed === null || dismissed || !isDefault || isUnsupported) {
+  // No mostrar hasta que:
+  // 1. isReady sea true (hook determinó el estado real del permiso)
+  // 2. dismissed !== null (verificamos localStorage)
+  // 3. dismissed sea false (no fue descartado)
+  // 4. isDefault sea true (permiso en estado 'default')
+  // 5. isUnsupported sea false (navegador soporta notificaciones)
+  if (!isReady || dismissed === null || dismissed || !isDefault || isUnsupported) {
     return null;
   }
 

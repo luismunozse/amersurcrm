@@ -4,11 +4,11 @@ export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'un
 
 /**
  * Hook para manejar los permisos de notificaciones del navegador
- * @returns {NotificationPermissionState} - Estado actual del permiso
- * @returns {() => Promise<NotificationPermissionState>} - Función para solicitar permiso
+ * Usa null como estado inicial para evitar problemas de hidratación
  */
 export function useNotificationPermission() {
-  const [permission, setPermission] = useState<NotificationPermissionState>('default');
+  // null = aún no determinado (para evitar hydration mismatch)
+  const [permission, setPermission] = useState<NotificationPermissionState | null>(null);
 
   useEffect(() => {
     // Verificar si el navegador soporta notificaciones
@@ -49,8 +49,8 @@ export function useNotificationPermission() {
    * Solicitar permiso para mostrar notificaciones
    */
   const requestPermission = async (): Promise<NotificationPermissionState> => {
-    if (permission === 'unsupported') {
-      return 'unsupported';
+    if (permission === 'unsupported' || permission === null) {
+      return permission ?? 'unsupported';
     }
 
     if (permission === 'granted') {
@@ -63,13 +63,15 @@ export function useNotificationPermission() {
       return result as NotificationPermissionState;
     } catch (error) {
       console.error('Error al solicitar permiso de notificaciones:', error);
-      return permission;
+      return permission ?? 'default';
     }
   };
 
   return {
     permission,
     requestPermission,
+    // isReady indica que ya determinamos el estado real del permiso
+    isReady: permission !== null,
     isGranted: permission === 'granted',
     isDenied: permission === 'denied',
     isDefault: permission === 'default',
