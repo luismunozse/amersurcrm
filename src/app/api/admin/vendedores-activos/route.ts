@@ -31,11 +31,24 @@ export async function GET() {
       );
     }
 
-    // Obtener vendedores activos
-    const { data: vendedoresActivosRaw, error } = await supabase
+    // Obtener vendedores activos con JOIN (una sola query)
+    const { data: vendedoresActivos, error } = await supabase
       .schema("crm")
       .from("vendedor_activo")
-      .select("id, vendedor_id, orden, activo, fecha_configuracion")
+      .select(`
+        id,
+        vendedor_id,
+        orden,
+        activo,
+        fecha_configuracion,
+        usuario_perfil:vendedor_id (
+          id,
+          username,
+          nombre_completo,
+          telefono,
+          email
+        )
+      `)
       .order("orden", { ascending: true });
 
     if (error) {
@@ -45,29 +58,6 @@ export async function GET() {
         { status: 500 }
       );
     }
-
-    // Obtener información de los perfiles de usuario
-    const vendedoresActivos = await Promise.all(
-      (vendedoresActivosRaw || []).map(async (va) => {
-        const { data: perfil } = await supabase
-          .schema("crm")
-          .from("usuario_perfil")
-          .select("id, username, nombre_completo, telefono, email")
-          .eq("id", va.vendedor_id)
-          .single();
-
-        return {
-          ...va,
-          usuario_perfil: perfil || {
-            id: va.vendedor_id,
-            username: "Desconocido",
-            nombre_completo: "Usuario Desconocido",
-            telefono: "",
-            email: "",
-          },
-        };
-      })
-    );
 
     // Obtener configuración actual (próximo índice)
     const { data: config } = await supabase
