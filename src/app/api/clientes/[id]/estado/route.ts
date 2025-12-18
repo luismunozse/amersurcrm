@@ -65,14 +65,14 @@ export async function PATCH(
       );
     }
 
-    // Validar estado
+    // Validar estado (sincronizado con el CRM)
     const estadosValidos = [
       "por_contactar",
       "contactado",
-      "interesado",
-      "negociacion",
-      "cerrado",
-      "perdido",
+      "intermedio",
+      "potencial",
+      "desestimado",
+      "transferido",
     ];
 
     if (!estadosValidos.includes(estado_cliente)) {

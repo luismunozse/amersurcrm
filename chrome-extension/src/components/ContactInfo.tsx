@@ -16,28 +16,28 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   const estadoColors: Record<string, string> = {
     por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
     contactado: 'bg-blue-100 text-blue-800 border-blue-300',
-    interesado: 'bg-crm-accent/30 text-crm-primary border-crm-primary',
-    negociacion: 'bg-orange-100 text-orange-800 border-orange-300',
-    cerrado: 'bg-green-100 text-green-800 border-green-300',
-    perdido: 'bg-red-100 text-red-800 border-red-300',
+    intermedio: 'bg-purple-100 text-purple-800 border-purple-300',
+    potencial: 'bg-crm-accent/30 text-crm-primary border-crm-primary',
+    desestimado: 'bg-red-100 text-red-800 border-red-300',
+    transferido: 'bg-gray-100 text-gray-800 border-gray-300',
   };
 
   const estadoIcons: Record<string, string> = {
     por_contactar: '📋',
     contactado: '📞',
-    interesado: '👀',
-    negociacion: '💰',
-    cerrado: '✅',
-    perdido: '❌',
+    intermedio: '🔄',
+    potencial: '⭐',
+    desestimado: '❌',
+    transferido: '↗️',
   };
 
   const estadoLabels: Record<string, string> = {
     por_contactar: 'Por Contactar',
     contactado: 'Contactado',
-    interesado: 'Interesado',
-    negociacion: 'En Negociación',
-    cerrado: 'Cerrado',
-    perdido: 'Perdido',
+    intermedio: 'Intermedio',
+    potencial: 'Potencial',
+    desestimado: 'Desestimado',
+    transferido: 'Transferido',
   };
 
   // Cargar información adicional cuando hay un cliente

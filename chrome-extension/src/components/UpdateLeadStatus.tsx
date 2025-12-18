@@ -11,10 +11,10 @@ interface UpdateLeadStatusProps {
 const ESTADOS = [
   { value: 'por_contactar', label: 'Por Contactar', color: 'bg-yellow-100 text-yellow-800', icon: '📋' },
   { value: 'contactado', label: 'Contactado', color: 'bg-blue-100 text-blue-800', icon: '📞' },
-  { value: 'interesado', label: 'Interesado', color: 'bg-crm-accent/30 text-crm-primary', icon: '⭐' },
-  { value: 'negociacion', label: 'En Negociación', color: 'bg-orange-100 text-orange-800', icon: '💼' },
-  { value: 'cerrado', label: 'Cerrado', color: 'bg-green-100 text-green-800', icon: '✅' },
-  { value: 'perdido', label: 'Perdido', color: 'bg-red-100 text-red-800', icon: '❌' },
+  { value: 'intermedio', label: 'Intermedio', color: 'bg-purple-100 text-purple-800', icon: '🔄' },
+  { value: 'potencial', label: 'Potencial', color: 'bg-crm-accent/30 text-crm-primary', icon: '⭐' },
+  { value: 'desestimado', label: 'Desestimado', color: 'bg-red-100 text-red-800', icon: '❌' },
+  { value: 'transferido', label: 'Transferido', color: 'bg-gray-100 text-gray-800', icon: '↗️' },
 ];
 
 export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadStatusProps) {

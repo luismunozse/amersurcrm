@@ -152,16 +152,38 @@ export async function POST(request: NextRequest) {
     let errors = 0;
     const errorsDetails: string[] = [];
 
-    // Insertar/actualizar cada archivo en la base de datos
+    // OPTIMIZADO: Obtener todos los documentos existentes de Google Drive en una sola query
+    const googleDriveFileIds = archivos.map(f => f.id);
+    const { data: existingDocs } = await serviceSupabase
+      .from('documento')
+      .select('id, google_drive_file_id')
+      .in('google_drive_file_id', googleDriveFileIds);
+
+    // Crear mapa para búsqueda O(1)
+    const existingDocsMap = new Map<string, string>();
+    (existingDocs || []).forEach(doc => {
+      existingDocsMap.set(doc.google_drive_file_id, doc.id);
+    });
+
+    // OPTIMIZADO: Pre-procesar carpetas únicas primero
+    const uniqueParentIds = [...new Set(archivos.map(f => f.parents?.[0]).filter(Boolean))] as string[];
+    const carpetaIdMap = new Map<string, string | null>();
+
+    // Procesar carpetas secuencialmente (necesario por la recursión)
+    for (const parentGoogleId of uniqueParentIds) {
+      if (!carpetaIdMap.has(parentGoogleId)) {
+        const carpetaId = await ensureFolder(parentGoogleId);
+        carpetaIdMap.set(parentGoogleId, carpetaId);
+      }
+    }
+
+    // OPTIMIZADO: Preparar datos para batch operations
+    const docsToInsert: Array<Record<string, unknown>> = [];
+    const docsToUpdate: Array<{ id: string; data: Record<string, unknown> }> = [];
+
     for (const file of archivos) {
       try {
-
-        // Verificar si el documento ya existe
-        const { data: existing } = await serviceSupabase
-          .from('documento')
-          .select('id')
-          .eq('google_drive_file_id', file.id)
-          .maybeSingle();
+        const existingId = existingDocsMap.get(file.id);
 
         // Extraer extensión del nombre
         const extension = file.name.includes('.')
@@ -169,7 +191,7 @@ export async function POST(request: NextRequest) {
           : null;
 
         const parentGoogleId = file.parents?.[0] ?? null;
-        const carpetaId = await ensureFolder(parentGoogleId);
+        const carpetaId = parentGoogleId ? carpetaIdMap.get(parentGoogleId) ?? null : null;
 
         const documentData = {
           nombre: file.name,
@@ -188,41 +210,55 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         };
 
-        if (existing) {
-          // Actualizar existente
-          const { error: updateError } = await serviceSupabase
-            .from('documento')
-            .update({
-              ...documentData,
-            })
-            .eq('id', existing.id);
-
-          if (updateError) {
-            console.error(`[SYNC] Error actualizando documento ${file.id}:`, updateError);
-            errorsDetails.push(`${file.name}: ${updateError.message}`);
-            errors++;
-          } else {
-            updated++;
-          }
+        if (existingId) {
+          docsToUpdate.push({ id: existingId, data: documentData });
         } else {
-          // Insertar nuevo
-          const { error: insertError } = await serviceSupabase
-            .from('documento')
-            .insert(documentData);
-
-          if (insertError) {
-            console.error(`[SYNC] Error insertando documento ${file.id}:`, insertError);
-            errorsDetails.push(`${file.name}: ${insertError.message}`);
-            errors++;
-          } else {
-            inserted++;
-          }
+          docsToInsert.push(documentData);
         }
       } catch (fileError) {
         console.error(`[SYNC] Error procesando archivo ${file.id}:`, fileError);
         errorsDetails.push(`${file.name}: ${fileError instanceof Error ? fileError.message : 'Error desconocido'}`);
         errors++;
       }
+    }
+
+    // OPTIMIZADO: Batch insert de documentos nuevos
+    if (docsToInsert.length > 0) {
+      const { error: insertError } = await serviceSupabase
+        .from('documento')
+        .insert(docsToInsert);
+
+      if (insertError) {
+        console.error('[SYNC] Error en batch insert:', insertError);
+        errorsDetails.push(`Batch insert: ${insertError.message}`);
+        errors += docsToInsert.length;
+      } else {
+        inserted = docsToInsert.length;
+      }
+    }
+
+    // OPTIMIZADO: Batch updates usando Promise.all (Supabase no tiene batch update nativo)
+    if (docsToUpdate.length > 0) {
+      const updateResults = await Promise.allSettled(
+        docsToUpdate.map(({ id, data }) =>
+          serviceSupabase
+            .from('documento')
+            .update(data)
+            .eq('id', id)
+        )
+      );
+
+      updateResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && !result.value.error) {
+          updated++;
+        } else {
+          const errorMsg = result.status === 'rejected'
+            ? result.reason?.message
+            : result.value.error?.message;
+          errorsDetails.push(`Update ${docsToUpdate[index].id}: ${errorMsg}`);
+          errors++;
+        }
+      });
     }
 
 

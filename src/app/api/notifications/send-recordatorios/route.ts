@@ -67,33 +67,40 @@ async function handleRequest(req: NextRequest) {
     return NextResponse.json({ processed: 0 });
   }
 
-  let successCount = 0;
   const failures: Array<{ id: string; error: string }> = [];
 
-  for (const recordatorio of pendientes) {
-    try {
-      const mensaje =
-        recordatorio.descripcion ??
-        `Recordatorio programado para ${new Date(recordatorio.fecha_recordatorio).toLocaleString("es-PE")}.`;
-      const dataPayload: Record<string, unknown> = {
-        recordatorio_id: recordatorio.id,
-        prioridad: recordatorio.prioridad,
-        fecha_recordatorio: recordatorio.fecha_recordatorio,
-        url: "/dashboard/agenda?tab=recordatorios",
-      };
-      if (recordatorio.data) {
-        Object.assign(dataPayload, recordatorio.data as Record<string, unknown>);
-      }
+  // OPTIMIZADO: Preparar todos los datos primero
+  const notificacionesData = pendientes.map((recordatorio) => {
+    const mensaje =
+      recordatorio.descripcion ??
+      `Recordatorio programado para ${new Date(recordatorio.fecha_recordatorio).toLocaleString("es-PE")}.`;
+    const dataPayload: Record<string, unknown> = {
+      recordatorio_id: recordatorio.id,
+      prioridad: recordatorio.prioridad,
+      fecha_recordatorio: recordatorio.fecha_recordatorio,
+      url: "/dashboard/agenda?tab=recordatorios",
+    };
+    if (recordatorio.data) {
+      Object.assign(dataPayload, recordatorio.data as Record<string, unknown>);
+    }
+    return { recordatorio, mensaje, dataPayload };
+  });
 
-      await supabaseCrm.from("notificacion").insert({
-        usuario_id: recordatorio.vendedor_id,
-        tipo: "sistema",
-        titulo: recordatorio.titulo,
-        mensaje,
-        data: dataPayload,
-      });
+  // OPTIMIZADO: Batch insert de todas las notificaciones (1 query en lugar de N)
+  const notificacionesInsert = notificacionesData.map(({ recordatorio, mensaje, dataPayload }) => ({
+    usuario_id: recordatorio.vendedor_id,
+    tipo: "sistema",
+    titulo: recordatorio.titulo,
+    mensaje,
+    data: dataPayload,
+  }));
 
-      await dispatchNotificationChannels(
+  await supabaseCrm.from("notificacion").insert(notificacionesInsert);
+
+  // OPTIMIZADO: Dispatch todas las push notifications en paralelo
+  const dispatchResults = await Promise.allSettled(
+    notificacionesData.map(({ recordatorio, mensaje, dataPayload }) =>
+      dispatchNotificationChannels(
         {
           userId: recordatorio.vendedor_id,
           titulo: recordatorio.titulo,
@@ -116,21 +123,32 @@ async function handleRequest(req: NextRequest) {
           },
         },
         { supabaseClient: supabase },
-      );
+      ).then(() => recordatorio.id)
+    )
+  );
 
-      await supabaseCrm
-        .from("recordatorio")
-        .update({ enviado: true, updated_at: new Date().toISOString() })
-        .eq("id", recordatorio.id);
-
-      successCount += 1;
-    } catch (err) {
+  // Separar éxitos y fallos
+  const successIds: string[] = [];
+  dispatchResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      successIds.push(result.value);
+    } else {
       failures.push({
-        id: recordatorio.id,
-        error: err instanceof Error ? err.message : "Error desconocido",
+        id: pendientes[index].id,
+        error: result.reason instanceof Error ? result.reason.message : "Error desconocido",
       });
     }
+  });
+
+  // OPTIMIZADO: Batch update de todos los recordatorios exitosos (1 query en lugar de N)
+  if (successIds.length > 0) {
+    await supabaseCrm
+      .from("recordatorio")
+      .update({ enviado: true, updated_at: new Date().toISOString() })
+      .in("id", successIds);
   }
+
+  const successCount = successIds.length;
 
   return NextResponse.json({
     processed: pendientes.length,
