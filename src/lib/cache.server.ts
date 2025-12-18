@@ -199,34 +199,35 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
 
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
-  
-  // Ahora pasamos las columnas a buildBaseQuery (ya incluye .select())
-  const { data, error } = await buildBaseQuery(selectedColumns)
+
+  // OPTIMIZADO: Ejecutar data query y count query en paralelo (~100ms vs ~200ms secuencial)
+  const dataQueryPromise = buildBaseQuery(selectedColumns)
     .order(sortBy, { ascending: sortOrder === 'asc' })
     .range(start, end);
 
-  if (error) {
+  const countQueryPromise = withTotal
+    ? buildBaseQuery('id', { count: 'exact', head: true })
+    : Promise.resolve({ count: null });
+
+  const [dataResult, countResult] = await Promise.all([dataQueryPromise, countQueryPromise]);
+
+  if (dataResult.error) {
     console.error('Error en getCachedClientes:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
+      message: dataResult.error.message,
+      details: dataResult.error.details,
+      hint: dataResult.error.hint,
+      code: dataResult.error.code,
     });
-    throw error;
+    throw dataResult.error;
   }
 
   // Deduplicar resultados por ID (puede haber duplicados si hay múltiples condiciones OR)
-  const dataArray = data as any[];
+  const dataArray = dataResult.data as any[];
   const uniqueData = dataArray ? Array.from(
     new Map(dataArray.map(item => [item.id, item])).values()
   ) : [];
 
-  let total = uniqueData.length;
-  if (withTotal) {
-    // Usar 'exact' en lugar de 'planned' para obtener el conteo real con filtros aplicados
-    const { count } = await buildBaseQuery('id', { count: 'exact', head: true });
-    total = count ?? total;
-  }
+  const total = countResult.count ?? uniqueData.length;
 
   return {
     data: uniqueData as ClienteCached[],

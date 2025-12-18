@@ -22,26 +22,38 @@ type ProyectoActivity = BaseActivity & {
 
 type Activity = ClienteActivity | ProyectoActivity;
 
-// Usar los tipos de @/types/crm
-type ClienteMin = Pick<ClienteCached, 'id' | 'nombre' | 'email'>;
-type ProyectoMin = Pick<ProyectoCached, 'id' | 'nombre' | 'descripcion'>;
+// Props opcionales para evitar re-fetch si los datos ya están disponibles
+interface RecentActivitiesProps {
+  clientes?: ClienteCached[];
+  proyectos?: ProyectoCached[];
+}
 
-export async function RecentActivities() {
-  // Obtener datos recientes
-  const [clientesResult, proyectosData] = await Promise.all([
-    getCachedClientes({ mode: "dashboard", pageSize: 4, withTotal: false }),
-    getCachedProyectos(),
-  ]);
+export async function RecentActivities({ clientes: clientesProp, proyectos: proyectosProp }: RecentActivitiesProps = {}) {
+  // Solo hacer fetch si no se pasaron datos como props
+  let clientes: ClienteCached[];
+  let proyectos: ProyectoCached[];
 
-  const clientes = Array.isArray(clientesResult?.data)
-    ? (clientesResult.data as ClienteMin[])
-    : [];
-  const proyectos = Array.isArray(proyectosData) ? (proyectosData as ProyectoMin[]) : [];
+  if (clientesProp && proyectosProp) {
+    // Usar datos pasados como props (evita queries duplicadas)
+    clientes = clientesProp;
+    proyectos = proyectosProp;
+  } else {
+    // Fallback: obtener datos si no se pasaron props
+    const [clientesResult, proyectosData] = await Promise.all([
+      getCachedClientes({ mode: "dashboard", pageSize: 4, withTotal: false }),
+      getCachedProyectos(),
+    ]);
+
+    clientes = Array.isArray(clientesResult?.data)
+      ? (clientesResult.data as ClienteCached[])
+      : [];
+    proyectos = Array.isArray(proyectosData) ? (proyectosData as ProyectoCached[]) : [];
+  }
 
   // Crear actividades recientes basadas en datos reales (máx 4)
   // Usar índice único para evitar claves duplicadas si hay IDs repetidos
   const activities: Activity[] = [
-    ...clientes.slice(0, 2).map((cliente: ClienteMin, index: number) => ({
+    ...clientes.slice(0, 2).map((cliente, index: number) => ({
       id: `cliente-${index}-${cliente.id}`,
       type: "cliente" as const,
       message: `Cliente: ${cliente.nombre}`,
@@ -49,7 +61,7 @@ export async function RecentActivities() {
       icon: "👤",
       email: cliente.email,
     })),
-    ...proyectos.slice(0, 2).map((proyecto: ProyectoMin, index: number) => ({
+    ...proyectos.slice(0, 2).map((proyecto, index: number) => ({
       id: `proyecto-${index}-${proyecto.id}`,
       type: "proyecto" as const,
       message: `Proyecto: ${proyecto.nombre}`,

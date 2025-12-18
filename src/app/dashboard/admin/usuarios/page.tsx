@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import UserEditModal from "@/components/UserEditModal";
@@ -55,35 +55,46 @@ function GestionUsuarios() {
   const [paginaActual, setPaginaActual] = useState(1);
   const USUARIOS_POR_PAGINA = 10;
 
-  useEffect(() => {
-    cargarUsuarios();
-    cargarRoles();
-  }, []);
-
-  const cargarUsuarios = async () => {
+  // OPTIMIZADO: Cargar usuarios y roles en paralelo
+  const cargarDatosIniciales = useCallback(async () => {
     try {
       setCargando(true);
+      // Promise.all ejecuta ambos fetch en paralelo (~200ms vs ~400ms secuencial)
+      const [usuariosRes, rolesRes] = await Promise.all([
+        fetch('/api/admin/usuarios'),
+        fetch('/api/admin/roles')
+      ]);
+
+      const [usuariosData, rolesData] = await Promise.all([
+        usuariosRes.json(),
+        rolesRes.json()
+      ]);
+
+      setUsuarios(usuariosData.usuarios || []);
+      setRoles(rolesData.roles || []);
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      toast.error('Error cargando datos');
+    } finally {
+      setCargando(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarDatosIniciales();
+  }, [cargarDatosIniciales]);
+
+  // Función para recargar solo usuarios (después de CRUD)
+  const cargarUsuarios = useCallback(async () => {
+    try {
       const response = await fetch('/api/admin/usuarios');
       const data = await response.json();
       setUsuarios(data.usuarios || []);
     } catch (error) {
       console.error('Error cargando usuarios:', error);
       toast.error('Error cargando usuarios');
-    } finally {
-      setCargando(false);
     }
-  };
-
-  const cargarRoles = async () => {
-    try {
-      const response = await fetch('/api/admin/roles');
-      const data = await response.json();
-      setRoles(data.roles || []);
-    } catch (error) {
-      console.error('Error cargando roles:', error);
-      toast.error('Error cargando roles');
-    }
-  };
+  }, []);
 
   const crearUsuario = async (formData: FormData) => {
     try {
@@ -210,26 +221,33 @@ function GestionUsuarios() {
     }
   };
 
-  // Filtrar usuarios según búsqueda
-  const usuariosFiltrados = usuarios.filter((usuario) => {
-    if (!busqueda.trim()) return true;
+  // OPTIMIZADO: Memoizar filtrado para evitar recálculos en cada render
+  const usuariosFiltrados = useMemo(() => {
+    if (!busqueda.trim()) return usuarios;
 
     const searchTerm = busqueda.toLowerCase();
-    return (
+    return usuarios.filter((usuario) => (
       usuario.nombre_completo?.toLowerCase().includes(searchTerm) ||
       usuario.username?.toLowerCase().includes(searchTerm) ||
       usuario.dni?.toLowerCase().includes(searchTerm) ||
       usuario.email?.toLowerCase().includes(searchTerm) ||
       usuario.telefono?.toLowerCase().includes(searchTerm) ||
       usuario.rol?.nombre?.toLowerCase().includes(searchTerm)
-    );
-  });
+    ));
+  }, [usuarios, busqueda]);
 
-  // Calcular paginación
-  const totalPaginas = Math.ceil(usuariosFiltrados.length / USUARIOS_POR_PAGINA);
-  const indiceInicio = (paginaActual - 1) * USUARIOS_POR_PAGINA;
-  const indiceFin = indiceInicio + USUARIOS_POR_PAGINA;
-  const usuariosPaginados = usuariosFiltrados.slice(indiceInicio, indiceFin);
+  // OPTIMIZADO: Memoizar paginación
+  const { totalPaginas, indiceInicio, indiceFin, usuariosPaginados } = useMemo(() => {
+    const total = Math.ceil(usuariosFiltrados.length / USUARIOS_POR_PAGINA);
+    const inicio = (paginaActual - 1) * USUARIOS_POR_PAGINA;
+    const fin = inicio + USUARIOS_POR_PAGINA;
+    return {
+      totalPaginas: total,
+      indiceInicio: inicio,
+      indiceFin: fin,
+      usuariosPaginados: usuariosFiltrados.slice(inicio, fin)
+    };
+  }, [usuariosFiltrados, paginaActual]);
 
   // Resetear a página 1 cuando cambia la búsqueda
   useEffect(() => {

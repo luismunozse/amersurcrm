@@ -11,6 +11,7 @@ import SecondaryPanelDrawer from "@/components/dashboard/SecondaryPanelDrawer";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { PERMISOS } from "@/lib/permissions";
 import { obtenerMetricasAgenda } from "@/app/dashboard/agenda/actions";
+import type { ClienteCached, ProyectoCached } from "@/types/crm";
 
 type ClienteLite = {
   ultimo_contacto?: string | null;
@@ -39,6 +40,9 @@ interface DashboardMetrics {
   puedeCrearProyectos: boolean;
   puedeEditarProyectos: boolean;
   esAdminOGerente: boolean;
+  // Datos raw para pasar a componentes (evita re-fetch)
+  clientes: ClienteCached[];
+  proyectos: ProyectoCached[];
 }
 
 const initialMetrics: DashboardMetrics = {
@@ -56,6 +60,8 @@ const initialMetrics: DashboardMetrics = {
   puedeCrearProyectos: false,
   puedeEditarProyectos: false,
   esAdminOGerente: false,
+  clientes: [],
+  proyectos: [],
 };
 
 async function loadDashboardMetrics(): Promise<DashboardMetrics> {
@@ -127,6 +133,9 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       puedeCrearProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.CREAR) ?? false,
       puedeEditarProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.EDITAR) ?? false,
       esAdminOGerente: permisosUsuario?.rol === 'ROL_ADMIN' || permisosUsuario?.rol === 'ROL_GERENTE',
+      // Pasar datos raw a componentes para evitar re-fetch
+      clientes: clientes as ClienteCached[],
+      proyectos: proyectos as ProyectoCached[],
     } satisfies DashboardMetrics;
   } catch (error) {
     // Mejorar el logging del error
@@ -568,7 +577,7 @@ async function DashboardContent() {
                 </div>
               }
             >
-              <RecentActivities />
+              <RecentActivities clientes={metrics.clientes} proyectos={metrics.proyectos} />
             </Suspense>
           </div>
 
@@ -589,7 +598,7 @@ async function DashboardContent() {
                 </div>
               }
             >
-              <RecentProjects />
+              <RecentProjects proyectos={metrics.proyectos} />
             </Suspense>
           </div>
         </div>
@@ -616,7 +625,7 @@ async function DashboardContent() {
             </Card>
           </div>
         }>
-          <RecentActivities />
+          <RecentActivities clientes={metrics.clientes} proyectos={metrics.proyectos} />
         </Suspense>
 
         <Suspense fallback={
@@ -635,7 +644,7 @@ async function DashboardContent() {
             </div>
           </div>
         }>
-          <RecentProjects />
+          <RecentProjects proyectos={metrics.proyectos} />
         </Suspense>
       </section>
 

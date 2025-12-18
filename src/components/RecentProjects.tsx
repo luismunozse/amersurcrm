@@ -3,10 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { getCachedProyectos } from "@/lib/cache.server";
 import type { ProyectoCached } from "@/types/crm";
 
-export async function RecentProjects() {
-  const proyectosData = await getCachedProyectos();
-  // Ensure we have an array, default to empty array if null/undefined
-  const proyectos: ProyectoCached[] = Array.isArray(proyectosData) ? proyectosData : [];
+// Props opcionales para evitar re-fetch si los datos ya están disponibles
+interface RecentProjectsProps {
+  proyectos?: ProyectoCached[];
+}
+
+export async function RecentProjects({ proyectos: proyectosProp }: RecentProjectsProps = {}) {
+  // Solo hacer fetch si no se pasaron datos como props
+  let proyectos: ProyectoCached[];
+
+  if (proyectosProp) {
+    // Usar datos pasados como props (evita queries duplicadas)
+    proyectos = proyectosProp;
+  } else {
+    // Fallback: obtener datos si no se pasaron props
+    const proyectosData = await getCachedProyectos();
+    proyectos = Array.isArray(proyectosData) ? proyectosData : [];
+  }
+
   const recentProjects = proyectos.slice(0, 3);
 
   return (
