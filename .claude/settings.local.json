@@ -99,7 +99,8 @@
       "Bash(then psql \"$DATABASE_URL\" -c \"SELECT up.id, up.username, r.nombre as rol_nombre FROM crm.usuario_perfil up LEFT JOIN crm.rol r ON up.rol_id = r.id WHERE up.username = ''admin'' OR r.nombre = ''admin'' LIMIT 5;\")",
       "Bash(git fetch:*)",
       "Bash(npm view:*)",
-      "Bash(then psql \"$DATABASE_URL\" -c \"SELECT column_name FROM information_schema.columns WHERE table_schema = ''crm'' AND table_name = ''usuario_perfil'' ORDER BY ordinal_position;\")"
+      "Bash(then psql \"$DATABASE_URL\" -c \"SELECT column_name FROM information_schema.columns WHERE table_schema = ''crm'' AND table_name = ''usuario_perfil'' ORDER BY ordinal_position;\")",
+      "Bash(then psql \"$DATABASE_URL\" -c \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = ''crm'' AND table_name = ''recordatorio'' ORDER BY ordinal_position;\")"
     ],
     "deny": [],
     "ask": []

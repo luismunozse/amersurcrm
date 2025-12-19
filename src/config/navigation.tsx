@@ -1,7 +1,7 @@
 import {
   LayoutDashboard,
   Users,
-  ClipboardList,
+  // ClipboardList, // Oculto - sin uso actual
   Building2,
   Home,
   Calendar,
@@ -28,7 +28,7 @@ export type NavItem = {
 export const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { name: "Clientes", href: "/dashboard/clientes", permisos: [PERMISOS.CLIENTES.VER_TODOS, PERMISOS.CLIENTES.VER_ASIGNADOS], icon: <Users className="w-5 h-5" /> },
-  { name: "Leads", href: "/dashboard/leads", icon: <ClipboardList className="w-5 h-5" /> },
+  // { name: "Leads", href: "/dashboard/leads", icon: <ClipboardList className="w-5 h-5" /> }, // Oculto - sin uso actual
   { name: "Proyectos", href: "/dashboard/proyectos", permisos: [PERMISOS.PROYECTOS.VER], icon: <Building2 className="w-5 h-5" /> },
   { name: "Propiedades", href: "/dashboard/propiedades", permisos: [PERMISOS.LOTES.VER], icon: <Home className="w-5 h-5" /> },
   { name: "Agenda", href: "/dashboard/agenda", icon: <Calendar className="w-5 h-5" /> },
