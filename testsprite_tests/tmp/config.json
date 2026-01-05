@@ -1,0 +1,20 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "loginUser": "admin2",
+  "loginPassword": "Admin2025!",
+  "executionArgs": {
+    "projectName": "amersurcrm",
+    "projectPath": "C:\\Users\\LUIS\\Desktop\\amersurcrm",
+    "testIds": [
+      "TC014"
+    ],
+    "additionalInstruction": "IMPORTANT LOGIN INSTRUCTIONS:\n\nThe login page has TWO TABS: \"Administrador\" and \"Vendedor\"\n- For VENDEDOR login: Click the \"Vendedor\" tab, then enter DNI (not username)\n- For ADMIN login: Use the \"Administrador\" tab with username\n\nTEST STEPS:\n1. Go to /auth/login\n2. Click the \"Vendedor\" tab/button (it shows a person icon and text \"Vendedor\")\n3. Enter DNI: 94449838\n4. Enter password: Alba1101!\n5. Click \"Iniciar Sesión\"\n6. If a modal appears with \"Entendido\" button, click it to close\n7. Navigate to /dashboard/clientes\n8. VERIFY: Button \"Importar Masivamente\" should NOT be visible (vendedor has no permission)\n9. VERIFY: Button \"Agregar Nuevo Cliente\" SHOULD be visible\n\nThat's the complete test - just verify those two buttons.",
+    "envs": {
+      "API_KEY": "sk-user-H0SqaEZihzgP8gikRm3rIL1YXNH5D72AOCpKryDbdHfQyqBKnotBzznfI0tC2HSBLaL4HwwFkeixdyIrkGkW_o5d1i0UY7BXbNBHI2apZJ4FstOcgooHvgAy9ivis5Ywcw4"
+    }
+  },
+  "proxy": "http://1a13e66a-e0c4-46c7-82dd-d007063b789b:YbMSXcV22MgXbBs6fYMuHD0VT9mpzD8V@tun.testsprite.com:8080"
+}

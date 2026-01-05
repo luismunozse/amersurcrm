@@ -125,6 +125,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
   }, []);
 
   const handleRealtimeInsert = useCallback((payload: NotificacionRow, currentUserId: string) => {
+    // Filtro client-side: solo procesar notificaciones del usuario actual
     if (!payload || payload.usuario_id !== currentUserId) {
       return;
     }
@@ -215,15 +216,20 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
     const handleStatusChange = (status: string) => {
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
         if (!errorNotifiedRef.current) {
-          toast.error("No se pudo conectar a notificaciones en tiempo real. Reintentando...");
+          // Usar ID fijo para evitar toasts duplicados y no bloquear la UI
+          toast.error("No se pudo conectar a notificaciones en tiempo real. Reintentando...", {
+            id: "realtime-notifications-error",
+            duration: 4000,
+          });
           errorNotifiedRef.current = true;
         }
         scheduleRetry();
       }
 
       if (status === "SUBSCRIBED") {
+        toast.dismiss("realtime-notifications-error");
         errorNotifiedRef.current = false;
-        retryCount = 0; // Reset retry count on successful connection
+        retryCount = 0;
       }
     };
 
@@ -248,36 +254,23 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
       cleanupChannel();
 
+      // NOTA: No usar filter en Realtime - tiene problemas con UUIDs en schemas no-públicos
+      // El filtro se aplica client-side en handleRealtimeInsert/Update (valida usuario_id)
       channel = supabase
         .channel(`notificaciones:${user.id}`)
         .on(
           "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "crm",
-            table: "notificacion",
-            filter: `usuario_id=eq.${user.id}`,
-          },
+          { event: "INSERT", schema: "crm", table: "notificacion" },
           (event) => handleRealtimeInsert(event.new as NotificacionRow, user.id),
         )
         .on(
           "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "crm",
-            table: "notificacion",
-            filter: `usuario_id=eq.${user.id}`,
-          },
+          { event: "UPDATE", schema: "crm", table: "notificacion" },
           (event) => handleRealtimeUpdate(event.new as NotificacionRow, user.id),
         )
         .on(
           "postgres_changes",
-          {
-            event: "DELETE",
-            schema: "crm",
-            table: "notificacion",
-            filter: `usuario_id=eq.${user.id}`,
-          },
+          { event: "DELETE", schema: "crm", table: "notificacion" },
           (event) => handleRealtimeDelete(event as unknown as { old: NotificacionRow }),
         )
         .subscribe(handleStatusChange);

@@ -14,7 +14,7 @@ export default function AppToaster() {
 
   return (
     <Toaster
-      position="top-right"
+      position="bottom-right"
       toastOptions={{
         style: { borderRadius: "12px", padding: "10px 12px" },
         success: { iconTheme: { primary: "var(--brand-500)", secondary: "white" } },

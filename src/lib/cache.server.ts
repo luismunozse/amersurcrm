@@ -135,7 +135,10 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
         query = query.ilike('nombre', `%${searchTerm}%`);
       }
       if (searchTelefono) {
-        query = query.ilike('telefono', `%${searchTelefono}%`);
+        // Limpiar número: solo dígitos para búsqueda más flexible
+        const cleanPhone = searchTelefono.replace(/[^\d]/g, '');
+        // Buscar en ambos campos de teléfono
+        query = query.or(`telefono.ilike.%${cleanPhone}%,telefono_whatsapp.ilike.%${cleanPhone}%`);
       }
       return query;
     }
@@ -144,37 +147,47 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     const necesitaFiltroPermisos = !esAdmin && !esGerente && username && !vendedor;
     const necesitaFiltroVendedor = !!vendedor && vendedor.trim() !== '' && (esAdmin || esGerente);
 
-    // Construir todas las condiciones OR en un solo array
-    const orConditions: string[] = [];
-
-    // 1. Filtros de permisos para vendedores (solo si no hay filtro de vendedor específico)
+    // 1. PRIMERO aplicar filtros de permisos (AND) - estos restringen el acceso
     if (necesitaFiltroPermisos) {
-      orConditions.push(`created_by.eq.${userId}`);
-      orConditions.push(`vendedor_username.eq.${username}`);
+      // Vendedores solo ven clientes que crearon o que tienen asignados
+      query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
     }
 
-    // 2. Filtro por vendedor (admins pueden filtrar por cualquier vendedor)
+    // 2. Filtro por vendedor específico (admins pueden filtrar por cualquier vendedor)
     if (necesitaFiltroVendedor && vendedor && vendedor.trim() !== '') {
-      orConditions.push(`vendedor_asignado.eq.${vendedor}`);
-      orConditions.push(`vendedor_username.eq.${vendedor}`);
+      query = query.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
     }
 
-    // 3. Búsquedas: agregar todas las condiciones de búsqueda
+    // 3. DESPUÉS aplicar filtros de búsqueda (AND con los permisos anteriores)
+    // Construir condiciones de búsqueda
+    const searchConditions: string[] = [];
+
     if (searchTerm && searchTerm.trim() !== '') {
-      orConditions.push(`nombre.ilike.%${searchTerm}%`);
-      orConditions.push(`email.ilike.%${searchTerm}%`);
-      orConditions.push(`codigo_cliente.ilike.%${searchTerm}%`);
+      const term = searchTerm.trim();
+      searchConditions.push(`nombre.ilike.%${term}%`);
+      searchConditions.push(`email.ilike.%${term}%`);
+      searchConditions.push(`codigo_cliente.ilike.%${term}%`);
+
+      // Si parece un número de teléfono, buscar también en campos de teléfono
+      const digitsOnly = term.replace(/[^\d]/g, '');
+      if (digitsOnly.length >= 3) {
+        searchConditions.push(`telefono.ilike.%${digitsOnly}%`);
+        searchConditions.push(`telefono_whatsapp.ilike.%${digitsOnly}%`);
+      }
     }
 
     if (searchTelefono && searchTelefono.trim() !== '') {
-      orConditions.push(`telefono.ilike.%${searchTelefono}%`);
-      orConditions.push(`telefono_whatsapp.ilike.%${searchTelefono}%`);
+      // Limpiar número: solo dígitos para búsqueda más flexible
+      const cleanPhone = searchTelefono.replace(/[^\d]/g, '');
+      if (cleanPhone) {
+        searchConditions.push(`telefono.ilike.%${cleanPhone}%`);
+        searchConditions.push(`telefono_whatsapp.ilike.%${cleanPhone}%`);
+      }
     }
 
-    // Aplicar todas las condiciones OR juntas (solo una vez)
-    // Ahora .or() está disponible porque ya llamamos .select()
-    if (orConditions.length > 0) {
-      query = query.or(orConditions.join(','));
+    // Aplicar condiciones de búsqueda (OR entre ellas, AND con permisos)
+    if (searchConditions.length > 0) {
+      query = query.or(searchConditions.join(','));
     }
 
     // Filtros individuales (no requieren OR, se aplican con AND sobre los resultados del OR)

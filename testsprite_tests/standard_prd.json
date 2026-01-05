@@ -1,0 +1,424 @@
+{
+  "meta": {
+    "project": "Amersur CRM - Sistema de Gestión Inmobiliaria",
+    "date": "2025-12-18",
+    "prepared_by": "Equipo de Desarrollo Amersur"
+  },
+  "product_overview": "Amersur CRM es una plataforma integral de gestión inmobiliaria diseñada para centralizar y automatizar el ciclo completo de ventas, comunicación y administración en el sector inmobiliario peruano.",
+  "core_goals": [
+    "Centralizar la gestión de clientes y leads en una única plataforma SaaS basada en la nube.",
+    "Automatizar procesos de ventas inmobiliarias desde captación de leads hasta cierre y seguimiento de pagos.",
+    "Integrar canales de comunicación multicanal (WhatsApp, SMS, Email) para marketing y atención al cliente.",
+    "Proporcionar visibilidad y control en tiempo real del inventario de propiedades, proyectos y lotes.",
+    "Facilitar la toma de decisiones mediante reportes, métricas, y analítica avanzada.",
+    "Garantizar seguridad, escalabilidad y accesibilidad mediante autenticación robusta, roles y permisos.",
+    "Ofrecer un sistema de agenda y recordatorios para gestión eficiente de citas y eventos.",
+    "Permitir la gestión administrativa completa incluyendo usuarios, configuraciones y auditoría."
+  ],
+  "key_features": [
+    "Gestión completa de clientes con CRUD, estados, búsqueda avanzada, importación masiva y timeline de interacciones.",
+    "Módulo de proyectos inmobiliarios con estados, galería de planos e integración con mapas y coordenadas GPS.",
+    "Administración de propiedades y lotes con estados únicos, filtros avanzados y soporte para importación batch.",
+    "Agenda y calendario para eventos, citas y recordatorios con notificaciones push y plantillas reutilizables.",
+    "Flujo de ventas integrando interacciones, reservas, ventas, pagos y cálculo automático de comisiones.",
+    "Sistema de marketing multicanal con integración a WhatsApp Cloud API, Twilio y Facebook Lead Ads, incluyendo manejo de plantillas, campañas y automatizaciones.",
+    "Control avanzado de roles y permisos basados en RLS para acceso granular y seguro a datos.",
+    "Reportes y dashboards con métricas en tiempo real, exportación profesional y gráficos interactivos.",
+    "Integración con Google Drive para gestión documental y sincronización de archivos.",
+    "Sistema de notificaciones push y en app para mantener informados a los usuarios.",
+    "Módulo de administración de usuarios con gestión de roles, permisos, auditoría y configuraciones de sistema.",
+    "Extensión de Chrome para integración con WhatsApp Web que facilita gestión de leads y clientes.",
+    "Bot autónomo de WhatsApp para captura automática de leads y respuestas automáticas configurables."
+  ],
+  "user_flow_summary": [
+    "Usuario se autentica con email y contraseña para acceder al sistema según sus permisos asignados.",
+    "Administradores configuran roles, permisos, campos personalizados y parámetros globales.",
+    "Vendedores y coordinadores gestionan clientes: creación, actualización, búsqueda y seguimiento cronológico.",
+    "Gestión de proyectos inmobiliarios con carga de planos, asignación de lotes y actualización de estados.",
+    "Uso del calendario para programar y recibir recordatorios de citas y eventos relevantes.",
+    "Gestión del flujo de ventas: registrar interacciones, crear reservas, convertir reservas a ventas y seguimiento de pagos.",
+    "Realización de campañas de marketing multicanal con creación de templates, configuración de audiencias y monitoreo de resultados.",
+    "Administración documental mediante integración con Google Drive para subir, sincronizar y visualizar archivos.",
+    "Usuarios reciben notificaciones push y en app para estar al tanto de eventos, recordatorios y cambios de estado.",
+    "Uso de extensión Chrome para detectar clientes en WhatsApp Web y creación rápida de leads desde la conversación.",
+    "Automatización mediante bot WhatsApp que gestiona leads entrantes y sincroniza con CRM automáticamente."
+  ],
+  "validation_criteria": [
+    "El sistema debe validar DNI/RUC único para clientes y soportar creación con datos mínimos requeridos.",
+    "Búsquedas y carga de dashboards y mapas deben responder en menos de 500ms a 3 segundos dependiendo del contexto.",
+    "Importación masiva debe soportar hasta 10,000 registros de clientes y lotes con validación efectiva.",
+    "Estado de lote y reserva se deben actualizar en tiempo real y bloquear lotes automáticamente tras reserva.",
+    "Notificaciones push deben entregarse en menos de 10 segundos y sincronizar estado leído en interfaz.",
+    "Campañas de marketing respetan límites de tasa configurados y métricas se actualizan vía webhooks.",
+    "Roles y permisos se aplican inmediatamente; UI oculta opciones no autorizadas y RLS bloquea acceso a datos no permitidos.",
+    "Dashboard y reportes deben cargar en menos de 3 segundos y soportar exportación a PDF y Excel.",
+    "Autenticación y roles previenen accesos no autorizados; usuarios desactivados no pueden acceder al sistema.",
+    "Extensión Chrome detecta números y permite creación rápida de leads; bot WhatsApp genera leads automáticamente y responde en menos de 5 segundos."
+  ],
+  "code_summary": {
+    "tech_stack": [
+      "TypeScript",
+      "Next.js 15",
+      "React 19",
+      "Tailwind CSS",
+      "Supabase",
+      "Twilio",
+      "Google Drive API",
+      "Playwright",
+      "Jest"
+    ],
+    "features": [
+      {
+        "name": "Authentication",
+        "description": "User authentication system with login, password change, password recovery, and session management",
+        "files": [
+          "src/app/_actionsAuth.ts",
+          "src/app/auth/login/page.tsx",
+          "src/app/auth/login/_LoginForm.tsx",
+          "src/app/auth/cambiar-password/page.tsx",
+          "src/app/api/auth/login/route.ts",
+          "src/app/api/auth/login-dni/route.ts",
+          "src/app/api/auth/login-username/route.ts",
+          "src/app/api/auth/cambiar-password/route.ts",
+          "src/app/api/auth/check-admin/route.ts",
+          "src/app/api/auth/me/route.ts",
+          "src/app/api/auth/permissions/route.ts",
+          "src/app/api/auth/refresh/route.ts",
+          "src/app/api/auth/reset-request/route.ts",
+          "src/lib/auth/roles.ts",
+          "src/lib/auth/usuarios.ts"
+        ]
+      },
+      {
+        "name": "Dashboard",
+        "description": "Main dashboard with statistics, recent activities, and quick actions for CRM management",
+        "files": [
+          "src/app/dashboard/page.tsx",
+          "src/app/dashboard/DashboardClient.tsx",
+          "src/app/dashboard/layout.tsx",
+          "src/components/DashboardShell.tsx",
+          "src/components/DashboardStats.tsx",
+          "src/components/LazyDashboardStats.tsx",
+          "src/components/RecentActivities.tsx",
+          "src/components/RecentProjects.tsx"
+        ]
+      },
+      {
+        "name": "Client Management",
+        "description": "Complete CRM module for managing clients, leads, and customer interactions with import/export capabilities",
+        "files": [
+          "src/app/dashboard/clientes/page.tsx",
+          "src/app/dashboard/clientes/_ClientesList.tsx",
+          "src/app/dashboard/clientes/_NewClienteForm.tsx",
+          "src/app/dashboard/clientes/_actions.ts",
+          "src/app/dashboard/clientes/_actions_crm.ts",
+          "src/app/api/clientes/route.ts",
+          "src/app/api/clientes/search/route.ts",
+          "src/app/api/clientes/import/route.ts",
+          "src/app/api/clientes/create-lead/route.ts",
+          "src/components/ClienteForm.tsx",
+          "src/components/ClientesTable.tsx",
+          "src/components/ClienteDetailModal.tsx",
+          "src/components/ClienteTimeline.tsx",
+          "src/components/AdvancedClientSearch.tsx",
+          "src/components/ImportarClientes.tsx",
+          "src/lib/types/clientes.ts"
+        ]
+      },
+      {
+        "name": "Project Management",
+        "description": "Real estate project management with lot tracking, blueprint uploading, and coordinate management",
+        "files": [
+          "src/app/dashboard/proyectos/page.tsx",
+          "src/app/dashboard/proyectos/_ProyectosGrid.tsx",
+          "src/app/dashboard/proyectos/_NewProyectoForm.tsx",
+          "src/app/dashboard/proyectos/_EditProjectModal.tsx",
+          "src/app/dashboard/proyectos/_actions.ts",
+          "src/app/dashboard/proyectos/QuickActions.tsx",
+          "src/app/api/proyectos/list/route.ts",
+          "src/app/api/proyectos/search-by-name/route.ts",
+          "src/app/api/proyectos/upload-plano/route.ts",
+          "src/app/api/proyectos/upload-overlay-layer/route.ts",
+          "src/components/BlueprintUploader.tsx",
+          "src/lib/validations/proyectos.ts"
+        ]
+      },
+      {
+        "name": "Property/Lot Management",
+        "description": "Property and lot management with CRUD operations, filtering, and batch import capabilities",
+        "files": [
+          "src/app/dashboard/propiedades/page.tsx",
+          "src/app/dashboard/propiedades/_PropiedadesList.tsx",
+          "src/app/dashboard/propiedades/_NewPropiedadForm.tsx",
+          "src/app/dashboard/propiedades/_EditarPropiedadModal.tsx",
+          "src/app/dashboard/propiedades/_VerPropiedadModal.tsx",
+          "src/app/dashboard/propiedades/_FiltrosPropiedades.tsx",
+          "src/app/dashboard/propiedades/_EstadisticasPropiedades.tsx",
+          "src/app/dashboard/propiedades/_actions.ts",
+          "src/app/api/lotes/importar/route.ts",
+          "src/app/api/lotes/coordenadas/route.ts",
+          "src/app/api/lotes/eliminar-masivo/route.ts",
+          "src/components/LoteCard.tsx",
+          "src/components/LoteWizard.tsx",
+          "src/components/PropiedadCard.tsx",
+          "src/components/PropiedadWizard.tsx",
+          "src/components/ImportarLotesModal.tsx",
+          "src/components/EliminarLotesMasivoModal.tsx",
+          "src/hooks/useLoteActions.ts",
+          "src/hooks/useBatchCoordinates.ts"
+        ]
+      },
+      {
+        "name": "Agenda/Calendar",
+        "description": "Calendar and scheduling system for events, reminders, and client appointments",
+        "files": [
+          "src/app/dashboard/agenda/page.tsx",
+          "src/app/dashboard/agenda/_AgendaDashboard.tsx",
+          "src/app/dashboard/agenda/_CalendarioAgenda.tsx",
+          "src/app/dashboard/agenda/_EstadisticasAgenda.tsx",
+          "src/app/dashboard/agenda/_EventoModal.tsx",
+          "src/app/dashboard/agenda/_ListaRecordatorios.tsx",
+          "src/app/dashboard/agenda/_RecordatorioModal.tsx",
+          "src/app/dashboard/agenda/actions.ts",
+          "src/app/api/agenda/eventos/route.ts",
+          "src/app/api/agenda/clientes/route.ts",
+          "src/app/api/agenda/propiedades/route.ts",
+          "src/app/api/agenda/oportunidades/route.ts",
+          "src/components/EventoForm.tsx",
+          "src/components/RecordatoriosPanel.tsx",
+          "src/lib/types/agenda.ts",
+          "src/lib/cache.agenda.ts"
+        ]
+      },
+      {
+        "name": "Reservations",
+        "description": "Property reservation system with creation, cancellation, and conversion to sales functionality",
+        "files": [
+          "src/app/api/reservas/opciones/route.ts",
+          "src/components/CrearReservaModal.tsx",
+          "src/components/CancelarReservaModal.tsx",
+          "src/components/DetalleReservaModal.tsx",
+          "src/components/EliminarReservaModal.tsx",
+          "src/components/ConvertirReservaVentaModal.tsx",
+          "src/components/RegistrarPagoModal.tsx"
+        ]
+      },
+      {
+        "name": "Marketing & Communications",
+        "description": "Marketing module with Twilio integration for WhatsApp/SMS campaigns, templates, and conversation management",
+        "files": [
+          "src/app/dashboard/admin/marketing/page.tsx",
+          "src/app/api/twilio/send-whatsapp/route.ts",
+          "src/app/api/twilio/send-sms/route.ts",
+          "src/app/api/twilio/webhook/route.ts",
+          "src/app/api/twilio/campanas/route.ts",
+          "src/app/api/marketing/twilio-config/route.ts",
+          "src/app/api/whatsapp/bot/route.ts",
+          "src/app/api/whatsapp/lead/route.ts",
+          "src/components/marketing/BandejaConversaciones.tsx",
+          "src/components/marketing/ConfiguracionTwilio.tsx",
+          "src/components/marketing/DashboardMetricas.tsx",
+          "src/components/marketing/GestionAutomatizaciones.tsx",
+          "src/components/marketing/GestionCampanas.tsx",
+          "src/components/marketing/GestionPlantillas.tsx",
+          "src/components/marketing/ModalCrearCampana.tsx",
+          "src/components/marketing/ModalCrearPlantilla.tsx",
+          "src/lib/services/twilio.ts",
+          "src/lib/whatsapp/client.ts",
+          "src/lib/whatsapp-bot-state.ts",
+          "src/hooks/useMarketingStats.ts",
+          "src/hooks/useWhatsAppBotStatus.ts"
+        ]
+      },
+      {
+        "name": "Reports & Analytics",
+        "description": "Reporting system with statistics, trends visualization, period comparisons, and data export",
+        "files": [
+          "src/app/dashboard/admin/reportes/page.tsx",
+          "src/app/api/admin/reportes/route.ts",
+          "src/app/api/admin/reportes/exportar/route.ts",
+          "src/app/api/vendedor/reportes/route.ts",
+          "src/app/dashboard/vendedor/reportes/page.tsx",
+          "src/components/reportes/ComparacionPeriodos.tsx",
+          "src/components/reportes/GraficosTendencias.tsx",
+          "src/components/export/ExportButton.tsx",
+          "src/lib/export/filteredExport.ts",
+          "src/lib/export/proyectosExport.ts",
+          "src/hooks/useReportes.ts"
+        ]
+      },
+      {
+        "name": "Google Drive Integration",
+        "description": "Document management with Google Drive integration for file storage, sync, and folder management",
+        "files": [
+          "src/app/dashboard/documentos/page.tsx",
+          "src/app/dashboard/documentos/_DocumentosClient.tsx",
+          "src/app/dashboard/documentos/_DocumentosList.tsx",
+          "src/app/dashboard/documentos/_DocumentoUploader.tsx",
+          "src/app/dashboard/documentos/_CarpetasTree.tsx",
+          "src/app/dashboard/documentos/_GoogleDriveFolders.tsx",
+          "src/app/dashboard/documentos/_GoogleDriveStatus.tsx",
+          "src/app/api/google/auth/route.ts",
+          "src/app/api/google/callback/route.ts",
+          "src/app/api/google/check-config/route.ts",
+          "src/app/api/google-drive/files/route.ts",
+          "src/app/api/google-drive/folders/route.ts",
+          "src/app/api/google-drive/download/route.ts",
+          "src/app/api/google-drive/search/route.ts",
+          "src/app/api/google-drive/sync/route.ts",
+          "src/lib/google-drive/client.ts",
+          "src/lib/google-drive/helpers.ts"
+        ]
+      },
+      {
+        "name": "Notifications",
+        "description": "Push notification system with browser notifications, reminders, and in-app notification center",
+        "files": [
+          "src/app/_actionsNotifications.ts",
+          "src/app/dashboard/notificaciones/page.tsx",
+          "src/app/api/notificaciones/route.ts",
+          "src/app/api/notifications/send-recordatorios/route.ts",
+          "src/components/NotificacionesPanel.tsx",
+          "src/components/NotificationsDropdown.tsx",
+          "src/components/NotificationPermissionPrompt.tsx",
+          "src/lib/notificationsDelivery.ts",
+          "src/lib/notifications/dedupe.ts",
+          "src/lib/notifications/transform.ts",
+          "src/lib/pushClient.ts",
+          "src/hooks/useNotificationPermission.ts"
+        ]
+      },
+      {
+        "name": "User Administration",
+        "description": "Admin module for user management, roles, permissions, and vendor management",
+        "files": [
+          "src/app/dashboard/admin/page.tsx",
+          "src/app/dashboard/admin/layout.tsx",
+          "src/app/dashboard/admin/usuarios/page.tsx",
+          "src/app/dashboard/admin/configuracion/page.tsx",
+          "src/app/dashboard/admin/vendedores-activos/page.tsx",
+          "src/app/api/admin/usuarios/route.ts",
+          "src/app/api/admin/roles/route.ts",
+          "src/app/api/admin/vendedores-activos/route.ts",
+          "src/app/api/admin/auth/reset-password/route.ts",
+          "src/components/UserEditModal.tsx",
+          "src/components/DeleteUserModal.tsx",
+          "src/components/ResetPasswordModal.tsx",
+          "src/components/EstadoUsuarioModal.tsx",
+          "src/components/FormularioCrearVendedor.tsx",
+          "src/components/FormularioEditarVendedor.tsx",
+          "src/components/ListaVendedores.tsx",
+          "src/components/CambiarEstadoVendedorActivoModal.tsx",
+          "src/components/EliminarVendedorActivoModal.tsx",
+          "src/components/EliminarVendedoresMultipleModal.tsx",
+          "src/lib/permissions/constants.ts",
+          "src/lib/permissions/middleware.ts",
+          "src/lib/permissions/server.ts",
+          "src/lib/permissions/client.tsx",
+          "src/lib/types/roles.ts",
+          "src/hooks/useAdminPermissions.ts"
+        ]
+      },
+      {
+        "name": "Ubigeo (Peru Geography)",
+        "description": "Geographic location management for Peru with departments, provinces, and districts",
+        "files": [
+          "src/app/api/ubigeo/departamentos/route.ts",
+          "src/app/api/ubigeo/provincias/route.ts",
+          "src/app/api/ubigeo/distritos/route.ts",
+          "src/app/api/ubigeo/search/route.ts",
+          "src/app/api/ubigeo-v2/departamentos/route.ts",
+          "src/app/api/ubigeo-v2/provincias/route.ts",
+          "src/app/api/ubigeo-v2/distritos/route.ts",
+          "src/components/UbicacionSelector.tsx",
+          "src/components/UbigeoSelector.tsx",
+          "src/lib/api/ubigeo-peru.ts",
+          "src/lib/data/ubigeo-peru-completo.ts",
+          "src/lib/types/ubigeo.ts",
+          "src/hooks/useUbigeo.ts",
+          "src/hooks/useUbicaciones.ts"
+        ]
+      },
+      {
+        "name": "User Profile",
+        "description": "User profile management with avatar upload, statistics, and personal settings",
+        "files": [
+          "src/app/dashboard/perfil/page.tsx",
+          "src/app/dashboard/perfil/_actions.ts",
+          "src/app/dashboard/perfil/_AvatarUpload.tsx",
+          "src/app/dashboard/perfil/_CambiarPasswordForm.tsx",
+          "src/app/dashboard/perfil/_EditarPerfilForm.tsx",
+          "src/app/dashboard/perfil/_EstadisticasUsuario.tsx",
+          "src/app/dashboard/perfil/_PerfilTabs.tsx",
+          "src/app/dashboard/perfil/_PerfilTabsContent.tsx",
+          "src/app/dashboard/perfil/_PerfilTabsWrapper.tsx",
+          "src/app/api/perfil/actualizar/route.ts",
+          "src/app/api/perfil/cambiar-password/route.ts",
+          "src/app/dashboard/UserProfileContext.tsx",
+          "src/lib/getPerfil.ts"
+        ]
+      },
+      {
+        "name": "PDF Generation",
+        "description": "PDF document generation for proformas and reports",
+        "files": [
+          "src/lib/pdfGenerator.ts",
+          "src/lib/generateTemplate.ts",
+          "src/lib/generateTemplateAMERSUR.ts",
+          "src/components/proforma/generarProformaPdf.ts"
+        ]
+      },
+      {
+        "name": "UI Components",
+        "description": "Reusable UI components including buttons, cards, inputs, modals, and form elements",
+        "files": [
+          "src/components/ui/Button.tsx",
+          "src/components/ui/Card.tsx",
+          "src/components/ui/Input.tsx",
+          "src/components/ui/InfoDialog.tsx",
+          "src/components/form/FormInput.tsx",
+          "src/components/form/FormSelect.tsx",
+          "src/components/form/FormTextarea.tsx",
+          "src/components/form/LoadingButton.tsx",
+          "src/components/form/index.ts",
+          "src/components/SimpleModal.tsx",
+          "src/components/ConfirmDialog.tsx",
+          "src/components/Pagination.tsx",
+          "src/components/DateTimePicker.tsx",
+          "src/components/PhoneInput.tsx",
+          "src/components/ImageUpload.tsx",
+          "src/components/ImageCarousel.tsx",
+          "src/components/ImagePreview.tsx",
+          "src/components/StorageImagePreview.tsx"
+        ]
+      },
+      {
+        "name": "Layout & Navigation",
+        "description": "Application layout components including sidebar, header, topbar, and theme management",
+        "files": [
+          "src/components/Sidebar.tsx",
+          "src/components/Header.tsx",
+          "src/components/Topbar.tsx",
+          "src/components/UserAvatarMenu.tsx",
+          "src/components/UserInfo.tsx",
+          "src/components/LogoutButton.tsx",
+          "src/components/ThemeProvider.tsx",
+          "src/components/ThemeToggle.tsx",
+          "src/components/GlobalSearch.tsx",
+          "src/components/dashboard/SecondaryPanelDrawer.tsx"
+        ]
+      },
+      {
+        "name": "Vendor/Salesperson Module",
+        "description": "Dedicated dashboard and reporting for sales vendors with property management",
+        "files": [
+          "src/app/dashboard/vendedor/page.tsx",
+          "src/app/dashboard/vendedor/_VendedorDashboard.tsx",
+          "src/app/dashboard/vendedor/propiedades/page.tsx",
+          "src/app/dashboard/vendedor/reportes/page.tsx",
+          "src/app/api/clientes/vendedores/route.ts"
+        ]
+      }
+    ]
+  }
+}

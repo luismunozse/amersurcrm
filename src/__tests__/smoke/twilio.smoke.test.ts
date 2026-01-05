@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __setTwilioClientFactory,
   enviarSMS,
@@ -7,7 +7,7 @@ import {
   enviarWhatsAppMasivo,
 } from '@/lib/services/twilio';
 
-const mockCreateMessage = jest.fn();
+const mockCreateMessage = vi.fn();
 const setMockFactory = () =>
   __setTwilioClientFactory(async () => ({
     client: {

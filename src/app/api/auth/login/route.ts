@@ -112,6 +112,17 @@ export async function POST(request: NextRequest) {
       console.error("[Login] Error obteniendo perfil:", perfilError);
     }
 
+    // SEGURIDAD: Verificar que el usuario esté activo
+    if (perfil && !perfil.activo) {
+      console.warn(`[Login] Usuario desactivado intentó iniciar sesión: ${emailToUse} (${authData.user.id})`);
+      // Cerrar la sesión que se acaba de crear
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: "Usuario inactivo. Contacta al administrador." },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     // Extraer el nombre del rol - mantener formato original (ROL_ADMIN, ROL_VENDEDOR, etc.)
     const rolData = perfil?.rol as { id?: string; nombre?: string } | null;
     const rolNombre = rolData?.nombre || "ROL_VENDEDOR";

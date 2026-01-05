@@ -11,9 +11,11 @@
     "build:turbo": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:jest": "jest",
     "test:e2e": "playwright test",
     "test:smoke": "jest src/__tests__/smoke",
     "type-check": "tsc --noEmit",
@@ -66,8 +68,8 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.55.0",
-    "@testing-library/jest-dom": "^6.8.0",
-    "@testing-library/react": "^16.3.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/google.maps": "^3.58.1",
     "@types/jest": "^30.0.0",
@@ -75,6 +77,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
+    "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.21",
     "baseline-browser-mapping": "^2.8.32",
     "cross-env": "^10.1.0",
@@ -85,6 +88,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.16"
   }
 }

@@ -1,0 +1,558 @@
+[
+  {
+    "id": "TC001",
+    "title": "Successful user login with valid credentials",
+    "description": "Verify that a user can log in using a valid email and password combination and is redirected to the appropriate dashboard based on their role.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid email and password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "User is authenticated and redirected to dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "User interface displays options according to user role permissions"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Login attempt with invalid password",
+    "description": "Verify that login fails if the user enters an incorrect password and an appropriate error message is displayed.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid email and incorrect password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Authentication is rejected with an error message about incorrect credentials"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "User authentication restrictions for deactivated accounts",
+    "description": "Verify that users with deactivated accounts cannot log in and receive appropriate notification.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt login with credentials for a deactivated user"
+      },
+      {
+        "type": "assertion",
+        "description": "Access is denied and user sees a message indicating account deactivation"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Client CRUD operations with DNI/RUC validation",
+    "description": "Verify clients can be created, updated, retrieved, and deleted with validation enforcing unique DNI/RUC and required minimum fields.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a client with valid and unique DNI/RUC and required data"
+      },
+      {
+        "type": "assertion",
+        "description": "Client record is successfully created in the system"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to create a second client with the same DNI/RUC"
+      },
+      {
+        "type": "assertion",
+        "description": "System rejects creation due to duplicate DNI/RUC"
+      },
+      {
+        "type": "action",
+        "description": "Update client details with valid changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Client details are updated correctly"
+      },
+      {
+        "type": "action",
+        "description": "Delete client record"
+      },
+      {
+        "type": "assertion",
+        "description": "Client record is removed from the system"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Client advanced search functionality and timeline display",
+    "description": "Verify that the advanced search filters return correct clients and timeline shows chronological interactions.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Apply various search filters based on client attributes"
+      },
+      {
+        "type": "assertion",
+        "description": "Client list updates with matching results within 3 seconds"
+      },
+      {
+        "type": "action",
+        "description": "Select a client to view interaction timeline"
+      },
+      {
+        "type": "assertion",
+        "description": "Timeline displays client interactions in correct chronological order"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Bulk import of 10,000 clients with validation",
+    "description": "Verify that the system supports bulk import of up to 10,000 client records with validation of DNI/RUC uniqueness and mandatory fields.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Initiate bulk import uploading 10,000 valid client data records"
+      },
+      {
+        "type": "assertion",
+        "description": "All valid clients are imported successfully"
+      },
+      {
+        "type": "action",
+        "description": "Include records with duplicate DNI/RUC and missing mandatory fields in import"
+      },
+      {
+        "type": "assertion",
+        "description": "Invalid records are rejected with proper error details"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Project creation with blueprint upload and GPS coordinate integration",
+    "description": "Verify users can create a real estate project with multiple blueprints and assign GPS coordinates, ensuring data is saved and accessible.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create new project entering required details"
+      },
+      {
+        "type": "action",
+        "description": "Upload one or more blueprint files"
+      },
+      {
+        "type": "action",
+        "description": "Assign GPS coordinates or upload overlay layers"
+      },
+      {
+        "type": "assertion",
+        "description": "Project is listed with all blueprints and coordinates correctly linked"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Property and lot CRUD, filtering and bulk import",
+    "description": "Verify properties and lots can be created, edited, filtered, and imported in batch with validations and state updates.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a new property and add lots with valid data"
+      },
+      {
+        "type": "assertion",
+        "description": "Property and lots are displayed correctly"
+      },
+      {
+        "type": "action",
+        "description": "Apply advanced filters to property/lot list"
+      },
+      {
+        "type": "assertion",
+        "description": "Filter outputs correct matching results"
+      },
+      {
+        "type": "action",
+        "description": "Perform batch import of multiple lots including invalid entries"
+      },
+      {
+        "type": "assertion",
+        "description": "System successfully imports valid lots and rejects invalid with clear errors"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Lot state updates and locking after reservation",
+    "description": "Verify that lot state updates in real time, and lots are locked from further booking immediately upon reservation to avoid conflicts.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Reserve a lot currently available"
+      },
+      {
+        "type": "assertion",
+        "description": "Lot state updates to reserved and no other reservation attempt succeeds on the same lot"
+      },
+      {
+        "type": "action",
+        "description": "Release or cancel reservation"
+      },
+      {
+        "type": "assertion",
+        "description": "Lot state reverts to available and becomes reservable again"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Full sales flow from interaction to commission calculation",
+    "description": "Verify that sales interactions can be logged, reservations created, confirmed as sale, payments tracked, and commissions calculated automatically.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log client interaction and create reservation for a property lot"
+      },
+      {
+        "type": "assertion",
+        "description": "Reservation is created and lot state updates accordingly"
+      },
+      {
+        "type": "action",
+        "description": "Convert reservation to sale and input payment details"
+      },
+      {
+        "type": "assertion",
+        "description": "Sale is recorded and payments tracked correctly"
+      },
+      {
+        "type": "assertion",
+        "description": "Commission is automatically calculated based on sale parameters"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Multichannel campaign creation and template management",
+    "description": "Verify that users can create marketing campaigns across WhatsApp, SMS, and Email channels, manage reusable templates, and configure automation rules.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create reusable message templates for different channels"
+      },
+      {
+        "type": "action",
+        "description": "Configure new campaign selecting channel, audience, and template"
+      },
+      {
+        "type": "assertion",
+        "description": "Campaign is saved and scheduled with correct parameters"
+      },
+      {
+        "type": "action",
+        "description": "Trigger campaign and monitor delivery and engagement"
+      },
+      {
+        "type": "assertion",
+        "description": "Messages are sent respecting configured rate limits and webhooks update metrics accurately"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "WhatsApp Chrome extension lead detection and quick creation",
+    "description": "Verify that the Chrome extension detects phone numbers in WhatsApp Web chats and allows fast lead creation linked to that contact.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Install and activate the Chrome extension"
+      },
+      {
+        "type": "action",
+        "description": "Open WhatsApp Web and view a chat with a phone number"
+      },
+      {
+        "type": "assertion",
+        "description": "Extension highlights detected numbers and provides option to create lead"
+      },
+      {
+        "type": "action",
+        "description": "Use lead creation prompt to add client data"
+      },
+      {
+        "type": "assertion",
+        "description": "Lead is created in CRM and linked to WhatsApp chat contact"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "WhatsApp bot automatic lead capture and response",
+    "description": "Verify that the autonomous WhatsApp bot captures incoming leads automatically, creates synchronized CRM records, and responds within 5 seconds.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send an incoming message to the configured WhatsApp bot number"
+      },
+      {
+        "type": "assertion",
+        "description": "Bot processes message, creates lead in CRM if not existing"
+      },
+      {
+        "type": "assertion",
+        "description": "Bot sends an automated response back within 5 seconds"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Role-based access control and permissions enforcement",
+    "description": "Verify system enforces role based security rules immediately, hiding unauthorized UI elements and restricting data access via RLS.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Assign a user a restrictive role with limited permissions"
+      },
+      {
+        "type": "action",
+        "description": "Log in as this user"
+      },
+      {
+        "type": "assertion",
+        "description": "UI hides unauthorized options and functionality"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to access restricted data endpoints directly"
+      },
+      {
+        "type": "assertion",
+        "description": "Access is denied by RLS and API returns appropriate error"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Dashboards and reports load performance and export",
+    "description": "Verify dashboards and report pages load statistics and charts within 3 seconds and support exporting data in PDF and Excel formats.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to dashboard and report sections"
+      },
+      {
+        "type": "assertion",
+        "description": "Data visualizations load and render within 3 seconds"
+      },
+      {
+        "type": "action",
+        "description": "Export reports to PDF and Excel"
+      },
+      {
+        "type": "assertion",
+        "description": "Exported files are correctly formatted and contain requested data"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Notification delivery and synchronization",
+    "description": "Verify push notifications are delivered within 10 seconds and notification read status is synchronized across devices and UI.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger a notification event for a logged-in user"
+      },
+      {
+        "type": "assertion",
+        "description": "Notification arrives on device/app within 10 seconds"
+      },
+      {
+        "type": "action",
+        "description": "User marks notification as read"
+      },
+      {
+        "type": "assertion",
+        "description": "Read status updates instantly on server and across all user interfaces"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Calendar event creation and reminders with push notifications",
+    "description": "Verify users can create calendar events and reminders with templates, receive notifications timely, and edit or cancel them.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a new calendar event with all required fields"
+      },
+      {
+        "type": "assertion",
+        "description": "Event is saved and visible on calendar"
+      },
+      {
+        "type": "action",
+        "description": "Set a reminder with push notification enabled"
+      },
+      {
+        "type": "assertion",
+        "description": "Reminder notification arrives on time"
+      },
+      {
+        "type": "action",
+        "description": "Edit and cancel the event and reminder"
+      },
+      {
+        "type": "assertion",
+        "description": "Changes are saved and notifications are cancelled as expected"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Google Drive integration for document upload, sync and management",
+    "description": "Verify users can upload documents to Google Drive, sync folders and files, and view updated files in CRM’s document module.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Authenticate Google Drive integration"
+      },
+      {
+        "type": "action",
+        "description": "Upload a document through integration interface"
+      },
+      {
+        "type": "assertion",
+        "description": "Document appears in linked Google Drive folder"
+      },
+      {
+        "type": "action",
+        "description": "Trigger sync and refresh document list in CRM"
+      },
+      {
+        "type": "assertion",
+        "description": "Uploaded document is visible and accessible in CRM"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "System configurations and role management by administrators",
+    "description": "Verify administrators can manage system configuration parameters, create and update roles and permissions, and perform audit checks.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as administrator"
+      },
+      {
+        "type": "action",
+        "description": "Create a new user role with specific permissions"
+      },
+      {
+        "type": "assertion",
+        "description": "Role is saved and listed among available roles"
+      },
+      {
+        "type": "action",
+        "description": "Modify existing system configuration parameters"
+      },
+      {
+        "type": "assertion",
+        "description": "Changes are saved successfully and apply on related modules"
+      },
+      {
+        "type": "action",
+        "description": "View audit logs of user and system activities"
+      },
+      {
+        "type": "assertion",
+        "description": "Logs display accurate and complete historic data"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Performance validation of client searches and dashboard responses",
+    "description": "Verify that all client searches and dashboard/map loads respond within 500ms to 3 seconds depending on complexity and data volume.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Perform simple and complex client searches with large datasets"
+      },
+      {
+        "type": "assertion",
+        "description": "Search results return within expected time limits"
+      },
+      {
+        "type": "action",
+        "description": "Load dashboards and map visualizations"
+      },
+      {
+        "type": "assertion",
+        "description": "Dashboards load and display correctly within 3 seconds"
+      }
+    ]
+  }
+]

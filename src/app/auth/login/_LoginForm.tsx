@@ -45,6 +45,18 @@ export default function LoginForm() {
       url.searchParams.delete('passwordChanged');
       window.history.replaceState({}, '', url.toString());
     }
+
+    // Mostrar mensaje de error si la cuenta fue desactivada
+    if (searchParams.get('error') === 'cuenta_desactivada') {
+      toast.error(
+        'Tu cuenta ha sido desactivada. Contacta al administrador para más información.',
+        { duration: 8000 }
+      );
+      // Limpiar el parámetro de la URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      window.history.replaceState({}, '', url.toString());
+    }
   }, [searchParams]);
 
   // Estado para el contador de segundos restantes (se actualiza cada segundo)

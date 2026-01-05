@@ -23,6 +23,13 @@
     from { transform: scale(1); }
     to { transform: scale(0.95); }
   }
+
+  /* Animación de barra de progreso para búsqueda */
+  @keyframes progress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(200%); }
+    100% { transform: translateX(-100%); }
+  }
 }
 
 @layer components{

@@ -2,7 +2,7 @@
  * Unit tests for Google Maps hooks
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { mapUtils } from '../useGoogleMaps';
 import type { MapPoint } from '@/types/proyectos';
 
@@ -147,7 +147,8 @@ describe('Google Maps Utilities', () => {
 
       expect(Array.isArray(geoJSON)).toBe(true);
       expect(geoJSON.length).toBe(1);
-      expect(geoJSON[0].length).toBe(1); // Just the closing point
+      // Empty polygon has no points (not even closing point)
+      expect(geoJSON[0].length).toBe(0);
     });
   });
 

@@ -24,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       nombre_completo,
       username,
       avatar_url,
+      activo,
       requiere_cambio_password,
       rol:rol!usuario_perfil_rol_id_fkey (
         nombre
@@ -31,6 +32,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     `)
     .eq('id', user.id)
     .single();
+
+  // SEGURIDAD: Verificar que el usuario esté activo
+  // Si fue desactivado después de iniciar sesión, cerrar sesión y redirigir
+  if (!perfil?.activo) {
+    await s.auth.signOut();
+    redirect("/auth/login?error=cuenta_desactivada");
+  }
 
   // Si el usuario requiere cambio de contraseña, redirigir a la página de cambio
   if (perfil?.requiere_cambio_password === true) {

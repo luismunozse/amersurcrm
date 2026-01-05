@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProyectoSearchResult, LoteSearchResult } from '@/lib/search/fullTextSearch';
 import {
   __setFullTextSearchClientFactory,
@@ -6,7 +6,7 @@ import {
   searchLotesFullText,
 } from '@/lib/search/fullTextSearch';
 
-const mockRpc = jest.fn();
+const mockRpc = vi.fn();
 
 beforeEach(() => {
   mockRpc.mockReset();

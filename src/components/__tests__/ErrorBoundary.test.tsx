@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -14,11 +14,11 @@ const ThrowError = ({ shouldThrow }: { shouldThrow: boolean }) => {
 describe('ErrorBoundary', () => {
   beforeEach(() => {
     // Suprimir console.error para tests
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('renders children when there is no error', () => {
@@ -57,7 +57,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('calls onError callback when error occurs', () => {
-    const onError = jest.fn();
+    const onError = vi.fn();
 
     render(
       <ErrorBoundary onError={onError}>

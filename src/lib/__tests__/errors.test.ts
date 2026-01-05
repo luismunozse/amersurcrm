@@ -1,17 +1,18 @@
-import { 
-  AppError, 
-  ValidationError, 
-  DatabaseError, 
-  AuthError, 
-  getErrorMessage, 
-  handleError 
+import { describe, it, expect, vi } from 'vitest';
+import {
+  AppError,
+  ValidationError,
+  DatabaseError,
+  AuthError,
+  getErrorMessage,
+  handleError
 } from '../errors';
 
 // Mock del errorLogger
-jest.mock('../errorLogger', () => ({
+vi.mock('../errorLogger', () => ({
   errorLogger: {
-    error: jest.fn(),
-    warn: jest.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 

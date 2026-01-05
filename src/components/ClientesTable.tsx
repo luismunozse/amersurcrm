@@ -129,10 +129,12 @@ export default function ClientesTable({
 
   // Estado local para búsqueda
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Actualizar búsqueda local cuando cambie el prop
   useEffect(() => {
     setLocalSearchQuery(searchQuery);
+    setIsSearching(false); // Resetear spinner cuando llegan los resultados
   }, [searchQuery]);
 
   // Cargar lista de vendedores disponibles (para filtros y acciones)
@@ -162,11 +164,24 @@ export default function ClientesTable({
   // Búsqueda automática con debounce
   useEffect(() => {
     // Solo ejecutar si el valor local es diferente al prop
-    if (localSearchQuery === searchQuery) return;
+    if (localSearchQuery === searchQuery) {
+      setIsSearching(false);
+      return;
+    }
+
+    // Requiere mínimo 2 caracteres para buscar (evita búsquedas innecesarias)
+    if (localSearchQuery.length > 0 && localSearchQuery.length < 2) {
+      setIsSearching(false);
+      return;
+    }
+
+    // Mostrar indicador de búsqueda
+    setIsSearching(true);
 
     const timer = setTimeout(() => {
       handleSearch(localSearchQuery);
-    }, 500); // Espera 500ms después de que el usuario deja de escribir
+      // El isSearching se resetea cuando cambia searchQuery (prop)
+    }, 400); // Espera 400ms después de que el usuario deja de escribir
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -485,11 +500,12 @@ export default function ClientesTable({
         <div className="relative">
           <input
             type="text"
-            placeholder="Buscar por nombre, email, teléfono o DNI..."
+            placeholder="Buscar por nombre, email, teléfono o código..."
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                setIsSearching(false);
                 handleSearch(localSearchQuery);
               }
             }}
@@ -503,6 +519,12 @@ export default function ClientesTable({
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
+          {/* Barra de progreso de búsqueda */}
+          {isSearching && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-crm-border rounded-b-lg overflow-hidden">
+              <div className="h-full bg-crm-primary animate-[progress_1s_ease-in-out_infinite]" style={{ width: '30%' }} />
+            </div>
+          )}
           {localSearchQuery && (
             <button
               onClick={handleClearSearch}

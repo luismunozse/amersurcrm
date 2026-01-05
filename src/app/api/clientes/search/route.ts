@@ -97,43 +97,77 @@ export async function GET(request: NextRequest) {
 
     console.log(`[ClienteSearch] Buscando cliente con teléfono: ${cleanPhone} o ${cleanPhoneWithPlus}`);
 
-    // Construir query base
-    let query = supabase
+    // Campos base del cliente
+    const camposCliente = `
+      id,
+      nombre,
+      telefono,
+      telefono_whatsapp,
+      email,
+      tipo_cliente,
+      estado_cliente,
+      origen_lead,
+      vendedor_asignado,
+      created_at,
+      notas
+    `;
+
+    // Intentar query con JOIN para obtener vendedor en una sola consulta (O(1))
+    // Si la FK no existe, hacemos fallback a query sin JOIN
+    const orFilter = `telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`;
+
+    let cliente: Record<string, unknown> | null = null;
+    let usedJoin = false;
+
+    // Primero intentar con JOIN (más eficiente si la FK existe)
+    let queryWithJoin = supabase
       .schema("crm")
       .from("cliente")
-      .select(
-        `
-        id,
-        nombre,
-        telefono,
-        telefono_whatsapp,
-        email,
-        tipo_cliente,
-        estado_cliente,
-        origen_lead,
-        vendedor_asignado,
-        created_at,
-        notas
-      `
-      )
-      .or(`telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`);
+      .select(`${camposCliente}, vendedor:usuario_perfil!cliente_vendedor_asignado_fkey(nombre_completo)`)
+      .or(orFilter);
 
-    // Si NO es admin, filtrar solo clientes asignados al vendedor
     if (!esAdmin && vendedorUsername) {
-      console.log(`[ClienteSearch] Filtrando por vendedor_asignado: ${vendedorUsername}`);
-      query = query.eq("vendedor_asignado", vendedorUsername);
+      queryWithJoin = queryWithJoin.eq("vendedor_asignado", vendedorUsername);
     }
 
-    // Ejecutar query
-    const { data: cliente, error } = await query
+    const { data: clienteWithJoin, error: errorJoin } = await queryWithJoin
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      console.error("[ClienteSearch] Error en query:", error);
+    if (!errorJoin && clienteWithJoin) {
+      cliente = clienteWithJoin;
+      usedJoin = true;
+    } else if (errorJoin?.message?.includes("relationship") || errorJoin?.code === "PGRST200") {
+      // FK no existe, hacer query sin JOIN
+      console.log("[ClienteSearch] FK no existe, usando query sin JOIN");
+      let queryBasic = supabase
+        .schema("crm")
+        .from("cliente")
+        .select(camposCliente)
+        .or(orFilter);
+
+      if (!esAdmin && vendedorUsername) {
+        queryBasic = queryBasic.eq("vendedor_asignado", vendedorUsername);
+      }
+
+      const { data: clienteBasic, error: errorBasic } = await queryBasic
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (errorBasic) {
+        console.error("[ClienteSearch] Error en query:", errorBasic);
+        return NextResponse.json(
+          { error: "Error buscando cliente", details: errorBasic.message },
+          { status: 500, headers: corsHeaders }
+        );
+      }
+      cliente = clienteBasic;
+    } else if (errorJoin) {
+      console.error("[ClienteSearch] Error en query:", errorJoin);
       return NextResponse.json(
-        { error: "Error buscando cliente", details: error.message },
+        { error: "Error buscando cliente", details: errorJoin.message },
         { status: 500, headers: corsHeaders }
       );
     }
@@ -163,19 +197,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ cliente: null }, { headers: corsHeaders });
     }
 
-    console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}, vendedor: ${cliente.vendedor_asignado}`);
+    console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}, vendedor: ${cliente.vendedor_asignado}, usedJoin: ${usedJoin}`);
 
-    // Obtener el nombre del vendedor si hay uno asignado
-    let vendedorNombre: string | null = null;
-    if (cliente.vendedor_asignado) {
+    // Obtener nombre del vendedor
+    let vendedorNombre: string | null = cliente.vendedor_asignado as string | null;
+
+    if (usedJoin) {
+      // El vendedor viene del JOIN (más eficiente, sin query adicional)
+      const vendedorData = cliente.vendedor as { nombre_completo?: string } | null;
+      if (vendedorData?.nombre_completo) {
+        vendedorNombre = vendedorData.nombre_completo;
+      }
+    } else if (cliente.vendedor_asignado) {
+      // Fallback: query separada (si FK no existe aún)
       const { data: vendedorData } = await supabase
         .schema("crm")
         .from("usuario_perfil")
-        .select("nombre_completo, username")
-        .eq("username", cliente.vendedor_asignado)
+        .select("nombre_completo")
+        .eq("username", cliente.vendedor_asignado as string)
         .single();
 
-      vendedorNombre = vendedorData?.nombre_completo || vendedorData?.username || cliente.vendedor_asignado;
+      if (vendedorData?.nombre_completo) {
+        vendedorNombre = vendedorData.nombre_completo;
+      }
     }
 
     return NextResponse.json({
