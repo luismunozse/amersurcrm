@@ -101,7 +101,12 @@
       "Bash(npm view:*)",
       "Bash(then psql \"$DATABASE_URL\" -c \"SELECT column_name FROM information_schema.columns WHERE table_schema = ''crm'' AND table_name = ''usuario_perfil'' ORDER BY ordinal_position;\")",
       "Bash(then psql \"$DATABASE_URL\" -c \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = ''crm'' AND table_name = ''recordatorio'' ORDER BY ordinal_position;\")",
-      "Bash(then psql \"$DATABASE_URL\" -c \"SELECT schemaname, tablename FROM pg_publication_tables WHERE pubname = ''supabase_realtime'';\")"
+      "Bash(then psql \"$DATABASE_URL\" -c \"SELECT schemaname, tablename FROM pg_publication_tables WHERE pubname = ''supabase_realtime'';\")",
+      "Bash(git checkout:*)",
+      "Bash(gh pr create --title \"Feature: Mejoras generales y tests\" --body \"$\\(cat <<''EOF''\n## Summary\n- Agregado PRD y documentación del proyecto\n- Nuevos tests de criterios \\(agenda, auth, clientes, notificaciones, reportes, ventas\\)\n- Tests unitarios para validación de clientes\n- Mejoras en búsqueda de clientes con índices de teléfono\n- Configuración de Vitest para testing\n- Tests de TestSprite para casos de uso frontend\n- Migraciones de base de datos para optimización\n\n## Test plan\n- [ ] Verificar que el build pasa correctamente\n- [ ] Revisar que los nuevos tests pasen\n- [ ] Validar migraciones en ambiente de staging\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(winget install:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr create:*)"
     ],
     "deny": [],
     "ask": []
