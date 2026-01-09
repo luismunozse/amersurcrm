@@ -348,6 +348,7 @@ export default function ClientesTable({
     if (estado) params.set('estado', estado);
     if (tipo) params.set('tipo', tipo);
     if (vendedor) params.set('vendedor', vendedor);
+    if (origen) params.set('origen', origen);
     params.set('sortBy', column);
     params.set('sortOrder', newSortOrder);
     params.set('page', '1'); // Resetear a página 1 al ordenar
@@ -363,6 +364,7 @@ export default function ClientesTable({
     if (estado) params.set('estado', estado);
     if (tipo) params.set('tipo', tipo);
     if (vendedor) params.set('vendedor', vendedor);
+    if (origen) params.set('origen', origen);
     if (sortBy) params.set('sortBy', sortBy);
     if (sortOrder) params.set('sortOrder', sortOrder);
     params.set('page', page.toString());
@@ -449,6 +451,42 @@ export default function ClientesTable({
 
   const handleClearVendedorFilter = () => {
     handleVendedorFilterChange('');
+  };
+
+  // Opciones de origen del lead
+  const ORIGEN_LEAD_OPTIONS = [
+    { value: 'web', label: 'Web' },
+    { value: 'recomendacion', label: 'Recomendación' },
+    { value: 'feria', label: 'Feria' },
+    { value: 'campaña', label: 'Campaña' },
+    { value: 'campaña_facebook', label: 'Campaña Facebook' },
+    { value: 'campaña_tiktok', label: 'Campaña TikTok' },
+    { value: 'facebook_ads', label: 'Facebook Lead Ads' },
+    { value: 'whatsapp_web', label: 'WhatsApp Web' },
+    { value: 'redes_sociales', label: 'Redes sociales' },
+    { value: 'publicidad', label: 'Publicidad' },
+    { value: 'referido', label: 'Referido' },
+    { value: 'otro', label: 'Otro' },
+  ];
+
+  const handleOrigenFilterChange = (value: string) => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (searchTelefono) params.set('telefono', searchTelefono);
+    if (searchDni) params.set('dni', searchDni);
+    if (estado) params.set('estado', estado);
+    if (tipo) params.set('tipo', tipo);
+    if (vendedor) params.set('vendedor', vendedor);
+    if (value) params.set('origen', value);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    params.set('page', '1');
+
+    router.push(`/dashboard/clientes?${params.toString()}`);
+  };
+
+  const handleClearOrigenFilter = () => {
+    handleOrigenFilterChange('');
   };
 
   // Manejar cambio de estado con modal de contacto
@@ -543,44 +581,70 @@ export default function ClientesTable({
           </p>
         )}
 
-        {puedeFiltrarPorVendedor && (
-          <div className="mt-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium text-crm-text-primary">
-                Filtrar por vendedor asignado
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
-                <select
-                  value={vendedor || ''}
-                  onChange={(e) => handleVendedorFilterChange(e.target.value)}
-                  disabled={loadingVendedores}
-                  className="w-full sm:w-64 px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary disabled:opacity-60"
-                >
-                  <option value="">
-                    {loadingVendedores ? 'Cargando vendedores...' : 'Todos los vendedores'}
+        {/* Filtros en una fila */}
+        <div className="mt-4 flex flex-col sm:flex-row gap-4">
+          {/* Filtro por vendedor */}
+          {puedeFiltrarPorVendedor && (
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-crm-text-primary mb-1">
+                Vendedor asignado
+              </label>
+              <select
+                value={vendedor || ''}
+                onChange={(e) => handleVendedorFilterChange(e.target.value)}
+                disabled={loadingVendedores}
+                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary disabled:opacity-60"
+              >
+                <option value="">
+                  {loadingVendedores ? 'Cargando vendedores...' : 'Todos los vendedores'}
+                </option>
+                {vendedores.map((vend) => (
+                  <option key={vend.id} value={vend.username}>
+                    {vend.nombre_completo ? `${vend.nombre_completo} (@${vend.username})` : `@${vend.username}`}
                   </option>
-                  {vendedores.map((vend) => (
-                    <option key={vend.id} value={vend.username}>
-                      {vend.nombre_completo ? `${vend.nombre_completo} (@${vend.username})` : `@${vend.username}`}
-                    </option>
-                  ))}
-                  {!loadingVendedores && vendedor && !vendedores.some((vend) => vend.username === vendedor) && (
-                    <option value={vendedor}>@{vendedor}</option>
-                  )}
-                </select>
-                {vendedor && (
-                  <button
-                    type="button"
-                    onClick={handleClearVendedorFilter}
-                    className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
-                  >
-                    Limpiar filtro
-                  </button>
+                ))}
+                {!loadingVendedores && vendedor && !vendedores.some((vend) => vend.username === vendedor) && (
+                  <option value={vendedor}>@{vendedor}</option>
                 )}
-              </div>
+              </select>
             </div>
+          )}
+
+          {/* Filtro por origen del lead */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-crm-text-primary mb-1">
+              Origen del lead
+            </label>
+            <select
+              value={origen || ''}
+              onChange={(e) => handleOrigenFilterChange(e.target.value)}
+              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+            >
+              <option value="">Todos los orígenes</option>
+              {ORIGEN_LEAD_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+
+          {/* Botón limpiar filtros */}
+          {(vendedor || origen) && (
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (vendedor) handleClearVendedorFilter();
+                  if (origen) handleClearOrigenFilter();
+                }}
+                className="px-3 py-2 text-sm font-medium text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover whitespace-nowrap"
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Barra de acciones masivas - Solo visible para roles con permisos */}

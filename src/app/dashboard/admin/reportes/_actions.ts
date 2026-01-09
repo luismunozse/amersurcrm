@@ -1573,7 +1573,7 @@ export async function obtenerReporteNivelInteres(
         ultimo_contacto
       `);
 
-    // Obtener interacciones en el rango de fechas
+    // Obtener TODAS las interacciones para determinar la última de cada cliente
     const interaccionesQuery = supabase
       .schema('crm')
       .from('cliente_interaccion')
@@ -1582,8 +1582,6 @@ export async function obtenerReporteNivelInteres(
         resultado,
         fecha_interaccion
       `)
-      .gte('fecha_interaccion', startDate.toISOString())
-      .lte('fecha_interaccion', endDate.toISOString())
       .order('fecha_interaccion', { ascending: false });
 
     const { data: interacciones } = await interaccionesQuery;
@@ -1666,19 +1664,17 @@ export async function obtenerReporteNivelInteres(
     };
 
     // Procesar clientes y clasificar por nivel de interés
-    // Solo incluir clientes que tuvieron interacción en el rango de fechas
+    // Mostrar clientes que tienen interés en proyectos (via cliente_propiedad_interes)
     const nivelesConteo = new Map<string, number>();
     let totalRegistros = 0;
 
-    // Obtener IDs únicos de clientes con interacciones en el rango
-    const clientesConInteraccionEnRango = new Set(
-      interacciones?.map(i => i.cliente_id) || []
-    );
+    // Set de clientes con interés en proyectos
+    const clientesConInteres = new Set(clientesConProyecto.keys());
 
     clientes?.forEach(cliente => {
-      // Solo procesar clientes que tuvieron interacción en el rango de fechas
-      if (!clientesConInteraccionEnRango.has(cliente.id)) {
-        return; // Skip - no tiene interacción en el rango
+      // Solo procesar clientes que tienen interés en algún proyecto
+      if (!clientesConInteres.has(cliente.id)) {
+        return; // Skip - no tiene interés en proyectos
       }
 
       // Filtrar por proyecto si se especifica
@@ -1689,7 +1685,15 @@ export async function obtenerReporteNivelInteres(
         }
       }
 
+      // Filtrar por rango de fechas de última interacción si se especifica
       const ultimaInteraccion = ultimaInteraccionPorCliente.get(cliente.id);
+      if (ultimaInteraccion && fechaInicio && fechaFin) {
+        const fechaInteraccion = new Date(ultimaInteraccion.fecha_interaccion);
+        if (fechaInteraccion < startDate || fechaInteraccion > endDate) {
+          return; // Skip - última interacción fuera del rango
+        }
+      }
+
       const nivelInteres = mapearNivelInteres(
         cliente.estado_cliente,
         ultimaInteraccion?.resultado || null
@@ -1709,17 +1713,25 @@ export async function obtenerReporteNivelInteres(
       }))
       .sort((a, b) => b.cantidad - a.cantidad);
 
-    // Distribución por proyecto (solo clientes con interacciones en el rango)
+    // Distribución por proyecto (clientes con interés en proyectos)
     const nivelesPorProyecto = new Map<string, Map<string, number>>();
 
     clientes?.forEach(cliente => {
-      // Solo procesar clientes que tuvieron interacción en el rango de fechas
-      if (!clientesConInteraccionEnRango.has(cliente.id)) {
+      // Solo procesar clientes que tienen interés en algún proyecto
+      if (!clientesConInteres.has(cliente.id)) {
         return;
       }
 
-      const proyectosCliente = clientesConProyecto.get(cliente.id) || [];
+      // Filtrar por rango de fechas de última interacción si se especifica
       const ultimaInteraccion = ultimaInteraccionPorCliente.get(cliente.id);
+      if (ultimaInteraccion && fechaInicio && fechaFin) {
+        const fechaInteraccion = new Date(ultimaInteraccion.fecha_interaccion);
+        if (fechaInteraccion < startDate || fechaInteraccion > endDate) {
+          return; // Skip - última interacción fuera del rango
+        }
+      }
+
+      const proyectosCliente = clientesConProyecto.get(cliente.id) || [];
       const nivelInteres = mapearNivelInteres(
         cliente.estado_cliente,
         ultimaInteraccion?.resultado || null

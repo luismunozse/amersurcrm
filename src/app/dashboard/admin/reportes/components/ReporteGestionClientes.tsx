@@ -102,14 +102,17 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
       fill: COLORS_SEGUIMIENTO[item.estado] || '#6B7280'
     }));
 
-  // Preparar datos para el gráfico de barras por vendedor
-  const barDataVendedores = distribucionPorVendedor.slice(0, 10).map((item: any) => ({
-    name: item.vendedor.length > 12 ? item.vendedor.substring(0, 12) + '...' : item.vendedor,
+  // Preparar datos para el gráfico de barras por vendedor (todos los vendedores)
+  const barDataVendedores = distribucionPorVendedor.map((item: any) => ({
+    name: item.vendedor.length > 15 ? item.vendedor.substring(0, 15) + '...' : item.vendedor,
     fullName: item.vendedor,
     contactados: item.contactados,
     sinContactar: item.sinContactar,
     total: item.total
   }));
+
+  // Calcular altura dinámica del gráfico basado en número de vendedores
+  const chartHeight = Math.max(400, barDataVendedores.length * 45);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -358,24 +361,26 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
       {vendedorSeleccionado === "todos" && barDataVendedores.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Clientes por Vendedor</CardTitle>
+            <CardTitle>Clientes por Vendedor ({barDataVendedores.length} vendedores)</CardTitle>
             <CardDescription>
               Comparativa de contactados vs sin contactar por vendedor
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div style={{ minHeight: '400px' }}>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={barDataVendedores} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                  <Tooltip content={<BarTooltip />} />
-                  <Legend />
-                  <Bar dataKey="contactados" name="Contactados" fill="#22C55E" stackId="a" />
-                  <Bar dataKey="sinContactar" name="Sin Contactar" fill="#EF4444" stackId="a" />
-                </BarChart>
-              </ResponsiveContainer>
+            <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+              <div style={{ height: `${chartHeight}px` }}>
+                <ResponsiveContainer width="100%" height={chartHeight}>
+                  <BarChart data={barDataVendedores} layout="vertical" margin={{ left: 20, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
+                    <Tooltip content={<BarTooltip />} />
+                    <Legend />
+                    <Bar dataKey="contactados" name="Contactados" fill="#22C55E" stackId="a" />
+                    <Bar dataKey="sinContactar" name="Sin Contactar" fill="#EF4444" stackId="a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </CardContent>
         </Card>

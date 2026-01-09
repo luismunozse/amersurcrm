@@ -11,6 +11,7 @@ type SP = Promise<{
   estado?: string | string[];
   tipo?: string | string[];
   vendedor?: string | string[];
+  origen?: string | string[];
   page?: string | string[];
   sortBy?: string | string[];
   sortOrder?: string | string[];
@@ -31,6 +32,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
   const estado = (Array.isArray(sp.estado) ? sp.estado[0] : sp.estado ?? "").trim();
   const tipo = (Array.isArray(sp.tipo) ? sp.tipo[0] : sp.tipo ?? "").trim();
   const vendedor = (Array.isArray(sp.vendedor) ? sp.vendedor[0] : sp.vendedor ?? "").trim();
+  const origen = (Array.isArray(sp.origen) ? sp.origen[0] : sp.origen ?? "").trim();
   const page = parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page ?? "1"), 10);
   const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "fecha_alta").trim();
   const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
@@ -54,6 +56,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
         estado,
         tipo,
         vendedor,
+        origen,
         sortBy,
         sortOrder
       }).catch(e => {
@@ -80,6 +83,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
     estado,
     tipo,
     vendedor,
+    origen,
     sortBy,
     sortOrder,
   };
@@ -133,6 +137,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
           estado={estado}
           tipo={tipo}
           vendedor={vendedor}
+          origen={origen}
           sortBy={sortBy}
           sortOrder={sortOrder}
         />

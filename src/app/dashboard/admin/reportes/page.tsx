@@ -26,17 +26,6 @@ const GraficosTendencias = dynamic(
   }
 );
 
-const ComparacionPeriodos = dynamic(
-  () => import("@/components/reportes/ComparacionPeriodos"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-40 flex items-center justify-center">
-        <div className="animate-pulse text-crm-text-muted">Cargando comparación...</div>
-      </div>
-    )
-  }
-);
 
 export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("30");
@@ -181,14 +170,6 @@ export default function ReportesPage() {
             metricas={data.metricas}
           />
         </div>
-      )}
-
-      {/* Comparación de Períodos */}
-      {data && !loading && !error && (
-        <ComparacionPeriodos
-          periodoActual={selectedPeriod}
-          datosActuales={data}
-        />
       )}
 
       {/* Reports Tabs */}
