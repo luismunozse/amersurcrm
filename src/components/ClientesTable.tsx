@@ -1088,11 +1088,18 @@ const ClienteRow = memo(function ClienteRow({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    const date = new Date(dateString);
+    const fecha = date.toLocaleDateString('es-PE', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
+    const hora = date.toLocaleTimeString('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    return `${fecha} ${hora}`;
   };
 
   return (

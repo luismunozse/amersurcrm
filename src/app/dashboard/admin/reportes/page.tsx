@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, RefreshCw } from "lucide-react";
+import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, MessageSquare, Users } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
 import ReporteClientes from "./components/ReporteClientes";
 import ReportePropiedades from "./components/ReportePropiedades";
 import ReporteRendimientoVendedores from "./components/ReporteRendimientoVendedores";
+import ReporteGestionClientes from "./components/ReporteGestionClientes";
+import ReporteInteracciones from "./components/ReporteInteracciones";
 import toast from "react-hot-toast";
 
 // Lazy load de componentes pesados (recharts ~100KB+)
@@ -37,9 +39,9 @@ const ComparacionPeriodos = dynamic(
 
 export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("30");
-  const [activeTab, setActiveTab] = useState("ventas");
+  const [activeTab, setActiveTab] = useState("gestion");
 
-  const { data, loading, error, cardsData, recargar } = useReportes({
+  const { data, loading, error } = useReportes({
     periodo: selectedPeriod,
     autoLoad: true
   });
@@ -70,27 +72,39 @@ export default function ReportesPage() {
 
   const reportTypes = [
     {
+      id: "gestion",
+      title: "Gestion Clientes",
+      description: "Estado de seguimiento de clientes captados",
+      icon: Users,
+    },
+    {
+      id: "interacciones",
+      title: "Interacciones",
+      description: "Actividad de vendedores con clientes",
+      icon: MessageSquare,
+    },
+    {
+      id: "propiedades",
+      title: "Propiedades",
+      description: "Inventario y disponibilidad",
+      icon: Building,
+    },
+    {
       id: "ventas",
-      title: "Reporte de Ventas",
-      description: "Análisis detallado de ventas por período",
+      title: "Ventas",
+      description: "Análisis detallado de ventas",
       icon: DollarSign,
     },
     {
       id: "clientes",
-      title: "Reporte de Clientes",
-      description: "Estadísticas de clientes y leads",
+      title: "Clientes",
+      description: "Estadísticas de clientes",
       icon: UserCheck,
     },
     {
-      id: "propiedades",
-      title: "Reporte de Propiedades",
-      description: "Inventario y ventas de propiedades",
-      icon: Building,
-    },
-    {
       id: "rendimiento",
-      title: "Rendimiento de Vendedores",
-      description: "Métricas de productividad del equipo",
+      title: "Rendimiento",
+      description: "Métricas de vendedores",
       icon: UserCog,
     },
   ];
@@ -143,65 +157,6 @@ export default function ReportesPage() {
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {loading ? (
-          // Loading skeleton
-          Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6">
-              <div className="animate-pulse">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-4 bg-crm-border rounded w-24"></div>
-                  <div className="w-8 h-8 bg-crm-border rounded-lg"></div>
-                </div>
-                <div className="h-8 bg-crm-border rounded w-20 mb-2"></div>
-                <div className="h-3 bg-crm-border rounded w-16"></div>
-              </div>
-            </div>
-          ))
-        ) : error ? (
-          // Error state
-          <div className="col-span-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                <span className="text-red-600 dark:text-red-400 text-sm">⚠️</span>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error cargando datos</h3>
-                <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-              </div>
-              <button
-                onClick={recargar}
-                className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Reintentar
-              </button>
-            </div>
-          </div>
-        ) : (
-          // Real data cards
-          cardsData.map((card, index) => (
-            <div key={index} className="bg-crm-card border border-crm-border rounded-xl p-6 hover:shadow-lg transition-shadow duration-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-crm-text-secondary">
-                  {card.title}
-                </h3>
-                <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                  <span className={`text-lg ${card.color}`}>{card.icon}</span>
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-crm-text-primary mb-1">{card.value}</div>
-              <p className={`text-xs ${
-                card.changeType === "positive" ? "text-green-600" : "text-red-600"
-              }`}>
-                {card.change} vs período anterior
-              </p>
-            </div>
-          ))
-        )}
-      </div>
-
       {/* Gráficos de Tendencias */}
       {data && !loading && !error && (
         <div className="bg-crm-card border border-crm-border rounded-xl p-6">
@@ -242,27 +197,29 @@ export default function ReportesPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
           {reportTypes.map((report) => (
             <button
               key={report.id}
               onClick={() => setActiveTab(report.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === report.id
                   ? 'bg-crm-primary text-white'
                   : 'bg-crm-card-hover text-crm-text-primary hover:bg-crm-sidebar-hover'
               }`}
             >
               <report.icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{report.title.split(' ')[0]}</span>
+              <span className="hidden sm:inline">{report.title}</span>
             </button>
           ))}
         </div>
-        
+
         {/* Tab Content */}
+        {activeTab === "gestion" && <ReporteGestionClientes periodo={selectedPeriod} />}
+        {activeTab === "interacciones" && <ReporteInteracciones periodo={selectedPeriod} />}
+        {activeTab === "propiedades" && <ReportePropiedades periodo={selectedPeriod} />}
         {activeTab === "ventas" && <ReporteVentas periodo={selectedPeriod} />}
         {activeTab === "clientes" && <ReporteClientes periodo={selectedPeriod} />}
-        {activeTab === "propiedades" && <ReportePropiedades periodo={selectedPeriod} />}
         {activeTab === "rendimiento" && <ReporteRendimientoVendedores periodo={selectedPeriod} />}
       </div>
 

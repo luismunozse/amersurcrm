@@ -1159,6 +1159,364 @@ export async function obtenerObjetivosVsRealidad(
   }
 }
 
+/**
+ * Obtiene reporte de gestión de clientes con estados de seguimiento
+ */
+export async function obtenerReporteGestionClientes(
+  periodo: string = '30'
+): Promise<{ data: any | null; error: string | null }> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { data: null, error: "No tienes permisos de administrador" };
+    }
+
+    // Calcular fechas
+    const days = parseInt(periodo);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Obtener todos los clientes con su información de seguimiento
+    const { data: clientes } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .select(`
+        id,
+        nombre,
+        email,
+        telefono,
+        estado_cliente,
+        vendedor_username,
+        fecha_alta,
+        ultimo_contacto,
+        proxima_accion
+      `)
+      .gte('fecha_alta', startDate.toISOString())
+      .order('fecha_alta', { ascending: false });
+
+    // Obtener última interacción de cada cliente
+    const { data: ultimasInteracciones } = await supabase
+      .schema('crm')
+      .from('cliente_interaccion')
+      .select(`
+        cliente_id,
+        tipo,
+        resultado,
+        fecha_interaccion,
+        proxima_accion,
+        fecha_proxima_accion
+      `)
+      .order('fecha_interaccion', { ascending: false });
+
+    // Agrupar última interacción por cliente
+    const ultimaInteraccionPorCliente = new Map<string, any>();
+    ultimasInteracciones?.forEach(interaccion => {
+      if (!ultimaInteraccionPorCliente.has(interaccion.cliente_id)) {
+        ultimaInteraccionPorCliente.set(interaccion.cliente_id, interaccion);
+      }
+    });
+
+    // Clasificar clientes por estado de seguimiento
+    const hoy = new Date();
+    const hace7dias = new Date(hoy);
+    hace7dias.setDate(hace7dias.getDate() - 7);
+    const hace30dias = new Date(hoy);
+    hace30dias.setDate(hace30dias.getDate() - 30);
+
+    let sinContactar = 0;
+    let contactadosReciente = 0; // < 7 días
+    let contactadosMedio = 0; // 7-30 días
+    let sinSeguimiento = 0; // > 30 días
+    let conAccionPendiente = 0;
+
+    const clientesDetalle = clientes?.map(cliente => {
+      const ultimaInteraccion = ultimaInteraccionPorCliente.get(cliente.id);
+      const fechaUltimoContacto = ultimaInteraccion?.fecha_interaccion
+        ? new Date(ultimaInteraccion.fecha_interaccion)
+        : cliente.ultimo_contacto
+          ? new Date(cliente.ultimo_contacto)
+          : null;
+
+      let estadoSeguimiento = 'sin_contactar';
+
+      if (!fechaUltimoContacto) {
+        sinContactar++;
+        estadoSeguimiento = 'sin_contactar';
+      } else if (fechaUltimoContacto >= hace7dias) {
+        contactadosReciente++;
+        estadoSeguimiento = 'contactado_reciente';
+      } else if (fechaUltimoContacto >= hace30dias) {
+        contactadosMedio++;
+        estadoSeguimiento = 'contactado_medio';
+      } else {
+        sinSeguimiento++;
+        estadoSeguimiento = 'sin_seguimiento';
+      }
+
+      if (ultimaInteraccion?.fecha_proxima_accion) {
+        conAccionPendiente++;
+      }
+
+      return {
+        ...cliente,
+        ultimaInteraccion: ultimaInteraccion || null,
+        fechaUltimoContacto,
+        estadoSeguimiento,
+        diasSinContacto: fechaUltimoContacto
+          ? Math.floor((hoy.getTime() - fechaUltimoContacto.getTime()) / (1000 * 60 * 60 * 24))
+          : null
+      };
+    }) || [];
+
+    // Agrupar por vendedor
+    const clientesPorVendedor = new Map<string, { total: number; sinContactar: number; contactados: number }>();
+    clientesDetalle.forEach(cliente => {
+      const vendedor = cliente.vendedor_username || 'Sin asignar';
+      const actual = clientesPorVendedor.get(vendedor) || { total: 0, sinContactar: 0, contactados: 0 };
+      actual.total++;
+      if (cliente.estadoSeguimiento === 'sin_contactar') {
+        actual.sinContactar++;
+      } else {
+        actual.contactados++;
+      }
+      clientesPorVendedor.set(vendedor, actual);
+    });
+
+    const distribucionPorVendedor = Array.from(clientesPorVendedor.entries())
+      .map(([vendedor, data]) => ({
+        vendedor,
+        ...data,
+        porcentajeContactados: data.total > 0 ? ((data.contactados / data.total) * 100).toFixed(1) : '0'
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    // Agrupar por estado de cliente
+    const estadosCliente = new Map<string, number>();
+    clientes?.forEach(cliente => {
+      const estado = cliente.estado_cliente || 'No especificado';
+      estadosCliente.set(estado, (estadosCliente.get(estado) || 0) + 1);
+    });
+
+    const distribucionEstados = Array.from(estadosCliente.entries())
+      .map(([estado, cantidad]) => ({
+        estado,
+        cantidad,
+        porcentaje: clientes ? ((cantidad / clientes.length) * 100).toFixed(1) : '0'
+      }));
+
+    return {
+      data: {
+        resumen: {
+          totalClientes: clientes?.length || 0,
+          sinContactar,
+          contactadosReciente,
+          contactadosMedio,
+          sinSeguimiento,
+          conAccionPendiente
+        },
+        distribucionSeguimiento: [
+          { estado: 'Sin contactar', cantidad: sinContactar, color: 'red' },
+          { estado: 'Contactado (<7 días)', cantidad: contactadosReciente, color: 'green' },
+          { estado: 'Contactado (7-30 días)', cantidad: contactadosMedio, color: 'yellow' },
+          { estado: 'Sin seguimiento (>30 días)', cantidad: sinSeguimiento, color: 'orange' }
+        ],
+        distribucionEstados,
+        distribucionPorVendedor,
+        clientesDetalle: clientesDetalle.slice(0, 50), // Limitar para el frontend
+        periodo: {
+          inicio: startDate.toISOString(),
+          fin: new Date().toISOString(),
+          dias: days
+        }
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('Error obteniendo reporte de gestión de clientes:', error);
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
+}
+
+/**
+ * Obtiene reporte de interacciones por vendedor
+ */
+export async function obtenerReporteInteracciones(
+  periodo: string = '30'
+): Promise<{ data: any | null; error: string | null }> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { data: null, error: "No tienes permisos de administrador" };
+    }
+
+    // Calcular fechas
+    const days = parseInt(periodo);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Obtener todas las interacciones del período
+    const { data: interacciones } = await supabase
+      .schema('crm')
+      .from('cliente_interaccion')
+      .select(`
+        id,
+        cliente_id,
+        vendedor_username,
+        tipo,
+        resultado,
+        duracion_minutos,
+        fecha_interaccion,
+        proxima_accion
+      `)
+      .gte('fecha_interaccion', startDate.toISOString())
+      .order('fecha_interaccion', { ascending: false });
+
+    // Obtener información de vendedores
+    const { data: vendedores } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('username, nombre_completo')
+      .eq('activo', true);
+
+    const vendedoresMap = new Map(vendedores?.map(v => [v.username, v.nombre_completo]) || []);
+
+    // Agrupar por vendedor
+    const interaccionesPorVendedor = new Map<string, {
+      total: number;
+      porTipo: Map<string, number>;
+      porResultado: Map<string, number>;
+      duracionTotal: number;
+      clientesUnicos: Set<string>;
+    }>();
+
+    interacciones?.forEach(interaccion => {
+      const vendedor = interaccion.vendedor_username;
+      if (!interaccionesPorVendedor.has(vendedor)) {
+        interaccionesPorVendedor.set(vendedor, {
+          total: 0,
+          porTipo: new Map(),
+          porResultado: new Map(),
+          duracionTotal: 0,
+          clientesUnicos: new Set()
+        });
+      }
+
+      const data = interaccionesPorVendedor.get(vendedor)!;
+      data.total++;
+      data.porTipo.set(interaccion.tipo, (data.porTipo.get(interaccion.tipo) || 0) + 1);
+      if (interaccion.resultado) {
+        data.porResultado.set(interaccion.resultado, (data.porResultado.get(interaccion.resultado) || 0) + 1);
+      }
+      data.duracionTotal += interaccion.duracion_minutos || 0;
+      data.clientesUnicos.add(interaccion.cliente_id);
+    });
+
+    // Formatear datos por vendedor
+    const rankingVendedores = Array.from(interaccionesPorVendedor.entries())
+      .map(([username, data]) => ({
+        username,
+        nombre: vendedoresMap.get(username) || username,
+        totalInteracciones: data.total,
+        clientesAtendidos: data.clientesUnicos.size,
+        duracionTotal: data.duracionTotal,
+        promedioPorCliente: data.clientesUnicos.size > 0
+          ? (data.total / data.clientesUnicos.size).toFixed(1)
+          : '0',
+        porTipo: Object.fromEntries(data.porTipo),
+        porResultado: Object.fromEntries(data.porResultado)
+      }))
+      .sort((a, b) => b.totalInteracciones - a.totalInteracciones);
+
+    // Totales por tipo de interacción
+    const totalesPorTipo = new Map<string, number>();
+    interacciones?.forEach(i => {
+      totalesPorTipo.set(i.tipo, (totalesPorTipo.get(i.tipo) || 0) + 1);
+    });
+
+    const distribucionTipo = Array.from(totalesPorTipo.entries())
+      .map(([tipo, cantidad]) => ({
+        tipo,
+        cantidad,
+        porcentaje: interacciones ? ((cantidad / interacciones.length) * 100).toFixed(1) : '0'
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad);
+
+    // Totales por resultado
+    const totalesPorResultado = new Map<string, number>();
+    interacciones?.forEach(i => {
+      if (i.resultado) {
+        totalesPorResultado.set(i.resultado, (totalesPorResultado.get(i.resultado) || 0) + 1);
+      }
+    });
+
+    const distribucionResultado = Array.from(totalesPorResultado.entries())
+      .map(([resultado, cantidad]) => ({
+        resultado,
+        cantidad,
+        porcentaje: interacciones ? ((cantidad / interacciones.length) * 100).toFixed(1) : '0'
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad);
+
+    // Interacciones por día (para gráfico)
+    const interaccionesPorDia = new Map<string, number>();
+    interacciones?.forEach(i => {
+      const fecha = new Date(i.fecha_interaccion).toISOString().split('T')[0];
+      interaccionesPorDia.set(fecha, (interaccionesPorDia.get(fecha) || 0) + 1);
+    });
+
+    const tendenciaDiaria = Array.from(interaccionesPorDia.entries())
+      .map(([fecha, cantidad]) => ({ fecha, cantidad }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .slice(-30); // últimos 30 días
+
+    return {
+      data: {
+        resumen: {
+          totalInteracciones: interacciones?.length || 0,
+          vendedoresActivos: interaccionesPorVendedor.size,
+          promedioPoVendedor: interaccionesPorVendedor.size > 0
+            ? Math.round((interacciones?.length || 0) / interaccionesPorVendedor.size)
+            : 0,
+          clientesContactados: new Set(interacciones?.map(i => i.cliente_id) || []).size
+        },
+        rankingVendedores,
+        distribucionTipo,
+        distribucionResultado,
+        tendenciaDiaria,
+        periodo: {
+          inicio: startDate.toISOString(),
+          fin: new Date().toISOString(),
+          dias: days
+        }
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('Error obteniendo reporte de interacciones:', error);
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
+}
+
 // Función para procesar tendencias de ventas
 function procesarTendenciasVentas(datos: any[]) {
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
