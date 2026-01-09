@@ -154,27 +154,42 @@ export default function VendedoresActivosPage() {
   const confirmarCambiarEstado = async () => {
     if (!vendedorACambiarEstado) return;
 
+    const nuevoEstado = !vendedorACambiarEstado.activo;
+    const vendedorId = vendedorACambiarEstado.id;
+
+    // Optimistic update: actualizar UI inmediatamente
+    setVendedores(prev => prev.map(v =>
+      v.id === vendedorId ? { ...v, activo: nuevoEstado } : v
+    ));
+    setCambiarEstadoModalOpen(false);
+    setVendedorACambiarEstado(null);
+
     try {
       const response = await fetch("/api/admin/vendedores-activos", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: vendedorACambiarEstado.id, activo: !vendedorACambiarEstado.activo }),
+        body: JSON.stringify({ id: vendedorId, activo: nuevoEstado }),
       });
 
       const data = await response.json();
 
       if (data.success) {
         toast.success(data.message);
-        await cargarVendedores();
+        // No recargar - ya actualizamos el estado localmente
       } else {
+        // Revertir si falla
+        setVendedores(prev => prev.map(v =>
+          v.id === vendedorId ? { ...v, activo: !nuevoEstado } : v
+        ));
         toast.error(data.error || "Error al actualizar vendedor");
       }
     } catch (error) {
+      // Revertir si hay error
+      setVendedores(prev => prev.map(v =>
+        v.id === vendedorId ? { ...v, activo: !nuevoEstado } : v
+      ));
       console.error("Error actualizando vendedor:", error);
       toast.error("Error al actualizar vendedor");
-    } finally {
-      setCambiarEstadoModalOpen(false);
-      setVendedorACambiarEstado(null);
     }
   };
 

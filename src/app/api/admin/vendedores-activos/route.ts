@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, verificarAdminOptimizado } from "@/lib/supabase.server";
 
+// Configuración de runtime para Vercel
+export const runtime = "nodejs";
+export const maxDuration = 10; // segundos máximos de ejecución
+
 interface VendedorConRol {
   id: string;
   username: string;
@@ -319,9 +323,12 @@ export async function DELETE(request: NextRequest) {
  * Activa o desactiva un vendedor de la lista
  */
 export async function PATCH(request: NextRequest) {
+  const startTime = Date.now();
   try {
     // Verificación optimizada
+    const authStart = Date.now();
     const { isAdmin, user } = await verificarAdminOptimizado();
+    console.log(`[PATCH] Auth check: ${Date.now() - authStart}ms`);
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -346,11 +353,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Actualizar estado del vendedor
+    const updateStart = Date.now();
     const { error: updateError } = await supabase
       .schema("crm")
       .from("vendedor_activo")
       .update({ activo })
       .eq("id", id);
+    console.log(`[PATCH] DB update: ${Date.now() - updateStart}ms`);
 
     if (updateError) {
       console.error("Error actualizando vendedor:", updateError);
@@ -360,13 +369,15 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const totalTime = Date.now() - startTime;
     console.log(
-      `✅ [VendedoresActivos] Vendedor ${id} ${activo ? "activado" : "desactivado"}`
+      `✅ [PATCH] Vendedor ${id} ${activo ? "activado" : "desactivado"} - TOTAL: ${totalTime}ms`
     );
 
     return NextResponse.json({
       success: true,
       message: `Vendedor ${activo ? "activado" : "desactivado"} exitosamente`,
+      _debug: { totalTime } // Temporal para debug
     });
   } catch (error) {
     console.error("[VendedoresActivos] Error en PATCH:", error);
