@@ -1,16 +1,39 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, RefreshCw } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
-import GraficosTendencias from "@/components/reportes/GraficosTendencias";
-import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
 import ReporteVentas from "./components/ReporteVentas";
 import ReporteClientes from "./components/ReporteClientes";
 import ReportePropiedades from "./components/ReportePropiedades";
 import ReporteRendimientoVendedores from "./components/ReporteRendimientoVendedores";
-import { abrirReportePDF } from "@/lib/pdfGenerator";
 import toast from "react-hot-toast";
+
+// Lazy load de componentes pesados (recharts ~100KB+)
+const GraficosTendencias = dynamic(
+  () => import("@/components/reportes/GraficosTendencias"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-80 flex items-center justify-center">
+        <div className="animate-pulse text-crm-text-muted">Cargando gráficos...</div>
+      </div>
+    )
+  }
+);
+
+const ComparacionPeriodos = dynamic(
+  () => import("@/components/reportes/ComparacionPeriodos"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-40 flex items-center justify-center">
+        <div className="animate-pulse text-crm-text-muted">Cargando comparación...</div>
+      </div>
+    )
+  }
+);
 
 export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("30");
@@ -34,7 +57,8 @@ export default function ReportesPage() {
     try {
       toast.loading('Generando PDF...', { id: 'export' });
 
-      // Generar y abrir el PDF usando los datos cargados
+      // Lazy load del generador de PDF (jspdf ~200KB+)
+      const { abrirReportePDF } = await import("@/lib/pdfGenerator");
       abrirReportePDF(data);
 
       toast.success('Reporte PDF generado exitosamente', { id: 'export' });

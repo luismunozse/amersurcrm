@@ -116,3 +116,43 @@ export function createServiceRoleClient() {
     }
   );
 }
+
+// ========== VERIFICACIÓN DE PERMISOS OPTIMIZADA ==========
+// Usa el cliente y auth cacheados para evitar queries redundantes
+// en API routes que ya verifican auth
+
+/**
+ * Verifica si el usuario actual es admin de forma optimizada
+ * Usa cache de React para evitar múltiples queries en el mismo request
+ * Retorna { isAdmin, user, error } para evitar queries adicionales
+ */
+export const verificarAdminOptimizado = cache(async () => {
+  try {
+    const supabase = await getSupabaseClient();
+    const { user, error: authError } = await getCachedAuthUser();
+
+    if (authError || !user) {
+      return { isAdmin: false, user: null, error: authError || 'No autenticado' };
+    }
+
+    // Query única para obtener rol del usuario
+    const { data: perfil, error: perfilError } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+      .eq('id', user.id)
+      .single();
+
+    if (perfilError || !perfil) {
+      return { isAdmin: false, user, error: perfilError?.message || 'Perfil no encontrado' };
+    }
+
+    const rol = Array.isArray(perfil.rol) ? perfil.rol[0] : perfil.rol;
+    const isAdmin = rol?.nombre === 'ROL_ADMIN';
+
+    return { isAdmin, user, error: null };
+  } catch (err) {
+    console.error('[verificarAdminOptimizado] Error:', err);
+    return { isAdmin: false, user: null, error: err };
+  }
+});

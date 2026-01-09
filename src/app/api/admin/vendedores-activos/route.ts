@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/permissions/server";
+import { createServerOnlyClient, verificarAdminOptimizado } from "@/lib/supabase.server";
 
 interface VendedorConRol {
   id: string;
@@ -16,20 +15,21 @@ interface VendedorConRol {
  */
 export async function GET() {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verificación optimizada: una sola query para auth + rol (evita ~400ms en producción)
+    const { isAdmin, user, error: authError } = await verificarAdminOptimizado();
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "No tienes permisos de administrador" },
         { status: 403 }
       );
     }
+
+    const supabase = await createServerOnlyClient();
 
     // Obtener vendedores activos (sin relación anidada porque FK apunta a auth.users)
     const { data: vendedoresActivos, error } = await supabase
@@ -108,21 +108,21 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verificación optimizada
+    const { isAdmin, user } = await verificarAdminOptimizado();
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "No tienes permisos de administrador" },
         { status: 403 }
       );
     }
 
+    const supabase = await createServerOnlyClient();
     const body = await request.json();
     const { vendedor_id } = body;
 
@@ -259,21 +259,21 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verificación optimizada
+    const { isAdmin, user } = await verificarAdminOptimizado();
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "No tienes permisos de administrador" },
         { status: 403 }
       );
     }
 
+    const supabase = await createServerOnlyClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -320,21 +320,21 @@ export async function DELETE(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verificación optimizada
+    const { isAdmin, user } = await verificarAdminOptimizado();
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "No tienes permisos de administrador" },
         { status: 403 }
       );
     }
 
+    const supabase = await createServerOnlyClient();
     const body = await request.json();
     const { id, activo } = body;
 
@@ -383,21 +383,21 @@ export async function PATCH(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verificación optimizada
+    const { isAdmin, user } = await verificarAdminOptimizado();
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "No tienes permisos de administrador" },
         { status: 403 }
       );
     }
 
+    const supabase = await createServerOnlyClient();
     const body = await request.json();
     const { vendedores } = body;
 
