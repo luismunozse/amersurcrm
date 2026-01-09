@@ -1517,6 +1517,262 @@ export async function obtenerReporteInteracciones(
   }
 }
 
+/**
+ * Obtiene reporte de nivel de interés de leads por proyecto
+ */
+export async function obtenerReporteNivelInteres(
+  periodo: string = '30',
+  proyectoId?: string,
+  fechaInicio?: string,
+  fechaFin?: string
+): Promise<{ data: any | null; error: string | null }> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { data: null, error: "No tienes permisos de administrador" };
+    }
+
+    // Calcular fechas
+    const days = parseInt(periodo);
+    let startDate: Date;
+    let endDate = new Date();
+
+    if (fechaInicio && fechaFin) {
+      startDate = new Date(fechaInicio);
+      endDate = new Date(fechaFin);
+    } else {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
+
+    // Obtener todos los proyectos para el filtro
+    const { data: proyectos } = await supabase
+      .schema('crm')
+      .from('proyecto')
+      .select('id, nombre')
+      .eq('estado', 'activo')
+      .order('nombre');
+
+    // Obtener clientes con su última interacción
+    const { data: clientes } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .select(`
+        id,
+        nombre,
+        estado_cliente,
+        vendedor_username,
+        fecha_alta,
+        ultimo_contacto
+      `);
+
+    // Obtener interacciones en el rango de fechas
+    const interaccionesQuery = supabase
+      .schema('crm')
+      .from('cliente_interaccion')
+      .select(`
+        cliente_id,
+        resultado,
+        fecha_interaccion
+      `)
+      .gte('fecha_interaccion', startDate.toISOString())
+      .lte('fecha_interaccion', endDate.toISOString())
+      .order('fecha_interaccion', { ascending: false });
+
+    const { data: interacciones } = await interaccionesQuery;
+
+    // Obtener intereses de clientes en proyectos
+    const interesQuery = supabase
+      .schema('crm')
+      .from('cliente_propiedad_interes')
+      .select(`
+        cliente_id,
+        lote:lote_id (
+          proyecto_id
+        ),
+        propiedad:propiedad_id (
+          proyecto_id
+        )
+      `);
+
+    const { data: interesesProyecto } = await interesQuery;
+
+    // Mapear clientes con interés en proyectos específicos
+    const clientesConProyecto = new Map<string, string[]>();
+    interesesProyecto?.forEach((interes: any) => {
+      const proyId = interes.lote?.proyecto_id || interes.propiedad?.proyecto_id;
+      if (proyId) {
+        const proyectos = clientesConProyecto.get(interes.cliente_id) || [];
+        if (!proyectos.includes(proyId)) {
+          proyectos.push(proyId);
+        }
+        clientesConProyecto.set(interes.cliente_id, proyectos);
+      }
+    });
+
+    // Agrupar última interacción por cliente
+    const ultimaInteraccionPorCliente = new Map<string, any>();
+    interacciones?.forEach(interaccion => {
+      if (!ultimaInteraccionPorCliente.has(interaccion.cliente_id)) {
+        ultimaInteraccionPorCliente.set(interaccion.cliente_id, interaccion);
+      }
+    });
+
+    // Mapear niveles de interés basados en estado_cliente + resultado de interacción
+    const mapearNivelInteres = (estadoCliente: string, resultado: string | null): string => {
+      // Si no hay interacción, usar estado del cliente
+      if (!resultado) {
+        if (estadoCliente === 'por_contactar') return 'Por Contactar';
+        if (estadoCliente === 'transferido') return 'Contacto Transferido';
+        return 'En Contacto';
+      }
+
+      // Mapear según resultado de última interacción
+      switch (resultado) {
+        case 'interesado':
+          return 'Alto';
+        case 'contesto':
+        case 'reagendo':
+          return 'En Contacto';
+        case 'no_contesto':
+        case 'pendiente':
+          return 'Intermedio';
+        case 'no_interesado':
+          return 'No Interesado';
+        case 'cerrado':
+          return 'Desestimado';
+        default:
+          return 'Bajo';
+      }
+    };
+
+    // Colores para cada nivel
+    const coloresNivel: Record<string, string> = {
+      'Alto': '#3B82F6',           // blue
+      'Bajo': '#6B7280',           // gray
+      'Contacto Transferido': '#10B981', // green
+      'Desestimado': '#F97316',    // orange
+      'En Contacto': '#8B5CF6',    // purple
+      'Intermedio': '#EF4444',     // red
+      'No Interesado': '#FCD34D',  // yellow
+      'Por Contactar': '#14B8A6'   // teal
+    };
+
+    // Procesar clientes y clasificar por nivel de interés
+    // Solo incluir clientes que tuvieron interacción en el rango de fechas
+    const nivelesConteo = new Map<string, number>();
+    let totalRegistros = 0;
+
+    // Obtener IDs únicos de clientes con interacciones en el rango
+    const clientesConInteraccionEnRango = new Set(
+      interacciones?.map(i => i.cliente_id) || []
+    );
+
+    clientes?.forEach(cliente => {
+      // Solo procesar clientes que tuvieron interacción en el rango de fechas
+      if (!clientesConInteraccionEnRango.has(cliente.id)) {
+        return; // Skip - no tiene interacción en el rango
+      }
+
+      // Filtrar por proyecto si se especifica
+      if (proyectoId && proyectoId !== 'todos') {
+        const proyectosCliente = clientesConProyecto.get(cliente.id) || [];
+        if (!proyectosCliente.includes(proyectoId)) {
+          return; // Skip this client
+        }
+      }
+
+      const ultimaInteraccion = ultimaInteraccionPorCliente.get(cliente.id);
+      const nivelInteres = mapearNivelInteres(
+        cliente.estado_cliente,
+        ultimaInteraccion?.resultado || null
+      );
+
+      nivelesConteo.set(nivelInteres, (nivelesConteo.get(nivelInteres) || 0) + 1);
+      totalRegistros++;
+    });
+
+    // Convertir a array para el gráfico
+    const distribucionNiveles = Array.from(nivelesConteo.entries())
+      .map(([nivel, cantidad]) => ({
+        nivel,
+        cantidad,
+        porcentaje: totalRegistros > 0 ? ((cantidad / totalRegistros) * 100).toFixed(1) : '0',
+        color: coloresNivel[nivel] || '#6B7280'
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad);
+
+    // Distribución por proyecto (solo clientes con interacciones en el rango)
+    const nivelesPorProyecto = new Map<string, Map<string, number>>();
+
+    clientes?.forEach(cliente => {
+      // Solo procesar clientes que tuvieron interacción en el rango de fechas
+      if (!clientesConInteraccionEnRango.has(cliente.id)) {
+        return;
+      }
+
+      const proyectosCliente = clientesConProyecto.get(cliente.id) || [];
+      const ultimaInteraccion = ultimaInteraccionPorCliente.get(cliente.id);
+      const nivelInteres = mapearNivelInteres(
+        cliente.estado_cliente,
+        ultimaInteraccion?.resultado || null
+      );
+
+      proyectosCliente.forEach(proyId => {
+        if (!nivelesPorProyecto.has(proyId)) {
+          nivelesPorProyecto.set(proyId, new Map());
+        }
+        const nivelesProyecto = nivelesPorProyecto.get(proyId)!;
+        nivelesProyecto.set(nivelInteres, (nivelesProyecto.get(nivelInteres) || 0) + 1);
+      });
+    });
+
+    // Formatear distribución por proyecto
+    const proyectosMap = new Map(proyectos?.map(p => [p.id, p.nombre]) || []);
+    const distribucionPorProyecto = Array.from(nivelesPorProyecto.entries())
+      .map(([proyId, niveles]) => ({
+        proyecto: proyectosMap.get(proyId) || 'Sin nombre',
+        proyectoId: proyId,
+        total: Array.from(niveles.values()).reduce((a, b) => a + b, 0),
+        niveles: Object.fromEntries(niveles)
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      data: {
+        resumen: {
+          totalRegistros,
+          totalProyectos: proyectos?.length || 0,
+          fechaInicio: startDate.toISOString(),
+          fechaFin: endDate.toISOString()
+        },
+        distribucionNiveles,
+        distribucionPorProyecto,
+        proyectos: proyectos || [],
+        periodo: {
+          inicio: startDate.toISOString(),
+          fin: endDate.toISOString(),
+          dias: days
+        }
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('Error obteniendo reporte de nivel de interés:', error);
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
+}
+
 // Función para procesar tendencias de ventas
 function procesarTendenciasVentas(datos: any[]) {
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];

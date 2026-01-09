@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, MessageSquare, Users } from "lucide-react";
+import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, MessageSquare, Users, PieChart } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
 import ReporteClientes from "./components/ReporteClientes";
@@ -10,6 +10,7 @@ import ReportePropiedades from "./components/ReportePropiedades";
 import ReporteRendimientoVendedores from "./components/ReporteRendimientoVendedores";
 import ReporteGestionClientes from "./components/ReporteGestionClientes";
 import ReporteInteracciones from "./components/ReporteInteracciones";
+import ReporteNivelInteres from "./components/ReporteNivelInteres";
 import toast from "react-hot-toast";
 
 // Lazy load de componentes pesados (recharts ~100KB+)
@@ -39,7 +40,7 @@ const ComparacionPeriodos = dynamic(
 
 export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("30");
-  const [activeTab, setActiveTab] = useState("gestion");
+  const [activeTab, setActiveTab] = useState("nivel-interes");
 
   const { data, loading, error } = useReportes({
     periodo: selectedPeriod,
@@ -71,6 +72,12 @@ export default function ReportesPage() {
   };
 
   const reportTypes = [
+    {
+      id: "nivel-interes",
+      title: "Nivel Interes",
+      description: "Nivel de interés por proyecto",
+      icon: PieChart,
+    },
     {
       id: "gestion",
       title: "Gestion Clientes",
@@ -197,7 +204,7 @@ export default function ReportesPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+        <div className="grid grid-cols-4 lg:grid-cols-7 gap-2 mb-6">
           {reportTypes.map((report) => (
             <button
               key={report.id}
@@ -215,6 +222,7 @@ export default function ReportesPage() {
         </div>
 
         {/* Tab Content */}
+        {activeTab === "nivel-interes" && <ReporteNivelInteres periodo={selectedPeriod} />}
         {activeTab === "gestion" && <ReporteGestionClientes periodo={selectedPeriod} />}
         {activeTab === "interacciones" && <ReporteInteracciones periodo={selectedPeriod} />}
         {activeTab === "propiedades" && <ReportePropiedades periodo={selectedPeriod} />}
