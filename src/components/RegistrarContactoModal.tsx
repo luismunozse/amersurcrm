@@ -6,6 +6,7 @@ import { Fragment } from 'react';
 import { XMarkIcon, PhoneIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, UserGroupIcon, VideoCameraIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { registrarInteraccion } from '@/app/dashboard/clientes/_actions_crm';
+import DatePicker from "@/components/ui/DatePicker";
 
 interface RegistrarContactoModalProps {
   isOpen: boolean;
@@ -261,12 +262,11 @@ export default function RegistrarContactoModal({
                         <label className="block text-sm font-medium text-crm-text-primary mb-2">
                           Fecha próxima acción
                         </label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={fechaProximaAccion}
-                          onChange={(e) => setFechaProximaAccion(e.target.value)}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="w-full px-4 py-2.5 border border-crm-border rounded-lg bg-crm-background text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
+                          onChange={setFechaProximaAccion}
+                          placeholder="Seleccionar fecha"
+                          minDate={new Date()}
                         />
                       </div>
                     )}

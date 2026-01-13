@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { convertirReservaEnVenta } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, FORMAS_PAGO, type Moneda, type FormaPago } from "@/lib/types/crm-flujo";
+import DatePicker from "@/components/ui/DatePicker";
 
 interface Props {
   isOpen: boolean;
@@ -265,11 +266,11 @@ export default function ConvertirReservaVentaModal({
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Fecha de Entrega (estimada)
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={fechaEntrega}
-              onChange={(e) => setFechaEntrega(e.target.value)}
-              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+              onChange={setFechaEntrega}
+              placeholder="Seleccionar fecha"
+              minDate={new Date()}
             />
           </div>
 

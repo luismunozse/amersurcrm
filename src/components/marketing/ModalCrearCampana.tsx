@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Send, Users, Calendar, Zap } from "lucide-react";
+import { X, Send, Users, Zap, Calendar } from "lucide-react";
 import { crearCampana, obtenerPlantillas, verificarCredencialesWhatsApp } from "@/app/dashboard/admin/marketing/_actions";
 import type { MarketingTemplate, EstadoCampana } from "@/types/whatsapp-marketing";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 
 interface ModalCrearCampanaProps {
@@ -404,12 +405,11 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
                   <label className="block text-sm font-medium text-crm-text-primary mb-2">
                     Fecha y Hora de Inicio
                   </label>
-                  <input
-                    type="datetime-local"
-                    required={!formData.enviar_inmediatamente}
+                  <DateTimePicker
                     value={formData.fecha_inicio}
-                    onChange={(e) => setFormData({ ...formData, fecha_inicio: e.target.value })}
-                    className="crm-datetime-input"
+                    onChange={(value) => setFormData({ ...formData, fecha_inicio: value })}
+                    placeholder="Seleccionar fecha y hora"
+                    minDate={new Date()}
                   />
                 </div>
               )}

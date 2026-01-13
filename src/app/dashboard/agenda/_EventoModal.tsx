@@ -5,6 +5,7 @@ import { Evento } from "@/lib/types/agenda";
 import { crearEvento, actualizarEvento } from "./actions";
 import toast from "react-hot-toast";
 import { XMarkIcon, UserIcon } from "@heroicons/react/24/outline";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface EventoModalProps {
   evento?: Evento | null;
@@ -355,12 +356,10 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Fecha y hora *
                 </label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={formData.fecha_inicio}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
-                  required
+                  onChange={(value) => setFormData(prev => ({ ...prev, fecha_inicio: value }))}
+                  placeholder="Seleccionar fecha y hora"
                 />
               </div>
               <div>

@@ -5,6 +5,7 @@ import { Recordatorio, RecordatorioFormData, TIPOS_RECORDATORIO_OPTIONS, PRIORID
 import { crearRecordatorio } from "./actions";
 import toast from "react-hot-toast";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface RecordatorioModalProps {
   recordatorio?: Recordatorio | null;
@@ -186,12 +187,10 @@ export default function RecordatorioModal({
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Fecha del Recordatorio *
                 </label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={formData.fecha_recordatorio}
-                  onChange={(e) => handleInputChange("fecha_recordatorio", e.target.value)}
-                  className="crm-datetime-input"
-                  required
+                  onChange={(value) => handleInputChange("fecha_recordatorio", value)}
+                  placeholder="Seleccionar fecha y hora"
                 />
               </div>
               <div>

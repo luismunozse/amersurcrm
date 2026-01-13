@@ -3,9 +3,11 @@
 import { Fragment, useState, useTransition } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { createPortal } from "react-dom";
-import { X, CreditCard, DollarSign, Calendar } from "lucide-react";
+import { X, CreditCard, DollarSign } from "lucide-react";
 import { registrarPago } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, METODOS_PAGO, formatearMoneda, type Moneda } from "@/lib/types/crm-flujo";
+import DateTimePicker from "@/components/ui/DateTimePicker";
+import DatePicker from "@/components/ui/DatePicker";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -232,33 +234,24 @@ export default function RegistrarPagoModal({
                       <label className="block text-sm font-medium text-crm-text mb-2">
                         Fecha de Pago *
                       </label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-crm-text-muted" />
-                        <input
-                          type="datetime-local"
-                          value={fechaPago}
-                          onChange={(e) => setFechaPago(e.target.value)}
-                          className="crm-datetime-input pl-10 pr-4"
-                          required
-                          disabled={isPending}
-                        />
-                      </div>
+                      <DateTimePicker
+                        value={fechaPago}
+                        onChange={setFechaPago}
+                        placeholder="Seleccionar fecha y hora"
+                        disabled={isPending}
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-crm-text mb-2">
                         Fecha de Vencimiento
                       </label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-crm-text-muted" />
-                        <input
-                          type="date"
-                          value={fechaVencimiento}
-                          onChange={(e) => setFechaVencimiento(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2.5 bg-crm-background border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent text-crm-text"
-                          disabled={isPending}
-                        />
-                      </div>
+                      <DatePicker
+                        value={fechaVencimiento}
+                        onChange={setFechaVencimiento}
+                        placeholder="Seleccionar fecha"
+                        disabled={isPending}
+                      />
                     </div>
                   </div>
 

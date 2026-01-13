@@ -11,6 +11,7 @@ import { Pagination } from "@/components/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import ClienteForm from "@/components/ClienteForm";
 import SimpleModal from "@/components/SimpleModal";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 
 type Cliente = { 
   id: string; 
@@ -745,11 +746,10 @@ function RegistrarContactoModal({
           {proximaAccion && proximaAccion !== 'ninguna' && (
             <div>
               <label className="block text-xs font-semibold text-crm-text-muted uppercase mb-1">Fecha próxima acción</label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={fechaProxima}
-                onChange={(e) => setFechaProxima(e.target.value)}
-                className="crm-datetime-input"
+                onChange={setFechaProxima}
+                placeholder="Seleccionar fecha y hora"
                 disabled={loading}
               />
             </div>

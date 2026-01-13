@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { crearEvento } from "@/app/dashboard/agenda/actions";
 import { EventoFormState } from "@/lib/types/agenda";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 
 interface EventoFormProps {
@@ -170,12 +171,10 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Fecha de Inicio *
                 </label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={formData.fecha_inicio}
-                  onChange={(e) => handleChange('fecha_inicio', e.target.value)}
-                  className="crm-datetime-input"
-                  required
+                  onChange={(value) => handleChange('fecha_inicio', value)}
+                  placeholder="Seleccionar fecha y hora"
                 />
               </div>
 
@@ -183,11 +182,10 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Fecha de Fin
                 </label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={formData.fecha_fin}
-                  onChange={(e) => handleChange('fecha_fin', e.target.value)}
-                  className="crm-datetime-input"
+                  onChange={(value) => handleChange('fecha_fin', value)}
+                  placeholder="Seleccionar fecha y hora"
                 />
               </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
 import { PieChart as PieChartIcon, Loader2, Filter } from "lucide-react";
 import { obtenerReporteNivelInteres } from "../_actions";
 import toast from "react-hot-toast";
@@ -158,23 +159,29 @@ export default function ReporteNivelInteres({ periodo }: ReporteNivelInteresProp
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-crm-text-secondary whitespace-nowrap">
-                Fecha de ultima interaccion:
-              </span>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="px-3 py-2 border border-crm-border rounded-lg text-sm bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-              />
-              <span className="text-crm-text-muted">-</span>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="px-3 py-2 border border-crm-border rounded-lg text-sm bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-              />
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div>
+                <label className="block text-sm font-medium text-crm-text-secondary mb-2">
+                  Fecha desde
+                </label>
+                <DatePicker
+                  value={fechaInicio}
+                  onChange={setFechaInicio}
+                  placeholder="Fecha inicio"
+                  maxDate={fechaFin ? new Date(fechaFin) : undefined}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-crm-text-secondary mb-2">
+                  Fecha hasta
+                </label>
+                <DatePicker
+                  value={fechaFin}
+                  onChange={setFechaFin}
+                  placeholder="Fecha fin"
+                  minDate={fechaInicio ? new Date(fechaInicio) : undefined}
+                />
+              </div>
             </div>
 
             <Button

@@ -25,6 +25,7 @@ import { Evento } from "@/lib/types/agenda";
 import EventoModal from "./_EventoModal";
 import RecordatoriosPanel from "@/components/RecordatoriosPanel";
 import NotificacionesPanel from "@/components/NotificacionesPanel";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 
 type VistaCalendario = "mes" | "semana" | "dia";
@@ -860,12 +861,10 @@ export default function AgendaDashboard() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-crm-text-primary">Nueva fecha y hora</label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={nuevaFechaReprogramar}
-                  onChange={(e) => setNuevaFechaReprogramar(e.target.value)}
-                  className="crm-datetime-input"
-                  required
+                  onChange={setNuevaFechaReprogramar}
+                  placeholder="Seleccionar fecha y hora"
                 />
               </div>
 
