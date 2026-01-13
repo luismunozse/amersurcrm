@@ -30,6 +30,25 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [vendedorAsignado, setVendedorAsignado] = useState<string | null>(null);
+
+  // Estado para origen del lead
+  const [origenLead, setOrigenLead] = useState<string>('whatsapp_web');
+
+  // Opciones de origen del lead
+  const ORIGENES_LEAD_OPTIONS = [
+    { value: 'whatsapp_web', label: 'WhatsApp Web' },
+    { value: 'campaña_facebook', label: 'Campaña de Facebook' },
+    { value: 'campaña_tiktok', label: 'Campaña de TikTok' },
+    { value: 'redes_sociales', label: 'Redes Sociales' },
+    { value: 'publicidad', label: 'Publicidad' },
+    { value: 'referido', label: 'Referido' },
+    { value: 'recomendacion', label: 'Recomendación' },
+    { value: 'feria', label: 'Feria/Evento' },
+    { value: 'web', label: 'Sitio Web' },
+    { value: 'otro', label: 'Otro' },
+  ];
 
   // Estado para proyecto de interés
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
@@ -124,7 +143,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         nombre: nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`,
         telefono: contact.phone,
         telefono_whatsapp: contact.phone,
-        origen_lead: 'whatsapp_web',
+        origen_lead: origenLead,
         canal: 'whatsapp_extension',
         mensaje_inicial: mensaje || undefined,
         chat_id: contact.chatId,
@@ -134,12 +153,20 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         // Si se seleccionó un lote, agregarlo como proyecto de interés
         if (selectedLote && result.clienteId) {
           try {
-            await apiClient.addProyectoInteres(result.clienteId, selectedLote);
-            console.log('[CreateLeadForm] Proyecto de interés agregado');
+            console.log('[CreateLeadForm] Agregando proyecto de interés:', {
+              clienteId: result.clienteId,
+              loteId: selectedLote,
+            });
+            const interesResult = await apiClient.addProyectoInteres(result.clienteId, selectedLote);
+            console.log('[CreateLeadForm] Proyecto de interés agregado:', interesResult);
           } catch (err) {
             console.error('[CreateLeadForm] Error agregando proyecto de interés:', err);
-            // No fallar la creación del lead por esto
+            // Mostrar warning al usuario pero no fallar la creación del lead
+            setWarning('Lead creado, pero hubo un error al guardar el proyecto de interés. Puedes agregarlo manualmente.');
           }
+        } else if (selectedProyecto && !selectedLote) {
+          // Usuario seleccionó proyecto pero no lote
+          console.log('[CreateLeadForm] Proyecto seleccionado pero sin lote, no se agrega interés');
         }
 
         // Construir objeto cliente con los datos disponibles
@@ -149,10 +176,13 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           telefono: contact.phone,
           telefono_whatsapp: contact.phone,
           estado_cliente: 'por_contactar',
-          origen_lead: 'whatsapp_web',
+          origen_lead: origenLead,
           vendedor_asignado: result.vendedor || null,
           created_at: new Date().toISOString(),
         };
+
+        // Guardar vendedor asignado para mostrar en éxito
+        setVendedorAsignado(result.vendedor || null);
 
         // Mostrar mensaje de éxito brevemente
         setSuccess(true);
@@ -199,6 +229,11 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         <p className="text-sm text-green-700 dark:text-green-200 mb-2">
           {nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`}
         </p>
+        {vendedorAsignado && (
+          <p className="text-sm text-green-700 dark:text-green-200 mb-2 font-medium">
+            Asignado a: {vendedorAsignado}
+          </p>
+        )}
         <p className="text-xs text-green-600 dark:text-green-300">
           Cargando datos del cliente...
         </p>
@@ -240,6 +275,24 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
             disabled
           />
+        </div>
+
+        {/* Selector de Origen del Lead */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Origen del lead
+          </label>
+          <select
+            value={origenLead}
+            onChange={(e) => setOrigenLead(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+          >
+            {ORIGENES_LEAD_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Selector de Proyecto de Interés */}
@@ -309,6 +362,12 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         {error && (
           <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
             <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
+        {warning && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-md p-3">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>
           </div>
         )}
 

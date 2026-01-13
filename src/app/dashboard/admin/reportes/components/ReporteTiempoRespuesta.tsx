@@ -333,7 +333,7 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
             <CardTitle>Detalle</CardTitle>
             <div className="flex gap-2">
               <Button
-                variant={tabActiva === 'ranking' ? 'default' : 'outline'}
+                variant={tabActiva === 'ranking' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => setTabActiva('ranking')}
                 className={tabActiva === 'ranking' ? 'bg-crm-primary text-white' : ''}
@@ -342,7 +342,7 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
                 Ranking Vendedores
               </Button>
               <Button
-                variant={tabActiva === 'alertas' ? 'default' : 'outline'}
+                variant={tabActiva === 'alertas' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => setTabActiva('alertas')}
                 className={tabActiva === 'alertas' ? 'bg-crm-primary text-white' : ''}

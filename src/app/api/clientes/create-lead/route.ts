@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Parsear body
     const body = await request.json();
-    const { telefono, nombre, mensaje_inicial } = body;
+    const { telefono, nombre, mensaje_inicial, origen_lead } = body;
 
     if (!telefono) {
       return NextResponse.json(
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         p_nombre: nombreLead,
         p_telefono: telefonoLimpio,
         p_telefono_whatsapp: telefonoLimpio,
-        p_origen_lead: "whatsapp_web",
+        p_origen_lead: origen_lead || "whatsapp_web",
         p_vendedor_asignado: null, // NULL = asignación automática round-robin
         p_created_by: user.id,
         p_notas: notas,

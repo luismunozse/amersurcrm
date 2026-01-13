@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AmersurChat",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Integración de WhatsApp Web con Amersur CRM para gestión de leads inmobiliarios",
   "permissions": [
     "storage",

@@ -358,7 +358,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3">
         <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-          AmersurChat v1.1.4
+          AmersurChat v1.1.6
         </p>
       </div>
     </div>

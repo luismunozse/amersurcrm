@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.1.5
+                Descargar AmersurChat v1.1.6
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: 18 Diciembre 2025
+                Última actualización: 13 Enero 2026
               </p>
             </div>
           </li>
@@ -125,27 +125,27 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.1.5 */}
+      {/* Novedades v1.1.6 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.1.5
+          🎉 Novedades v1.1.6
         </h3>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Estados sincronizados con el CRM:</strong> Por Contactar, Contactado, Intermedio, Potencial, Desestimado, Transferido</span>
+            <span><strong>Selector de origen del lead:</strong> Ahora puedes elegir el origen al crear un lead (Facebook, TikTok, Redes Sociales, etc.)</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Cambio de estado desde la extensión:</strong> Ahora puedes actualizar el estado del lead directamente desde WhatsApp Web</span>
+            <span><strong>Proyecto de interés al crear lead:</strong> Asigna un lote de interés directamente al crear el lead</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Leads se crean como "Por Contactar":</strong> Estado inicial correcto para nuevos leads</span>
+            <span><strong>Mejor feedback de errores:</strong> Mensajes más claros cuando algo falla</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Mejoras de conexión:</strong> Solucionado error de conexión para usuarios admin</span>
+            <span><strong>Logs mejorados:</strong> Mejor diagnóstico de problemas</span>
           </li>
         </ul>
         <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
