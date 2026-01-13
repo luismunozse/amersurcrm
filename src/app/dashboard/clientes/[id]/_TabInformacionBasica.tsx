@@ -107,11 +107,19 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
           <div className="p-4 bg-crm-background rounded-lg">
             <p className="text-xs font-medium text-crm-text-muted mb-1">Fecha de Alta</p>
             <p className="text-sm text-crm-text font-medium">
-              {new Date(cliente.fecha_alta).toLocaleDateString('es-PE', {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric'
-              })}
+              {(() => {
+                const date = new Date(cliente.fecha_alta);
+                const fechaParte = date.toLocaleDateString('es-PE', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric'
+                });
+                const horaParte = date.toLocaleTimeString('es-PE', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                return `${fechaParte} a las ${horaParte}`;
+              })()}
             </p>
           </div>
         </div>

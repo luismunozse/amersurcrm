@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, MessageSquare, Users, PieChart, Target } from "lucide-react";
+import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, MessageSquare, Users, PieChart, Target, Clock } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
 import ReporteClientes from "./components/ReporteClientes";
@@ -12,6 +12,7 @@ import ReporteGestionClientes from "./components/ReporteGestionClientes";
 import ReporteInteracciones from "./components/ReporteInteracciones";
 import ReporteNivelInteres from "./components/ReporteNivelInteres";
 import ReporteOrigenLead from "./components/ReporteOrigenLead";
+import ReporteTiempoRespuesta from "./components/ReporteTiempoRespuesta";
 import toast from "react-hot-toast";
 
 // Lazy load de componentes pesados (recharts ~100KB+)
@@ -73,6 +74,12 @@ export default function ReportesPage() {
       title: "Origen Lead",
       description: "Clientes captados por canal",
       icon: Target,
+    },
+    {
+      id: "tiempo-respuesta",
+      title: "Tiempo Respuesta",
+      description: "Velocidad de contacto a leads",
+      icon: Clock,
     },
     {
       id: "gestion",
@@ -192,7 +199,7 @@ export default function ReportesPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-4 lg:grid-cols-8 gap-2 mb-6">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mb-6">
           {reportTypes.map((report) => (
             <button
               key={report.id}
@@ -212,6 +219,7 @@ export default function ReportesPage() {
         {/* Tab Content */}
         {activeTab === "nivel-interes" && <ReporteNivelInteres periodo={selectedPeriod} />}
         {activeTab === "origen-lead" && <ReporteOrigenLead periodo={selectedPeriod} />}
+        {activeTab === "tiempo-respuesta" && <ReporteTiempoRespuesta periodo={selectedPeriod} />}
         {activeTab === "gestion" && <ReporteGestionClientes periodo={selectedPeriod} />}
         {activeTab === "interacciones" && <ReporteInteracciones periodo={selectedPeriod} />}
         {activeTab === "propiedades" && <ReportePropiedades periodo={selectedPeriod} />}

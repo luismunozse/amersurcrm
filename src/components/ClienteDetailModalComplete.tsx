@@ -220,6 +220,21 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
     });
   };
 
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return 'No especificada';
+    const date = new Date(dateString);
+    const fechaParte = date.toLocaleDateString('es-PE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const horaParte = date.toLocaleTimeString('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return `${fechaParte} a las ${horaParte}`;
+  };
+
   const formatDireccion = (direccion: any) => {
     if (!direccion || typeof direccion !== 'object') return 'No especificada';
     
@@ -529,7 +544,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
                       <div className="space-y-3">
                         <div className="p-3 bg-gray-50 dark:bg-crm-card-hover border-2 border-gray-200 dark:border-crm-border rounded-lg">
                           <p className="text-sm font-medium text-gray-900 dark:text-crm-text-primary">Fecha de Alta</p>
-                          <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{formatDate(cliente.fecha_alta)}</p>
+                          <p className="text-sm text-gray-600 dark:text-crm-text-secondary">{formatDateTime(cliente.fecha_alta)}</p>
                         </div>
 
                         {cliente.ultimo_contacto && (
