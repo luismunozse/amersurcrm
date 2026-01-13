@@ -133,19 +133,23 @@ export default function ExtensionPage() {
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Selector de origen del lead:</strong> Ahora puedes elegir el origen al crear un lead (Facebook, TikTok, Redes Sociales, etc.)</span>
+            <span><strong>Selector de origen del lead:</strong> Elige el origen al crear un lead (WhatsApp, Facebook, TikTok, Redes Sociales, Referido, etc.)</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Proyecto de interés al crear lead:</strong> Asigna un lote de interés directamente al crear el lead</span>
+            <span><strong>Proyecto de interés al crear lead:</strong> Asigna un lote de interés directamente al crear el lead desde WhatsApp</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Mejor feedback de errores:</strong> Mensajes más claros cuando algo falla</span>
+            <span><strong>Vendedor asignado visible:</strong> Muestra inmediatamente qué asesor fue asignado al lead después de crearlo</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Logs mejorados:</strong> Mejor diagnóstico de problemas</span>
+            <span><strong>Información completa sin recargar:</strong> Origen, estado, vendedor y proyectos de interés se muestran automáticamente</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Mejor feedback:</strong> Mensajes más claros cuando algo falla y warnings informativos</span>
           </li>
         </ul>
         <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
