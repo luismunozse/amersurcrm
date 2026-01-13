@@ -154,11 +154,11 @@ export async function POST(request: NextRequest) {
       throw new Error("No se pudo crear el lead");
     }
 
-    // Obtener el cliente creado con el vendedor asignado
+    // Obtener el cliente creado con todos sus datos
     const { data: clienteCreado } = await supabaseAdmin
       .schema("crm")
       .from("cliente")
-      .select("id, nombre, telefono, vendedor_asignado")
+      .select("id, nombre, telefono, telefono_whatsapp, email, estado_cliente, origen_lead, vendedor_asignado, created_at, notas")
       .eq("id", nuevoCliente.id)
       .single();
 
@@ -175,10 +175,18 @@ export async function POST(request: NextRequest) {
       vendedorNombre = vendedor?.nombre_completo || vendedor?.username || null;
     }
 
+    // Construir objeto de respuesta completo
     const clienteData = {
-      id: nuevoCliente.id,
-      nombre: nombreLead,
-      telefono: telefonoLimpio,
+      id: clienteCreado?.id || nuevoCliente.id,
+      nombre: clienteCreado?.nombre || nombreLead,
+      telefono: clienteCreado?.telefono || telefonoLimpio,
+      telefono_whatsapp: clienteCreado?.telefono_whatsapp || telefonoLimpio,
+      email: clienteCreado?.email || null,
+      estado_cliente: clienteCreado?.estado_cliente || 'por_contactar',
+      origen_lead: clienteCreado?.origen_lead || origen_lead || 'whatsapp_web',
+      vendedor_asignado: vendedorNombre,
+      created_at: clienteCreado?.created_at || new Date().toISOString(),
+      notas: clienteCreado?.notas || null,
     };
 
     console.log(`✅ [CreateLead] Lead creado: ${clienteData.id}, vendedor: ${vendedorNombre}`);

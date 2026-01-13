@@ -52,9 +52,5 @@ export interface CreateLeadResponse {
   message?: string;
   vendedor?: string;
   existente?: boolean;
-  cliente?: {
-    id: string;
-    nombre?: string;
-    estado_cliente?: string;
-  };
+  cliente?: Cliente;
 }

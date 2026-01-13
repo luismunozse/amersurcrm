@@ -169,8 +169,8 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           console.log('[CreateLeadForm] Proyecto seleccionado pero sin lote, no se agrega interés');
         }
 
-        // Construir objeto cliente con los datos disponibles
-        const clienteCreado: Cliente = {
+        // Usar el cliente completo que devuelve el servidor
+        const clienteCreado: Cliente = result.cliente || {
           id: result.clienteId!,
           nombre: nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`,
           telefono: contact.phone,
