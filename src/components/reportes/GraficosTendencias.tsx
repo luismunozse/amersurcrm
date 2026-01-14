@@ -52,12 +52,19 @@ export default function GraficosTendencias({ tendencias, metricas }: GraficosTen
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const getLabel = (dataKey: string) => {
+        switch (dataKey) {
+          case 'ventas': return 'Ventas';
+          case 'propiedades': return 'Propiedades agregadas';
+          default: return dataKey;
+        }
+      };
       return (
         <div className="bg-crm-card dark:bg-gray-800 p-3 border border-crm-border rounded-lg shadow-lg">
           <p className="font-medium text-crm-text-primary">{`Mes: ${label}`}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {`${entry.dataKey}: ${entry.dataKey === 'ventas' ? formatearMoneda(entry.value) : entry.value}`}
+              {`${getLabel(entry.dataKey)}: ${entry.dataKey === 'ventas' ? formatearMoneda(entry.value) : entry.value}`}
             </p>
           ))}
         </div>
@@ -103,12 +110,13 @@ export default function GraficosTendencias({ tendencias, metricas }: GraficosTen
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Barras - Propiedades */}
+        {/* Gráfico de Barras - Propiedades Agregadas */}
         <div className="bg-crm-card border border-crm-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-crm-text-primary">Propiedades por Mes</h3>
+            <h3 className="text-lg font-semibold text-crm-text-primary">Propiedades Agregadas por Mes</h3>
           </div>
+          <p className="text-xs text-crm-text-muted mb-4">Lotes y propiedades añadidos al inventario</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={datosVentas}>

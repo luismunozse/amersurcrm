@@ -53,7 +53,7 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
     );
   }
 
-  const { propertyStats, distribucionProyectos, resumen } = data;
+  const { propertyStats, distribucionProyectos, distribucionTipo, resumen } = data;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-PE', {
@@ -131,6 +131,39 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
         </CardContent>
       </Card>
 
+      {/* Distribución por Tipo */}
+      {distribucionTipo && distribucionTipo.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribución por Tipo</CardTitle>
+            <CardDescription>
+              Lotes vs Propiedades en el inventario
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              {distribucionTipo.map((item: any, index: number) => (
+                <div key={index} className="p-4 bg-crm-card-hover border border-crm-border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-crm-text-primary capitalize">{item.tipo}</span>
+                    <span className="text-2xl font-bold text-crm-text-primary">{item.cantidad}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className="bg-crm-primary h-2 rounded-full transition-all"
+                      style={{ width: `${item.porcentaje}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-crm-text-muted mt-1 text-right">
+                    {item.porcentaje.toFixed(1)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Distribución por Proyecto */}
       {distribucionProyectos && distribucionProyectos.length > 0 && (
         <Card>
@@ -140,30 +173,48 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
               Detalle de propiedades por proyecto
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {distribucionProyectos.map((proyecto: any, index: number) => (
-                <div key={index} className="p-4 border border-crm-border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-crm-text-primary">{proyecto.proyecto}</h4>
-                    <span className="text-sm font-bold text-crm-text-primary">{proyecto.total} propiedades</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                      <div className="font-bold text-green-600">{proyecto.disponibles}</div>
-                      <div className="text-green-700 dark:text-green-300">Disponibles</div>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
-                      <div className="font-bold text-blue-600">{proyecto.vendidas}</div>
-                      <div className="text-blue-700 dark:text-blue-300">Vendidas</div>
-                    </div>
-                    <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                      <div className="font-bold text-yellow-600">{proyecto.reservadas}</div>
-                      <div className="text-yellow-700 dark:text-yellow-300">Reservadas</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-crm-border bg-crm-card-hover">
+                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">Proyecto</th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Total</th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">
+                      <span className="text-green-600">Disponibles</span>
+                    </th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">
+                      <span className="text-blue-600">Vendidas</span>
+                    </th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">
+                      <span className="text-yellow-600">Reservadas</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {distribucionProyectos.map((proyecto: any, index: number) => (
+                    <tr key={index} className="border-b border-crm-border hover:bg-crm-card-hover transition-colors">
+                      <td className="py-3 px-4 font-medium text-crm-text-primary">{proyecto.proyecto}</td>
+                      <td className="py-3 px-4 text-center font-bold text-crm-text-primary">{proyecto.total}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium">
+                          {proyecto.disponibles}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
+                          {proyecto.vendidas}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 font-medium">
+                          {proyecto.reservadas}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>

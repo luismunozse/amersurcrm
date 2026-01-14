@@ -203,10 +203,10 @@ export async function obtenerMetricasReportes(
     const tasaConversion = totalLeads > 0 ? (clientesActivos / totalLeads) * 100 : 0;
 
     // 6. Datos para gráficos de tendencias (últimos 6 meses)
-    // Usamos las ventas reales en lugar de created_at de propiedades
     const seisMesesAtras = new Date();
     seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
 
+    // Obtener ventas de los últimos 6 meses
     const { data: tendenciasVentasData } = await supabase
       .schema('crm')
       .from('venta')
@@ -214,8 +214,26 @@ export async function obtenerMetricasReportes(
       .gte('fecha_venta', seisMesesAtras.toISOString())
       .order('fecha_venta', { ascending: true });
 
-    // Procesar datos para gráficos mensuales
-    const tendenciasMensuales = procesarTendenciasVentas(tendenciasVentasData || []);
+    // Obtener lotes creados en los últimos 6 meses (para gráfico de propiedades)
+    const { data: lotesTendencia } = await supabase
+      .schema('crm')
+      .from('lote')
+      .select('created_at')
+      .gte('created_at', seisMesesAtras.toISOString());
+
+    // Obtener propiedades creadas en los últimos 6 meses
+    const { data: propiedadesTendencia } = await supabase
+      .schema('crm')
+      .from('propiedad')
+      .select('created_at')
+      .gte('created_at', seisMesesAtras.toISOString());
+
+    // Procesar datos para gráficos mensuales (incluye propiedades agregadas al inventario)
+    const tendenciasMensuales = procesarTendenciasCompletas(
+      tendenciasVentasData || [],
+      lotesTendencia || [],
+      propiedadesTendencia || []
+    );
 
     // 7. Top vendedores por ventas (DATOS REALES)
     // Obtener ventas reales por vendedor
@@ -616,7 +634,7 @@ export async function obtenerReportePropiedades(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // 1. Obtener LOTES
+    // 1. Obtener LOTES (solo de proyectos activos)
     const { data: lotes } = await supabase
       .schema('crm')
       .from('lote')
@@ -628,11 +646,12 @@ export async function obtenerReportePropiedades(
         sup_m2,
         created_at,
         proyecto:proyecto_id (
-          nombre
+          nombre,
+          estado
         )
       `);
 
-    // 2. Obtener PROPIEDADES
+    // 2. Obtener PROPIEDADES (solo de proyectos activos)
     const { data: propiedades } = await supabase
       .schema('crm')
       .from('propiedad')
@@ -644,7 +663,8 @@ export async function obtenerReportePropiedades(
         precio,
         created_at,
         proyecto:proyecto_id (
-          nombre
+          nombre,
+          estado
         )
       `);
 
@@ -659,25 +679,30 @@ export async function obtenerReportePropiedades(
       nombreProyecto: string;
     }
 
-    const lotesNormalizados: PropiedadNormalizada[] = (lotes || []).map((l: any) => ({
-      id: l.id,
-      codigo: l.codigo,
-      tipo: 'lote',
-      estado: l.estado,
-      precio: Number(l.precio) || 0,
-      created_at: l.created_at,
-      nombreProyecto: l.proyecto?.nombre || 'Sin proyecto'
-    }));
+    // Filtrar solo proyectos activos
+    const lotesNormalizados: PropiedadNormalizada[] = (lotes || [])
+      .filter((l: any) => l.proyecto?.estado === 'activo')
+      .map((l: any) => ({
+        id: l.id,
+        codigo: l.codigo,
+        tipo: 'lote',
+        estado: l.estado,
+        precio: Number(l.precio) || 0,
+        created_at: l.created_at,
+        nombreProyecto: l.proyecto?.nombre || 'Sin proyecto'
+      }));
 
-    const propiedadesNormalizadas: PropiedadNormalizada[] = (propiedades || []).map((p: any) => ({
-      id: p.id,
-      codigo: p.codigo,
-      tipo: p.tipo || 'propiedad',
-      estado: p.estado_comercial,
-      precio: Number(p.precio ?? p.precio_venta) || 0,
-      created_at: p.created_at,
-      nombreProyecto: p.proyecto?.nombre || 'Sin proyecto'
-    }));
+    const propiedadesNormalizadas: PropiedadNormalizada[] = (propiedades || [])
+      .filter((p: any) => p.proyecto?.estado === 'activo')
+      .map((p: any) => ({
+        id: p.id,
+        codigo: p.codigo,
+        tipo: p.tipo || 'propiedad',
+        estado: p.estado_comercial,
+        precio: Number(p.precio ?? p.precio_venta) || 0,
+        created_at: p.created_at,
+        nombreProyecto: p.proyecto?.nombre || 'Sin proyecto'
+      }));
 
     const todasPropiedades = [...lotesNormalizados, ...propiedadesNormalizadas];
 
@@ -726,29 +751,36 @@ export async function obtenerReportePropiedades(
       porcentaje: todasPropiedades.length > 0 ? (count / todasPropiedades.length) * 100 : 0
     }));
 
+    const porcentajeDisponibles = todasPropiedades.length > 0
+      ? ((disponibles / todasPropiedades.length) * 100).toFixed(1)
+      : '0';
+    const porcentajeVendidas = todasPropiedades.length > 0
+      ? ((vendidas / todasPropiedades.length) * 100).toFixed(1)
+      : '0';
+
     const propertyStats = [
       {
         label: "Total Propiedades",
         value: todasPropiedades.length,
-        change: `+${propiedadesNuevas}`,
+        change: `+${propiedadesNuevas} nuevas en período`,
         type: "positive"
       },
       {
         label: "Disponibles",
         value: disponibles,
-        change: "0",
+        change: `${porcentajeDisponibles}% del total`,
         type: "neutral"
       },
       {
         label: "Vendidas",
         value: vendidas,
-        change: "0",
+        change: `${porcentajeVendidas}% del total`,
         type: "positive"
       },
       {
         label: "Valor Total",
         value: valorTotal,
-        change: "0",
+        change: `${lotesNormalizados.length} lotes, ${propiedadesNormalizadas.length} propiedades`,
         type: "positive"
       }
     ];
@@ -1460,9 +1492,11 @@ export async function obtenerReporteInteracciones(
 
     // Totales por resultado
     const totalesPorResultado = new Map<string, number>();
+    let interaccionesConResultado = 0;
     interacciones?.forEach(i => {
       if (i.resultado) {
         totalesPorResultado.set(i.resultado, (totalesPorResultado.get(i.resultado) || 0) + 1);
+        interaccionesConResultado++;
       }
     });
 
@@ -1470,7 +1504,7 @@ export async function obtenerReporteInteracciones(
       .map(([resultado, cantidad]) => ({
         resultado,
         cantidad,
-        porcentaje: interacciones ? ((cantidad / interacciones.length) * 100).toFixed(1) : '0'
+        porcentaje: interaccionesConResultado > 0 ? ((cantidad / interaccionesConResultado) * 100).toFixed(1) : '0'
       }))
       .sort((a, b) => b.cantidad - a.cantidad);
 
@@ -1491,7 +1525,7 @@ export async function obtenerReporteInteracciones(
         resumen: {
           totalInteracciones: interacciones?.length || 0,
           vendedoresActivos: interaccionesPorVendedor.size,
-          promedioPoVendedor: interaccionesPorVendedor.size > 0
+          promedioPorVendedor: interaccionesPorVendedor.size > 0
             ? Math.round((interacciones?.length || 0) / interaccionesPorVendedor.size)
             : 0,
           clientesContactados: new Set(interacciones?.map(i => i.cliente_id) || []).size
@@ -1586,12 +1620,13 @@ export async function obtenerReporteNivelInteres(
 
     const { data: interacciones } = await interaccionesQuery;
 
-    // Obtener intereses de clientes en proyectos
+    // Obtener intereses de clientes en proyectos CON PRIORIDAD
     const interesQuery = supabase
       .schema('crm')
       .from('cliente_propiedad_interes')
       .select(`
         cliente_id,
+        prioridad,
         lote:lote_id (
           proyecto_id
         ),
@@ -1602,8 +1637,10 @@ export async function obtenerReporteNivelInteres(
 
     const { data: interesesProyecto } = await interesQuery;
 
-    // Mapear clientes con interés en proyectos específicos
+    // Mapear clientes con interés en proyectos específicos Y su mejor prioridad
     const clientesConProyecto = new Map<string, string[]>();
+    const clientePrioridad = new Map<string, number>(); // Mejor prioridad del cliente (1=alta, menor es mejor)
+
     interesesProyecto?.forEach((interes: any) => {
       const proyId = interes.lote?.proyecto_id || interes.propiedad?.proyecto_id;
       if (proyId) {
@@ -1612,6 +1649,13 @@ export async function obtenerReporteNivelInteres(
           proyectos.push(proyId);
         }
         clientesConProyecto.set(interes.cliente_id, proyectos);
+
+        // Guardar la mejor prioridad (menor número = mayor prioridad)
+        const prioridadActual = clientePrioridad.get(interes.cliente_id) || 3;
+        const nuevaPrioridad = interes.prioridad || 2;
+        if (nuevaPrioridad < prioridadActual) {
+          clientePrioridad.set(interes.cliente_id, nuevaPrioridad);
+        }
       }
     });
 
@@ -1623,44 +1667,67 @@ export async function obtenerReporteNivelInteres(
       }
     });
 
-    // Mapear niveles de interés basados en estado_cliente + resultado de interacción
-    const mapearNivelInteres = (estadoCliente: string, resultado: string | null): string => {
-      // Si no hay interacción, usar estado del cliente
+    // Mapear niveles de interés COMBINANDO prioridad del proyecto + resultado de interacción
+    // prioridad: 1=Alta, 2=Media, 3=Baja
+    const mapearNivelInteres = (
+      estadoCliente: string,
+      resultado: string | null,
+      prioridad: number = 2
+    ): string => {
+      // Casos especiales de estado del cliente
+      if (estadoCliente === 'transferido') return 'Contacto Transferido';
+      if (resultado === 'cerrado') return 'Desestimado';
+      if (resultado === 'no_interesado') return 'No Interesado';
+
+      // Si no hay interacción, basarse en prioridad + estado
       if (!resultado) {
-        if (estadoCliente === 'por_contactar') return 'Por Contactar';
-        if (estadoCliente === 'transferido') return 'Contacto Transferido';
-        return 'En Contacto';
+        if (estadoCliente === 'por_contactar') {
+          return prioridad === 1 ? 'Alto (Por Contactar)' : 'Por Contactar';
+        }
+        // Solo tiene proyecto de interés asignado
+        if (prioridad === 1) return 'Alto';
+        if (prioridad === 2) return 'Medio';
+        return 'Bajo';
       }
 
-      // Mapear según resultado de última interacción
-      switch (resultado) {
-        case 'interesado':
-          return 'Alto';
-        case 'contesto':
-        case 'reagendo':
-          return 'En Contacto';
-        case 'no_contesto':
-        case 'pendiente':
-          return 'Intermedio';
-        case 'no_interesado':
-          return 'No Interesado';
-        case 'cerrado':
-          return 'Desestimado';
-        default:
-          return 'Bajo';
+      // COMBINAR prioridad + resultado de interacción
+      // Prioridad Alta (1)
+      if (prioridad === 1) {
+        if (resultado === 'interesado') return 'Muy Alto';
+        if (resultado === 'contesto' || resultado === 'reagendo') return 'Alto';
+        if (resultado === 'no_contesto' || resultado === 'pendiente') return 'Alto (Pendiente)';
+        return 'Alto';
       }
+
+      // Prioridad Media (2)
+      if (prioridad === 2) {
+        if (resultado === 'interesado') return 'Alto';
+        if (resultado === 'contesto' || resultado === 'reagendo') return 'Medio';
+        if (resultado === 'no_contesto' || resultado === 'pendiente') return 'Medio (Pendiente)';
+        return 'Medio';
+      }
+
+      // Prioridad Baja (3)
+      if (resultado === 'interesado') return 'Medio';
+      if (resultado === 'contesto' || resultado === 'reagendo') return 'Bajo';
+      if (resultado === 'no_contesto' || resultado === 'pendiente') return 'Bajo (Pendiente)';
+      return 'Bajo';
     };
 
-    // Colores para cada nivel
+    // Colores para cada nivel (actualizado con nuevos niveles)
     const coloresNivel: Record<string, string> = {
-      'Alto': '#3B82F6',           // blue
-      'Bajo': '#6B7280',           // gray
-      'Contacto Transferido': '#10B981', // green
-      'Desestimado': '#F97316',    // orange
-      'En Contacto': '#8B5CF6',    // purple
-      'Intermedio': '#EF4444',     // red
-      'No Interesado': '#FCD34D',  // yellow
-      'Por Contactar': '#14B8A6'   // teal
+      'Muy Alto': '#059669',              // emerald-600
+      'Alto': '#3B82F6',                  // blue
+      'Alto (Por Contactar)': '#0EA5E9',  // sky-500
+      'Alto (Pendiente)': '#6366F1',      // indigo
+      'Medio': '#8B5CF6',                 // purple
+      'Medio (Pendiente)': '#A855F7',     // purple-500
+      'Bajo': '#6B7280',                  // gray
+      'Bajo (Pendiente)': '#9CA3AF',      // gray-400
+      'Por Contactar': '#14B8A6',         // teal
+      'Contacto Transferido': '#10B981',  // green
+      'No Interesado': '#FCD34D',         // yellow
+      'Desestimado': '#F97316'            // orange
     };
 
     // Procesar clientes y clasificar por nivel de interés
@@ -1694,9 +1761,13 @@ export async function obtenerReporteNivelInteres(
         }
       }
 
+      // Obtener prioridad del cliente
+      const prioridad = clientePrioridad.get(cliente.id) || 2;
+
       const nivelInteres = mapearNivelInteres(
         cliente.estado_cliente,
-        ultimaInteraccion?.resultado || null
+        ultimaInteraccion?.resultado || null,
+        prioridad
       );
 
       nivelesConteo.set(nivelInteres, (nivelesConteo.get(nivelInteres) || 0) + 1);
@@ -1732,9 +1803,11 @@ export async function obtenerReporteNivelInteres(
       }
 
       const proyectosCliente = clientesConProyecto.get(cliente.id) || [];
+      const prioridad = clientePrioridad.get(cliente.id) || 2;
       const nivelInteres = mapearNivelInteres(
         cliente.estado_cliente,
-        ultimaInteraccion?.resultado || null
+        ultimaInteraccion?.resultado || null,
+        prioridad
       );
 
       proyectosCliente.forEach(proyId => {
@@ -1757,16 +1830,38 @@ export async function obtenerReporteNivelInteres(
       }))
       .sort((a, b) => b.total - a.total);
 
+    // ===== NUEVO: Contar clientes interesados por proyecto =====
+    const clientesPorProyectoMap = new Map<string, number>();
+
+    // Contar cuántos clientes tienen interés en cada proyecto
+    clientesConProyecto.forEach((proyectosCliente, clienteId) => {
+      proyectosCliente.forEach(proyId => {
+        clientesPorProyectoMap.set(proyId, (clientesPorProyectoMap.get(proyId) || 0) + 1);
+      });
+    });
+
+    // Formatear lista de clientes por proyecto (todos los proyectos activos)
+    const clientesPorProyecto = (proyectos || []).map(p => ({
+      proyectoId: p.id,
+      proyecto: p.nombre,
+      clientesInteresados: clientesPorProyectoMap.get(p.id) || 0
+    })).sort((a, b) => b.clientesInteresados - a.clientesInteresados);
+
+    // Total de clientes únicos con interés en algún proyecto
+    const totalClientesConInteres = clientesConProyecto.size;
+
     return {
       data: {
         resumen: {
           totalRegistros,
           totalProyectos: proyectos?.length || 0,
+          totalClientesConInteres,
           fechaInicio: startDate.toISOString(),
           fechaFin: endDate.toISOString()
         },
         distribucionNiveles,
         distribucionPorProyecto,
+        clientesPorProyecto,  // NUEVO
         proyectos: proyectos || [],
         periodo: {
           inicio: startDate.toISOString(),
@@ -2298,8 +2393,12 @@ export async function obtenerReporteTiempoRespuesta(
   }
 }
 
-// Función para procesar tendencias de ventas
-function procesarTendenciasVentas(datos: any[]) {
+// Función para procesar tendencias completas (ventas + propiedades agregadas)
+function procesarTendenciasCompletas(
+  ventasData: any[],
+  lotesData: any[],
+  propiedadesData: any[]
+) {
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   const tendencias: any = {};
 
@@ -2311,22 +2410,41 @@ function procesarTendenciasVentas(datos: any[]) {
     const mesKey = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
     tendencias[mesKey] = {
       ventas: 0,
-      propiedades: 0,
+      propiedades: 0, // Propiedades AGREGADAS al inventario (lotes + propiedades)
       clientes: new Set()
     };
   }
 
   // Procesar datos de ventas
-  datos.forEach(item => {
+  ventasData.forEach(item => {
     const fecha = new Date(item.fecha_venta);
     const mesKey = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
 
     if (tendencias[mesKey]) {
       tendencias[mesKey].ventas += Number(item.precio_total) || 0;
-      tendencias[mesKey].propiedades++;
       if (item.cliente_id) {
         tendencias[mesKey].clientes.add(item.cliente_id);
       }
+    }
+  });
+
+  // Procesar lotes agregados al inventario
+  lotesData.forEach(item => {
+    const fecha = new Date(item.created_at);
+    const mesKey = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
+
+    if (tendencias[mesKey]) {
+      tendencias[mesKey].propiedades++;
+    }
+  });
+
+  // Procesar propiedades agregadas al inventario
+  propiedadesData.forEach(item => {
+    const fecha = new Date(item.created_at);
+    const mesKey = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
+
+    if (tendencias[mesKey]) {
+      tendencias[mesKey].propiedades++;
     }
   });
 

@@ -200,7 +200,12 @@ export function Sidebar() {
   async function handleLeadCreated(nuevoCliente?: Cliente) {
     // Si se proporcionan datos del cliente, setearlos directamente
     if (nuevoCliente) {
-      logger.info('Lead creado, seteando cliente directamente', { clienteId: nuevoCliente.id });
+      logger.info('Lead creado, seteando cliente directamente', {
+        clienteId: nuevoCliente.id,
+        vendedor_asignado: nuevoCliente.vendedor_asignado,
+        origen_lead: nuevoCliente.origen_lead,
+      });
+      console.log('[Sidebar] Cliente recibido completo:', nuevoCliente);
       setCliente(nuevoCliente);
       setClienteAsignadoAOtro(null);
     } else if (contact && apiClient) {

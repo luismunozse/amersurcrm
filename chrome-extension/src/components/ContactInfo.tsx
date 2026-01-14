@@ -13,6 +13,15 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   const [ultimaInteraccion, setUltimaInteraccion] = useState<any>(null);
   const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
 
+  // Log del cliente cuando cambia para debugging
+  useEffect(() => {
+    if (cliente) {
+      console.log('[ContactInfo] Cliente recibido:', cliente);
+      console.log('[ContactInfo] vendedor_asignado:', cliente.vendedor_asignado);
+      console.log('[ContactInfo] origen_lead:', cliente.origen_lead);
+    }
+  }, [cliente]);
+
   const estadoColors: Record<string, string> = {
     por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
     contactado: 'bg-blue-100 text-blue-800 border-blue-300',

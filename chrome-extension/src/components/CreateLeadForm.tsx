@@ -150,6 +150,10 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
       });
 
       if (result.success) {
+        console.log('[CreateLeadForm] Resultado completo del servidor:', result);
+        console.log('[CreateLeadForm] Cliente del servidor:', result.cliente);
+        console.log('[CreateLeadForm] Vendedor del servidor:', result.vendedor);
+
         // Si se seleccionó un lote, agregarlo como proyecto de interés
         if (selectedLote && result.clienteId) {
           try {
@@ -181,6 +185,9 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           created_at: new Date().toISOString(),
         };
 
+        console.log('[CreateLeadForm] Cliente creado (que se pasará al Sidebar):', clienteCreado);
+        console.log('[CreateLeadForm] vendedor_asignado del cliente:', clienteCreado.vendedor_asignado);
+
         // Guardar vendedor asignado para mostrar en éxito
         setVendedorAsignado(result.vendedor || null);
 
@@ -189,6 +196,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
 
         // Después de 1 segundo, pasar los datos del cliente al Sidebar
         setTimeout(() => {
+          console.log('[CreateLeadForm] Pasando cliente al Sidebar:', clienteCreado);
           onLeadCreated(clienteCreado);
         }, 1000);
       } else if (result.existente) {

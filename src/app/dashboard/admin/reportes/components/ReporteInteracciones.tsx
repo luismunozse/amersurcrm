@@ -60,6 +60,7 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
       case 'llamada': return <Phone className="w-4 h-4" />;
       case 'email': return <Mail className="w-4 h-4" />;
       case 'whatsapp': return <MessageSquare className="w-4 h-4" />;
+      case 'mensaje': return <MessageSquare className="w-4 h-4" />;
       default: return <MessageSquare className="w-4 h-4" />;
     }
   };
@@ -71,6 +72,7 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
       case 'whatsapp': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
       case 'visita': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300';
       case 'reunion': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300';
+      case 'mensaje': return 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300';
       default: return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
     }
   };
@@ -143,7 +145,7 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
             <Clock className="h-4 w-4 text-crm-text-muted" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-crm-text-primary">{resumen.promedioPoVendedor}</div>
+            <div className="text-2xl font-bold text-crm-text-primary">{resumen.promedioPorVendedor}</div>
             <p className="text-xs text-crm-text-muted mt-1">Interacciones</p>
           </CardContent>
         </Card>
@@ -170,72 +172,66 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
             Actividad de cada vendedor en el periodo seleccionado
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {rankingVendedores.length > 0 ? (
-              rankingVendedores.map((vendedor: any, index: number) => (
-                <div key={index} className="p-4 border border-crm-border rounded-lg hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
-                        index === 0 ? 'bg-yellow-500' :
-                        index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-400' :
-                        'bg-crm-primary'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-crm-text-primary">{vendedor.nombre}</h4>
-                        <p className="text-xs text-crm-text-muted">@{vendedor.username}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-crm-text-primary">{vendedor.totalInteracciones}</div>
-                      <p className="text-xs text-crm-text-muted">interacciones</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    <div className="p-2 bg-crm-card-hover rounded text-center">
-                      <div className="font-bold text-crm-text-primary">{vendedor.clientesAtendidos}</div>
-                      <div className="text-xs text-crm-text-muted">Clientes</div>
-                    </div>
-                    <div className="p-2 bg-crm-card-hover rounded text-center">
-                      <div className="font-bold text-crm-text-primary">{vendedor.promedioPorCliente}</div>
-                      <div className="text-xs text-crm-text-muted">Promedio/Cliente</div>
-                    </div>
-                    <div className="p-2 bg-crm-card-hover rounded text-center">
-                      <div className="font-bold text-crm-text-primary">{vendedor.duracionTotal}</div>
-                      <div className="text-xs text-crm-text-muted">Min. totales</div>
-                    </div>
-                    <div className="p-2 bg-crm-card-hover rounded text-center">
-                      <div className="font-bold text-crm-text-primary">
-                        {vendedor.porTipo?.llamada || 0}
-                      </div>
-                      <div className="text-xs text-crm-text-muted">Llamadas</div>
-                    </div>
-                  </div>
-
-                  {/* Detalle por tipo */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {Object.entries(vendedor.porTipo || {}).map(([tipo, cantidad]: [string, any]) => (
-                      <span
-                        key={tipo}
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getTipoColor(tipo)}`}
-                      >
-                        {tipo}: {cantidad}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-crm-text-muted">
-                No hay interacciones registradas en este periodo
-              </div>
-            )}
-          </div>
+        <CardContent className="p-0">
+          {rankingVendedores.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-crm-border bg-crm-card-hover">
+                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">#</th>
+                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">Vendedor</th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Total</th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Clientes</th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Prom/Cliente</th>
+                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Min.</th>
+                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">Por Tipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankingVendedores.map((vendedor: any, index: number) => (
+                    <tr key={index} className="border-b border-crm-border hover:bg-crm-card-hover transition-colors">
+                      <td className="py-3 px-4">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${
+                          index === 0 ? 'bg-yellow-500' :
+                          index === 1 ? 'bg-gray-400' :
+                          index === 2 ? 'bg-orange-400' :
+                          'bg-crm-primary'
+                        }`}>
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-crm-text-primary">{vendedor.nombre}</div>
+                        <div className="text-xs text-crm-text-muted">@{vendedor.username}</div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="font-bold text-crm-text-primary text-lg">{vendedor.totalInteracciones}</span>
+                      </td>
+                      <td className="py-3 px-4 text-center text-crm-text-primary">{vendedor.clientesAtendidos}</td>
+                      <td className="py-3 px-4 text-center text-crm-text-primary">{vendedor.promedioPorCliente}</td>
+                      <td className="py-3 px-4 text-center text-crm-text-muted">{vendedor.duracionTotal}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(vendedor.porTipo || {}).map(([tipo, cantidad]: [string, any]) => (
+                            <span
+                              key={tipo}
+                              className={`px-2 py-0.5 rounded text-xs font-medium ${getTipoColor(tipo)}`}
+                            >
+                              {tipo.charAt(0).toUpperCase() + tipo.slice(1)}: {cantidad}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-crm-text-muted">
+              No hay interacciones registradas en este periodo
+            </div>
+          )}
         </CardContent>
       </Card>
 
