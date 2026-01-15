@@ -63,8 +63,8 @@ function GestionUsuarios() {
       setCargando(true);
       // Promise.all ejecuta ambos fetch en paralelo (~200ms vs ~400ms secuencial)
       const [usuariosRes, rolesRes] = await Promise.all([
-        fetch('/api/admin/usuarios'),
-        fetch('/api/admin/roles')
+        fetch('/api/admin/usuarios', { cache: 'no-store' }),
+        fetch('/api/admin/roles', { cache: 'no-store' })
       ]);
 
       const [usuariosData, rolesData] = await Promise.all([
@@ -89,7 +89,7 @@ function GestionUsuarios() {
   // Función para recargar solo usuarios (después de CRUD)
   const cargarUsuarios = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/usuarios');
+      const response = await fetch('/api/admin/usuarios', { cache: 'no-store' });
       const data = await response.json();
       setUsuarios(data.usuarios || []);
     } catch (error) {
@@ -142,7 +142,7 @@ function GestionUsuarios() {
   };
 
   // PATCH helper
-  const patchUsuario = async (payload: { id: string; nombre_completo?: string; dni?: string; telefono?: string | null; rol_id?: string; meta_mensual?: number | null; comision_porcentaje?: number | null; activo?: boolean; }) => {
+  const patchUsuario = async (payload: { id: string; username?: string; email?: string; nombre_completo?: string; dni?: string; telefono?: string | null; rol_id?: string; meta_mensual?: number | null; comision_porcentaje?: number | null; activo?: boolean; }) => {
     try {
       const response = await fetch('/api/admin/usuarios', {
         method: 'PATCH',

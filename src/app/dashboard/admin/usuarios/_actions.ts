@@ -115,12 +115,13 @@ export async function cambiarEstadoUsuario(
 ) {
   // Solo admin puede cambiar estado de usuarios
   const isAdmin = await esAdmin();
-  
+
   if (!isAdmin) {
-    throw new Error("No tienes permisos para cambiar el estado de usuarios");
+    return {
+      success: false,
+      error: "No tienes permisos para cambiar el estado de usuarios"
+    };
   }
-  
-  const supabase = await createServerActionClient();
 
   if (!motivo || motivo.trim().length < 10) {
     return {
@@ -129,8 +130,26 @@ export async function cambiarEstadoUsuario(
     };
   }
 
+  // Usar serviceRole para bypasear RLS en operaciones administrativas
+  const serviceRole = createServiceRoleClient();
+
   try {
-    const { error } = await supabase
+    // Verificar que el usuario existe antes de actualizar
+    const { data: usuarioExistente, error: fetchError } = await serviceRole
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('id, nombre_completo')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !usuarioExistente) {
+      return {
+        success: false,
+        error: 'Usuario no encontrado'
+      };
+    }
+
+    const { data, error } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
       .update({
@@ -139,11 +158,16 @@ export async function cambiarEstadoUsuario(
         fecha_cambio_estado: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId);
+      .eq('id', userId)
+      .select('activo')
+      .single();
 
     if (error) {
+      console.error('Error en update:', error);
       throw new Error(error.message);
     }
+
+    console.log(`[CambiarEstado] Usuario ${userId} actualizado a activo=${data?.activo}`);
 
     // NOTA: No usar revalidatePath aquí porque:
     // 1. La página es "use client" y carga datos via API fetch
@@ -180,11 +204,23 @@ export async function cambiarPasswordPerfil(
       return { success: false, error: 'No autenticado' };
     }
 
-    // Validar que la contraseña nueva tenga al menos 6 caracteres
-    if (!passwordNueva || passwordNueva.length < 6) {
+    // Validar que la contraseña nueva cumpla requisitos de seguridad
+    if (!passwordNueva || passwordNueva.length < 8) {
       return {
         success: false,
-        error: 'La contraseña nueva debe tener al menos 6 caracteres'
+        error: 'La contraseña nueva debe tener al menos 8 caracteres'
+      };
+    }
+
+    // Validar complejidad: al menos una mayúscula, una minúscula y un número
+    const hasUppercase = /[A-Z]/.test(passwordNueva);
+    const hasLowercase = /[a-z]/.test(passwordNueva);
+    const hasNumber = /[0-9]/.test(passwordNueva);
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      return {
+        success: false,
+        error: 'La contraseña debe contener al menos una mayúscula, una minúscula y un número'
       };
     }
 

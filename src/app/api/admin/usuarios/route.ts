@@ -490,6 +490,21 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Validar que el rol existe si se proporciona
+    if (typeof rol_id === 'string' && rol_id.trim()) {
+      const { data: rolExistente, error: rolError } = await supabase
+        .schema('crm')
+        .from('rol')
+        .select('id, nombre')
+        .eq('id', rol_id)
+        .eq('activo', true)
+        .single();
+
+      if (rolError || !rolExistente) {
+        return NextResponse.json({ error: "El rol especificado no existe o no está activo" }, { status: 400 });
+      }
+    }
+
     // Construir payload de update solo con campos presentes
     // IMPORTANTE: Mapeo de campos desde el frontend a la base de datos
     // El frontend envía 'meta_mensual' pero la BD espera 'meta_mensual_ventas'
@@ -499,7 +514,7 @@ export async function PATCH(request: NextRequest) {
     if (typeof dni === 'string') updatePayload.dni = dni;
     if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;
     if (typeof email === 'string' && email.trim()) updatePayload.email = email.trim().toLowerCase();
-    if (typeof rol_id === 'string') updatePayload.rol_id = rol_id;
+    if (typeof rol_id === 'string' && rol_id.trim()) updatePayload.rol_id = rol_id;
     // Mapear meta_mensual (frontend) -> meta_mensual_ventas (BD)
     if (typeof meta_mensual !== 'undefined') updatePayload.meta_mensual_ventas = meta_mensual === null ? null : parseInt(String(meta_mensual), 10);
     if (typeof comision_porcentaje !== 'undefined') updatePayload.comision_porcentaje = comision_porcentaje === null ? null : Number(comision_porcentaje);
