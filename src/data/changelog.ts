@@ -15,6 +15,17 @@ export interface ChangelogVersion {
 // Agregar nuevas versiones al inicio del array
 export const changelog: ChangelogVersion[] = [
   {
+    version: "1.3.0",
+    date: "2025-01-15",
+    title: "Nueva versión de AmersurChat y mejoras generales",
+    changes: [
+      { type: "feature", description: "AmersurChat v1.1.6 disponible para descargar desde el menú Extensión" },
+      { type: "improvement", description: "Mejoras de rendimiento y estabilidad general" },
+      { type: "improvement", description: "Optimización de la interfaz de usuario" },
+      { type: "fix", description: "Correcciones de errores menores" },
+    ],
+  },
+  {
     version: "1.2.1",
     date: "2024-12-16",
     title: "Nueva versión de AmersurChat disponible",
