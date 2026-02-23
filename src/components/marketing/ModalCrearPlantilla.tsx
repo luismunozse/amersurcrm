@@ -1,40 +1,81 @@
 "use client";
 
-import { useState } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
-import { crearPlantilla } from "@/app/dashboard/admin/marketing/_actions";
-import type { CategoriaTemplate, EstadoAprobacion } from "@/types/whatsapp-marketing";
+import { useState, useEffect } from "react";
+import { X, Plus, Trash2, Mail, MessageCircle } from "lucide-react";
+import { crearPlantilla, actualizarPlantilla } from "@/app/dashboard/admin/marketing/_actions";
+import type { MarketingTemplate, CategoriaTemplate, EstadoAprobacion } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
 
 interface ModalCrearPlantillaProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  plantilla?: MarketingTemplate; // Si se pasa, modo edición
 }
 
-export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalCrearPlantillaProps) {
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    nombre: "",
-    whatsapp_template_id: "",
-    categoria: "MARKETING" as CategoriaTemplate,
-    idioma: "es",
-    body_texto: "",
-    footer_texto: "",
-    estado_aprobacion: "APPROVED" as EstadoAprobacion,
-    objetivo: "",
-    activo: true
-  });
+const FORM_DEFAULTS = {
+  nombre: "",
+  canal_tipo: "whatsapp" as "whatsapp" | "sms" | "email",
+  whatsapp_template_id: "",
+  categoria: "MARKETING" as CategoriaTemplate,
+  idioma: "es",
+  body_texto: "",
+  footer_texto: "",
+  subject: "",
+  body_html: "",
+  estado_aprobacion: "APPROVED" as EstadoAprobacion,
+  objetivo: "",
+  activo: true,
+};
 
+export default function ModalCrearPlantilla({
+  open,
+  onClose,
+  onSuccess,
+  plantilla,
+}: ModalCrearPlantillaProps) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState(FORM_DEFAULTS);
   const [variables, setVariables] = useState<string[]>([]);
   const [newVariable, setNewVariable] = useState("");
+  const [botones, setBotones] = useState<
+    Array<{
+      tipo: "URL" | "QUICK_REPLY" | "PHONE_NUMBER";
+      texto: string;
+      url?: string;
+      phone_number?: string;
+    }>
+  >([]);
 
-  const [botones, setBotones] = useState<Array<{
-    tipo: "URL" | "QUICK_REPLY" | "PHONE_NUMBER";
-    texto: string;
-    url?: string;
-    phone_number?: string;
-  }>>([]);
+  const esEdicion = !!plantilla;
+
+  // Pre-popular el formulario cuando se abre en modo edición
+  useEffect(() => {
+    if (open && plantilla) {
+      setFormData({
+        nombre: plantilla.nombre,
+        canal_tipo: plantilla.canal_tipo ?? "whatsapp",
+        whatsapp_template_id: plantilla.whatsapp_template_id || "",
+        categoria: plantilla.categoria,
+        idioma: plantilla.idioma,
+        body_texto: plantilla.body_texto,
+        footer_texto: plantilla.footer_texto || "",
+        subject: plantilla.subject || "",
+        body_html: plantilla.body_html || "",
+        estado_aprobacion: plantilla.estado_aprobacion,
+        objetivo: plantilla.objetivo || "",
+        activo: plantilla.activo,
+      });
+      setVariables(plantilla.variables || []);
+      setBotones(plantilla.botones || []);
+    } else if (open && !plantilla) {
+      // Modo creación: limpiar
+      setFormData(FORM_DEFAULTS);
+      setVariables([]);
+      setBotones([]);
+    }
+    setNewVariable("");
+  }, [open, plantilla]);
 
   if (!open) return null;
 
@@ -68,40 +109,29 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
     setLoading(true);
 
     try {
-      const plantillaData = {
+      const payload = {
         ...formData,
         variables,
-        botones: botones.filter(b => b.texto.trim() !== ""),
-        tags: []
+        botones: formData.canal_tipo === "email" ? [] : botones.filter((b) => b.texto.trim() !== ""),
+        tags: plantilla?.tags || [],
+        subject: formData.canal_tipo === "email" ? formData.subject : undefined,
+        body_html: formData.canal_tipo === "email" && formData.body_html ? formData.body_html : undefined,
       };
 
-      const result = await crearPlantilla(plantillaData);
+      const result = esEdicion
+        ? await actualizarPlantilla(plantilla.id, payload)
+        : await crearPlantilla(payload);
 
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success("Plantilla creada exitosamente");
+        toast.success(esEdicion ? "Plantilla actualizada" : "Plantilla creada exitosamente");
         onSuccess();
         onClose();
-
-        // Reset form
-        setFormData({
-          nombre: "",
-          whatsapp_template_id: "",
-          categoria: "MARKETING",
-          idioma: "es",
-          body_texto: "",
-          footer_texto: "",
-          estado_aprobacion: "APPROVED",
-          objetivo: "",
-          activo: true
-        });
-        setVariables([]);
-        setBotones([]);
       }
     } catch (error) {
-      console.error("Error creando plantilla:", error);
-      toast.error("Error creando plantilla");
+      console.error("Error guardando plantilla:", error);
+      toast.error(esEdicion ? "Error actualizando plantilla" : "Error creando plantilla");
     } finally {
       setLoading(false);
     }
@@ -111,10 +141,7 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-black/50 transition-opacity"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
 
         {/* Modal */}
         <div className="relative w-full max-w-3xl bg-crm-card rounded-xl shadow-xl border border-crm-border">
@@ -122,10 +149,12 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
           <div className="flex items-center justify-between p-6 border-b border-crm-border">
             <div>
               <h3 className="text-xl font-semibold text-crm-text-primary">
-                Crear Plantilla de Mensaje
+                {esEdicion ? "Editar Plantilla" : "Crear Plantilla de Mensaje"}
               </h3>
               <p className="text-sm text-crm-text-secondary mt-1">
-                Crea plantillas de WhatsApp o SMS para tus campañas con Twilio
+                {esEdicion
+                  ? `Modificando: ${plantilla.nombre}`
+                  : "Crea plantillas de WhatsApp o SMS para tus campañas con Twilio"}
               </p>
             </div>
             <button
@@ -137,7 +166,31 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
           </div>
 
           {/* Body */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+            {/* Canal */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">Canal de envío *</label>
+              <div className="flex gap-2">
+                {(["whatsapp", "email"] as const).map((canal) => (
+                  <button
+                    key={canal}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, canal_tipo: canal })}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm rounded-xl border transition-colors ${
+                      formData.canal_tipo === canal
+                        ? canal === "email"
+                          ? "bg-blue-500 text-white border-blue-500"
+                          : "bg-crm-primary text-white border-crm-primary"
+                        : "border-crm-border text-crm-text-secondary hover:bg-crm-card-hover"
+                    }`}
+                  >
+                    {canal === "email" ? <Mail className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
+                    {canal === "email" ? "Email" : "WhatsApp"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Información básica */}
             <div className="space-y-4">
               <h4 className="text-sm font-medium text-crm-text-primary">Información Básica</h4>
@@ -167,7 +220,9 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                   <input
                     type="text"
                     value={formData.whatsapp_template_id}
-                    onChange={(e) => setFormData({ ...formData, whatsapp_template_id: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, whatsapp_template_id: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
                     placeholder="ej: bienvenida_amersur (opcional)"
                   />
@@ -184,7 +239,9 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                   </label>
                   <select
                     value={formData.categoria}
-                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value as CategoriaTemplate })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, categoria: e.target.value as CategoriaTemplate })
+                    }
                     className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
                   >
                     <option value="MARKETING">Marketing</option>
@@ -215,7 +272,12 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                   </label>
                   <select
                     value={formData.estado_aprobacion}
-                    onChange={(e) => setFormData({ ...formData, estado_aprobacion: e.target.value as EstadoAprobacion })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        estado_aprobacion: e.target.value as EstadoAprobacion,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
                   >
                     <option value="APPROVED">Activa (lista para usar)</option>
@@ -249,32 +311,71 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Pie de Página (Opcional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.footer_texto}
-                  onChange={(e) => setFormData({ ...formData, footer_texto: e.target.value })}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  placeholder="AMERSUR - Tu hogar, nuestra pasión"
-                />
-              </div>
+              {/* Campos específicos de email */}
+              {formData.canal_tipo === "email" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                      Asunto del email *
+                    </label>
+                    <input
+                      type="text"
+                      required={formData.canal_tipo === "email"}
+                      value={formData.subject}
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                      placeholder="Ej: Nueva propiedad disponible para ti, {{nombre}}"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                      Cuerpo HTML (Opcional)
+                    </label>
+                    <textarea
+                      value={formData.body_html}
+                      onChange={(e) => setFormData({ ...formData, body_html: e.target.value })}
+                      rows={6}
+                      className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary font-mono text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                      placeholder="<p>Hola {{nombre}},</p><p>Tenemos una nueva propiedad...</p>"
+                    />
+                    <p className="text-xs text-crm-text-muted mt-1">
+                      Si está vacío, el sistema convertirá el cuerpo de texto a HTML automáticamente.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {formData.canal_tipo !== "email" && (
+                <div>
+                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                    Pie de Página (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.footer_texto}
+                    onChange={(e) => setFormData({ ...formData, footer_texto: e.target.value })}
+                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                    placeholder="AMERSUR - Tu hogar, nuestra pasión"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Variables */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-crm-text-primary">Variables</h4>
-              </div>
+              <h4 className="text-sm font-medium text-crm-text-primary">Variables</h4>
 
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={newVariable}
                   onChange={(e) => setNewVariable(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddVariable())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddVariable();
+                    }
+                  }}
                   className="flex-1 px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
                   placeholder="nombre_cliente, nombre_vendedor, proyecto..."
                 />
@@ -295,11 +396,13 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                       key={index}
                       className="inline-flex items-center gap-2 px-3 py-1 bg-crm-info/10 text-crm-info rounded-lg border border-crm-info/30"
                     >
-                      <span className="text-sm font-medium">{`{{${index + 1}}}`} = {variable}</span>
+                      <span className="text-sm font-medium">
+                        {`{{${index + 1}}}`} = {variable}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveVariable(index)}
-                        className="text-crm-danger hover:text-crm-danger-hover"
+                        className="text-crm-error hover:text-crm-error/80"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -328,11 +431,14 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
               </div>
 
               {botones.map((boton, index) => (
-                <div key={index} className="flex gap-2 p-3 bg-crm-bg-secondary rounded-lg border border-crm-border">
+                <div
+                  key={index}
+                  className="flex gap-2 p-3 bg-crm-bg-secondary rounded-lg border border-crm-border"
+                >
                   <div className="flex-1 space-y-2">
                     <select
                       value={boton.tipo}
-                      onChange={(e) => handleBotonChange(index, 'tipo', e.target.value)}
+                      onChange={(e) => handleBotonChange(index, "tipo", e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
                     >
                       <option value="URL">URL</option>
@@ -343,26 +449,26 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                     <input
                       type="text"
                       value={boton.texto}
-                      onChange={(e) => handleBotonChange(index, 'texto', e.target.value)}
+                      onChange={(e) => handleBotonChange(index, "texto", e.target.value)}
                       placeholder="Texto del botón"
                       className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
                     />
 
-                    {boton.tipo === 'URL' && (
+                    {boton.tipo === "URL" && (
                       <input
                         type="url"
-                        value={boton.url || ''}
-                        onChange={(e) => handleBotonChange(index, 'url', e.target.value)}
+                        value={boton.url || ""}
+                        onChange={(e) => handleBotonChange(index, "url", e.target.value)}
                         placeholder="https://ejemplo.com"
                         className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
                       />
                     )}
 
-                    {boton.tipo === 'PHONE_NUMBER' && (
+                    {boton.tipo === "PHONE_NUMBER" && (
                       <input
                         type="tel"
-                        value={boton.phone_number || ''}
-                        onChange={(e) => handleBotonChange(index, 'phone_number', e.target.value)}
+                        value={boton.phone_number || ""}
+                        onChange={(e) => handleBotonChange(index, "phone_number", e.target.value)}
                         placeholder="+51987654321"
                         className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
                       />
@@ -372,7 +478,7 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                   <button
                     type="button"
                     onClick={() => handleRemoveBoton(index)}
-                    className="text-crm-danger hover:text-crm-danger-hover"
+                    className="text-crm-error hover:text-crm-error/80"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -409,7 +515,13 @@ export default function ModalCrearPlantilla({ open, onClose, onSuccess }: ModalC
                 disabled={loading}
                 className="px-6 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Creando..." : "Crear Plantilla"}
+                {loading
+                  ? esEdicion
+                    ? "Guardando..."
+                    : "Creando..."
+                  : esEdicion
+                    ? "Guardar Cambios"
+                    : "Crear Plantilla"}
               </button>
             </div>
           </form>

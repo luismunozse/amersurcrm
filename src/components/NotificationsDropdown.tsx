@@ -214,9 +214,11 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
     };
 
     const handleStatusChange = (status: string) => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        if (!errorNotifiedRef.current) {
-          // Usar ID fijo para evitar toasts duplicados y no bloquear la UI
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        // Solo mostrar el error tras varios fallos consecutivos (≥3).
+        // Esto evita notificar al usuario por desconexiones breves que el
+        // sistema resuelve solo en el siguiente reintento.
+        if (!errorNotifiedRef.current && retryCount >= 3) {
           toast.error("No se pudo conectar a notificaciones en tiempo real. Reintentando...", {
             id: "realtime-notifications-error",
             duration: 4000,
@@ -228,8 +230,9 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
       if (status === "SUBSCRIBED") {
         toast.dismiss("realtime-notifications-error");
-        errorNotifiedRef.current = false;
         retryCount = 0;
+        // No resetear errorNotifiedRef aquí: si ya se mostró el error una vez
+        // en esta sesión, no volver a mostrarlo por reconexiones posteriores.
       }
     };
 

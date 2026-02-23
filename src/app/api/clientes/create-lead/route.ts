@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +191,14 @@ export async function POST(request: NextRequest) {
     };
 
     console.log(`✅ [CreateLead] Lead creado: ${clienteData.id}, vendedor: ${vendedorNombre}`);
+
+    // Disparar automatizaciones de marketing (fire & forget, no bloquea la respuesta)
+    dispararAutomatizaciones("lead.created", {
+      clienteId: clienteData.id,
+      nombre: clienteData.nombre,
+      telefono: clienteData.telefono_whatsapp || clienteData.telefono,
+      vendedorUsername: vendedorNombre || undefined,
+    }).catch((err) => console.warn("[Marketing] Error automatizaciones lead.created:", err));
 
     return NextResponse.json({
       success: true,

@@ -9,6 +9,7 @@ import { getCachedClientes } from "@/lib/cache.server";
 import { esAdmin } from "@/lib/permissions/server";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
+import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
 import {
   TipoCliente,
   TipoDocumento,
@@ -295,7 +296,7 @@ export async function crearCliente(formData: FormData) {
 
   revalidatePath("/dashboard/clientes");
 
-  // Notificación no-bloqueante (se ejecuta después de enviar la respuesta)
+  // Notificación y automatizaciones no-bloqueantes (se ejecutan después de enviar la respuesta)
   after(async () => {
     try {
       await crearNotificacion(
@@ -307,6 +308,17 @@ export async function crearCliente(formData: FormData) {
       );
     } catch (error) {
       console.warn("No se pudo crear notificación:", error);
+    }
+
+    try {
+      await dispararAutomatizaciones("lead.created", {
+        clienteId: inserted!.id,
+        nombre: parsed.data.nombre,
+        telefono: parsed.data.telefono_whatsapp || parsed.data.telefono || undefined,
+        vendedorUsername: parsed.data.vendedor_asignado || undefined,
+      });
+    } catch (error) {
+      console.warn("[Marketing] Error disparando automatizaciones lead.created:", error);
     }
   });
 }

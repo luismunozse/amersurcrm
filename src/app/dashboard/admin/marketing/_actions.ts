@@ -11,14 +11,21 @@ import type {
   MarketingChannelCredential,
   EstadisticasMarketing,
   EstadoCampana,
-  EstadoConversacion
+  EstadoConversacion,
+  MarketingAutomatizacion,
+  MarketingMensaje,
 } from "@/types/whatsapp-marketing";
+
+type VerificarCredencialesResult =
+  | { tieneCredenciales: false; error: string }
+  | { tieneCredenciales: true; proveedor: string; origen: 'database'; sandbox: boolean; updatedAt: string | null }
+  | { tieneCredenciales: true; proveedor: string; origen: 'env' };
 
 // =====================================================
 // CREDENCIALES TWILIO
 // =====================================================
 
-export async function verificarCredencialesWhatsApp() {
+export async function verificarCredencialesWhatsApp(): Promise<VerificarCredencialesResult> {
   try {
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -632,5 +639,615 @@ export async function obtenerEstadisticasMarketing(): Promise<{ data: Estadistic
   } catch (error) {
     console.error('Error obteniendo estadísticas:', error);
     return { data: null, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// AUTOMATIZACIONES
+// =====================================================
+
+export async function obtenerAutomatizaciones() {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autorizado" };
+    }
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_automatizacion')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error obteniendo automatizaciones:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data as MarketingAutomatizacion[], error: null };
+  } catch (error) {
+    console.error('Error obteniendo automatizaciones:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+export async function crearAutomatizacion(automatizacion: Partial<MarketingAutomatizacion>) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { data: null, error: "No tienes permisos de administrador" };
+    }
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_automatizacion')
+      .insert({
+        ...automatizacion,
+        created_by: user.id,
+        total_ejecutadas: 0,
+        total_completadas: 0,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creando automatización:', error);
+      return { data: null, error: error.message };
+    }
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { data: data as MarketingAutomatizacion, error: null };
+  } catch (error) {
+    console.error('Error creando automatización:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+export async function actualizarEstadoAutomatizacion(id: string, activo: boolean) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { success: false, error: "No tienes permisos de administrador" };
+    }
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_automatizacion')
+      .update({ activo })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error actualizando automatización:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error actualizando automatización:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+export async function eliminarAutomatizacion(id: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "No autorizado" };
+    }
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) {
+      return { success: false, error: "No tienes permisos de administrador" };
+    }
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_automatizacion')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error eliminando automatización:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error eliminando automatización:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// ESTADO DE CONVERSACIÓN
+// =====================================================
+
+export async function actualizarEstadoConversacion(id: string, estado: EstadoConversacion) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "No autorizado" };
+    }
+
+    const updateData: Record<string, unknown> = { estado };
+    if (estado === 'CERRADA') {
+      updateData.closed_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_conversacion')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error actualizando conversación:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error actualizando conversación:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// MENSAJES DE CONVERSACIÓN
+// =====================================================
+
+export async function obtenerMensajesConversacion(conversacionId: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: "No autorizado" };
+    }
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_mensaje')
+      .select('*')
+      .eq('conversacion_id', conversacionId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    if (error) {
+      console.error('Error obteniendo mensajes:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: data as MarketingMensaje[], error: null };
+  } catch (error) {
+    console.error('Error obteniendo mensajes:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// EQUIPO / VENDEDORES
+// =====================================================
+
+export async function obtenerVendedores() {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    const { data, error } = await supabase
+      .from('usuario_perfil')
+      .select('username, nombre_completo, rol')
+      .in('rol', ['admin', 'vendedor', 'agente'])
+      .order('nombre_completo');
+
+    if (error) return { data: null, error: error.message };
+    return { data: data ?? [], error: null };
+  } catch (error) {
+    console.error('Error obteniendo vendedores:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// NOTAS INTERNAS Y OPT-OUT
+// =====================================================
+
+export async function actualizarNotasConversacion(id: string, notas: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autorizado" };
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_conversacion')
+      .update({ notas_internas: notas || null })
+      .eq('id', id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error actualizando notas:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+export async function toggleOptOut(
+  clienteId: string,
+  optOut: boolean,
+  motivo?: string
+) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autorizado" };
+
+    const updateData: Record<string, unknown> = {
+      whatsapp_opt_out: optOut,
+      whatsapp_opt_out_fecha: optOut ? new Date().toISOString() : null,
+    };
+    if (motivo !== undefined) {
+      updateData.whatsapp_opt_out_motivo = motivo || null;
+    }
+
+    const { error } = await supabase
+      .from('cliente')
+      .update(updateData)
+      .eq('id', clienteId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error actualizando opt-out:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// ANALYTICS / MÉTRICAS (recharts)
+// =====================================================
+
+export async function obtenerAnalyticsMarketing() {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    // Campañas con métricas
+    const { data: campanas } = await supabase
+      .schema('crm')
+      .from('marketing_campana')
+      .select('nombre, total_enviados, total_entregados, total_leidos, total_respondidos, total_fallidos, completado_at')
+      .not('total_enviados', 'is', null)
+      .order('completado_at', { ascending: false })
+      .limit(10);
+
+    // Mensajes por día (últimos 30 días)
+    const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: mensajesPorDia } = await supabase
+      .schema('crm')
+      .from('marketing_mensaje')
+      .select('created_at, direccion')
+      .gte('created_at', desde)
+      .eq('direccion', 'outbound');
+
+    // Distribución de conversaciones por estado
+    const { data: convsPorEstado } = await supabase
+      .schema('crm')
+      .from('marketing_conversacion')
+      .select('estado');
+
+    // Agrupar mensajes por día
+    const mensajesAgrupados: Record<string, number> = {};
+    for (const msg of mensajesPorDia ?? []) {
+      const dia = msg.created_at.slice(0, 10);
+      mensajesAgrupados[dia] = (mensajesAgrupados[dia] ?? 0) + 1;
+    }
+    const tendenciaMensajes = Object.entries(mensajesAgrupados)
+      .map(([fecha, cantidad]) => ({ fecha, cantidad }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    // Agrupar conversaciones por estado
+    const estadoConteo: Record<string, number> = {};
+    for (const conv of convsPorEstado ?? []) {
+      estadoConteo[conv.estado] = (estadoConteo[conv.estado] ?? 0) + 1;
+    }
+    const distribucionEstados = Object.entries(estadoConteo).map(([estado, valor]) => ({
+      estado,
+      valor,
+    }));
+
+    return {
+      data: {
+        metricasCampanas: (campanas ?? []).map((c) => ({
+          nombre: c.nombre.length > 20 ? c.nombre.slice(0, 20) + '…' : c.nombre,
+          enviados: c.total_enviados ?? 0,
+          entregados: c.total_entregados ?? 0,
+          leidos: c.total_leidos ?? 0,
+          respondidos: c.total_respondidos ?? 0,
+          fallidos: c.total_fallidos ?? 0,
+        })),
+        tendenciaMensajes,
+        distribucionEstados,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error('Error obteniendo analytics:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// ROI — CONVERSIONES
+// =====================================================
+
+export async function registrarConversion(
+  conversacionId: string,
+  monto?: number,
+  nota?: string
+) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autorizado" };
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_conversacion')
+      .update({
+        conversion_registrada_at: new Date().toISOString(),
+        conversion_monto: monto ?? null,
+        conversion_nota: nota ?? null,
+      })
+      .eq('id', conversacionId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error registrando conversión:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+export async function obtenerConversionesCampana(campanaId: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    // Step 1: get conversation IDs linked to this campaign via messages
+    const { data: mensajes, error: errMsg } = await supabase
+      .schema('crm')
+      .from('marketing_mensaje')
+      .select('conversacion_id')
+      .eq('campana_id', campanaId)
+      .not('conversacion_id', 'is', null);
+
+    if (errMsg) return { data: null, error: errMsg.message };
+
+    const ids = [...new Set((mensajes ?? []).map((m: { conversacion_id: string }) => m.conversacion_id).filter(Boolean))];
+    if (ids.length === 0) return { data: [], error: null };
+
+    // Step 2: get conversaciones with conversion registered
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_conversacion')
+      .select('id, conversion_registrada_at, conversion_monto, conversion_nota, cliente:cliente_id(id, nombre, telefono)')
+      .in('id', ids)
+      .not('conversion_registrada_at', 'is', null)
+      .order('conversion_registrada_at', { ascending: false });
+
+    if (error) return { data: null, error: error.message };
+    return { data: data ?? [], error: null };
+  } catch (error) {
+    console.error('Error obteniendo conversiones de campaña:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+// =====================================================
+// AUDIENCIAS
+// =====================================================
+
+interface FiltrosAudiencia {
+  estados?: string[];
+  proyectoId?: string;
+  capacidadMin?: number;
+  capacidadMax?: number;
+  diasSinContacto?: number;
+  soloConWhatsApp?: boolean;
+}
+
+export async function calcularAudiencia(filtros: FiltrosAudiencia) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    let query = supabase
+      .from('cliente')
+      .select('id, nombre, telefono_whatsapp, whatsapp_opt_out')
+      .eq('whatsapp_opt_out', false);
+
+    if (filtros.estados?.length) {
+      query = query.in('estado_cliente', filtros.estados);
+    }
+    if (filtros.proyectoId) {
+      query = query.eq('proyecto_interes_id', filtros.proyectoId);
+    }
+    if (filtros.capacidadMin != null) {
+      query = query.gte('capacidad_compra_estimada', filtros.capacidadMin);
+    }
+    if (filtros.capacidadMax != null) {
+      query = query.lte('capacidad_compra_estimada', filtros.capacidadMax);
+    }
+    if (filtros.diasSinContacto != null) {
+      const fechaLimite = new Date(
+        Date.now() - filtros.diasSinContacto * 24 * 60 * 60 * 1000
+      ).toISOString();
+      query = query.lt('ultimo_contacto', fechaLimite);
+    }
+    if (filtros.soloConWhatsApp) {
+      query = query.not('telefono_whatsapp', 'is', null);
+    }
+
+    const { data, error } = await query.limit(500);
+    if (error) return { data: null, error: error.message };
+
+    return {
+      data: {
+        count: data?.length ?? 0,
+        preview: (data ?? []).slice(0, 5).map((c) => c.nombre),
+        ids: (data ?? []).map((c) => c.id),
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error('Error calculando audiencia:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+export async function crearAudiencia(params: {
+  nombre: string;
+  descripcion?: string;
+  tipo: 'DINAMICO' | 'ESTATICO';
+  filtros?: FiltrosAudiencia;
+  contactosIds?: string[];
+}) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    const isAdmin = await esAdmin();
+    if (!isAdmin) return { data: null, error: "Solo administradores" };
+
+    let contactosIds = params.contactosIds ?? [];
+    let contactosCount = contactosIds.length;
+
+    if (params.tipo === 'DINAMICO' && params.filtros) {
+      const resultado = await calcularAudiencia(params.filtros);
+      if (resultado.data) {
+        contactosIds = resultado.data.ids;
+        contactosCount = resultado.data.count;
+      }
+    }
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('marketing_audiencia')
+      .insert({
+        nombre: params.nombre,
+        descripcion: params.descripcion ?? null,
+        tipo: params.tipo,
+        filtros: params.filtros ?? null,
+        contactos_ids: contactosIds,
+        contactos_count: contactosCount,
+      })
+      .select()
+      .single();
+
+    if (error) return { data: null, error: error.message };
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { data: data as MarketingAudiencia, error: null };
+  } catch (error) {
+    console.error('Error creando audiencia:', error);
+    return { data: null, error: 'Error desconocido' };
+  }
+}
+
+export async function sincronizarAudiencia(audienciaId: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autorizado" };
+
+    const { data: audiencia } = await supabase
+      .schema('crm')
+      .from('marketing_audiencia')
+      .select('tipo, filtros')
+      .eq('id', audienciaId)
+      .maybeSingle();
+
+    if (!audiencia || audiencia.tipo !== 'DINAMICO') {
+      return { success: false, error: "Solo se pueden sincronizar audiencias dinámicas" };
+    }
+
+    const resultado = await calcularAudiencia(audiencia.filtros ?? {});
+    if (!resultado.data) return { success: false, error: resultado.error };
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_audiencia')
+      .update({
+        contactos_ids: resultado.data.ids,
+        contactos_count: resultado.data.count,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', audienciaId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error sincronizando audiencia:', error);
+    return { success: false, error: 'Error desconocido' };
+  }
+}
+
+export async function eliminarAudiencia(id: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autorizado" };
+
+    const isAdmin = await esAdmin();
+    if (!isAdmin) return { success: false, error: "Solo administradores" };
+
+    const { error } = await supabase
+      .schema('crm')
+      .from('marketing_audiencia')
+      .delete()
+      .eq('id', id);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/dashboard/admin/marketing');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error eliminando audiencia:', error);
+    return { success: false, error: 'Error desconocido' };
   }
 }

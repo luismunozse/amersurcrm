@@ -38,22 +38,20 @@ async function handleRequest(req: NextRequest) {
     return NextResponse.json({ error: configError.message }, { status: 500 });
   }
 
-  if (
-    !configData?.notificaciones_push ||
-    !configData.notificaciones_recordatorios ||
-    configData.push_provider !== "webpush" ||
-    !configData.push_vapid_public ||
-    !configData.push_vapid_private
-  ) {
-    return NextResponse.json({ processed: 0, skipped: "Push notifications disabled" });
-  }
+  // Determinar si el envío push está habilitado (opcional — no bloquea las notificaciones in-app)
+  const pushHabilitado =
+    configData?.notificaciones_push === true &&
+    configData.notificaciones_recordatorios === true &&
+    configData.push_provider === "webpush" &&
+    !!configData.push_vapid_public &&
+    !!configData.push_vapid_private;
 
+  // Buscar recordatorios pendientes de todos modos (sin filtrar por notificar_push)
   const { data: pendientes, error } = await supabaseCrm
     .from("recordatorio")
     .select(
       "id, titulo, descripcion, prioridad, fecha_recordatorio, vendedor_id, notificar_push, data",
     )
-    .eq("notificar_push", true)
     .eq("completado", false)
     .eq("enviado", false)
     .lte("fecha_recordatorio", nowIso)
@@ -69,7 +67,7 @@ async function handleRequest(req: NextRequest) {
 
   const failures: Array<{ id: string; error: string }> = [];
 
-  // OPTIMIZADO: Preparar todos los datos primero
+  // Preparar todos los datos primero
   const notificacionesData = pendientes.map((recordatorio) => {
     const mensaje =
       recordatorio.descripcion ??
@@ -86,7 +84,7 @@ async function handleRequest(req: NextRequest) {
     return { recordatorio, mensaje, dataPayload };
   });
 
-  // OPTIMIZADO: Batch insert de todas las notificaciones (1 query en lugar de N)
+  // Batch insert de todas las notificaciones in-app (siempre, independiente de push)
   const notificacionesInsert = notificacionesData.map(({ recordatorio, mensaje, dataPayload }) => ({
     usuario_id: recordatorio.vendedor_id,
     tipo: "sistema",
@@ -97,62 +95,64 @@ async function handleRequest(req: NextRequest) {
 
   await supabaseCrm.from("notificacion").insert(notificacionesInsert);
 
-  // OPTIMIZADO: Dispatch todas las push notifications en paralelo
-  const dispatchResults = await Promise.allSettled(
-    notificacionesData.map(({ recordatorio, mensaje, dataPayload }) =>
-      dispatchNotificationChannels(
-        {
-          userId: recordatorio.vendedor_id,
-          titulo: recordatorio.titulo,
-          mensaje,
-          tipo: "sistema",
-          createdAt: new Date().toISOString(),
-          data: dataPayload,
-          url: "/dashboard/agenda?tab=recordatorios",
-        },
-        {
-          pushEnabled: true,
-          recordatoriosEnabled: true,
-        },
-        {
-          push: {
-            provider: "webpush",
-            vapidPublicKey: configData.push_vapid_public,
-            vapidPrivateKey: configData.push_vapid_private,
-            subject: configData.push_vapid_subject ?? null,
-          },
-        },
-        { supabaseClient: supabase },
-      ).then(() => recordatorio.id)
-    )
-  );
-
-  // Separar éxitos y fallos
+  // Dispatch push notifications solo si está habilitado
   const successIds: string[] = [];
-  dispatchResults.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      successIds.push(result.value);
-    } else {
-      failures.push({
-        id: pendientes[index].id,
-        error: result.reason instanceof Error ? result.reason.message : "Error desconocido",
-      });
-    }
-  });
 
-  // OPTIMIZADO: Batch update de todos los recordatorios exitosos (1 query en lugar de N)
-  if (successIds.length > 0) {
+  if (pushHabilitado) {
+    const dispatchResults = await Promise.allSettled(
+      notificacionesData
+        .filter(({ recordatorio }) => recordatorio.notificar_push)
+        .map(({ recordatorio, mensaje, dataPayload }) =>
+          dispatchNotificationChannels(
+            {
+              userId: recordatorio.vendedor_id,
+              titulo: recordatorio.titulo,
+              mensaje,
+              tipo: "sistema",
+              createdAt: new Date().toISOString(),
+              data: dataPayload,
+              url: "/dashboard/agenda?tab=recordatorios",
+            },
+            { pushEnabled: true, recordatoriosEnabled: true },
+            {
+              push: {
+                provider: "webpush",
+                vapidPublicKey: configData!.push_vapid_public,
+                vapidPrivateKey: configData!.push_vapid_private,
+                subject: configData!.push_vapid_subject ?? null,
+              },
+            },
+            { supabaseClient: supabase },
+          ).then(() => recordatorio.id)
+        )
+    );
+
+    dispatchResults.forEach((result, index) => {
+      const filteredPendientes = pendientes.filter((r) => r.notificar_push);
+      if (result.status === "fulfilled") {
+        successIds.push(result.value);
+      } else {
+        failures.push({
+          id: filteredPendientes[index]?.id ?? "",
+          error: result.reason instanceof Error ? result.reason.message : "Error desconocido",
+        });
+      }
+    });
+  }
+
+  // Marcar todos los recordatorios como enviados (la notif in-app ya fue insertada)
+  const allIds = pendientes.map((r) => r.id);
+  if (allIds.length > 0) {
     await supabaseCrm
       .from("recordatorio")
       .update({ enviado: true, updated_at: new Date().toISOString() })
-      .in("id", successIds);
+      .in("id", allIds);
   }
-
-  const successCount = successIds.length;
 
   return NextResponse.json({
     processed: pendientes.length,
-    success: successCount,
+    success: allIds.length,
+    pushDispatched: successIds.length,
     failures,
   });
 }

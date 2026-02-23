@@ -56,7 +56,7 @@ export async function GET() {
     whatsappFrom: data?.whatsapp_from ?? null,
     smsFrom: data?.sms_from ?? null,
     webhookVerifyToken: data?.webhook_verify_token ?? null,
-    esSandbox: data?.es_sandbox ?? true,
+    esSandbox: data?.es_sandbox ?? false,
     updatedAt: data?.updated_at ?? null,
   });
 }
@@ -96,7 +96,7 @@ export async function PUT(request: NextRequest) {
     whatsapp_from: payload.whatsappFrom.trim(),
     sms_from: payload.smsFrom?.trim() || null,
     webhook_verify_token: payload.webhookVerifyToken.trim(),
-    es_sandbox: payload.esSandbox ?? true,
+    es_sandbox: payload.esSandbox ?? false,
     activo: true,
     updated_at: new Date().toISOString(),
     phone_number_id: payload.whatsappFrom.trim(),

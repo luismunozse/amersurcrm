@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ShieldCheck, PlugZap, Loader2, Save, Copy, RefreshCw } from "lucide-react";
+import { ShieldCheck, PlugZap, Loader2, Save, Copy, RefreshCw, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 
 type TwilioConfigResponse = {
@@ -20,7 +20,7 @@ const initialFormState = {
   whatsappFrom: "",
   smsFrom: "",
   webhookVerifyToken: "",
-  esSandbox: true,
+  esSandbox: false,
 };
 
 export default function ConfiguracionTwilio() {
@@ -52,7 +52,7 @@ export default function ConfiguracionTwilio() {
         whatsappFrom: data.whatsappFrom ?? "",
         smsFrom: data.smsFrom ?? "",
         webhookVerifyToken: data.webhookVerifyToken ?? "",
-        esSandbox: data.esSandbox ?? true,
+        esSandbox: data.esSandbox ?? false,
         authToken: "",
       }));
     } catch (error) {
@@ -136,6 +136,18 @@ export default function ConfiguracionTwilio() {
           </div>
         </div>
 
+        {/* Banner sandbox activo */}
+        {form.esSandbox && config?.hasCredential && (
+          <div className="mt-4 flex items-start gap-3 rounded-xl bg-crm-warning/10 border border-crm-warning/30 px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-crm-warning flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-crm-warning">
+              <span className="font-semibold">Modo Sandbox activo.</span>{" "}
+              Los mensajes solo llegarán a los números autorizados en el Sandbox de Twilio.
+              Desactívalo para enviar a números reales en producción.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -200,7 +212,13 @@ export default function ConfiguracionTwilio() {
               />
             </div>
 
-            <div className="flex items-center gap-3 mt-6">
+            <div
+              className={`flex items-center gap-3 mt-4 rounded-xl border px-4 py-3 transition-colors ${
+                form.esSandbox
+                  ? "bg-crm-warning/10 border-crm-warning/40"
+                  : "bg-crm-card-hover border-crm-border"
+              }`}
+            >
               <input
                 id="sandbox"
                 type="checkbox"
@@ -208,7 +226,19 @@ export default function ConfiguracionTwilio() {
                 checked={form.esSandbox}
                 onChange={(e) => setForm((prev) => ({ ...prev, esSandbox: e.target.checked }))}
               />
-              <label htmlFor="sandbox" className="text-sm text-crm-text-secondary">Modo Sandbox (usar números de prueba)</label>
+              <div>
+                <label
+                  htmlFor="sandbox"
+                  className={`text-sm font-medium cursor-pointer ${form.esSandbox ? "text-crm-warning" : "text-crm-text-secondary"}`}
+                >
+                  Modo Sandbox
+                </label>
+                <p className="text-xs text-crm-text-muted mt-0.5">
+                  {form.esSandbox
+                    ? "Activo — solo para pruebas, no apto para producción"
+                    : "Inactivo — modo producción, mensajes a números reales"}
+                </p>
+              </div>
             </div>
           </div>
 

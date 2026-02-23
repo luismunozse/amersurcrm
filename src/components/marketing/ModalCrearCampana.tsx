@@ -23,6 +23,7 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
     nombre: "",
     descripcion: "",
     template_id: "",
+    canal: "whatsapp" as "whatsapp" | "email",
     enviar_inmediatamente: true,
     fecha_inicio: "",
     max_envios_por_segundo: 10,
@@ -58,7 +59,11 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
     setLoadingPlantillas(false);
   };
 
-  const plantillaSeleccionada = plantillas.find(p => p.id === formData.template_id);
+  // Filtrar plantillas según canal seleccionado
+  const plantillasFiltradas = plantillas.filter(
+    (p) => (p.canal_tipo ?? "whatsapp") === formData.canal
+  );
+  const plantillaSeleccionada = plantillasFiltradas.find(p => p.id === formData.template_id);
 
   // Inicializar variables cuando se selecciona una plantilla
   useEffect(() => {
@@ -117,7 +122,7 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
         enviar_inmediatamente: formData.enviar_inmediatamente,
         fecha_inicio: formData.fecha_inicio || undefined,
         max_envios_por_segundo: formData.max_envios_por_segundo,
-        estado: (formData.enviar_inmediatamente ? 'RUNNING' : 'DRAFT') as EstadoCampana,
+        estado: (formData.enviar_inmediatamente ? 'RUNNING' : 'SCHEDULED') as EstadoCampana,
         // Guardar config de destinatarios temporalmente (lo procesaremos en el backend)
         objetivo: `Destinatarios: ${destinatarios.tipo}${destinatarios.tipo === 'manual' ? ` - ${destinatarios.numeros.split('\n').length} números` : ''}`,
       };
@@ -175,6 +180,7 @@ export default function ModalCrearCampana({ open, onClose, onSuccess }: ModalCre
       nombre: "",
       descripcion: "",
       template_id: "",
+      canal: "whatsapp",
       enviar_inmediatamente: true,
       fecha_inicio: "",
       max_envios_por_segundo: 10,

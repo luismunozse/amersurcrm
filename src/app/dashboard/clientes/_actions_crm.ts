@@ -2,6 +2,8 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
 import type { TipoEvento, EstadoEvento } from "@/lib/types/agenda";
@@ -555,6 +557,21 @@ export async function registrarVisita(data: {
       revalidatePath('/dashboard/agenda');
     }
     revalidarCliente(data.clienteId);
+
+    // Disparar automatizaciones de marketing (no bloquea la respuesta)
+    const triggerEvento = estadoEvento === 'completado' ? 'visita.completada' : 'visita.agendada';
+    after(async () => {
+      try {
+        await dispararAutomatizaciones(triggerEvento, {
+          clienteId: data.clienteId,
+          vendedorUsername: authResult.username,
+          fechaVisita: fechaVisita,
+        });
+      } catch (error) {
+        console.warn(`[Marketing] Error disparando automatizaciones ${triggerEvento}:`, error);
+      }
+    });
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };

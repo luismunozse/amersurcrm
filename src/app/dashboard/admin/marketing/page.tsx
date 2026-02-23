@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { MessageSquare, Users, Zap, BarChart3, Send, TestTube2, Shield } from "lucide-react";
+import { MessageSquare, Users, Zap, BarChart3, Send, Shield } from "lucide-react";
 import DashboardMetricas from "@/components/marketing/DashboardMetricas";
 import GestionPlantillas from "@/components/marketing/GestionPlantillas";
 import GestionCampanas from "@/components/marketing/GestionCampanas";
 import BandejaConversaciones from "@/components/marketing/BandejaConversaciones";
 import GestionAutomatizaciones from "@/components/marketing/GestionAutomatizaciones";
+import GestionAudiencias from "@/components/marketing/GestionAudiencias";
 import { verificarCredencialesWhatsApp } from "@/app/dashboard/admin/marketing/_actions";
 import ConfiguracionTwilio from "@/components/marketing/ConfiguracionTwilio";
 
@@ -33,6 +33,7 @@ const MARKETING_TABS: MarketingTabConfig[] = [
   { id: "conversaciones", label: "Conversaciones", icon: MessageSquare },
   { id: "plantillas", label: "Plantillas", icon: Send },
   { id: "campanas", label: "Campañas", icon: Users },
+  { id: "audiencias", label: "Audiencias", icon: Users },
   { id: "automatizaciones", label: "Automatizaciones", icon: Zap },
   { id: "configuracion", label: "Configuración", icon: Shield },
 ];
@@ -92,6 +93,7 @@ const TAB_CONTENT: Record<string, () => React.JSX.Element> = {
   conversaciones: () => <BandejaConversaciones />,
   plantillas: () => <GestionPlantillas />,
   campanas: () => <GestionCampanas />,
+  audiencias: () => <GestionAudiencias />,
   automatizaciones: () => <GestionAutomatizaciones />,
   configuracion: () => <ConfiguracionTwilio />,
 };
@@ -135,11 +137,15 @@ export default function MarketingPage() {
         const result = await verificarCredencialesWhatsApp();
         if (!isMounted) return;
         setTieneCredenciales(result.tieneCredenciales);
-        setCredencialesMeta({
-          origen: 'origen' in result ? (result as any).origen : null,
-          sandbox: 'sandbox' in result ? (result as any).sandbox : null,
-          updatedAt: 'updatedAt' in result ? (result as any).updatedAt : null,
-        });
+        if (result.tieneCredenciales) {
+          setCredencialesMeta({
+            origen: result.origen,
+            sandbox: result.origen === 'database' ? result.sandbox : null,
+            updatedAt: result.origen === 'database' ? result.updatedAt : null,
+          });
+        } else {
+          setCredencialesMeta(null);
+        }
         setCredencialesError(null);
       } catch (error) {
         console.error("Error verificando credenciales de WhatsApp:", error);
@@ -182,14 +188,6 @@ export default function MarketingPage() {
           </p>
         </div>
 
-        {/* Botón de prueba Twilio */}
-        <Link
-          href="/dashboard/admin/marketing/twilio-test"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-        >
-          <TestTube2 className="w-4 h-4" />
-          Probar Twilio
-        </Link>
       </div>
 
       {verificandoCredenciales ? (
@@ -218,7 +216,7 @@ export default function MarketingPage() {
           </div>
 
           {/* Tab Content */}
-          <div className="min-h-[500px]">
+          <div>
             <ActiveTabContent />
           </div>
         </>

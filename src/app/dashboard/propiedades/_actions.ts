@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { esAdmin } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
+import { dispararPropiedadDisponible } from "@/lib/services/marketing-automatizaciones";
 
 export async function crearPropiedad(formData: FormData) {
   const supabase = await createServerActionClient();
@@ -162,6 +164,19 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
         console.error("Error creando notificación:", notifError);
         // No fallar la operación principal si la notificación falla
       }
+    }
+
+    // Disparar automatizaciones de marketing cuando la propiedad queda disponible
+    if (nuevoEstado === "disponible") {
+      after(async () => {
+        await dispararPropiedadDisponible({
+          propiedadId,
+          propiedadTipo: propiedad.tipo,
+          precioVenta: propiedad.precio ?? undefined,
+        }).catch((err) =>
+          console.error("[Propiedades] Error disparando propiedad.disponible:", err)
+        );
+      });
     }
 
     revalidatePath("/dashboard/propiedades");

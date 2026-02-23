@@ -329,8 +329,8 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           prefersReducedMotion
             ? "transition-none" // Sin animaciones si el usuario lo prefiere
             : cn(
-                "transform transition-all duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)]",
-                "lg:transition-[width] lg:duration-300 lg:ease-[cubic-bezier(0.4,0.0,0.2,1)]"
+                "transform transition-all duration-300 ease-in-out",
+                "lg:transition-[width] lg:duration-300 lg:ease-in-out"
               ),
           // Animación mejorada con scale en móvil
           isOpen

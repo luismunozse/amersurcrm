@@ -59,12 +59,16 @@ export interface MarketingChannelCredential {
 export interface MarketingTemplate {
   id: string;
   nombre: string;
+  canal_tipo: 'whatsapp' | 'sms' | 'email';  // Canal de envío
   categoria: CategoriaTemplate;
   idioma: string;
   header_tipo?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'NONE';
   header_contenido?: string;
   body_texto: string;
   footer_texto?: string;
+  // Campos email
+  subject?: string;       // Asunto del email
+  body_html?: string;     // HTML del email (body_texto = fallback texto plano)
   variables: string[];
   botones: Array<{
     tipo: 'URL' | 'QUICK_REPLY' | 'PHONE_NUMBER';

@@ -107,7 +107,8 @@
       "Bash(npx shadcn@latest add select table tabs badge progress alert -y)",
       "WebFetch(domain:skills.sh)",
       "Bash(npx next build:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": [],
     "ask": []
