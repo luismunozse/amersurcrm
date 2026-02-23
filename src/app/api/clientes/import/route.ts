@@ -210,14 +210,19 @@ export async function POST(request: NextRequest) {
     // Eliminar teléfonos ya existentes en la BD
     if (clientesList.length > 0) {
       const phoneChunks = chunkArray(Array.from(uniqueClientes.keys()), 500);
+
+      // Verificar todos los chunks en paralelo (Promise.all)
+      const chunkResults = await Promise.all(
+        phoneChunks.map(chunk =>
+          serviceSupabase
+            .from("cliente")
+            .select("telefono_e164")
+            .in("telefono_e164", chunk)
+        )
+      );
+
       const existingPhones = new Set<string>();
-
-      for (const chunk of phoneChunks) {
-        const { data: existing, error } = await serviceSupabase
-          .from("cliente")
-          .select("telefono_e164")
-          .in("telefono_e164", chunk);
-
+      for (const { data: existing, error } of chunkResults) {
         if (error) {
           console.error("Error consultando teléfonos existentes:", error);
           return NextResponse.json({
@@ -225,7 +230,6 @@ export async function POST(request: NextRequest) {
             details: error.message
           }, { status: 500 });
         }
-
         (existing || []).forEach((row) => {
           if (row?.telefono_e164) {
             existingPhones.add(row.telefono_e164);

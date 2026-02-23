@@ -1,5 +1,5 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Dynamic imports para reducir bundle size (~180KB ahorrados)
+import type jsPDFType from 'jspdf';
 
 interface ReporteData {
   periodo: {
@@ -38,7 +38,9 @@ interface ReporteData {
   };
 }
 
-export function generarReportePDF(data: ReporteData): jsPDF {
+export async function generarReportePDF(data: ReporteData): Promise<jsPDFType> {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF();
 
   // Configuración de fuente y colores
@@ -204,14 +206,14 @@ export function generarReportePDF(data: ReporteData): jsPDF {
   return doc;
 }
 
-export function descargarReportePDF(data: ReporteData, nombreArchivo?: string): void {
-  const doc = generarReportePDF(data);
+export async function descargarReportePDF(data: ReporteData, nombreArchivo?: string): Promise<void> {
+  const doc = await generarReportePDF(data);
   const fileName = nombreArchivo || `reporte-amersur-${new Date().toISOString().split('T')[0]}.pdf`;
   doc.save(fileName);
 }
 
-export function abrirReportePDF(data: ReporteData): void {
-  const doc = generarReportePDF(data);
+export async function abrirReportePDF(data: ReporteData): Promise<void> {
+  const doc = await generarReportePDF(data);
   const pdfBlob = doc.output('blob');
   const url = URL.createObjectURL(pdfBlob);
   window.open(url, '_blank');

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Building, Loader2 } from "lucide-react";
 import { obtenerReportePropiedades } from "../_actions";
 import toast from "react-hot-toast";
+import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
+import { Progress } from "@/components/ui/progress";
+import { CRMBadge } from "@/components/ui/crm-badge";
 
 interface ReportePropiedadesProps {
   periodo: string;
@@ -16,25 +19,25 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setLoading(true);
-      setError(null);
+  const cargarDatos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      const result = await obtenerReportePropiedades(periodo);
+    const result = await obtenerReportePropiedades(periodo);
 
-      if (result.error) {
-        setError(result.error);
-        toast.error(result.error);
-      } else {
-        setData(result.data);
-      }
+    if (result.error) {
+      setError(result.error);
+      toast.error(result.error);
+    } else {
+      setData(result.data);
+    }
 
-      setLoading(false);
-    };
-
-    cargarDatos();
+    setLoading(false);
   }, [periodo]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   if (loading) {
     return (
@@ -48,7 +51,7 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
     return (
       <div className="text-center py-12">
         <div className="text-red-600 dark:text-red-400 mb-4">{error || 'Error cargando datos'}</div>
-        <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        <Button onClick={cargarDatos}>Reintentar</Button>
       </div>
     );
   }
@@ -148,12 +151,7 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
                     <span className="font-medium text-crm-text-primary capitalize">{item.tipo}</span>
                     <span className="text-2xl font-bold text-crm-text-primary">{item.cantidad}</span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div
-                      className="bg-crm-primary h-2 rounded-full transition-all"
-                      style={{ width: `${item.porcentaje}%` }}
-                    />
-                  </div>
+                  <Progress value={item.porcentaje} className="w-full h-2" />
                   <div className="text-xs text-crm-text-muted mt-1 text-right">
                     {item.porcentaje.toFixed(1)}%
                   </div>
@@ -174,48 +172,34 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-crm-border bg-crm-card-hover">
-                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">Proyecto</th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Total</th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">
-                      <span className="text-green-600">Disponibles</span>
-                    </th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">
-                      <span className="text-blue-600">Vendidas</span>
-                    </th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">
-                      <span className="text-yellow-600">Reservadas</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {distribucionProyectos.map((proyecto: any, index: number) => (
-                    <tr key={index} className="border-b border-crm-border hover:bg-crm-card-hover transition-colors">
-                      <td className="py-3 px-4 font-medium text-crm-text-primary">{proyecto.proyecto}</td>
-                      <td className="py-3 px-4 text-center font-bold text-crm-text-primary">{proyecto.total}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium">
-                          {proyecto.disponibles}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
-                          {proyecto.vendidas}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 font-medium">
-                          {proyecto.reservadas}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <CRMTable>
+              <CRMTableHeader>
+                <CRMTableRow>
+                  <CRMTableHead>Proyecto</CRMTableHead>
+                  <CRMTableHead className="text-center">Total</CRMTableHead>
+                  <CRMTableHead className="text-center text-green-600">Disponibles</CRMTableHead>
+                  <CRMTableHead className="text-center text-blue-600">Vendidas</CRMTableHead>
+                  <CRMTableHead className="text-center text-yellow-600">Reservadas</CRMTableHead>
+                </CRMTableRow>
+              </CRMTableHeader>
+              <CRMTableBody>
+                {distribucionProyectos.map((proyecto: any, index: number) => (
+                  <CRMTableRow key={index}>
+                    <CRMTableCell className="font-medium">{proyecto.proyecto}</CRMTableCell>
+                    <CRMTableCell className="text-center font-bold">{proyecto.total}</CRMTableCell>
+                    <CRMTableCell className="text-center">
+                      <CRMBadge variant="success">{proyecto.disponibles}</CRMBadge>
+                    </CRMTableCell>
+                    <CRMTableCell className="text-center">
+                      <CRMBadge variant="info">{proyecto.vendidas}</CRMBadge>
+                    </CRMTableCell>
+                    <CRMTableCell className="text-center">
+                      <CRMBadge variant="warning">{proyecto.reservadas}</CRMBadge>
+                    </CRMTableCell>
+                  </CRMTableRow>
+                ))}
+              </CRMTableBody>
+            </CRMTable>
           </CardContent>
         </Card>
       )}

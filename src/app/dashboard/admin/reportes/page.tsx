@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Calendar, Download, Filter, TrendingUp, Building, DollarSign, BarChart3, UserCheck, UserCog, MessageSquare, Users, PieChart, Target, Clock } from "lucide-react";
+import {
+  Calendar, Download, BarChart3, UserCheck, UserCog, MessageSquare,
+  Users, PieChart, Target, Clock, AlertCircle, Building, DollarSign,
+  TrendingUp, Loader2, GitCompare,
+} from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
 import ReporteClientes from "./components/ReporteClientes";
@@ -13,7 +17,11 @@ import ReporteInteracciones from "./components/ReporteInteracciones";
 import ReporteNivelInteres from "./components/ReporteNivelInteres";
 import ReporteOrigenLead from "./components/ReporteOrigenLead";
 import ReporteTiempoRespuesta from "./components/ReporteTiempoRespuesta";
+import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
 import toast from "react-hot-toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Lazy load de componentes pesados (recharts ~100KB+)
 const GraficosTendencias = dynamic(
@@ -28,18 +36,70 @@ const GraficosTendencias = dynamic(
   }
 );
 
+const ReporteFunnel = dynamic(
+  () => import("./components/ReporteFunnel"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+      </div>
+    )
+  }
+);
+
+function calcularFechasPeriodo(periodo: string): { fechaInicio: string; fechaFin: string } {
+  const hoy = new Date();
+  const fin = new Date(hoy);
+  fin.setHours(23, 59, 59, 999);
+  const inicio = new Date(hoy);
+  inicio.setDate(inicio.getDate() - parseInt(periodo));
+  inicio.setHours(0, 0, 0, 0);
+  return {
+    fechaInicio: inicio.toISOString().split("T")[0],
+    fechaFin: fin.toISOString().split("T")[0],
+  };
+}
+
+const ALL_TABS = [
+  { id: "analisis",        title: "Análisis",        icon: BarChart3 },
+  { id: "comparacion",     title: "Comparación",      icon: GitCompare },
+  { id: "funnel",          title: "Funnel",           icon: TrendingUp },
+  { id: "nivel-interes",   title: "Nivel Interés",    icon: PieChart },
+  { id: "origen-lead",     title: "Origen Lead",      icon: Target },
+  { id: "tiempo-respuesta",title: "Tiempo Respuesta", icon: Clock },
+  { id: "gestion",         title: "Gestión",          icon: Users },
+  { id: "interacciones",   title: "Interacciones",    icon: MessageSquare },
+  { id: "propiedades",     title: "Propiedades",      icon: Building },
+  { id: "ventas",          title: "Ventas",           icon: DollarSign },
+  { id: "clientes",        title: "Clientes",         icon: UserCheck },
+  { id: "rendimiento",     title: "Rendimiento",      icon: UserCog },
+];
 
 export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("30");
-  const [activeTab, setActiveTab] = useState("nivel-interes");
+  const [activeTab, setActiveTab] = useState("analisis");
+  // Registra qué tabs ya se visitaron (carga lazy + caché sin re-fetch)
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+    () => new Set(["analisis"])
+  );
 
   const { data, loading, error } = useReportes({
     periodo: selectedPeriod,
     autoLoad: true
   });
 
+  const fechasPeriodo = calcularFechasPeriodo(selectedPeriod);
+
   const handlePeriodoChange = (nuevoPeriodo: string) => {
     setSelectedPeriod(nuevoPeriodo);
+    // Al cambiar período, reiniciar para forzar re-fetch en todos los tabs
+    setVisitedTabs(new Set([activeTab]));
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => new Set([...prev, tab]));
   };
 
   const handleExportar = async () => {
@@ -47,14 +107,10 @@ export default function ReportesPage() {
       toast.error('No hay datos para exportar');
       return;
     }
-
     try {
       toast.loading('Generando PDF...', { id: 'export' });
-
-      // Lazy load del generador de PDF (jspdf ~200KB+)
       const { abrirReportePDF } = await import("@/lib/pdfGenerator");
       abrirReportePDF(data);
-
       toast.success('Reporte PDF generado exitosamente', { id: 'export' });
     } catch (err) {
       console.error('Error exportando reporte:', err);
@@ -62,62 +118,24 @@ export default function ReportesPage() {
     }
   };
 
-  const reportTypes = [
-    {
-      id: "nivel-interes",
-      title: "Nivel Interes",
-      description: "Nivel de interés por proyecto",
-      icon: PieChart,
-    },
-    {
-      id: "origen-lead",
-      title: "Origen Lead",
-      description: "Clientes captados por canal",
-      icon: Target,
-    },
-    {
-      id: "tiempo-respuesta",
-      title: "Tiempo Respuesta",
-      description: "Velocidad de contacto a leads",
-      icon: Clock,
-    },
-    {
-      id: "gestion",
-      title: "Gestion Clientes",
-      description: "Estado de seguimiento de clientes captados",
-      icon: Users,
-    },
-    {
-      id: "interacciones",
-      title: "Interacciones",
-      description: "Actividad de vendedores con clientes",
-      icon: MessageSquare,
-    },
-    {
-      id: "propiedades",
-      title: "Propiedades",
-      description: "Inventario y disponibilidad",
-      icon: Building,
-    },
-    {
-      id: "ventas",
-      title: "Ventas",
-      description: "Análisis detallado de ventas",
-      icon: DollarSign,
-    },
-    {
-      id: "clientes",
-      title: "Clientes",
-      description: "Estadísticas de clientes",
-      icon: UserCheck,
-    },
-    {
-      id: "rendimiento",
-      title: "Rendimiento",
-      description: "Métricas de vendedores",
-      icon: UserCog,
-    },
-  ];
+  // Estado de carga para las tabs que dependen de useReportes
+  // Recibe una factory fn para evitar evaluar data! cuando data es null
+  const renderOverviewContent = (factory: () => React.ReactNode) => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <div className="text-center py-12 text-red-600 dark:text-red-400">{error}</div>
+      );
+    }
+    if (!data) return null;
+    return factory();
+  };
 
   return (
     <div className="space-y-6">
@@ -134,23 +152,24 @@ export default function ReportesPage() {
             )}
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-crm-text-muted" />
-            <select
-              value={selectedPeriod}
-              onChange={(e) => handlePeriodoChange(e.target.value)}
-              className="px-3 py-2 border border-crm-border rounded-lg text-sm bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
-            >
-              <option value="7">Últimos 7 días</option>
-              <option value="30">Últimos 30 días</option>
-              <option value="90">Últimos 90 días</option>
-              <option value="365">Último año</option>
-            </select>
+            <Select value={selectedPeriod} onValueChange={handlePeriodoChange}>
+              <SelectTrigger className="w-[180px] bg-crm-card border-crm-border text-crm-text-primary">
+                <SelectValue placeholder="Seleccionar período" />
+              </SelectTrigger>
+              <SelectContent className="bg-crm-card border-crm-border">
+                <SelectItem value="7"   className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Últimos 7 días</SelectItem>
+                <SelectItem value="30"  className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Últimos 30 días</SelectItem>
+                <SelectItem value="90"  className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Últimos 90 días</SelectItem>
+                <SelectItem value="365" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Último año</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          
-          <button 
+
+          <button
             onClick={handleExportar}
             disabled={loading || !data}
             className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -162,100 +181,99 @@ export default function ReportesPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </div>
+        <Alert variant="destructive" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Gráficos de Tendencias */}
-      {data && !loading && !error && (
-        <div className="bg-crm-card border border-crm-border rounded-xl p-6">
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-2 mb-2">
-              <BarChart3 className="w-5 h-5" />
-              Análisis Visual
-            </h2>
-            <p className="text-crm-text-secondary">
-              Gráficos interactivos y tendencias de los últimos 6 meses
-            </p>
+      {/* Sección unificada de reportes */}
+      <div className="bg-crm-card border border-crm-border rounded-xl p-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+
+          {/* Tab Navigation - scrolleable en móvil */}
+          <div className="overflow-x-auto -mx-1 px-1 mb-6">
+            <TabsList className="flex flex-nowrap w-max min-w-full bg-transparent p-0 gap-1 h-auto">
+              {ALL_TABS.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors bg-crm-card-hover text-crm-text-primary hover:bg-crm-sidebar-hover data-[state=active]:bg-crm-primary data-[state=active]:text-white whitespace-nowrap"
+                >
+                  <tab.icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{tab.title}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
           </div>
-          <GraficosTendencias 
-            tendencias={data.tendencias} 
-            metricas={data.metricas}
-          />
-        </div>
-      )}
 
-      {/* Reports Tabs */}
-      <div className="bg-crm-card border border-crm-border rounded-xl p-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-2 mb-2">
-            <BarChart3 className="w-5 h-5" />
-            Reportes Detallados
-          </h2>
-          <p className="text-crm-text-secondary">
-            Selecciona el tipo de reporte que deseas visualizar
-          </p>
-        </div>
+          {/* ── Tabs que usan datos de useReportes ── */}
+          <TabsContent value="analisis" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("analisis") && renderOverviewContent(
+              () => <GraficosTendencias tendencias={data!.tendencias} metricas={data!.metricas} />
+            )}
+          </TabsContent>
 
-        {/* Tab Navigation */}
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mb-6">
-          {reportTypes.map((report) => (
-            <button
-              key={report.id}
-              onClick={() => setActiveTab(report.id)}
-              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === report.id
-                  ? 'bg-crm-primary text-white'
-                  : 'bg-crm-card-hover text-crm-text-primary hover:bg-crm-sidebar-hover'
-              }`}
-            >
-              <report.icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{report.title}</span>
-            </button>
-          ))}
-        </div>
+          <TabsContent value="comparacion" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("comparacion") && renderOverviewContent(
+              () => <ComparacionPeriodos periodoActual={selectedPeriod} datosActuales={data!} />
+            )}
+          </TabsContent>
 
-        {/* Tab Content */}
-        {activeTab === "nivel-interes" && <ReporteNivelInteres periodo={selectedPeriod} />}
-        {activeTab === "origen-lead" && <ReporteOrigenLead periodo={selectedPeriod} />}
-        {activeTab === "tiempo-respuesta" && <ReporteTiempoRespuesta periodo={selectedPeriod} />}
-        {activeTab === "gestion" && <ReporteGestionClientes periodo={selectedPeriod} />}
-        {activeTab === "interacciones" && <ReporteInteracciones periodo={selectedPeriod} />}
-        {activeTab === "propiedades" && <ReportePropiedades periodo={selectedPeriod} />}
-        {activeTab === "ventas" && <ReporteVentas periodo={selectedPeriod} />}
-        {activeTab === "clientes" && <ReporteClientes periodo={selectedPeriod} />}
-        {activeTab === "rendimiento" && <ReporteRendimientoVendedores periodo={selectedPeriod} />}
-      </div>
+          {/* ── Tabs con sus propias server actions ── */}
+          <TabsContent value="funnel" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("funnel") && <ReporteFunnel periodo={selectedPeriod} />}
+          </TabsContent>
 
-      {/* Quick Actions */}
-      <div className="bg-crm-card border border-crm-border rounded-xl p-6">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-crm-text-primary mb-2">Acciones Rápidas</h2>
-          <p className="text-crm-text-secondary">
-            Herramientas adicionales para análisis y reportes
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <button className="h-auto p-4 flex flex-col items-start gap-2 border border-crm-border bg-transparent text-crm-text-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-            <Filter className="w-5 h-5" />
-            <span className="font-medium">Filtros Avanzados</span>
-            <span className="text-sm text-crm-text-muted">Personalizar reportes</span>
-          </button>
-          
-          <button className="h-auto p-4 flex flex-col items-start gap-2 border border-crm-border bg-transparent text-crm-text-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-            <Calendar className="w-5 h-5" />
-            <span className="font-medium">Comparar Períodos</span>
-            <span className="text-sm text-crm-text-muted">Análisis comparativo</span>
-          </button>
-          
-          <button className="h-auto p-4 flex flex-col items-start gap-2 border border-crm-border bg-transparent text-crm-text-primary rounded-lg hover:bg-crm-card-hover transition-colors">
-            <TrendingUp className="w-5 h-5" />
-            <span className="font-medium">Tendencias</span>
-            <span className="text-sm text-crm-text-muted">Análisis de tendencias</span>
-          </button>
-        </div>
+          <TabsContent value="nivel-interes" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("nivel-interes") && (
+              <ReporteNivelInteres
+                periodo={selectedPeriod}
+                fechaInicioDefault={fechasPeriodo.fechaInicio}
+                fechaFinDefault={fechasPeriodo.fechaFin}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="origen-lead" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("origen-lead") && (
+              <ReporteOrigenLead
+                periodo={selectedPeriod}
+                fechaInicioDefault={fechasPeriodo.fechaInicio}
+                fechaFinDefault={fechasPeriodo.fechaFin}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="tiempo-respuesta" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("tiempo-respuesta") && <ReporteTiempoRespuesta periodo={selectedPeriod} />}
+          </TabsContent>
+
+          <TabsContent value="gestion" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("gestion") && <ReporteGestionClientes periodo={selectedPeriod} />}
+          </TabsContent>
+
+          <TabsContent value="interacciones" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("interacciones") && <ReporteInteracciones periodo={selectedPeriod} />}
+          </TabsContent>
+
+          <TabsContent value="propiedades" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("propiedades") && <ReportePropiedades periodo={selectedPeriod} />}
+          </TabsContent>
+
+          <TabsContent value="ventas" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("ventas") && <ReporteVentas periodo={selectedPeriod} />}
+          </TabsContent>
+
+          <TabsContent value="clientes" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("clientes") && <ReporteClientes periodo={selectedPeriod} />}
+          </TabsContent>
+
+          <TabsContent value="rendimiento" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {visitedTabs.has("rendimiento") && <ReporteRendimientoVendedores periodo={selectedPeriod} />}
+          </TabsContent>
+
+        </Tabs>
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { DollarSign, TrendingUp, Calendar, Download, Loader2 } from "lucide-react";
+import { DollarSign, TrendingUp, Loader2 } from "lucide-react";
 import { obtenerReporteVentas, obtenerMetricasRendimiento, obtenerObjetivosVsRealidad } from "../_actions";
 import toast from "react-hot-toast";
 
@@ -18,38 +18,37 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setLoading(true);
-      setError(null);
+  const cargarDatos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      // Cargar todos los datos en paralelo
-      const [resultVentas, resultMetricas, resultObjetivos] = await Promise.all([
-        obtenerReporteVentas(periodo),
-        obtenerMetricasRendimiento(periodo),
-        obtenerObjetivosVsRealidad(periodo)
-      ]);
+    const [resultVentas, resultMetricas, resultObjetivos] = await Promise.all([
+      obtenerReporteVentas(periodo),
+      obtenerMetricasRendimiento(periodo),
+      obtenerObjetivosVsRealidad(periodo)
+    ]);
 
-      if (resultVentas.error) {
-        setError(resultVentas.error);
-        toast.error(resultVentas.error);
-      } else {
-        setData(resultVentas.data);
-      }
+    if (resultVentas.error) {
+      setError(resultVentas.error);
+      toast.error(resultVentas.error);
+    } else {
+      setData(resultVentas.data);
+    }
 
-      if (resultMetricas.data) {
-        setMetricas(resultMetricas.data);
-      }
+    if (resultMetricas.data) {
+      setMetricas(resultMetricas.data);
+    }
 
-      if (resultObjetivos.data) {
-        setObjetivos(resultObjetivos.data);
-      }
+    if (resultObjetivos.data) {
+      setObjetivos(resultObjetivos.data);
+    }
 
-      setLoading(false);
-    };
-
-    cargarDatos();
+    setLoading(false);
   }, [periodo]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   if (loading) {
     return (
@@ -63,7 +62,7 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
     return (
       <div className="text-center py-12">
         <div className="text-red-600 dark:text-red-400 mb-4">{error || 'Error cargando datos'}</div>
-        <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        <Button onClick={cargarDatos}>Reintentar</Button>
       </div>
     );
   }
@@ -92,16 +91,6 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Seleccionar Período
-          </Button>
-          <Button className="flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Exportar
-          </Button>
-        </div>
       </div>
 
       {/* Summary Cards */}

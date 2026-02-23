@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { getCachedClientes } from "@/lib/cache.server";
@@ -292,20 +293,22 @@ export async function crearCliente(formData: FormData) {
     .single();
   if (error) throw new Error(error.message);
 
-  // Crear notificación
-  try {
-    await crearNotificacion(
-      user.id,
-      "cliente",
-      "Nuevo cliente registrado",
-      `Se ha registrado un nuevo cliente: ${parsed.data.nombre}`,
-      { cliente_id: inserted?.id, cliente_nombre: parsed.data.nombre }
-    );
-  } catch (error) {
-    console.warn("No se pudo crear notificación:", error);
-  }
-
   revalidatePath("/dashboard/clientes");
+
+  // Notificación no-bloqueante (se ejecuta después de enviar la respuesta)
+  after(async () => {
+    try {
+      await crearNotificacion(
+        user.id,
+        "cliente",
+        "Nuevo cliente registrado",
+        `Se ha registrado un nuevo cliente: ${parsed.data.nombre}`,
+        { cliente_id: inserted?.id, cliente_nombre: parsed.data.nombre }
+      );
+    } catch (error) {
+      console.warn("No se pudo crear notificación:", error);
+    }
+  });
 }
 
 export async function actualizarCliente(formData: FormData) {
@@ -395,21 +398,23 @@ export async function actualizarCliente(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  // Crear notificación
-  try {
-    await crearNotificacion(
-      user.id,
-      "cliente",
-      "Cliente actualizado",
-      `Se ha actualizado la información del cliente: ${parsed.data.nombre}`,
-      { cliente_id: clienteId, cliente_nombre: parsed.data.nombre }
-    );
-  } catch (error) {
-    console.warn("No se pudo crear notificación:", error);
-  }
-
   revalidatePath("/dashboard/clientes");
   revalidatePath(`/dashboard/clientes/${clienteId}`);
+
+  // Notificación no-bloqueante
+  after(async () => {
+    try {
+      await crearNotificacion(
+        user.id,
+        "cliente",
+        "Cliente actualizado",
+        `Se ha actualizado la información del cliente: ${parsed.data.nombre}`,
+        { cliente_id: clienteId, cliente_nombre: parsed.data.nombre }
+      );
+    } catch (error) {
+      console.warn("No se pudo crear notificación:", error);
+    }
+  });
 }
 
 export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: string) {
@@ -435,17 +440,23 @@ export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: st
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/clientes");
 
-  await notifyVendedorAsignado(
-    supabase,
-    cliente.vendedor_username,
-    "Estado de cliente actualizado",
-    `El cliente ${cliente.nombre ?? ""} ahora está marcado como ${mapEstadoClienteLabel(nuevoEstado)}.`,
-    {
-      cliente_id: clienteId,
-      nuevo_estado: nuevoEstado,
-      url: `/dashboard/clientes/${clienteId}`,
-    },
-  );
+  // Notificación no-bloqueante
+  const vendedorUsername = cliente.vendedor_username;
+  const clienteNombre = cliente.nombre;
+  after(async () => {
+    const supabaseAfter = await createServerActionClient();
+    await notifyVendedorAsignado(
+      supabaseAfter,
+      vendedorUsername,
+      "Estado de cliente actualizado",
+      `El cliente ${clienteNombre ?? ""} ahora está marcado como ${mapEstadoClienteLabel(nuevoEstado)}.`,
+      {
+        cliente_id: clienteId,
+        nuevo_estado: nuevoEstado,
+        url: `/dashboard/clientes/${clienteId}`,
+      },
+    );
+  });
 }
 
 export async function asignarVendedorCliente(clienteId: string, vendedorUsername: string | null) {
@@ -481,17 +492,22 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
   revalidatePath(`/dashboard/clientes/${clienteId}`);
   revalidatePath("/dashboard/clientes");
 
+  // Notificación no-bloqueante
   if (vendedorUsername) {
-    await notifyVendedorAsignado(
-      supabase,
-      vendedorUsername,
-      "Nuevo cliente asignado",
-      `Se te asignó el cliente ${cliente?.nombre ?? ""}.`,
-      {
-        cliente_id: clienteId,
-        url: `/dashboard/clientes/${clienteId}`,
-      },
-    );
+    const clienteNombre = cliente?.nombre;
+    after(async () => {
+      const supabaseAfter = await createServerActionClient();
+      await notifyVendedorAsignado(
+        supabaseAfter,
+        vendedorUsername,
+        "Nuevo cliente asignado",
+        `Se te asignó el cliente ${clienteNombre ?? ""}.`,
+        {
+          cliente_id: clienteId,
+          url: `/dashboard/clientes/${clienteId}`,
+        },
+      );
+    });
   }
 }
 
@@ -722,23 +738,30 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
 
   revalidatePath("/dashboard/clientes");
 
+  // Notificación no-bloqueante
   if (vendedor?.id) {
-    try {
-      const resumen = buildNombreResumen((clientesSeleccionados ?? []).map((c) => c?.nombre));
-      const descripcionExtra = resumen ? ` (${resumen})` : "";
-      await crearNotificacion(
-        vendedor.id,
-        "cliente",
-        "Asignación de clientes",
-        `Se te asignaron ${ids.length} cliente${ids.length === 1 ? "" : "s"}${descripcionExtra}.`,
-        {
-          cliente_ids: ids,
-          url: "/dashboard/clientes?vista=asignados",
-        },
-      );
-    } catch (notifyError) {
-      console.warn("No se pudo crear notificación para asignación masiva:", notifyError);
-    }
+    const vendedorId = vendedor.id;
+    const nombresClientes = (clientesSeleccionados ?? []).map((c) => c?.nombre);
+    const totalIds = ids.length;
+    const idsClientes = [...ids];
+    after(async () => {
+      try {
+        const resumen = buildNombreResumen(nombresClientes);
+        const descripcionExtra = resumen ? ` (${resumen})` : "";
+        await crearNotificacion(
+          vendedorId,
+          "cliente",
+          "Asignación de clientes",
+          `Se te asignaron ${totalIds} cliente${totalIds === 1 ? "" : "s"}${descripcionExtra}.`,
+          {
+            cliente_ids: idsClientes,
+            url: "/dashboard/clientes?vista=asignados",
+          },
+        );
+      } catch (notifyError) {
+        console.warn("No se pudo crear notificación para asignación masiva:", notifyError);
+      }
+    });
   }
 
   return { success: true, count: ids.length };
@@ -764,44 +787,49 @@ export async function cambiarEstadoMasivo(ids: string[], nuevoEstado: EstadoClie
 
   revalidatePath("/dashboard/clientes");
 
-  try {
-    const agrupados = new Map<string, { id: string; nombre: string | null }[]>();
-    (clientes ?? []).forEach((cliente) => {
-      if (!cliente?.vendedor_username) return;
-      const lista = agrupados.get(cliente.vendedor_username) ?? [];
-      lista.push({ id: cliente.id, nombre: cliente.nombre });
-      agrupados.set(cliente.vendedor_username, lista);
-    });
+  // Notificaciones no-bloqueantes
+  const clientesCopy = [...(clientes ?? [])];
+  after(async () => {
+    try {
+      const supabaseAfter = await createServerActionClient();
+      const agrupados = new Map<string, { id: string; nombre: string | null }[]>();
+      clientesCopy.forEach((cliente) => {
+        if (!cliente?.vendedor_username) return;
+        const lista = agrupados.get(cliente.vendedor_username) ?? [];
+        lista.push({ id: cliente.id, nombre: cliente.nombre });
+        agrupados.set(cliente.vendedor_username, lista);
+      });
 
-    if (agrupados.size > 0) {
-      const vendedoresMap = await getVendedoresMap(supabase, Array.from(agrupados.keys()));
-      await Promise.all(
-        Array.from(agrupados.entries()).map(async ([username, lista]) => {
-          const perfil = vendedoresMap.get(username);
-          if (!perfil?.id) return;
-          const nombres = lista.map((item) => item.nombre);
-          const resumen = buildNombreResumen(nombres);
-          const mensaje =
-            lista.length === 1
-              ? `El cliente ${nombres[0] ?? ""} ahora está marcado como ${mapEstadoClienteLabel(nuevoEstado)}.`
-              : `${lista.length} clientes${resumen ? ` (${resumen})` : ""} ahora están marcados como ${mapEstadoClienteLabel(nuevoEstado)}.`;
+      if (agrupados.size > 0) {
+        const vendedoresMap = await getVendedoresMap(supabaseAfter, Array.from(agrupados.keys()));
+        await Promise.all(
+          Array.from(agrupados.entries()).map(async ([username, lista]) => {
+            const perfil = vendedoresMap.get(username);
+            if (!perfil?.id) return;
+            const nombres = lista.map((item) => item.nombre);
+            const resumen = buildNombreResumen(nombres);
+            const mensaje =
+              lista.length === 1
+                ? `El cliente ${nombres[0] ?? ""} ahora está marcado como ${mapEstadoClienteLabel(nuevoEstado)}.`
+                : `${lista.length} clientes${resumen ? ` (${resumen})` : ""} ahora están marcados como ${mapEstadoClienteLabel(nuevoEstado)}.`;
 
-          await crearNotificacion(
-            perfil.id,
-            "cliente",
-            "Clientes actualizados",
-            mensaje,
-            {
-              cliente_ids: lista.map((item) => item.id),
-              nuevo_estado: nuevoEstado,
-            },
-          );
-        }),
-      );
+            await crearNotificacion(
+              perfil.id,
+              "cliente",
+              "Clientes actualizados",
+              mensaje,
+              {
+                cliente_ids: lista.map((item) => item.id),
+                nuevo_estado: nuevoEstado,
+              },
+            );
+          }),
+        );
+      }
+    } catch (notificationError) {
+      console.warn("No se pudieron enviar notificaciones por cambio masivo:", notificationError);
     }
-  } catch (notificationError) {
-    console.warn("No se pudieron enviar notificaciones por cambio masivo:", notificationError);
-  }
+  });
 
   return { success: true, count: ids.length };
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx";
-import Papa from "papaparse";
+// xlsx y papaparse se cargan dinámicamente al procesar archivo (~700KB ahorrados)
+import type * as XLSXType from "xlsx";
+import type PapaType from "papaparse";
 import { getErrorMessage } from "@/lib/errors";
 import { downloadTemplate } from "@/lib/generateTemplate";
 import { normalizePhoneE164, isValidPhone } from "@/lib/utils/phone";
@@ -82,6 +83,12 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   const vendedoresCacheRef = useRef<VendedorLookupItem[] | null>(null);
   const router = useRouter();
 
+  // Preload xlsx y papaparse on hover (~700KB cargados antes del click)
+  const handlePreloadImportLibs = useCallback(() => {
+    import("xlsx").catch(() => {});
+    import("papaparse").catch(() => {});
+  }, []);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
@@ -97,7 +104,8 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       let rawData: RawRow[] = [];
 
       if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Parsear Excel
+        // Parsear Excel (dynamic import)
+        const XLSX = await import("xlsx");
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
@@ -105,7 +113,8 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
         const sheetData = XLSX.utils.sheet_to_json<RawCell[]>(worksheet, { header: 1 });
         rawData = sheetData.map((row) => row as RawRow);
       } else if (fileExtension === 'csv') {
-        // Parsear CSV
+        // Parsear CSV (dynamic import)
+        const Papa = (await import("papaparse")).default;
         const text = await file.text();
         const result = Papa.parse<RawCell[]>(text, { header: false, skipEmptyLines: true });
         rawData = result.data.map((row) => row as RawRow);
@@ -603,7 +612,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
     toast.dismiss('import-progress');
   };
 
-  const exportErrors = () => {
+  const exportErrors = async () => {
     if (!validationResult || validationResult.errorsList.length === 0) return;
 
     const errorsData = validationResult.errorsList.map(error => ({
@@ -615,6 +624,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       Errores: error.errors.join('; ')
     }));
 
+    const Papa = (await import("papaparse")).default;
     const csv = Papa.unparse(errorsData);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
@@ -639,6 +649,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
         username: vendedor.username,
         nombre_completo: vendedor.nombre || '',
       }));
+      const Papa = (await import("papaparse")).default;
       const csv = Papa.unparse(csvData, { header: true });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
@@ -737,6 +748,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
+                  onMouseEnter={handlePreloadImportLibs}
                   className="crm-button-primary px-6 py-3 rounded-lg"
                 >
                   Seleccionar Archivo
@@ -849,26 +861,26 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-5 gap-3">
-                <div className="text-center p-4 bg-crm-card-hover rounded-lg">
-                  <div className="text-2xl font-bold text-crm-text-primary">{validationResult.total}</div>
-                  <div className="text-sm text-crm-text-muted">Total</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="text-center p-3 sm:p-4 bg-crm-card-hover rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-crm-text-primary">{validationResult.total}</div>
+                  <div className="text-xs sm:text-sm text-crm-text-muted">Total</div>
                 </div>
-                <div className="text-center p-4 bg-green-100 rounded-lg">
-                  <div className="text-2xl font-bold text-green-800">{validationResult.success}</div>
-                  <div className="text-sm text-green-600">Válidos</div>
+                <div className="text-center p-3 sm:p-4 bg-green-100 rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-green-800">{validationResult.success}</div>
+                  <div className="text-xs sm:text-sm text-green-600">Válidos</div>
                 </div>
-                <div className="text-center p-4 bg-red-100 rounded-lg">
-                  <div className="text-2xl font-bold text-red-800">{validationResult.errors}</div>
-                  <div className="text-sm text-red-600">Con errores</div>
+                <div className="text-center p-3 sm:p-4 bg-red-100 rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-red-800">{validationResult.errors}</div>
+                  <div className="text-xs sm:text-sm text-red-600">Con errores</div>
                 </div>
-                <div className="text-center p-4 bg-yellow-100 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-800">{validationResult.duplicates}</div>
-                  <div className="text-sm text-yellow-600">Duplicados</div>
+                <div className="text-center p-3 sm:p-4 bg-yellow-100 rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-800">{validationResult.duplicates}</div>
+                  <div className="text-xs sm:text-sm text-yellow-600">Duplicados</div>
                 </div>
-                <div className="text-center p-4 bg-orange-100 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-800">{validationResult.warnings}</div>
-                  <div className="text-sm text-orange-600">Avisos</div>
+                <div className="text-center p-3 sm:p-4 bg-orange-100 rounded-lg col-span-2 sm:col-span-1">
+                  <div className="text-xl sm:text-2xl font-bold text-orange-800">{validationResult.warnings}</div>
+                  <div className="text-xs sm:text-sm text-orange-600">Avisos</div>
                 </div>
               </div>
 
@@ -962,26 +974,26 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                 <h3 className="text-lg font-medium text-crm-text-primary mb-2">Resultado de la Importación</h3>
               </div>
 
-              <div className="grid grid-cols-5 gap-3">
-                <div className="text-center p-4 bg-crm-card-hover rounded-lg">
-                  <div className="text-2xl font-bold text-crm-text-primary">{result.total}</div>
-                  <div className="text-sm text-crm-text-muted">Total</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="text-center p-3 sm:p-4 bg-crm-card-hover rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-crm-text-primary">{result.total}</div>
+                  <div className="text-xs sm:text-sm text-crm-text-muted">Total</div>
                 </div>
-                <div className="text-center p-4 bg-green-100 rounded-lg">
-                  <div className="text-2xl font-bold text-green-800">{result.success}</div>
-                  <div className="text-sm text-green-600">Importados</div>
+                <div className="text-center p-3 sm:p-4 bg-green-100 rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-green-800">{result.success}</div>
+                  <div className="text-xs sm:text-sm text-green-600">Importados</div>
                 </div>
-                <div className="text-center p-4 bg-red-100 rounded-lg">
-                  <div className="text-2xl font-bold text-red-800">{result.errors}</div>
-                  <div className="text-sm text-red-600">Con errores</div>
+                <div className="text-center p-3 sm:p-4 bg-red-100 rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-red-800">{result.errors}</div>
+                  <div className="text-xs sm:text-sm text-red-600">Con errores</div>
                 </div>
-                <div className="text-center p-4 bg-yellow-100 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-800">{result.duplicates}</div>
-                  <div className="text-sm text-yellow-600">Duplicados</div>
+                <div className="text-center p-3 sm:p-4 bg-yellow-100 rounded-lg">
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-800">{result.duplicates}</div>
+                  <div className="text-xs sm:text-sm text-yellow-600">Duplicados</div>
                 </div>
-                <div className="text-center p-4 bg-orange-100 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-800">{result.warnings}</div>
-                  <div className="text-sm text-orange-600">Avisos</div>
+                <div className="text-center p-3 sm:p-4 bg-orange-100 rounded-lg col-span-2 sm:col-span-1">
+                  <div className="text-xl sm:text-2xl font-bold text-orange-800">{result.warnings}</div>
+                  <div className="text-xs sm:text-sm text-orange-600">Avisos</div>
                 </div>
               </div>
 

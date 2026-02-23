@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useCallback, useState, useRef } from "react";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx";
+// xlsx se carga dinámicamente al descargar plantilla (~600KB ahorrados en carga inicial)
+import type * as XLSXType from "xlsx";
 
 interface ImportarLotesModalProps {
   proyectoId: string;
@@ -33,6 +34,11 @@ export default function ImportarLotesModal({
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Preload xlsx on hover (~600KB cargado antes de necesitarlo)
+  const handlePreloadXlsx = useCallback(() => {
+    import("xlsx").catch(() => {});
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -97,7 +103,7 @@ export default function ImportarLotesModal({
     }
   };
 
-  const descargarPlantilla = () => {
+  const descargarPlantilla = async () => {
     // Crear datos de ejemplo
     const data = [
       {
@@ -138,7 +144,8 @@ export default function ImportarLotesModal({
       },
     ];
 
-    // Crear workbook y worksheet
+    // Crear workbook y worksheet (dynamic import)
+    const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Lotes");
@@ -204,6 +211,7 @@ export default function ImportarLotesModal({
           {/* Botón descargar plantilla */}
           <button
             onClick={descargarPlantilla}
+            onMouseEnter={handlePreloadXlsx}
             className="w-full crm-button-secondary py-3 rounded-lg text-sm font-medium flex items-center justify-center space-x-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,7 +1,7 @@
 # ❓ Preguntas Frecuentes
 ## Las respuestas que necesitas
 
-*Última actualización: Noviembre 2025*
+*Última actualización: Febrero 2026*
 
 ---
 
@@ -19,7 +19,9 @@ Sí, funciona perfecto. Abre Chrome en tu celular y escribe: **crm.amersursac.co
 
 Usa el mismo usuario y contraseña de siempre.
 
-### ¿Puedo verlos clientes de mis compañeros?
+> Nota: La extensión AmersurChat solo funciona en Chrome de escritorio (computadora), no en celular.
+
+### ¿Puedo ver los clientes de mis compañeros?
 
 No. Cada vendedor solo ve sus propios clientes. Es para proteger tu cartera.
 
@@ -46,13 +48,17 @@ No puedes borrarlo tú mismo. Pregúntale a tu coordinador y él lo hace.
 ### ¿Cómo anoto que hablé con un cliente?
 
 1. Abre el cliente
-2. Busca donde dice "Timeline" o "Actividad"
+2. Ve a la pestaña "Timeline"
 3. Click en "+ Nueva Interacción"
 4. Elige si fue llamada, WhatsApp, reunión, etc.
 5. Escribe qué se habló
 6. Guarda
 
 **Importante:** Anota SIEMPRE. Si no lo anotas, después no te vas a acordar.
+
+### ¿Puedo importar muchos clientes a la vez?
+
+Sí. Ve a `Clientes → Importar`, descarga la plantilla CSV, rellénala con tus datos y súbela. El sistema detecta duplicados por DNI automáticamente y solo crea los nuevos.
 
 ---
 
@@ -82,7 +88,9 @@ No, cada uno ve solo su propia agenda.
 
 Entra a **Proyectos**, busca el proyecto que te interesa, y ahí ves todos los lotes.
 
-Los que están en **verde** están disponibles. Los **rojos** ya están vendidos o reservados.
+Los que están en **verde** están disponibles. Los **amarillos** están reservados. Los **rojos** ya están vendidos.
+
+También puedes ir a **Propiedades** en el menú para buscar lotes de todos los proyectos a la vez.
 
 ### ¿Cuánto tiempo dura una reserva?
 
@@ -122,6 +130,42 @@ Sí, normalmente el proceso es así:
 
 ---
 
+## 💬 Sobre AmersurChat
+
+### ¿Qué es AmersurChat?
+
+Es una extensión de Chrome que añade un panel del CRM directamente en WhatsApp Web. Puedes registrar un cliente nuevo sin salir de la conversación.
+
+### ¿Cómo instalo AmersurChat?
+
+1. Ve al menú lateral → `AmersurChat`
+2. Descarga el archivo ZIP que aparece en la página
+3. Descomprímelo en tu computadora
+4. Abre Chrome y escribe `chrome://extensions` en la barra de direcciones
+5. Activa "Modo desarrollador" (esquina superior derecha)
+6. Haz clic en "Cargar descomprimida" y selecciona la carpeta que descomprimiste
+7. Listo. La extensión ya está instalada.
+
+### ¿Para qué sirve AmersurChat?
+
+- Cuando un cliente te escribe por WhatsApp, puedes registrarlo en el CRM al instante
+- Elige de dónde viene el lead (Facebook, TikTok, Referido, etc.)
+- Asigna qué proyecto le interesa
+- Todo esto sin abrir el CRM aparte
+
+### ¿AmersurChat funciona en el celular?
+
+No. Solo funciona en Chrome en computadora con WhatsApp Web abierto.
+
+### El panel de AmersurChat no aparece en WhatsApp
+
+Revisa que:
+1. La extensión esté instalada y activa en `chrome://extensions`
+2. Estés usando Chrome (no funciona en Firefox ni Edge)
+3. Hayas abierto un chat individual (no grupos)
+
+---
+
 ## 🔔 Sobre las Notificaciones
 
 ### ¿Qué son las notificaciones?
@@ -130,7 +174,7 @@ Son avisos que te salen cuando pasa algo importante:
 - Un cliente te escribió
 - Se vence una reserva
 - Te asignaron un cliente nuevo
-- Etc.
+- Vence un evento de la agenda
 
 ### ¿Cada cuánto se actualizan?
 
@@ -140,7 +184,7 @@ Cada 15 segundos el sistema revisa si hay algo nuevo.
 
 Cuando entraste por primera vez, el navegador te preguntó "¿Permitir notificaciones?". Si le dijiste "No", por eso no te salen.
 
-Para activarlas: En Chrome, click en el **candado** que está al lado de "crm.amersursac.com" → Permisos → Notificaciones → Permitir.
+Para activarlas: En Chrome, click en el **candado** que está al lado de la URL del CRM → Permisos del sitio → Notificaciones → Permitir.
 
 ---
 
@@ -157,7 +201,7 @@ Para activarlas: En Chrome, click en el **candado** que está al lado de "crm.am
 
 - Revisa que la foto no pese más de 5MB
 - Usa fotos en JPG o PNG
-- Si es muy grande, bájale el tamaño en tu celular antes
+- Si es muy grande, bájale el tamaño antes de subirla
 
 ### Sale un error que dice "No autenticado"
 
@@ -214,13 +258,12 @@ Si no lo anotas, se te va a olvidar y vas a quedar mal con el cliente.
 Pregúntale a:
 - **Tu coordinador** (dudas de ventas)
 - **Soporte técnico** (problemas del sistema)
-  - Email: soporte@amersur.com
-  - Teléfono: (01) XXX-XXXX
-  - Horario: Lunes a Viernes 9am - 6pm
+  - Email: soporteamersur@gmail.com
+- También puedes usar `Avatar → Reportar problema` para enviar capturas de pantalla directamente al equipo técnico.
 
 ### ¿Puedo hablar con alguien de soporte?
 
-Sí, llama o manda email. Te van a ayudar.
+Sí, manda email a soporteamersur@gmail.com. Te van a ayudar.
 
 Para problemas rápidos, también puedes preguntarle a tus compañeros vendedores que ya llevan más tiempo.
 
@@ -246,4 +289,3 @@ Recuerda estas 3 reglas de oro:
 ---
 
 *El CRM es tu mejor amigo para vender más. Dale una oportunidad y vas a ver la diferencia.*
-

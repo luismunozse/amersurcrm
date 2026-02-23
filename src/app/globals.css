@@ -189,6 +189,33 @@
   --crm-text-secondary: #64748b;
   --crm-text-muted: #94a3b8;
   --crm-bg-primary: #f8fafc;
+
+  /* shadcn/ui variables - mapeadas a paleta CRM */
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 66 65% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 66 39% 47%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 66 29% 57%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 66 65% 34%;
+  --radius: 0.75rem;
+  --chart-1: 66 65% 34%;
+  --chart-2: 66 39% 47%;
+  --chart-3: 142 71% 45%;
+  --chart-4: 217 91% 60%;
+  --chart-5: 43 96% 56%;
 }
 
 /* Dark */
@@ -216,6 +243,27 @@
   --crm-text-secondary: #cbd5e1;
   --crm-text-muted: #94a3b8;
   --crm-bg-primary: #0f172a;
+
+  /* shadcn/ui variables - modo oscuro */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 217 33% 17%;
+  --card-foreground: 210 40% 98%;
+  --popover: 217 33% 17%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 66 39% 47%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 66 65% 34%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 66 29% 27%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62% 71%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 217 19% 27%;
+  --input: 217 19% 27%;
+  --ring: 66 39% 47%;
 }
 
 /* === Sidebar responsive width === */

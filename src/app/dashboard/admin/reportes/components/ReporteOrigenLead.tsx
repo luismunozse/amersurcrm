@@ -7,6 +7,8 @@ import DatePicker from "@/components/ui/DatePicker";
 import { Users, Loader2, Filter, TrendingUp } from "lucide-react";
 import { obtenerReporteOrigenLead } from "../_actions";
 import toast from "react-hot-toast";
+import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
+import { Progress } from "@/components/ui/progress";
 import {
   PieChart,
   Pie,
@@ -25,22 +27,32 @@ import {
 
 interface ReporteOrigenLeadProps {
   periodo: string;
+  fechaInicioDefault?: string;
+  fechaFinDefault?: string;
 }
 
-export default function ReporteOrigenLead({ periodo }: ReporteOrigenLeadProps) {
+export default function ReporteOrigenLead({ periodo, fechaInicioDefault, fechaFinDefault }: ReporteOrigenLeadProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filtros
+  // Filtros - inicializados con los valores del período global si se proveen
   const [fechaInicio, setFechaInicio] = useState<string>(() => {
+    if (fechaInicioDefault) return fechaInicioDefault;
     const date = new Date();
     date.setDate(date.getDate() - 30);
     return date.toISOString().split("T")[0];
   });
   const [fechaFin, setFechaFin] = useState<string>(() => {
+    if (fechaFinDefault) return fechaFinDefault;
     return new Date().toISOString().split("T")[0];
   });
+
+  // Sincronizar fechas cuando cambia el período global
+  useEffect(() => {
+    if (fechaInicioDefault) setFechaInicio(fechaInicioDefault);
+    if (fechaFinDefault) setFechaFin(fechaFinDefault);
+  }, [fechaInicioDefault, fechaFinDefault]);
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -60,7 +72,7 @@ export default function ReporteOrigenLead({ periodo }: ReporteOrigenLeadProps) {
 
   useEffect(() => {
     cargarDatos();
-  }, [periodo]);
+  }, [cargarDatos]);
 
   const handleFiltrar = () => {
     cargarDatos();
@@ -446,64 +458,45 @@ export default function ReporteOrigenLead({ periodo }: ReporteOrigenLeadProps) {
           <CardTitle>Distribución Detallada por Origen</CardTitle>
           <CardDescription>Cantidad y porcentaje por cada canal de captación</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-crm-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-crm-text-secondary">
-                    Origen del Lead
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-crm-text-secondary">
-                    Cantidad
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-crm-text-secondary">
-                    Porcentaje
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-crm-text-secondary">
-                    Distribución
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {distribucionOrigen.map((item: any, index: number) => (
-                  <tr
-                    key={index}
-                    className="border-b border-crm-border last:border-0"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="text-crm-text-primary">
-                          {item.etiqueta}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-right py-3 px-4 font-medium text-crm-text-primary">
-                      {item.cantidad.toLocaleString()}
-                    </td>
-                    <td className="text-right py-3 px-4 text-crm-text-secondary">
-                      {item.porcentaje}%
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full transition-all"
-                          style={{
-                            width: `${item.porcentaje}%`,
-                            backgroundColor: item.color,
-                          }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <CardContent className="p-0">
+          <CRMTable>
+            <CRMTableHeader>
+              <CRMTableRow>
+                <CRMTableHead>Origen del Lead</CRMTableHead>
+                <CRMTableHead className="text-right">Cantidad</CRMTableHead>
+                <CRMTableHead className="text-right">Porcentaje</CRMTableHead>
+                <CRMTableHead>Distribución</CRMTableHead>
+              </CRMTableRow>
+            </CRMTableHeader>
+            <CRMTableBody>
+              {distribucionOrigen.map((item: any, index: number) => (
+                <CRMTableRow key={index}>
+                  <CRMTableCell>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span>{item.etiqueta}</span>
+                    </div>
+                  </CRMTableCell>
+                  <CRMTableCell className="text-right font-medium">
+                    {item.cantidad.toLocaleString()}
+                  </CRMTableCell>
+                  <CRMTableCell className="text-right text-crm-text-secondary">
+                    {item.porcentaje}%
+                  </CRMTableCell>
+                  <CRMTableCell>
+                    <Progress
+                      value={item.porcentaje}
+                      className="w-full max-w-xs h-2"
+                      style={{ ["--progress-color" as string]: item.color }}
+                    />
+                  </CRMTableCell>
+                </CRMTableRow>
+              ))}
+            </CRMTableBody>
+          </CRMTable>
         </CardContent>
       </Card>
     </div>

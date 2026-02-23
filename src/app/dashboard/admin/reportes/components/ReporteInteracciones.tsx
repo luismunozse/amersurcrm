@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MessageSquare, Phone, Mail, Users, Clock, Loader2 } from "lucide-react";
 import { obtenerReporteInteracciones } from "../_actions";
 import toast from "react-hot-toast";
+import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
+import { Progress } from "@/components/ui/progress";
+import { CRMBadge } from "@/components/ui/crm-badge";
 
 interface ReporteInteraccionesProps {
   periodo: string;
@@ -16,25 +19,25 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setLoading(true);
-      setError(null);
+  const cargarDatos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      const result = await obtenerReporteInteracciones(periodo);
+    const result = await obtenerReporteInteracciones(periodo);
 
-      if (result.error) {
-        setError(result.error);
-        toast.error(result.error);
-      } else {
-        setData(result.data);
-      }
+    if (result.error) {
+      setError(result.error);
+      toast.error(result.error);
+    } else {
+      setData(result.data);
+    }
 
-      setLoading(false);
-    };
-
-    cargarDatos();
+    setLoading(false);
   }, [periodo]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   if (loading) {
     return (
@@ -48,7 +51,7 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
     return (
       <div className="text-center py-12">
         <div className="text-red-600 dark:text-red-400 mb-4">{error || 'Error cargando datos'}</div>
-        <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        <Button onClick={cargarDatos}>Reintentar</Button>
       </div>
     );
   }
@@ -65,28 +68,28 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
     }
   };
 
-  const getTipoColor = (tipo: string) => {
+  const getTipoVariant = (tipo: string): "info" | "purple" | "success" | "orange" | "default" => {
     switch (tipo.toLowerCase()) {
-      case 'llamada': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
-      case 'email': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300';
-      case 'whatsapp': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
-      case 'visita': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300';
-      case 'reunion': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300';
-      case 'mensaje': return 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300';
-      default: return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
+      case 'llamada': return 'info';
+      case 'email': return 'purple';
+      case 'whatsapp': return 'success';
+      case 'visita': return 'orange';
+      case 'reunion': return 'info';
+      case 'mensaje': return 'info';
+      default: return 'default';
     }
   };
 
-  const getResultadoColor = (resultado: string) => {
+  const getResultadoVariant = (resultado: string): "success" | "danger" | "default" | "warning" | "info" | "purple" => {
     switch (resultado.toLowerCase()) {
-      case 'contesto': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
-      case 'interesado': return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
-      case 'no_contesto': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
-      case 'no_interesado': return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
-      case 'reagendo': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300';
-      case 'pendiente': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
-      case 'cerrado': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300';
-      default: return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
+      case 'contesto': return 'success';
+      case 'interesado': return 'success';
+      case 'no_contesto': return 'danger';
+      case 'no_interesado': return 'default';
+      case 'reagendo': return 'warning';
+      case 'pendiente': return 'info';
+      case 'cerrado': return 'purple';
+      default: return 'default';
     }
   };
 
@@ -174,59 +177,54 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
         </CardHeader>
         <CardContent className="p-0">
           {rankingVendedores.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-crm-border bg-crm-card-hover">
-                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">#</th>
-                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">Vendedor</th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Total</th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Clientes</th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Prom/Cliente</th>
-                    <th className="text-center py-3 px-4 font-medium text-crm-text-secondary">Min.</th>
-                    <th className="text-left py-3 px-4 font-medium text-crm-text-secondary">Por Tipo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankingVendedores.map((vendedor: any, index: number) => (
-                    <tr key={index} className="border-b border-crm-border hover:bg-crm-card-hover transition-colors">
-                      <td className="py-3 px-4">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${
-                          index === 0 ? 'bg-yellow-500' :
-                          index === 1 ? 'bg-gray-400' :
-                          index === 2 ? 'bg-orange-400' :
-                          'bg-crm-primary'
-                        }`}>
-                          {index + 1}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-crm-text-primary">{vendedor.nombre}</div>
-                        <div className="text-xs text-crm-text-muted">@{vendedor.username}</div>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="font-bold text-crm-text-primary text-lg">{vendedor.totalInteracciones}</span>
-                      </td>
-                      <td className="py-3 px-4 text-center text-crm-text-primary">{vendedor.clientesAtendidos}</td>
-                      <td className="py-3 px-4 text-center text-crm-text-primary">{vendedor.promedioPorCliente}</td>
-                      <td className="py-3 px-4 text-center text-crm-text-muted">{vendedor.duracionTotal}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(vendedor.porTipo || {}).map(([tipo, cantidad]: [string, any]) => (
-                            <span
-                              key={tipo}
-                              className={`px-2 py-0.5 rounded text-xs font-medium ${getTipoColor(tipo)}`}
-                            >
-                              {tipo.charAt(0).toUpperCase() + tipo.slice(1)}: {cantidad}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <CRMTable>
+              <CRMTableHeader>
+                <CRMTableRow>
+                  <CRMTableHead>#</CRMTableHead>
+                  <CRMTableHead>Vendedor</CRMTableHead>
+                  <CRMTableHead className="text-center">Total</CRMTableHead>
+                  <CRMTableHead className="text-center">Clientes</CRMTableHead>
+                  <CRMTableHead className="text-center">Prom/Cliente</CRMTableHead>
+                  <CRMTableHead className="text-center">Min.</CRMTableHead>
+                  <CRMTableHead>Por Tipo</CRMTableHead>
+                </CRMTableRow>
+              </CRMTableHeader>
+              <CRMTableBody>
+                {rankingVendedores.map((vendedor: any, index: number) => (
+                  <CRMTableRow key={index}>
+                    <CRMTableCell>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${
+                        index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-400' :
+                        index === 2 ? 'bg-orange-400' :
+                        'bg-crm-primary'
+                      }`}>
+                        {index + 1}
+                      </div>
+                    </CRMTableCell>
+                    <CRMTableCell>
+                      <div className="font-medium">{vendedor.nombre}</div>
+                      <div className="text-xs text-crm-text-muted">@{vendedor.username}</div>
+                    </CRMTableCell>
+                    <CRMTableCell className="text-center">
+                      <span className="font-bold text-lg">{vendedor.totalInteracciones}</span>
+                    </CRMTableCell>
+                    <CRMTableCell className="text-center">{vendedor.clientesAtendidos}</CRMTableCell>
+                    <CRMTableCell className="text-center">{vendedor.promedioPorCliente}</CRMTableCell>
+                    <CRMTableCell className="text-center text-crm-text-muted">{vendedor.duracionTotal}</CRMTableCell>
+                    <CRMTableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(vendedor.porTipo || {}).map(([tipo, cantidad]: [string, any]) => (
+                          <CRMBadge key={tipo} variant={getTipoVariant(tipo)}>
+                            {tipo.charAt(0).toUpperCase() + tipo.slice(1)}: {cantidad}
+                          </CRMBadge>
+                        ))}
+                      </div>
+                    </CRMTableCell>
+                  </CRMTableRow>
+                ))}
+              </CRMTableBody>
+            </CRMTable>
           ) : (
             <div className="text-center py-8 text-crm-text-muted">
               No hay interacciones registradas en este periodo
@@ -250,18 +248,13 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
               {distribucionTipo.map((item: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-crm-card-hover rounded-lg">
                   <div className="flex items-center gap-3">
-                    <span className={`p-2 rounded-lg ${getTipoColor(item.tipo)}`}>
+                    <CRMBadge variant={getTipoVariant(item.tipo)} className="p-2">
                       {getTipoIcon(item.tipo)}
-                    </span>
+                    </CRMBadge>
                     <span className="font-medium text-crm-text-primary capitalize">{item.tipo}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-crm-primary h-2 rounded-full transition-all"
-                        style={{ width: `${item.porcentaje}%` }}
-                      />
-                    </div>
+                    <Progress value={item.porcentaje} className="w-24 h-2" />
                     <span className="text-sm font-bold text-crm-text-primary w-12 text-right">{item.cantidad}</span>
                     <span className="text-xs text-crm-text-muted w-12">({item.porcentaje}%)</span>
                   </div>
@@ -283,16 +276,11 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
             <div className="space-y-3">
               {distribucionResultado.map((item: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-crm-card-hover rounded-lg">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getResultadoColor(item.resultado)}`}>
+                  <CRMBadge variant={getResultadoVariant(item.resultado)}>
                     {formatResultado(item.resultado)}
-                  </span>
+                  </CRMBadge>
                   <div className="flex items-center gap-2">
-                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-crm-primary h-2 rounded-full transition-all"
-                        style={{ width: `${item.porcentaje}%` }}
-                      />
-                    </div>
+                    <Progress value={item.porcentaje} className="w-24 h-2" />
                     <span className="text-sm font-bold text-crm-text-primary w-12 text-right">{item.cantidad}</span>
                     <span className="text-xs text-crm-text-muted w-12">({item.porcentaje}%)</span>
                   </div>

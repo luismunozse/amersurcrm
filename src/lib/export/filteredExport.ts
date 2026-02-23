@@ -25,9 +25,16 @@
  * ```
  */
 
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Dynamic imports: xlsx (~600KB), jsPDF (~150KB), jspdf-autotable (~30KB)
+// Se cargan solo cuando el usuario realmente exporta, no al cargar la página
+async function getXLSX() {
+  return await import('xlsx');
+}
+async function getJsPDF() {
+  const { jsPDF } = await import('jspdf');
+  await import('jspdf-autotable');
+  return jsPDF;
+}
 
 /**
  * Filtros para exportación de proyectos
@@ -146,10 +153,10 @@ export async function exportFilteredProyectos(
   // Exportar según el formato
   switch (format) {
     case 'excel':
-      exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
+      await exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
       break;
     case 'csv':
-      exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
+      await exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
       break;
     case 'pdf':
       await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
@@ -185,10 +192,10 @@ export async function exportFilteredLotes(
 
   switch (format) {
     case 'excel':
-      exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
+      await exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
       break;
     case 'csv':
-      exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
+      await exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
       break;
     case 'pdf':
       await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
@@ -218,10 +225,10 @@ export async function exportFilteredClientes(
 
   switch (format) {
     case 'excel':
-      exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
+      await exportToExcelWithFilters(transformedData, filterMetadata, finalFileName, columns, includeFiltersSheet);
       break;
     case 'csv':
-      exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
+      await exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
       break;
     case 'pdf':
       await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
@@ -413,13 +420,14 @@ function buildFilterMetadata(filters: any): Array<{ filtro: string; valor: strin
 /**
  * Exportar a Excel con hoja de filtros
  */
-function exportToExcelWithFilters(
+async function exportToExcelWithFilters(
   data: any[],
   filterMetadata: any[],
   fileName: string,
   columns: ExportColumn[],
   includeFiltersSheet: boolean
-): void {
+): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
 
   // Hoja de datos
@@ -445,12 +453,13 @@ function exportToExcelWithFilters(
 /**
  * Exportar a CSV con metadatos de filtros
  */
-function exportToCSVWithFilters(
+async function exportToCSVWithFilters(
   data: any[],
   filterMetadata: any[],
   fileName: string,
   includeFiltersSheet: boolean
-): void {
+): Promise<void> {
+  const XLSX = await getXLSX();
   let csvContent = '';
 
   // Agregar metadatos de filtros al inicio (opcional)
@@ -485,7 +494,9 @@ async function exportToPDFWithFilters(
   fileName: string,
   columns: ExportColumn[]
 ): Promise<void> {
-  const doc = new jsPDF('landscape');
+  const JsPDF = await getJsPDF();
+  const { default: autoTable } = await import('jspdf-autotable');
+  const doc = new JsPDF('landscape');
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginX = 14;
   const headerBg: [number, number, number] = [12, 25, 59];

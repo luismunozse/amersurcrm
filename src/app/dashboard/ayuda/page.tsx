@@ -8,19 +8,50 @@ export const metadata: Metadata = {
   description: "Documentación y guías para usar el sistema",
 };
 
-export default function AyudaPage() {
-  // Leer los archivos markdown en el servidor
+type TabType = "guia" | "manual" | "faq";
+const VALID_TABS: TabType[] = ["guia", "manual", "faq"];
+
+export default async function AyudaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const params = await searchParams;
   const docsPath = join(process.cwd(), "docs");
 
-  const guiaRapida = readFileSync(join(docsPath, "GUIA_INICIO_RAPIDO.md"), "utf-8");
-  const manualVendedor = readFileSync(join(docsPath, "MANUAL_VENDEDOR.md"), "utf-8");
-  const faqVendedores = readFileSync(join(docsPath, "FAQ_VENDEDORES.md"), "utf-8");
+  let guiaRapida = "";
+  let manualVendedor = "";
+  let faqVendedores = "";
+
+  try {
+    guiaRapida = readFileSync(join(docsPath, "GUIA_INICIO_RAPIDO.md"), "utf-8");
+  } catch {
+    guiaRapida = "# Guía Rápida\n\nDocumento no encontrado. Contacta a soporte técnico.";
+  }
+
+  try {
+    manualVendedor = readFileSync(join(docsPath, "MANUAL_VENDEDOR.md"), "utf-8");
+  } catch {
+    manualVendedor = "# Manual Completo\n\nDocumento no encontrado. Contacta a soporte técnico.";
+  }
+
+  try {
+    faqVendedores = readFileSync(join(docsPath, "FAQ_VENDEDORES.md"), "utf-8");
+  } catch {
+    faqVendedores = "# Preguntas Frecuentes\n\nDocumento no encontrado. Contacta a soporte técnico.";
+  }
+
+  const rawTab = params?.tab ?? "guia";
+  const initialTab: TabType = VALID_TABS.includes(rawTab as TabType)
+    ? (rawTab as TabType)
+    : "guia";
 
   return (
     <HelpCenter
       guiaRapida={guiaRapida}
       manualVendedor={manualVendedor}
       faqVendedores={faqVendedores}
+      initialTab={initialTab}
     />
   );
 }

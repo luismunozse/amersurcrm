@@ -1100,7 +1100,7 @@ export async function obtenerTimelineCliente(
     const offset = options?.offset ?? 0;
 
     // Obtener todas las entidades relacionadas al cliente con límite
-    const [interacciones, visitas, reservas, ventas] = await Promise.all([
+    const [interacciones, visitas, reservas, ventas, eventosAgenda] = await Promise.all([
       // Interacciones
       supabase
         .from('cliente_interaccion')
@@ -1131,6 +1131,15 @@ export async function obtenerTimelineCliente(
         .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username), pagos:pago(*)')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false })
+        .limit(limit),
+
+      // Eventos de agenda
+      supabase
+        .from('evento')
+        .select('id, titulo, tipo, estado, prioridad, fecha_inicio, duracion_minutos, notas, descripcion')
+        .eq('cliente_id', clienteId)
+        .neq('estado', 'cancelado')
+        .order('fecha_inicio', { ascending: false })
         .limit(limit),
     ]);
 
@@ -1225,6 +1234,23 @@ export async function obtenerTimelineCliente(
             vendedor_username: pago.registrado_por,
           },
         });
+      });
+    });
+
+    // Agregar eventos de agenda
+    eventosAgenda.data?.forEach((item) => {
+      eventos.push({
+        id: `evento-agenda-${item.id}`,
+        type: 'evento_agenda',
+        fecha: item.fecha_inicio,
+        titulo: item.titulo,
+        descripcion: item.descripcion ?? item.notas ?? undefined,
+        metadata: {
+          tipo: item.tipo,
+          estado: item.estado,
+          prioridad: item.prioridad,
+          duracion_minutos: item.duracion_minutos,
+        },
       });
     });
 

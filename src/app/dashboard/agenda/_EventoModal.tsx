@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Evento } from "@/lib/types/agenda";
-import { crearEvento, actualizarEvento } from "./actions";
+import { crearEvento, actualizarEvento, buscarLotes } from "./actions";
 import toast from "react-hot-toast";
 import { XMarkIcon, UserIcon } from "@heroicons/react/24/outline";
 import DateTimePicker from "@/components/ui/DateTimePicker";
@@ -12,6 +12,8 @@ interface EventoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  fechaPreseleccionada?: string;
+  clienteInicial?: { id: string; nombre: string };
 }
 
 const TIPOS_EVENTO = [
@@ -23,10 +25,10 @@ const TIPOS_EVENTO = [
 ];
 
 const PRIORIDADES = [
-  { value: "baja", label: "Baja", color: "bg-gray-100 text-gray-700" },
-  { value: "media", label: "Media", color: "bg-blue-100 text-blue-700" },
-  { value: "alta", label: "Alta", color: "bg-orange-100 text-orange-700" },
-  { value: "urgente", label: "Urgente", color: "bg-red-100 text-red-700" },
+  { value: "baja", label: "Baja", color: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300" },
+  { value: "media", label: "Media", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { value: "alta", label: "Alta", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+  { value: "urgente", label: "Urgente", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
 ];
 
 const RECORDATORIOS = [
@@ -42,10 +44,15 @@ interface FormValues {
   tipo: string;
   prioridad: string;
   cliente_id: string;
+  cliente_nombre: string;
+  propiedad_id: string;
+  propiedad_label: string;
   fecha_inicio: string;
   duracion_minutos: number;
   recordar_antes_minutos: number;
   notas: string;
+  proximo_paso_objetivo: string;
+  proximo_paso_fecha: string;
 }
 
 // Componente de búsqueda de clientes con búsqueda en servidor
@@ -172,16 +179,124 @@ function ClienteSearch({
   );
 }
 
-export default function EventoModal({ evento, isOpen, onClose, onSuccess }: EventoModalProps) {
+// Selector de lote con búsqueda
+type LoteResultado = Awaited<ReturnType<typeof buscarLotes>>[number];
+
+function LoteSearch({
+  value,
+  onChange,
+  loteInicial,
+}: {
+  value: string;
+  onChange: (id: string, label: string) => void;
+  loteInicial?: { id: string; label: string };
+}) {
+  const [busqueda, setBusqueda] = useState('');
+  const [abierto, setAbierto] = useState(false);
+  const [resultados, setResultados] = useState<LoteResultado[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [loteSeleccionado, setLoteSeleccionado] = useState<{ id: string; label: string } | null>(
+    loteInicial ?? null
+  );
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (!busqueda.trim()) { setResultados([]); return; }
+
+    timeoutRef.current = setTimeout(async () => {
+      setBuscando(true);
+      try {
+        const data = await buscarLotes(busqueda);
+        setResultados(data);
+      } finally {
+        setBuscando(false);
+      }
+    }, 300);
+  }, [busqueda, abierto]);
+
+  const seleccionar = (lote: LoteResultado) => {
+    const label = `${lote.proyecto_nombre} — Lote ${lote.codigo}`;
+    setLoteSeleccionado({ id: lote.id, label });
+    onChange(lote.id, label);
+    setBusqueda('');
+    setAbierto(false);
+  };
+
+  const limpiar = () => {
+    setLoteSeleccionado(null);
+    onChange('', '');
+    setBusqueda('');
+  };
+
+  return (
+    <div className="relative">
+      {loteSeleccionado ? (
+        <div className="flex items-center gap-2 px-3 py-2.5 border border-crm-border rounded-lg bg-crm-bg-secondary">
+          <span className="text-sm text-crm-text-primary flex-1 truncate">🏠 {loteSeleccionado.label}</span>
+          <button type="button" onClick={limpiar} className="text-crm-text-muted hover:text-crm-text-primary text-xs">✕</button>
+        </div>
+      ) : (
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => { setBusqueda(e.target.value); setAbierto(true); }}
+          onFocus={() => setAbierto(true)}
+          onBlur={() => setTimeout(() => setAbierto(false), 200)}
+          placeholder="Buscar por código de lote..."
+          className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary text-sm"
+        />
+      )}
+
+      {abierto && !loteSeleccionado && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-crm-border rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {buscando ? (
+            <p className="p-3 text-sm text-crm-text-muted text-center">Buscando...</p>
+          ) : resultados.length === 0 ? (
+            <p className="p-3 text-sm text-crm-text-muted text-center">
+              {busqueda.length > 0 ? 'Sin resultados' : 'Escribe el código del lote'}
+            </p>
+          ) : (
+            resultados.map((lote) => (
+              <button
+                key={lote.id}
+                type="button"
+                onMouseDown={() => seleccionar(lote)}
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-crm-primary/10 transition-colors border-b border-crm-border/50 last:border-0"
+              >
+                <span className="font-medium text-crm-text-primary">{lote.proyecto_nombre}</span>
+                <span className="text-crm-text-muted ml-1">— Lote {lote.codigo}</span>
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${lote.estado === 'disponible' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                  {lote.estado}
+                </span>
+                {lote.sup_m2 && (
+                  <span className="ml-1 text-xs text-crm-text-muted">{lote.sup_m2} m²</span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaPreseleccionada, clienteInicial }: EventoModalProps) {
   const [formData, setFormData] = useState<FormValues>({
     titulo: "",
     tipo: "llamada",
     prioridad: "media",
     cliente_id: "",
+    cliente_nombre: "",
+    propiedad_id: "",
+    propiedad_label: "",
     fecha_inicio: "",
     duracion_minutos: 30,
     recordar_antes_minutos: 15,
     notas: "",
+    proximo_paso_objetivo: "",
+    proximo_paso_fecha: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -190,34 +305,51 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
     if (!isOpen) return;
 
     if (evento) {
+      const eventoAny = evento as any;
+      const clienteNombre = eventoAny.cliente?.nombre || "";
       setFormData({
         titulo: evento.titulo,
         tipo: evento.tipo,
         prioridad: evento.prioridad,
         cliente_id: evento.cliente_id || "",
+        cliente_nombre: clienteNombre,
+        propiedad_id: evento.propiedad_id || "",
+        propiedad_label: evento.propiedad_id ? `Lote ${evento.propiedad_id.slice(0, 8)}...` : "",
         fecha_inicio: evento.fecha_inicio?.slice(0, 16) || "",
         duracion_minutos: evento.duracion_minutos || 30,
         recordar_antes_minutos: evento.recordar_antes_minutos || 15,
         notas: evento.notas || "",
+        proximo_paso_objetivo: (evento as any).proximo_paso_objetivo || "",
+        proximo_paso_fecha: (evento as any).proximo_paso_fecha?.slice(0, 16) || "",
       });
     } else {
       // Valores por defecto para nuevo evento
-      const ahora = new Date();
-      ahora.setMinutes(Math.ceil(ahora.getMinutes() / 15) * 15); // Redondear a 15 min
-      const fechaDefault = ahora.toISOString().slice(0, 16);
+      let fechaDefault: string;
+      if (fechaPreseleccionada) {
+        fechaDefault = fechaPreseleccionada;
+      } else {
+        const ahora = new Date();
+        ahora.setMinutes(Math.ceil(ahora.getMinutes() / 15) * 15); // Redondear a 15 min
+        fechaDefault = ahora.toISOString().slice(0, 16);
+      }
 
       setFormData({
         titulo: "",
         tipo: "llamada",
         prioridad: "media",
-        cliente_id: "",
+        cliente_id: clienteInicial?.id || "",
+        cliente_nombre: clienteInicial?.nombre || "",
+        propiedad_id: "",
+        propiedad_label: "",
         fecha_inicio: fechaDefault,
         duracion_minutos: 30,
         recordar_antes_minutos: 15,
         notas: "",
+        proximo_paso_objetivo: "",
+        proximo_paso_fecha: "",
       });
     }
-  }, [evento, isOpen]);
+  }, [evento, isOpen, fechaPreseleccionada, clienteInicial]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,10 +378,19 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
       payload.append("tipo", formData.tipo);
       payload.append("prioridad", formData.prioridad);
       payload.append("cliente_id", formData.cliente_id);
+      if (formData.propiedad_id) {
+        payload.append("propiedad_id", formData.propiedad_id);
+      }
       payload.append("fecha_inicio", formData.fecha_inicio);
       payload.append("duracion_minutos", String(formData.duracion_minutos));
       payload.append("recordar_antes_minutos", String(formData.recordar_antes_minutos));
       payload.append("notas", formData.notas);
+      if (formData.proximo_paso_objetivo) {
+        payload.append("proximo_paso_objetivo", formData.proximo_paso_objetivo);
+      }
+      if (formData.proximo_paso_fecha) {
+        payload.append("proximo_paso_fecha", formData.proximo_paso_fecha);
+      }
 
       // Valores por defecto para campos requeridos por el schema
       payload.append("notificar_email", "true");
@@ -304,7 +445,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
                 Tipo de evento
               </label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {TIPOS_EVENTO.map((tipo) => (
                   <button
                     key={tipo.value}
@@ -331,9 +472,36 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
               </label>
               <ClienteSearch
                 value={formData.cliente_id}
-                onChange={(id) => setFormData(prev => ({ ...prev, cliente_id: id }))}
+                onChange={(id, nombre) =>
+                  setFormData(prev => ({ ...prev, cliente_id: id, cliente_nombre: nombre }))
+                }
+                clienteInicial={
+                  formData.cliente_id && formData.cliente_nombre
+                    ? { id: formData.cliente_id, nombre: formData.cliente_nombre }
+                    : undefined
+                }
               />
             </div>
+
+            {/* Lote/Proyecto — solo para visitas */}
+            {(formData.tipo === 'visita' || formData.tipo === 'cita') && (
+              <div>
+                <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                  🏠 Lote / Propiedad <span className="text-crm-text-muted font-normal">(opcional)</span>
+                </label>
+                <LoteSearch
+                  value={formData.propiedad_id}
+                  onChange={(id, label) =>
+                    setFormData(prev => ({ ...prev, propiedad_id: id, propiedad_label: label }))
+                  }
+                  loteInicial={
+                    formData.propiedad_id && formData.propiedad_label
+                      ? { id: formData.propiedad_id, label: formData.propiedad_label }
+                      : undefined
+                  }
+                />
+              </div>
+            )}
 
             {/* Título */}
             <div>
@@ -351,7 +519,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
             </div>
 
             {/* Fecha y Duración */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Fecha y hora *
@@ -382,7 +550,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
             </div>
 
             {/* Prioridad y Recordatorio */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Prioridad
@@ -425,6 +593,35 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess }: Even
                 rows={3}
                 className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary resize-none"
               />
+            </div>
+
+            {/* Próximo paso */}
+            <div className="border border-crm-border rounded-lg p-4 space-y-3 bg-crm-bg-secondary/50">
+              <p className="text-sm font-semibold text-crm-text-primary flex items-center gap-2">
+                <span>➡️</span> Próximo paso
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-crm-text-muted mb-1.5">
+                  ¿Qué acción se tomará?
+                </label>
+                <input
+                  type="text"
+                  value={formData.proximo_paso_objetivo}
+                  onChange={(e) => setFormData(prev => ({ ...prev, proximo_paso_objetivo: e.target.value }))}
+                  placeholder="Ej: Enviar propuesta, Agendar visita al proyecto..."
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-crm-text-muted mb-1.5">
+                  Fecha límite del próximo paso
+                </label>
+                <DateTimePicker
+                  value={formData.proximo_paso_fecha}
+                  onChange={(value) => setFormData(prev => ({ ...prev, proximo_paso_fecha: value }))}
+                  placeholder="Seleccionar fecha y hora"
+                />
+              </div>
             </div>
           </div>
 

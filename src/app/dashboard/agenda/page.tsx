@@ -18,8 +18,8 @@ export default async function AgendaPage() {
     <div className="min-h-screen bg-crm-bg-primary">
       <div className="container mx-auto px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-crm-text-primary">Agenda y Recordatorios</h1>
-          <p className="text-crm-text-secondary mt-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-crm-text-primary">Agenda y Recordatorios</h1>
+          <p className="text-sm sm:text-base text-crm-text-secondary mt-1 sm:mt-2">
             Gestiona tus eventos, citas y recordatorios
           </p>
         </div>

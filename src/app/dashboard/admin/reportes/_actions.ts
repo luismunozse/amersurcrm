@@ -85,75 +85,96 @@ export async function obtenerMetricasReportes(
       startDate = start.toISOString();
     }
 
-    // 1. Métricas de Clientes
-    const { data: clientesData, error: clientesError } = await supabase
-      .schema('crm')
-      .from('cliente')
-      .select('id, estado_cliente, fecha_alta, vendedor_asignado')
-      .gte('fecha_alta', startDate)
-      .lte('fecha_alta', endDate);
+    // Ejecutar todas las queries independientes en paralelo (Promise.all)
+    const seisMesesAtras = new Date();
+    seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
 
-    if (clientesError) {
-      console.error('Error obteniendo clientes:', clientesError);
-    }
+    const [
+      clientesResult,
+      totalClientesResult,
+      lotesResult,
+      lotesEstadosResult,
+      propiedadesResult,
+      propiedadesEstadosResult,
+      proyectosResult,
+      vendedoresResult,
+      ventasResult,
+      tendenciasVentasResult,
+      lotesTendenciaResult,
+      propiedadesTendenciaResult,
+      ventasVendedoresResult,
+    ] = await Promise.all([
+      // 1. Clientes del período
+      supabase.schema('crm').from('cliente')
+        .select('id, estado_cliente, fecha_alta, vendedor_asignado')
+        .gte('fecha_alta', startDate).lte('fecha_alta', endDate),
+      // 2. Clientes totales
+      supabase.schema('crm').from('cliente')
+        .select('id', { count: 'exact', head: true }),
+      // 3. Lotes del período
+      supabase.schema('crm').from('lote')
+        .select('id, estado, precio, created_at')
+        .gte('created_at', startDate).lte('created_at', endDate),
+      // 4. Lotes totales por estado
+      supabase.schema('crm').from('lote')
+        .select('id, estado, precio'),
+      // 5. Propiedades del período
+      supabase.schema('crm').from('propiedad')
+        .select('id, estado_comercial, precio, created_at')
+        .gte('created_at', startDate).lte('created_at', endDate),
+      // 6. Propiedades totales por estado
+      supabase.schema('crm').from('propiedad')
+        .select('id, estado_comercial, precio'),
+      // 7. Proyectos del período
+      supabase.schema('crm').from('proyecto')
+        .select('id, nombre, estado, created_at')
+        .gte('created_at', startDate).lte('created_at', endDate),
+      // 8. Vendedores activos
+      supabase.schema('crm').from('usuario_perfil')
+        .select('id, username, nombre_completo, activo, rol_id, meta_mensual_ventas, comision_porcentaje')
+        .eq('activo', true),
+      // 9. Ventas del período
+      supabase.schema('crm').from('venta')
+        .select('precio_total')
+        .gte('fecha_venta', startDate).lte('fecha_venta', endDate),
+      // 10. Tendencias de ventas (6 meses)
+      supabase.schema('crm').from('venta')
+        .select('fecha_venta, precio_total, cliente_id')
+        .gte('fecha_venta', seisMesesAtras.toISOString())
+        .order('fecha_venta', { ascending: true }),
+      // 11. Tendencias de lotes (6 meses)
+      supabase.schema('crm').from('lote')
+        .select('created_at')
+        .gte('created_at', seisMesesAtras.toISOString()),
+      // 12. Tendencias de propiedades (6 meses)
+      supabase.schema('crm').from('propiedad')
+        .select('created_at')
+        .gte('created_at', seisMesesAtras.toISOString()),
+      // 13. Ventas por vendedor (período)
+      supabase.schema('crm').from('venta')
+        .select('vendedor_username, precio_total')
+        .gte('fecha_venta', startDate).lte('fecha_venta', endDate),
+    ]);
 
-    // Clientes totales (no solo del período)
-    const { count: totalClientesCount, error: totalClientesError } = await supabase
-      .schema('crm')
-      .from('cliente')
-      .select('id', { count: 'exact', head: true });
+    const { data: clientesData, error: clientesError } = clientesResult;
+    const { count: totalClientesCount, error: totalClientesError } = totalClientesResult;
+    const { data: lotesData } = lotesResult;
+    const { data: lotesEstados } = lotesEstadosResult;
+    const { data: propiedadesData, error: propiedadesError } = propiedadesResult;
+    const { data: propiedadesEstados } = propiedadesEstadosResult;
+    const { data: proyectosData } = proyectosResult;
+    const { data: vendedoresData } = vendedoresResult;
+    const { data: ventasData } = ventasResult;
+    const { data: tendenciasVentasData } = tendenciasVentasResult;
+    const { data: lotesTendencia } = lotesTendenciaResult;
+    const { data: propiedadesTendencia } = propiedadesTendenciaResult;
+    const { data: ventasVendedores } = ventasVendedoresResult;
 
-    if (totalClientesError) {
-      console.error('Error obteniendo total de clientes:', totalClientesError);
-    }
+    if (clientesError) console.error('Error obteniendo clientes:', clientesError);
+    if (totalClientesError) console.error('Error obteniendo total de clientes:', totalClientesError);
+    if (propiedadesError) console.error('Error obteniendo propiedades:', propiedadesError);
 
-    // 2. Métricas de Propiedades (incluye lotes y propiedades)
-    // 2.1 Lotes
-    const { data: lotesData } = await supabase
-      .schema('crm')
-      .from('lote')
-      .select('id, estado, precio, created_at')
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
-
-    const { data: lotesEstados } = await supabase
-      .schema('crm')
-      .from('lote')
-      .select('id, estado, precio');
-
-    // 2.2 Propiedades
-    const { data: propiedadesData, error: propiedadesError } = await supabase
-      .schema('crm')
-      .from('propiedad')
-      .select('id, estado_comercial, precio, created_at')
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
-
-    if (propiedadesError) {
-      console.error('Error obteniendo propiedades:', propiedadesError);
-    }
-
-    const { data: propiedadesEstados } = await supabase
-      .schema('crm')
-      .from('propiedad')
-      .select('id, estado_comercial, precio');
-
-    // 3. Métricas de Proyectos
-    const { data: proyectosData } = await supabase
-      .schema('crm')
-      .from('proyecto')
-      .select('id, nombre, estado, created_at')
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
-
-    // 4. Métricas de Usuarios/Vendedores
-    const { data: vendedoresData } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .select('id, username, nombre_completo, activo, rol_id, meta_mensual_ventas, comision_porcentaje')
-      .eq('activo', true);
-
-    // 5. Calcular métricas
+    // Calcular métricas
     const clientesNuevos = clientesData?.length || 0;
     const clientesActivos = totalClientesCount ?? 0;
 
@@ -167,14 +188,6 @@ export async function obtenerMetricasReportes(
     const lotesDisponibles = lotesEstados?.filter(l => l.estado === 'disponible').length || 0;
     const propiedadesDisponibles = propiedadesEstados?.filter(p => p.estado_comercial === 'disponible').length || 0;
     const totalDisponibles = lotesDisponibles + propiedadesDisponibles;
-
-    // Obtener valor total de ventas REALES desde la tabla venta
-    const { data: ventasData } = await supabase
-      .schema('crm')
-      .from('venta')
-      .select('precio_total')
-      .gte('fecha_venta', startDate)
-      .lte('fecha_venta', endDate);
 
     const valorVentasRegistradas =
       ventasData?.reduce((sum, v) => sum + (Number(v.precio_total) || 0), 0) || 0;
@@ -198,51 +211,17 @@ export async function obtenerMetricasReportes(
     const proyectosNuevos = proyectosData?.length || 0;
     const vendedoresActivos = vendedoresData?.length || 0;
 
-    // Calcular tasa de conversión (clientes activos / total de leads)
+    // Calcular tasa de conversión: clientes del período que ya son 'cliente' / total del período
     const totalLeads = clientesData?.length || 0;
-    const tasaConversion = totalLeads > 0 ? (clientesActivos / totalLeads) * 100 : 0;
+    const clientesConvertidos = clientesData?.filter((c) => c.estado_cliente === 'cliente').length || 0;
+    const tasaConversion = totalLeads > 0 ? (clientesConvertidos / totalLeads) * 100 : 0;
 
-    // 6. Datos para gráficos de tendencias (últimos 6 meses)
-    const seisMesesAtras = new Date();
-    seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
-
-    // Obtener ventas de los últimos 6 meses
-    const { data: tendenciasVentasData } = await supabase
-      .schema('crm')
-      .from('venta')
-      .select('fecha_venta, precio_total, cliente_id')
-      .gte('fecha_venta', seisMesesAtras.toISOString())
-      .order('fecha_venta', { ascending: true });
-
-    // Obtener lotes creados en los últimos 6 meses (para gráfico de propiedades)
-    const { data: lotesTendencia } = await supabase
-      .schema('crm')
-      .from('lote')
-      .select('created_at')
-      .gte('created_at', seisMesesAtras.toISOString());
-
-    // Obtener propiedades creadas en los últimos 6 meses
-    const { data: propiedadesTendencia } = await supabase
-      .schema('crm')
-      .from('propiedad')
-      .select('created_at')
-      .gte('created_at', seisMesesAtras.toISOString());
-
-    // Procesar datos para gráficos mensuales (incluye propiedades agregadas al inventario)
+    // Procesar datos para gráficos mensuales
     const tendenciasMensuales = procesarTendenciasCompletas(
       tendenciasVentasData || [],
       lotesTendencia || [],
       propiedadesTendencia || []
     );
-
-    // 7. Top vendedores por ventas (DATOS REALES)
-    // Obtener ventas reales por vendedor
-    const { data: ventasVendedores } = await supabase
-      .schema('crm')
-      .from('venta')
-      .select('vendedor_username, precio_total')
-      .gte('fecha_venta', startDate)
-      .lte('fecha_venta', endDate);
 
     const ventasPorVendedor = new Map<string, { ventas: number; propiedades: number }>();
     ventasVendedores?.forEach(venta => {
@@ -858,6 +837,21 @@ export async function obtenerReporteRendimiento(
       .gte('fecha_venta', startDate.toISOString())
       .lte('fecha_venta', endDate.toISOString());
 
+    // Obtener total de leads asignados por vendedor en el período (para calcular tasa de conversión real)
+    const { data: leadsDelPeriodo } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .select('vendedor_username')
+      .gte('fecha_alta', startDate.toISOString())
+      .lte('fecha_alta', endDate.toISOString())
+      .not('vendedor_username', 'is', null);
+
+    const leadsPorVendedor = new Map<string, number>();
+    leadsDelPeriodo?.forEach(c => {
+      const v = c.vendedor_username as string;
+      leadsPorVendedor.set(v, (leadsPorVendedor.get(v) || 0) + 1);
+    });
+
     // Calcular métricas por vendedor
     const ventasPorVendedor = new Map<string, {
       username: string;
@@ -890,15 +884,22 @@ export async function obtenerReporteRendimiento(
 
     // Top performers
     const topPerformers = Array.from(ventasPorVendedor.values())
-      .map(v => ({
-        name: v.nombre,
-        avatar: v.nombre.split(' ').map(n => n[0]).join('').toUpperCase(),
-        sales: v.ventas,
-        deals: v.propiedades,
-        conversion: v.propiedades > 0 ? (v.clientes.size / v.propiedades * 100).toFixed(1) + '%' : '0%',
-        meta: v.meta,
-        cumplimiento: v.meta > 0 ? ((v.ventas / v.meta) * 100).toFixed(1) : '0'
-      }))
+      .map(v => {
+        const totalLeads = leadsPorVendedor.get(v.username) || 0;
+        // Tasa de conversión real: compradores únicos / leads asignados en el período
+        const conversion = totalLeads > 0
+          ? ((v.clientes.size / totalLeads) * 100).toFixed(1) + '%'
+          : 'N/A';
+        return {
+          name: v.nombre,
+          avatar: v.nombre.split(' ').map(n => n[0]).join('').toUpperCase(),
+          sales: v.ventas,
+          deals: v.propiedades,
+          conversion,
+          meta: v.meta,
+          cumplimiento: v.meta > 0 ? ((v.ventas / v.meta) * 100).toFixed(1) : '0'
+        };
+      })
       .sort((a, b) => b.sales - a.sales)
       .slice(0, 10);
 
@@ -1145,13 +1146,21 @@ export async function obtenerObjetivosVsRealidad(
     ) || 0;
 
     // 2. META DE PROPIEDADES
-    // Asumimos una meta de propiedades vendidas (por ejemplo, 100 propiedades por mes)
-    // Esto podría venir de una tabla de configuración
-    const metaPropiedades = 100;
+    // Calculada dinámicamente: meta de ventas / ticket promedio por unidad
     const propiedadesVendidas = ventasReales?.length || 0;
+    const ticketPromedio = propiedadesVendidas > 0
+      ? ventasRealizadas / propiedadesVendidas
+      : 0;
+    const numVendedores = vendedores?.length || 1;
+    // Si hay ticket promedio real, derivar meta de propiedades desde la meta de ventas
+    // Si no hay ventas históricas, usar 5 propiedades por vendedor como base
+    const metaPropiedades = ticketPromedio > 0 && metaTotalVentas > 0
+      ? Math.max(1, Math.ceil(metaTotalVentas / ticketPromedio))
+      : numVendedores * 5;
 
     // 3. META DE CLIENTES NUEVOS
-    const metaClientesNuevos = 50; // Meta asumida, debería venir de configuración
+    // Cada vendedor activo debería captar al menos 10 clientes nuevos por período
+    const metaClientesNuevos = numVendedores * 10;
 
     const { data: clientesNuevos } = await supabase
       .schema('crm')
@@ -1233,7 +1242,8 @@ export async function obtenerReporteGestionClientes(
       .gte('fecha_alta', startDate.toISOString())
       .order('fecha_alta', { ascending: false });
 
-    // Obtener última interacción de cada cliente
+    // Obtener última interacción de cada cliente (solo para los clientes del período)
+    const idsClientesGestion = clientes?.map(c => c.id) || [];
     const { data: ultimasInteracciones } = await supabase
       .schema('crm')
       .from('cliente_interaccion')
@@ -1245,6 +1255,7 @@ export async function obtenerReporteGestionClientes(
         proxima_accion,
         fecha_proxima_accion
       `)
+      .in('cliente_id', idsClientesGestion.length > 0 ? idsClientesGestion : ['00000000-0000-0000-0000-000000000000'])
       .order('fecha_interaccion', { ascending: false });
 
     // Agrupar última interacción por cliente
@@ -2175,11 +2186,14 @@ export async function obtenerReporteTiempoRespuesta(
       .lte('fecha_alta', endDate.toISOString())
       .order('fecha_alta', { ascending: false });
 
-    // Obtener primera interacción de cada cliente
+    // Obtener primera interacción de cada cliente (solo del período y de los clientes captados en él)
+    const clienteIdsDelPeriodo = clientes?.map(c => c.id) || [];
     const { data: interacciones } = await supabase
       .schema('crm')
       .from('cliente_interaccion')
       .select('cliente_id, fecha_interaccion, vendedor_username, tipo')
+      .in('cliente_id', clienteIdsDelPeriodo.length > 0 ? clienteIdsDelPeriodo : ['00000000-0000-0000-0000-000000000000'])
+      .gte('fecha_interaccion', startDate.toISOString())
       .order('fecha_interaccion', { ascending: true });
 
     // Obtener información de vendedores
@@ -2288,9 +2302,12 @@ export async function obtenerReporteTiempoRespuesta(
         const promedio = data.tiempos.length > 0
           ? data.tiempos.reduce((a, b) => a + b, 0) / data.tiempos.length
           : 0;
-        const mediana = tiemposOrdenados.length > 0
-          ? tiemposOrdenados[Math.floor(tiemposOrdenados.length / 2)]
-          : 0;
+        const mediana = (() => {
+          const n = tiemposOrdenados.length;
+          if (n === 0) return 0;
+          if (n % 2 === 1) return tiemposOrdenados[Math.floor(n / 2)];
+          return (tiemposOrdenados[n / 2 - 1] + tiemposOrdenados[n / 2]) / 2;
+        })();
         const minimo = tiemposOrdenados.length > 0 ? tiemposOrdenados[0] : 0;
         const maximo = tiemposOrdenados.length > 0 ? tiemposOrdenados[tiemposOrdenados.length - 1] : 0;
 
@@ -2455,4 +2472,108 @@ function procesarTendenciasCompletas(
     propiedades: data.propiedades,
     clientes: data.clientes.size
   }));
+}
+
+// =====================================================
+// REPORTE FUNNEL DE CONVERSIÓN
+// =====================================================
+
+export async function obtenerReporteFunnel(
+  periodo: string = '30'
+): Promise<{ data: any | null; error: string | null }> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return { data: null, error: "No autorizado" };
+
+    const isAdminUser = await esAdmin();
+    if (!isAdminUser) return { data: null, error: "No tienes permisos de administrador" };
+
+    const days = parseInt(periodo);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const startISO = startDate.toISOString();
+    const endISO = new Date().toISOString();
+
+    const [
+      leadsResult,
+      interaccionesResult,
+      visitasResult,
+      reservasResult,
+      ventasResult,
+    ] = await Promise.all([
+      supabase.schema('crm').from('cliente')
+        .select('id, estado_cliente')
+        .gte('fecha_alta', startISO).lte('fecha_alta', endISO),
+      supabase.schema('crm').from('cliente_interaccion')
+        .select('cliente_id')
+        .gte('fecha_interaccion', startISO).lte('fecha_interaccion', endISO),
+      supabase.schema('crm').from('visita_propiedad')
+        .select('cliente_id')
+        .gte('fecha_visita', startISO).lte('fecha_visita', endISO),
+      supabase.schema('crm').from('reserva')
+        .select('cliente_id')
+        .gte('created_at', startISO).lte('created_at', endISO),
+      supabase.schema('crm').from('venta')
+        .select('cliente_id, precio_total')
+        .gte('fecha_venta', startISO).lte('fecha_venta', endISO),
+    ]);
+
+    const leads = leadsResult.data ?? [];
+    const leadIds = new Set(leads.map((l: any) => l.id));
+
+    const contactadosIds = new Set(
+      (interaccionesResult.data ?? []).filter((i: any) => leadIds.has(i.cliente_id)).map((i: any) => i.cliente_id)
+    );
+    const conVisitaIds = new Set(
+      (visitasResult.data ?? []).filter((v: any) => leadIds.has(v.cliente_id)).map((v: any) => v.cliente_id)
+    );
+    const conReservaIds = new Set(
+      (reservasResult.data ?? []).filter((r: any) => leadIds.has(r.cliente_id)).map((r: any) => r.cliente_id)
+    );
+    const ventasCerradasIds = new Set(
+      (ventasResult.data ?? []).filter((v: any) => leadIds.has(v.cliente_id)).map((v: any) => v.cliente_id)
+    );
+
+    const totalLeads = leads.length;
+    const totalContactados = contactadosIds.size;
+    const totalConVisita = conVisitaIds.size;
+    const totalConReserva = conReservaIds.size;
+    const totalVentas = ventasCerradasIds.size;
+    const valorVentas = (ventasResult.data ?? []).reduce((sum: number, v: any) => sum + (v.precio_total || 0), 0);
+
+    const distribucionEstado = leads.reduce<Record<string, number>>((acc, c: any) => {
+      const estado = c.estado_cliente || 'sin_estado';
+      acc[estado] = (acc[estado] || 0) + 1;
+      return acc;
+    }, {});
+
+    const etapas = [
+      { id: 'leads',       label: 'Leads captados',   descripcion: 'Total clientes registrados en el período',       cantidad: totalLeads,       porcentaje: 100,                                                                                    color: '#6366f1', icon: '👥' },
+      { id: 'contactados', label: 'Contactados',       descripcion: 'Leads con al menos una interacción registrada',  cantidad: totalContactados, porcentaje: totalLeads > 0 ? Math.round((totalContactados / totalLeads) * 100) : 0,       color: '#3b82f6', icon: '📞' },
+      { id: 'visita',      label: 'Visita realizada',  descripcion: 'Leads que visitaron al menos un proyecto',       cantidad: totalConVisita,   porcentaje: totalLeads > 0 ? Math.round((totalConVisita / totalLeads) * 100) : 0,          color: '#f59e0b', icon: '🏠' },
+      { id: 'reserva',     label: 'Reserva activa',    descripcion: 'Leads con reserva de lote generada',             cantidad: totalConReserva,  porcentaje: totalLeads > 0 ? Math.round((totalConReserva / totalLeads) * 100) : 0,         color: '#f97316', icon: '📋' },
+      { id: 'venta',       label: 'Venta cerrada',     descripcion: 'Leads que finalizaron en venta confirmada',      cantidad: totalVentas,      porcentaje: totalLeads > 0 ? Math.round((totalVentas / totalLeads) * 100) : 0,             color: '#22c55e', icon: '🎉' },
+    ];
+
+    const conversiones = [
+      { desde: 'Leads → Contactados', tasa: totalLeads > 0       ? Math.round((totalContactados / totalLeads) * 100)       : 0 },
+      { desde: 'Contactados → Visita', tasa: totalContactados > 0 ? Math.round((totalConVisita / totalContactados) * 100)   : 0 },
+      { desde: 'Visita → Reserva',    tasa: totalConVisita > 0   ? Math.round((totalConReserva / totalConVisita) * 100)     : 0 },
+      { desde: 'Reserva → Venta',     tasa: totalConReserva > 0  ? Math.round((totalVentas / totalConReserva) * 100)        : 0 },
+    ];
+
+    return {
+      data: {
+        etapas, conversiones, distribucionEstado, valorVentas,
+        totalLeads, totalVentas,
+        tasaConversionFinal: totalLeads > 0 ? Math.round((totalVentas / totalLeads) * 100) : 0,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error('Error obteniendo reporte funnel:', error);
+    return { data: null, error: 'Error al obtener datos del funnel' };
+  }
 }

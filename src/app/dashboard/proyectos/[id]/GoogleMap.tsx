@@ -75,6 +75,8 @@ const ESTADO_TEXTOS: Record<string, string> = {
   desconocido: 'Sin estado',
 };
 
+const LEGEND_ITEMS = ['disponible', 'reservado', 'vendido'] as const;
+
 type BoundsTuple =
   | [[number, number], [number, number]]
   | [[number, number], [number, number], [number, number], [number, number]];
@@ -1108,16 +1110,13 @@ export default function GoogleMap({
     });
   }, [lotes, highlightLoteId, isLoaded]);
 
-  const loadingFallback = useMemo(
-    () => (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Cargando Google Maps...</p>
-        </div>
+  const loadingFallback = (
+    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+        <p className="text-gray-600">Cargando Google Maps...</p>
       </div>
-    ),
-    []
+    </div>
   );
 
   const hasDragData = useCallback((event: React.DragEvent) => {
@@ -1172,10 +1171,7 @@ export default function GoogleMap({
     onPinDrop?.(loteId, latLng.lat(), latLng.lng());
   }, [draggingLoteId, onPinDrop, dropBounds]);
 
-  const legendItems = useMemo(
-    () => ['disponible', 'reservado', 'vendido'] as const,
-    []
-  );
+  const legendItems = LEGEND_ITEMS;
 
   useEffect(() => {
     if (!focusLoteRequest || !isLoaded) return;

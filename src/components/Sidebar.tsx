@@ -180,11 +180,13 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
 
   const canAccessNavItem = useCallback(
     (item: NavItem) => {
-      // Los administradores pueden ver todos los items del menú
-      if (esAdmin()) return true;
+      const hasRol = !item.roles?.length || tieneAlgunoDeRoles(item.roles);
+
+      // Los administradores saltan verificaciones de permisos,
+      // pero se respetan las restricciones de roles explícitas
+      if (esAdmin()) return hasRol;
 
       const hasPermiso = !item.permisos?.length || tieneAlgunoDePermisos(item.permisos);
-      const hasRol = !item.roles?.length || tieneAlgunoDeRoles(item.roles);
 
       // Si el ítem define ambos, permitir si cumple al menos uno
       if (item.permisos?.length && item.roles?.length) {

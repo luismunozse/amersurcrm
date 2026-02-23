@@ -260,14 +260,14 @@ function GestionUsuarios() {
     <div className="space-y-6">
       {/* Header con botón para crear usuario */}
       <div className="crm-card p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-crm-text-primary">Gestión de Usuarios</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-crm-text-primary">Gestión de Usuarios</h2>
             <p className="text-crm-text-secondary text-sm mt-1">
               Crea y administra usuarios del sistema (Vendedores, Coordinadores, etc.)
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <a
               href="/dashboard/admin/vendedores-activos"
               className="px-4 py-2 rounded-lg text-sm font-medium border border-crm-border text-crm-text-primary hover:bg-crm-hover transition-colors flex items-center space-x-2"
@@ -758,7 +758,7 @@ function GestionUsuarios() {
 
         {/* Controles de paginación */}
         {totalPaginas > 1 && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-crm-border">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-4 pt-4 border-t border-crm-border gap-3">
             <div className="text-sm text-crm-text-muted">
               Mostrando {indiceInicio + 1} a {Math.min(indiceFin, usuariosFiltrados.length)} de {usuariosFiltrados.length} usuarios
             </div>
@@ -904,8 +904,8 @@ export default function AdminUsuariosPage() {
     <div className="min-h-screen bg-crm-bg-primary">
       <div className="container mx-auto px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-crm-text-primary">Gestión de Usuarios</h1>
-          <p className="text-crm-text-secondary mt-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-crm-text-primary">Gestión de Usuarios</h1>
+          <p className="text-sm sm:text-base text-crm-text-secondary mt-1 sm:mt-2">
             Administra usuarios, roles y permisos del sistema. Crea vendedores y coordinadores con información completa.
           </p>
         </div>

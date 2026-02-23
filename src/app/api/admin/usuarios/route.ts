@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Faltan campos requeridos: contraseña y rol son obligatorios" }, { status: 400 });
     }
 
-    // Verificar que el rol existe
+    // Verificar rol + validaciones de formato primero (sin DB)
     const { data: rol, error: rolError } = await supabase
       .schema('crm')
       .from('rol')
@@ -170,16 +170,13 @@ export async function POST(request: NextRequest) {
 
     // Validar campos según el tipo de rol
     if (esRolAdmin) {
-      // Para admin: solo username es requerido
       if (!username) {
         return NextResponse.json({ error: "Username es requerido para administradores" }, { status: 400 });
       }
     } else {
-      // Para vendedores/coordinadores: nombre y DNI son requeridos
       if (!nombre_completo || !dni) {
         return NextResponse.json({ error: "Nombre completo y DNI son requeridos para vendedores" }, { status: 400 });
       }
-      // Generar username si no se proporcionó
       if (!username) {
         username = generarUsername(nombre_completo);
       }
@@ -191,109 +188,80 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validacion.error }, { status: 400 });
     }
 
-    // Verificar que el username no exista
-    const { data: existingUser } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .select('username')
-      .eq('username', username)
-      .single();
-
-    if (existingUser) {
-      if (esRolAdmin) {
-        // Para admin, rechazar si el username ya existe
-        return NextResponse.json({
-          error: `El username "${username}" ya está en uso. Por favor, elige otro.`
-        }, { status: 400 });
-      } else {
-        // Para vendedores, intentar con número incremental
-        let numero = 2;
-        let usernameDisponible = false;
-        let usernameConNumero = username;
-
-        while (!usernameDisponible && numero <= 99) {
-          usernameConNumero = generarUsernameConNumero(username, numero);
-          const { data } = await supabase
-            .schema('crm')
-            .from('usuario_perfil')
-            .select('username')
-            .eq('username', usernameConNumero)
-            .single();
-
-          if (!data) {
-            usernameDisponible = true;
-            username = usernameConNumero;
-          }
-          numero++;
-        }
-
-        if (!usernameDisponible) {
-          return NextResponse.json({
-            error: `El username "${username}" y sus variantes ya están en uso. Por favor, elige otro.`
-          }, { status: 400 });
-        }
-      }
-    }
-
-    // Validar y generar email según el tipo de usuario
+    // Validar email (formato, sin DB)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    // Validar que el email sea proporcionado y tenga un formato válido
     if (!email || !email.trim()) {
       return NextResponse.json({
         error: "El email es obligatorio. Por favor, proporciona un email válido con un dominio de internet (ej: @gmail.com, @outlook.com, etc.)"
       }, { status: 400 });
     }
-
     const emailTrimmed = email.trim().toLowerCase();
-    
-    // Validar formato básico
     if (!emailRegex.test(emailTrimmed)) {
-      return NextResponse.json({
-        error: "El formato del email no es válido"
-      }, { status: 400 });
+      return NextResponse.json({ error: "El formato del email no es válido" }, { status: 400 });
     }
-
-    // Validar que el dominio sea válido (no dominios locales)
     const domain = emailTrimmed.split('@')[1]?.toLowerCase();
     const invalidDomains = ['.local', '.admin', '.test', '.localhost'];
     const hasInvalidDomain = invalidDomains.some(invalid => domain?.endsWith(invalid));
-    
     if (hasInvalidDomain) {
       return NextResponse.json({
         error: "No se puede usar un dominio local (.local, .admin, etc.). Por favor, usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com, etc."
       }, { status: 400 });
     }
-
     const emailFinal = emailTrimmed;
-    
-    // Verificar si el email ya existe
-    const { data: existingEmail } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .select('email')
-      .eq('email', emailFinal)
-      .single();
 
+    // Verificar username, email y DNI en paralelo (Promise.all)
+    const [
+      { data: existingUser },
+      { data: existingEmail },
+      existingDniResult,
+    ] = await Promise.all([
+      supabase.schema('crm').from('usuario_perfil').select('username').eq('username', username).single(),
+      supabase.schema('crm').from('usuario_perfil').select('email').eq('email', emailFinal).single(),
+      dni && !esRolAdmin
+        ? supabase.schema('crm').from('usuario_perfil').select('dni').eq('dni', dni).single()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    // Validar email duplicado
     if (existingEmail) {
       return NextResponse.json({
         error: `El email "${emailFinal}" ya está en uso.`
       }, { status: 400 });
     }
 
-    // Verificar si el DNI ya existe (solo para no-admin)
-    if (dni && !esRolAdmin) {
-      const { data: existingDni } = await supabase
-        .schema('crm')
-        .from('usuario_perfil')
-        .select('dni')
-        .eq('dni', dni)
-        .single();
+    // Validar DNI duplicado
+    if (existingDniResult?.data) {
+      return NextResponse.json({
+        error: `El DNI "${dni}" ya está registrado.`
+      }, { status: 400 });
+    }
 
-      if (existingDni) {
+    // Validar username duplicado
+    if (existingUser) {
+      if (esRolAdmin) {
         return NextResponse.json({
-          error: `El DNI "${dni}" ya está registrado.`
+          error: `El username "${username}" ya está en uso. Por favor, elige otro.`
         }, { status: 400 });
+      } else {
+        // Para vendedores, buscar variantes disponibles en batch
+        const usernameCandidates = Array.from({ length: 98 }, (_, i) =>
+          generarUsernameConNumero(username, i + 2)
+        );
+        const { data: existingUsernames } = await supabase
+          .schema('crm')
+          .from('usuario_perfil')
+          .select('username')
+          .in('username', usernameCandidates);
+
+        const takenUsernames = new Set(existingUsernames?.map(u => u.username) || []);
+        const usernameDisponible = usernameCandidates.find(u => !takenUsernames.has(u));
+
+        if (!usernameDisponible) {
+          return NextResponse.json({
+            error: `El username "${username}" y sus variantes ya están en uso. Por favor, elige otro.`
+          }, { status: 400 });
+        }
+        username = usernameDisponible;
       }
     }
 
@@ -469,38 +437,35 @@ export async function PATCH(request: NextRequest) {
       console.log(`[Admin] Email actualizado en Auth para usuario ${id}: ${newEmail}`);
     }
 
-    // Validar username si se proporciona
+    // Validar formato de username (sin DB)
     if (typeof username === 'string' && username.trim()) {
       const validacion = validarUsername(username.trim());
       if (!validacion.valido) {
         return NextResponse.json({ error: validacion.error || "El username no es válido" }, { status: 400 });
       }
-
-      // Verificar que el username no esté en uso por otro usuario
-      const { data: existente } = await supabase
-        .schema('crm')
-        .from('usuario_perfil')
-        .select('id')
-        .eq('username', username.trim())
-        .neq('id', id)
-        .single();
-
-      if (existente) {
-        return NextResponse.json({ error: "El username ya está en uso" }, { status: 400 });
-      }
     }
 
-    // Validar que el rol existe si se proporciona
-    if (typeof rol_id === 'string' && rol_id.trim()) {
-      const { data: rolExistente, error: rolError } = await supabase
-        .schema('crm')
-        .from('rol')
-        .select('id, nombre')
-        .eq('id', rol_id)
-        .eq('activo', true)
-        .single();
+    // Verificar username y rol en paralelo (Promise.all)
+    const needsUsernameCheck = typeof username === 'string' && username.trim();
+    const needsRolCheck = typeof rol_id === 'string' && rol_id.trim();
 
-      if (rolError || !rolExistente) {
+    if (needsUsernameCheck || needsRolCheck) {
+      const [usernameResult, rolResult] = await Promise.all([
+        needsUsernameCheck
+          ? supabase.schema('crm').from('usuario_perfil').select('id')
+              .eq('username', username.trim()).neq('id', id).single()
+          : Promise.resolve({ data: null, error: null }),
+        needsRolCheck
+          ? supabase.schema('crm').from('rol').select('id, nombre')
+              .eq('id', rol_id).eq('activo', true).single()
+          : Promise.resolve({ data: true, error: null }),
+      ]);
+
+      if (needsUsernameCheck && usernameResult.data) {
+        return NextResponse.json({ error: "El username ya está en uso" }, { status: 400 });
+      }
+
+      if (needsRolCheck && (rolResult.error || !rolResult.data)) {
         return NextResponse.json({ error: "El rol especificado no existe o no está activo" }, { status: 400 });
       }
     }

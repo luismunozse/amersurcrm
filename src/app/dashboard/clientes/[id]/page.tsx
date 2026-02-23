@@ -3,6 +3,7 @@ import { PERMISOS } from "@/lib/permissions";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { redirect, notFound } from "next/navigation";
 import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
+import AgendarEventoButton from "./_AgendarEventoButton";
 import { ArrowLeft, User, Phone, Mail, MapPin } from "lucide-react";
 import Link from "next/link";
 import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/clientes";
@@ -234,8 +235,8 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     <div className="min-h-screen bg-crm-background">
       {/* Header */}
       <div className="bg-crm-card border-b border-crm-border sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3 sm:gap-4 mb-4">
             <Link
               href="/dashboard/clientes"
               className="p-2 hover:bg-crm-card-hover rounded-lg transition-colors"
@@ -243,18 +244,19 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
               <ArrowLeft className="h-5 w-5 text-crm-text-muted" />
             </Link>
             <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-crm-text-primary">{cliente.nombre}</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold text-crm-text-primary">{cliente.nombre}</h1>
                 <span className={getStatusBadgeClasses(estadoColor)}>
                   {getEstadoClienteLabel(cliente.estado_cliente)}
                 </span>
               </div>
               <p className="text-sm text-crm-text-muted mt-1">{cliente.codigo_cliente}</p>
             </div>
+            <AgendarEventoButton clienteId={cliente.id} clienteNombre={cliente.nombre} />
           </div>
 
           {/* Información Rápida */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {cliente.telefono && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-crm-text-muted" />
@@ -296,7 +298,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       </div>
 
       {/* Tabs con contenido */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <ClienteDetailTabs
           cliente={cliente}
           interacciones={interacciones || []}

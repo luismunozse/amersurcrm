@@ -92,7 +92,9 @@ export function useReportes(options: UseReportesOptions = {}) {
     {
       title: "Ventas Totales",
       value: formatearMoneda(data.metricas.ventas.valorTotal),
-      change: data.metricas.ventas.propiedadesVendidas > 0 ? "+12.5%" : "0%",
+      change: data.metricas.ventas.propiedadesVendidas > 0
+        ? `${data.metricas.ventas.propiedadesVendidas} ${data.metricas.ventas.propiedadesVendidas === 1 ? 'propiedad' : 'propiedades'}`
+        : "Sin ventas en el período",
       changeType: "positive" as const,
       icon: "💰",
       color: "text-green-600",
@@ -119,7 +121,9 @@ export function useReportes(options: UseReportesOptions = {}) {
     {
       title: "Conversión",
       value: formatearPorcentaje(data.metricas.clientes.tasaConversion),
-      change: data.metricas.clientes.tasaConversion > 0 ? "+3.1%" : "0%",
+      change: data.metricas.clientes.nuevos > 0
+        ? `+${data.metricas.clientes.nuevos} nuevos clientes`
+        : "Sin clientes nuevos",
       changeType: "positive" as const,
       icon: "📈",
       color: "text-orange-600",

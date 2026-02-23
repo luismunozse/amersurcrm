@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   format,
   startOfMonth,
@@ -20,7 +20,7 @@ import {
   endOfDay,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { obtenerEventos, cambiarEstadoEvento, reprogramarEvento } from "./actions";
+import { obtenerEventos, reprogramarEvento, marcarEventosVencidos, obtenerVendedoresAgenda, completarEventoConResultado, type DatosCompletarEvento } from "./actions";
 import { Evento } from "@/lib/types/agenda";
 import EventoModal from "./_EventoModal";
 import RecordatoriosPanel from "@/components/RecordatoriosPanel";
@@ -30,6 +30,17 @@ import toast from "react-hot-toast";
 
 type VistaCalendario = "mes" | "semana" | "dia";
 type VistaTab = "calendario" | "recordatorios" | "notificaciones";
+
+// Mapa de colores por tipo de evento (module-level para evitar re-creación)
+const COLOR_TIPO: Record<string, { bg: string; border: string }> = {
+  cita:         { bg: '#3B82F6', border: '#2563EB' },  // Azul
+  llamada:      { bg: '#22C55E', border: '#16A34A' },  // Verde
+  email:        { bg: '#8B5CF6', border: '#7C3AED' },  // Violeta
+  visita:       { bg: '#F97316', border: '#EA580C' },  // Naranja
+  seguimiento:  { bg: '#EAB308', border: '#CA8A04' },  // Amarillo (WhatsApp, mensajes)
+  recordatorio: { bg: '#F43F5E', border: '#E11D48' },  // Rosa
+  tarea:        { bg: '#64748B', border: '#475569' },  // Gris
+};
 
 export default function AgendaDashboard() {
   const [fechaActual, setFechaActual] = useState(new Date());
@@ -46,6 +57,10 @@ export default function AgendaDashboard() {
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
+  // Vista de equipo para admin/gerente
+  const [vendedorFiltroId, setVendedorFiltroId] = useState<string | null>(null);
+  const [vendedores, setVendedores] = useState<Array<{ id: string; nombre: string }>>([]);
+
   // Modal de reprogramar
   const [mostrarModalReprogramar, setMostrarModalReprogramar] = useState(false);
   const [eventoReprogramar, setEventoReprogramar] = useState<Evento | null>(null);
@@ -55,7 +70,8 @@ export default function AgendaDashboard() {
   const cargarEventos = useCallback(async () => {
     try {
       setCargando(true);
-      const data = await obtenerEventos(fechaActual, vista);
+      await marcarEventosVencidos();
+      const data = await obtenerEventos(fechaActual, vista, vendedorFiltroId);
       setEventos(data);
     } catch (error) {
       console.error("Error cargando eventos:", error);
@@ -63,11 +79,16 @@ export default function AgendaDashboard() {
     } finally {
       setCargando(false);
     }
-  }, [fechaActual, vista]);
+  }, [fechaActual, vista, vendedorFiltroId]);
 
   useEffect(() => {
     cargarEventos();
   }, [cargarEventos]);
+
+  // Cargar lista de vendedores para el selector admin (solo si el usuario es admin/gerente)
+  useEffect(() => {
+    obtenerVendedoresAgenda().then(setVendedores);
+  }, []);
 
 
   const navegarPeriodo = (direccion: "anterior" | "siguiente") => {
@@ -139,17 +160,27 @@ export default function AgendaDashboard() {
     [eventosFiltrados]
   );
 
-  const obtenerColorEvento = useCallback((tipo: string) => {
-    const colores: Record<string, string> = {
-      cita: "bg-blue-100 text-blue-800 border-blue-200",
-      llamada: "bg-green-100 text-green-800 border-green-200",
-      email: "bg-purple-100 text-purple-800 border-purple-200",
-      visita: "bg-orange-100 text-orange-800 border-orange-200",
-      seguimiento: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      recordatorio: "bg-red-100 text-red-800 border-red-200",
-      tarea: "bg-gray-100 text-gray-800 border-gray-200",
+  const obtenerColorEvento = useCallback((tipo: string, estado?: string): React.CSSProperties => {
+    const base = COLOR_TIPO[tipo] || { bg: '#64748B', border: '#475569' };
+    const style: React.CSSProperties = {
+      backgroundColor: base.bg,
+      color: 'white',
+      borderColor: base.border,
     };
-    return colores[tipo] || "bg-gray-100 text-gray-800 border-gray-200";
+
+    // Estado modifica la opacidad/aspecto pero NO el color base
+    if (estado === 'completado')  style.opacity = 0.55;
+    if (estado === 'cancelado')   style.opacity = 0.35;
+    if (estado === 'vencida')     style.outline = '2px solid #EF4444';
+    if (estado === 'en_progreso') style.outline = '2px solid #60A5FA';
+
+    return style;
+  }, []);
+
+  // Clases extra según estado (no-color)
+  const obtenerClasesEvento = useCallback((tipo: string, estado?: string) => {
+    if (estado === 'cancelado') return "line-through";
+    return "";
   }, []);
 
   const tituloVista = useMemo(() => {
@@ -190,8 +221,18 @@ export default function AgendaDashboard() {
     [obtenerEventosDia, ordenarEventos, fechaActual]
   );
 
-  const abrirModalNuevoEvento = () => {
+  const [fechaPreseleccionada, setFechaPreseleccionada] = useState<string | null>(null);
+
+  const abrirModalNuevoEvento = (fechaSugerida?: Date) => {
     setEventoActivo(null);
+    if (fechaSugerida) {
+      // Redondear a la próxima hora completa para esa fecha
+      const fecha = new Date(fechaSugerida);
+      fecha.setHours(9, 0, 0, 0); // 9:00 AM por defecto
+      setFechaPreseleccionada(fecha.toISOString().slice(0, 16));
+    } else {
+      setFechaPreseleccionada(null);
+    }
     setMostrarModalEvento(true);
   };
 
@@ -202,6 +243,7 @@ export default function AgendaDashboard() {
 
   const handleCerrarModal = () => {
     setEventoActivo(null);
+    setFechaPreseleccionada(null);
     setMostrarModalEvento(false);
   };
 
@@ -210,16 +252,27 @@ export default function AgendaDashboard() {
     cargarEventos();
   };
 
+  // Modal de resultado al completar
+  const [mostrarModalResultado, setMostrarModalResultado] = useState(false);
+  const [eventoParaCompletar, setEventoParaCompletar] = useState<Evento | null>(null);
+
   // Quick Actions handlers
-  const handleMarcarCompletado = async (evento: Evento, e: React.MouseEvent) => {
+  const handleMarcarCompletado = (evento: Evento, e: React.MouseEvent) => {
     e.stopPropagation();
     if (procesandoAccion) return;
+    setEventoParaCompletar(evento);
+    setMostrarModalResultado(true);
+  };
 
+  const handleConfirmarCompletado = async (datos: DatosCompletarEvento) => {
+    if (!eventoParaCompletar || procesandoAccion) return;
     setProcesandoAccion(true);
     try {
-      const result = await cambiarEstadoEvento(evento.id, 'completado');
+      const result = await completarEventoConResultado(eventoParaCompletar.id, datos);
       if (result.success) {
         toast.success(result.message);
+        setMostrarModalResultado(false);
+        setEventoParaCompletar(null);
         cargarEventos();
       } else {
         toast.error(result.message);
@@ -295,6 +348,27 @@ export default function AgendaDashboard() {
     [eventosFiltrados, ordenarEventos]
   );
 
+  // Métricas para gerente/admin (calculadas del listado cargado)
+  const metricasEquipo = useMemo(() => {
+    if (vendedores.length === 0) return null;
+    const total = eventosFiltrados.length;
+    if (total === 0) return null;
+
+    const porEstado = eventosFiltrados.reduce<Record<string, number>>((acc, e) => {
+      acc[e.estado] = (acc[e.estado] || 0) + 1;
+      return acc;
+    }, {});
+    const porTipo = eventosFiltrados.reduce<Record<string, number>>((acc, e) => {
+      acc[e.tipo] = (acc[e.tipo] || 0) + 1;
+      return acc;
+    }, {});
+    const completados = porEstado['completado'] || 0;
+    const cerrados = completados + (porEstado['cancelado'] || 0) + (porEstado['vencida'] || 0);
+    const tasaConversion = cerrados > 0 ? Math.round((completados / cerrados) * 100) : 0;
+
+    return { total, porEstado, porTipo, tasaConversion, completados };
+  }, [eventosFiltrados, vendedores]);
+
   const renderMes = () => (
     <div className="grid grid-cols-7 gap-1 sm:gap-2">
       {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((dia) => (
@@ -316,7 +390,9 @@ export default function AgendaDashboard() {
           <button
             type="button"
             onClick={() => setFechaActual(dia)}
+            onDoubleClick={() => abrirModalNuevoEvento(dia)}
             key={dia.toISOString()}
+            title="Doble click para crear evento"
             className={`min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border border-crm-border rounded-lg transition-all duration-200 hover:shadow-md text-left ${
               esMesActual ? "bg-crm-card" : "bg-crm-border/30"
             } ${esHoy ? "ring-2 ring-crm-primary bg-crm-primary/5" : ""} ${
@@ -337,7 +413,8 @@ export default function AgendaDashboard() {
                 .map((evento) => (
                   <div
                     key={evento.id}
-                    className={`text-xs p-1 rounded border cursor-pointer hover:shadow-sm transition-all duration-200 ${obtenerColorEvento(evento.tipo)}`}
+                    className={`text-xs p-1 rounded border cursor-pointer hover:shadow-sm transition-all duration-200 ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
+                    style={obtenerColorEvento(evento.tipo, evento.estado)}
                     onClick={(e) => {
                       e.stopPropagation();
                       abrirModalEvento(evento);
@@ -391,7 +468,8 @@ export default function AgendaDashboard() {
                   return (
                     <div
                       key={evento.id}
-                      className={`group relative p-2 border rounded-lg cursor-pointer transition-all ${obtenerColorEvento(evento.tipo)}`}
+                      className={`group relative p-2 border rounded-lg cursor-pointer transition-all ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
+                      style={obtenerColorEvento(evento.tipo, evento.estado)}
                       onClick={() => abrirModalEvento(evento)}
                     >
                       <p className="text-xs font-semibold truncate pr-8">{evento.titulo}</p>
@@ -407,7 +485,7 @@ export default function AgendaDashboard() {
                         {evento.estado !== 'completado' && (
                           <button
                             onClick={(e) => handleMarcarCompletado(evento, e)}
-                            className="p-1 bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors"
+                            className="p-1 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-800/40 dark:text-green-400 rounded transition-colors"
                             title="Completar"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -417,7 +495,7 @@ export default function AgendaDashboard() {
                         )}
                         <button
                           onClick={(e) => handleAbrirReprogramar(evento, e)}
-                          className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors"
+                          className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 dark:text-blue-400 rounded transition-colors"
                           title="Reprogramar"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,7 +540,8 @@ export default function AgendaDashboard() {
             return (
               <div
                 key={evento.id}
-                className={`group relative p-3 border rounded-lg hover:shadow transition-all cursor-pointer ${obtenerColorEvento(evento.tipo)}`}
+                className={`group relative p-3 border rounded-lg hover:shadow transition-all cursor-pointer ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
+                style={obtenerColorEvento(evento.tipo, evento.estado)}
                 onClick={() => abrirModalEvento(evento)}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -479,6 +558,12 @@ export default function AgendaDashboard() {
                         {evento.descripcion}
                       </p>
                     )}
+                    {(evento as any).proximo_paso_objetivo && (
+                      <p className="text-xs mt-1.5 opacity-90 flex items-center gap-1">
+                        <span>➡️</span>
+                        <span className="truncate">{(evento as any).proximo_paso_objetivo}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Quick Actions */}
@@ -486,7 +571,7 @@ export default function AgendaDashboard() {
                     {evento.estado !== 'completado' && (
                       <button
                         onClick={(e) => handleMarcarCompletado(evento, e)}
-                        className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors"
+                        className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-800/40 dark:text-green-400 rounded transition-colors"
                         title="Marcar como completado"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -496,7 +581,7 @@ export default function AgendaDashboard() {
                     )}
                     <button
                       onClick={(e) => handleAbrirReprogramar(evento, e)}
-                      className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors"
+                      className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 dark:text-blue-400 rounded transition-colors"
                       title="Reprogramar"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -507,7 +592,7 @@ export default function AgendaDashboard() {
                       <>
                         <button
                           onClick={(e) => handleLlamar(evento, e)}
-                          className="p-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors"
+                          className="p-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/30 dark:hover:bg-purple-800/40 dark:text-purple-400 rounded transition-colors"
                           title="Llamar"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -516,7 +601,7 @@ export default function AgendaDashboard() {
                         </button>
                         <button
                           onClick={(e) => handleWhatsApp(evento, e)}
-                          className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded transition-colors"
+                          className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/40 dark:text-emerald-400 rounded transition-colors"
                           title="WhatsApp"
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -554,8 +639,8 @@ export default function AgendaDashboard() {
               }`}
             >
               <div className="flex items-center justify-center space-x-2">
-                <span className="hidden xs:inline">{tab.label}</span>
-                <span className="xs:hidden">{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.icon}</span>
               </div>
             </button>
           ))}
@@ -567,8 +652,8 @@ export default function AgendaDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div className="crm-card p-3 sm:p-4 hover:shadow-lg transition-all duration-200">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
@@ -581,8 +666,8 @@ export default function AgendaDashboard() {
 
             <div className="crm-card p-3 sm:p-4 hover:shadow-lg transition-all duration-200">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
@@ -595,8 +680,8 @@ export default function AgendaDashboard() {
 
             <div className="crm-card p-3 sm:p-4 hover:shadow-lg transition-all duration-200 sm:col-span-2 lg:col-span-1">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
@@ -607,6 +692,57 @@ export default function AgendaDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Panel de métricas para gerente/admin */}
+          {metricasEquipo && (
+            <div className="crm-card p-4 sm:p-5 border-l-4 border-crm-primary">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-crm-text-primary">
+                  Métricas del equipo
+                  {vendedorFiltroId && (
+                    <span className="ml-2 text-xs font-normal text-crm-text-muted">
+                      — {vendedores.find(v => v.id === vendedorFiltroId)?.nombre}
+                    </span>
+                  )}
+                </h3>
+                <span className="text-xs text-crm-text-muted">{metricasEquipo.total} eventos en el período</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {/* Tasa de conversión */}
+                <div className="bg-crm-primary/10 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-crm-primary">{metricasEquipo.tasaConversion}%</p>
+                  <p className="text-xs text-crm-text-muted mt-0.5">Tasa completados</p>
+                </div>
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-green-600">{metricasEquipo.porEstado['completado'] || 0}</p>
+                  <p className="text-xs text-crm-text-muted mt-0.5">Completados</p>
+                </div>
+                <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-orange-600">{(metricasEquipo.porEstado['pendiente'] || 0) + (metricasEquipo.porEstado['en_progreso'] || 0)}</p>
+                  <p className="text-xs text-crm-text-muted mt-0.5">Activos</p>
+                </div>
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-red-600">{metricasEquipo.porEstado['vencida'] || 0}</p>
+                  <p className="text-xs text-crm-text-muted mt-0.5">Vencidos</p>
+                </div>
+              </div>
+
+              {/* Por tipo */}
+              <div>
+                <p className="text-xs font-medium text-crm-text-muted mb-2">Distribución por tipo</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(metricasEquipo.porTipo)
+                    .sort(([,a],[,b]) => b - a)
+                    .map(([tipo, count]) => (
+                      <span key={tipo} className="px-2.5 py-1 text-xs rounded-full bg-crm-border text-crm-text-primary">
+                        {tipo}: <strong>{count}</strong>
+                      </span>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="crm-card p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
@@ -683,9 +819,8 @@ export default function AgendaDashboard() {
                   onClick={() => abrirModalEvento(evento)}
                 >
                   <div
-                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${
-                      obtenerColorEvento(evento.tipo).split(" ")[0]
-                    }`}
+                    className="w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: (COLOR_TIPO[evento.tipo] || { bg: '#64748B' }).bg }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs sm:text-sm font-medium text-crm-text-primary truncate">
@@ -695,7 +830,10 @@ export default function AgendaDashboard() {
                       {format(new Date(evento.fecha_inicio), "dd/MM/yyyy HH:mm", { locale: es })}
                     </p>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${obtenerColorEvento(evento.tipo)}`}>
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
+                    style={obtenerColorEvento(evento.tipo, evento.estado)}
+                  >
                     <span className="hidden sm:inline">{evento.tipo}</span>
                     <span className="sm:hidden">{evento.tipo.charAt(0).toUpperCase()}</span>
                   </span>
@@ -709,7 +847,7 @@ export default function AgendaDashboard() {
 
           <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
             <button
-              onClick={abrirModalNuevoEvento}
+              onClick={() => abrirModalNuevoEvento()}
               className="crm-button-primary px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium flex items-center justify-center space-x-2 w-full sm:w-auto"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -731,7 +869,7 @@ export default function AgendaDashboard() {
             <button
               onClick={() => setMostrarFiltros(!mostrarFiltros)}
               className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors w-full sm:w-auto ${
-                mostrarFiltros || filtroTipo || filtroPrioridad || filtroEstado
+                mostrarFiltros || filtroTipo || filtroPrioridad || filtroEstado || vendedorFiltroId
                   ? 'crm-button-primary'
                   : 'text-crm-text-secondary bg-crm-bg-secondary hover:bg-crm-border'
               }`}
@@ -740,9 +878,9 @@ export default function AgendaDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               <span>Filtros</span>
-              {(filtroTipo || filtroPrioridad || filtroEstado) && (
+              {(filtroTipo || filtroPrioridad || filtroEstado || vendedorFiltroId) && (
                 <span className="ml-1 px-2 py-0.5 bg-white rounded-full text-xs">
-                  {[filtroTipo, filtroPrioridad, filtroEstado].filter(Boolean).length}
+                  {[filtroTipo, filtroPrioridad, filtroEstado, vendedorFiltroId].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -751,7 +889,7 @@ export default function AgendaDashboard() {
           {/* Panel de Filtros */}
           {mostrarFiltros && (
             <div className="mt-4 p-4 bg-crm-bg-secondary rounded-lg border border-crm-border">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`grid grid-cols-1 gap-4 ${vendedores.length > 0 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
                 <div>
                   <label className="text-sm font-medium text-crm-text-primary block mb-2">Tipo</label>
                   <select
@@ -800,15 +938,32 @@ export default function AgendaDashboard() {
                     <option value="cancelado">Cancelada</option>
                   </select>
                 </div>
+
+                {vendedores.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-crm-text-primary block mb-2">Vendedor</label>
+                    <select
+                      value={vendedorFiltroId ?? ''}
+                      onChange={(e) => setVendedorFiltroId(e.target.value || null)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                    >
+                      <option value="">Todos los vendedores</option>
+                      {vendedores.map((v) => (
+                        <option key={v.id} value={v.id}>{v.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              {(filtroTipo || filtroPrioridad || filtroEstado) && (
+              {(filtroTipo || filtroPrioridad || filtroEstado || vendedorFiltroId) && (
                 <div className="mt-4 flex justify-end">
                   <button
                     onClick={() => {
                       setFiltroTipo('');
                       setFiltroPrioridad('');
                       setFiltroEstado('');
+                      setVendedorFiltroId(null);
                     }}
                     className="px-4 py-2 text-sm text-crm-text-secondary hover:text-crm-text-primary transition-colors"
                   >
@@ -898,7 +1053,203 @@ export default function AgendaDashboard() {
         isOpen={mostrarModalEvento}
         onClose={handleCerrarModal}
         onSuccess={handleEventoGuardado}
+        fechaPreseleccionada={fechaPreseleccionada ?? undefined}
       />
+
+      {/* Modal de resultado al completar */}
+      {mostrarModalResultado && eventoParaCompletar && (
+        <ModalResultadoEvento
+          evento={eventoParaCompletar}
+          procesando={procesandoAccion}
+          onConfirmar={handleConfirmarCompletado}
+          onCancelar={() => {
+            setMostrarModalResultado(false);
+            setEventoParaCompletar(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// =====================================================
+// COMPONENTE: MODAL DE RESULTADO AL COMPLETAR EVENTO
+// =====================================================
+
+function ModalResultadoEvento({
+  evento,
+  procesando,
+  onConfirmar,
+  onCancelar,
+}: {
+  evento: Evento;
+  procesando: boolean;
+  onConfirmar: (datos: DatosCompletarEvento) => void;
+  onCancelar: () => void;
+}) {
+  const [resultado, setResultado] = useState<DatosCompletarEvento['resultado']>('interesado');
+  const [notas, setNotas] = useState('');
+  const [agendarSiguiente, setAgendarSiguiente] = useState(false);
+  const [proximoTipo, setProximoTipo] = useState('llamada');
+  const [proximoTitulo, setProximoTitulo] = useState('');
+  const [proximaFecha, setProximaFecha] = useState('');
+  const [proximaDuracion, setProximaDuracion] = useState(30);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onConfirmar({
+      resultado,
+      notas: notas.trim() || undefined,
+      proximaAccion: agendarSiguiente && proximoTitulo && proximaFecha
+        ? { tipo: proximoTipo, titulo: proximoTitulo, fecha: proximaFecha, duracion_minutos: proximaDuracion }
+        : undefined,
+    });
+  };
+
+  const RESULTADOS = [
+    { value: 'interesado',     label: '✅ Interesado',         color: 'border-green-400 bg-green-50 text-green-800 dark:border-green-500 dark:bg-green-900/30 dark:text-green-300' },
+    { value: 'necesita_tiempo',label: '⏳ Necesita tiempo',    color: 'border-yellow-400 bg-yellow-50 text-yellow-800 dark:border-yellow-500 dark:bg-yellow-900/30 dark:text-yellow-300' },
+    { value: 'no_interesado',  label: '❌ No interesado',      color: 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-500 dark:bg-gray-800/50 dark:text-gray-400' },
+    { value: 'separo_lote',    label: '🏠 Separó lote',        color: 'border-blue-400 bg-blue-50 text-blue-800 dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
+    { value: 'perdido',        label: '💔 Perdido',            color: 'border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-900/30 dark:text-red-300' },
+  ] as const;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="p-5 border-b border-crm-border flex-shrink-0">
+          <h2 className="text-lg font-bold text-crm-text-primary">Resultado de la gestión</h2>
+          <p className="text-sm text-crm-text-muted mt-0.5 truncate">{evento.titulo}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="p-5 space-y-5 overflow-y-auto flex-1">
+            {/* Resultado */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-3">¿Cómo resultó la gestión?</label>
+              <div className="space-y-2">
+                {RESULTADOS.map((r) => (
+                  <label
+                    key={r.value}
+                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      resultado === r.value ? r.color + ' border-2' : 'border-crm-border hover:border-crm-primary/40'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="resultado"
+                      value={r.value}
+                      checked={resultado === r.value}
+                      onChange={() => setResultado(r.value)}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-medium">{r.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">Notas de la gestión <span className="text-crm-text-muted font-normal">(opcional)</span></label>
+              <textarea
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                placeholder="¿Qué se dijo? ¿Cuál es el siguiente paso conversado?"
+                rows={3}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary resize-none text-sm"
+              />
+            </div>
+
+            {/* Próxima acción */}
+            <div className="border border-crm-border rounded-lg overflow-hidden">
+              <label className="flex items-center gap-3 p-3 cursor-pointer bg-crm-bg-secondary/50 hover:bg-crm-bg-secondary transition-colors">
+                <input
+                  type="checkbox"
+                  checked={agendarSiguiente}
+                  onChange={(e) => setAgendarSiguiente(e.target.checked)}
+                  className="w-4 h-4 rounded text-crm-primary border-crm-border"
+                />
+                <div>
+                  <p className="text-sm font-medium text-crm-text-primary">Agendar próxima acción</p>
+                  <p className="text-xs text-crm-text-muted">Crea automáticamente el siguiente evento</p>
+                </div>
+              </label>
+
+              {agendarSiguiente && (
+                <div className="p-4 space-y-3 border-t border-crm-border">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-crm-text-muted mb-1.5">Tipo</label>
+                      <select
+                        value={proximoTipo}
+                        onChange={(e) => setProximoTipo(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                      >
+                        <option value="llamada">📞 Llamada</option>
+                        <option value="visita">🏠 Visita</option>
+                        <option value="cita">📅 Cita</option>
+                        <option value="seguimiento">👥 Seguimiento</option>
+                        <option value="email">✉️ Email</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-crm-text-muted mb-1.5">Duración</label>
+                      <select
+                        value={proximaDuracion}
+                        onChange={(e) => setProximaDuracion(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                      >
+                        <option value={15}>15 min</option>
+                        <option value={30}>30 min</option>
+                        <option value={60}>1 hora</option>
+                        <option value={90}>1h 30m</option>
+                        <option value={120}>2 horas</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-crm-text-muted mb-1.5">Título</label>
+                    <input
+                      type="text"
+                      value={proximoTitulo}
+                      onChange={(e) => setProximoTitulo(e.target.value)}
+                      placeholder="Ej: Seguimiento post-visita con María García"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-crm-text-muted mb-1.5">Fecha y hora</label>
+                    <input
+                      type="datetime-local"
+                      value={proximaFecha}
+                      onChange={(e) => setProximaFecha(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 p-5 pt-4 border-t border-crm-border flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
+            <button
+              type="button"
+              onClick={onCancelar}
+              className="px-4 py-2.5 text-sm font-medium text-crm-text-secondary bg-crm-border hover:bg-crm-border-hover rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={procesando || (agendarSiguiente && (!proximoTitulo || !proximaFecha))}
+              className="px-5 py-2.5 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary-hover rounded-lg transition-colors disabled:opacity-50"
+            >
+              {procesando ? 'Guardando...' : 'Completar evento'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

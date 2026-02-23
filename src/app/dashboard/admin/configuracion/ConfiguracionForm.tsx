@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
-import { useSearchParams } from "next/navigation";
 import { actualizarConfiguracion, ConfiguracionFormState } from "./actions";
 
 export type ConfiguracionInicial = {
@@ -70,7 +69,6 @@ function SubmitButton() {
 export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) {
   const [state, formAction] = useActionState(actualizarConfiguracion, initialState);
   const [reemplazarWhatsappToken, setReemplazarWhatsappToken] = useState(false);
-  const searchParams = useSearchParams();
   const [urlMessage, setUrlMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const camposClienteDefault = useMemo(
@@ -82,9 +80,11 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
     [config.camposPropiedad]
   );
 
+  // Lee parámetros de URL una sola vez al montar (sin useSearchParams para evitar re-renders)
   useEffect(() => {
-    const success = searchParams.get("success");
-    const error = searchParams.get("error");
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get("success");
+    const error = params.get("error");
 
     if (success === "google_connected") {
       setUrlMessage({
@@ -116,7 +116,7 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, []);
 
   return (
     <form
@@ -431,7 +431,7 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
         <div className="border-t border-crm-border pt-6">
           <h3 className="text-lg font-medium text-crm-text-primary mb-4">Google Drive</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-crm-background rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-crm-background rounded-lg">
               <div className="flex-1">
                 <p className="text-sm font-medium text-crm-text-primary">
                   Estado de conexión
@@ -486,7 +486,7 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
 
       {/* Botones de acción */}
       <input type="hidden" name="replaceWhatsappToken" value={reemplazarWhatsappToken ? "true" : "false"} />
-      <div className="flex justify-end space-x-4">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
         <button
           type="reset"
           className="px-6 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors"

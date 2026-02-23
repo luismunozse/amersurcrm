@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 interface SearchFilters {
   query: string;
@@ -24,26 +24,34 @@ interface AdvancedClientSearchProps {
   onFiltersChange?: (filters: SearchFilters) => void;
 }
 
+// Lee los parámetros de URL una sola vez sin suscribirse a cambios (evita re-renders innecesarios)
+function getInitialParams(): URLSearchParams {
+  if (typeof window === 'undefined') return new URLSearchParams();
+  return new URLSearchParams(window.location.search);
+}
+
 export default function AdvancedClientSearch({ clientes, onFiltersChange }: AdvancedClientSearchProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const [filters, setFilters] = useState<SearchFilters>({
-    query: searchParams.get('q') || '',
-    telefono: searchParams.get('telefono') || '',
-    dni: searchParams.get('dni') || '',
-    estado: searchParams.get('estado') || '',
-    tipo: searchParams.get('tipo') || '',
-    vendedor: searchParams.get('vendedor') || '',
-    estado_civil: searchParams.get('estado_civil') || '',
-    fecha_desde: searchParams.get('fecha_desde') || '',
-    fecha_hasta: searchParams.get('fecha_hasta') || '',
-    propiedades_reservadas: searchParams.get('propiedades_reservadas') || '',
-    propiedades_compradas: searchParams.get('propiedades_compradas') || '',
-    origen_lead: searchParams.get('origen_lead') || '',
-    interes_principal: searchParams.get('interes_principal') || '',
+  const [filters, setFilters] = useState<SearchFilters>(() => {
+    const params = getInitialParams();
+    return {
+      query: params.get('q') || '',
+      telefono: params.get('telefono') || '',
+      dni: params.get('dni') || '',
+      estado: params.get('estado') || '',
+      tipo: params.get('tipo') || '',
+      vendedor: params.get('vendedor') || '',
+      estado_civil: params.get('estado_civil') || '',
+      fecha_desde: params.get('fecha_desde') || '',
+      fecha_hasta: params.get('fecha_hasta') || '',
+      propiedades_reservadas: params.get('propiedades_reservadas') || '',
+      propiedades_compradas: params.get('propiedades_compradas') || '',
+      origen_lead: params.get('origen_lead') || '',
+      interes_principal: params.get('interes_principal') || '',
+    };
   });
 
 

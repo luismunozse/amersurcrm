@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Users, UserPlus, UserCheck, UserX, Loader2 } from "lucide-react";
@@ -16,25 +16,25 @@ export default function ReporteClientes({ periodo }: ReporteClientesProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setLoading(true);
-      setError(null);
+  const cargarDatos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      const result = await obtenerReporteClientes(periodo);
+    const result = await obtenerReporteClientes(periodo);
 
-      if (result.error) {
-        setError(result.error);
-        toast.error(result.error);
-      } else {
-        setData(result.data);
-      }
+    if (result.error) {
+      setError(result.error);
+      toast.error(result.error);
+    } else {
+      setData(result.data);
+    }
 
-      setLoading(false);
-    };
-
-    cargarDatos();
+    setLoading(false);
   }, [periodo]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   if (loading) {
     return (
@@ -48,7 +48,7 @@ export default function ReporteClientes({ periodo }: ReporteClientesProps) {
     return (
       <div className="text-center py-12">
         <div className="text-red-600 dark:text-red-400 mb-4">{error || 'Error cargando datos'}</div>
-        <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        <Button onClick={cargarDatos}>Reintentar</Button>
       </div>
     );
   }

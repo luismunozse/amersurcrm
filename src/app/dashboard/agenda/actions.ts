@@ -8,7 +8,8 @@ import {
   EstadoEvento,
 } from "@/lib/types/agenda";
 import { crearNotificacion } from "@/app/_actionsNotifications";
-import { 
+import { obtenerPermisosUsuario } from "@/lib/permissions/server";
+import {
   startOfMonth,
   endOfMonth,
   startOfWeek,
@@ -41,27 +42,29 @@ export async function obtenerMetricasAgenda(): Promise<{
     const finSemana = endOfDay(addDays(ahora, 7));
 
     // Eventos pendientes (programados que aún no han pasado)
+    const estadosActivos = ['pendiente', 'en_progreso', 'reprogramado'];
+
     const [pendientesRes, hoyRes, semanaRes] = await Promise.all([
       supabase
         .from('evento')
         .select('id', { count: 'exact', head: true })
         .eq('vendedor_id', user.id)
-        .eq('estado', 'programado')
+        .in('estado', estadosActivos)
         .gte('fecha_inicio', ahora.toISOString()),
-      
+
       supabase
         .from('evento')
         .select('id', { count: 'exact', head: true })
         .eq('vendedor_id', user.id)
-        .eq('estado', 'programado')
+        .in('estado', estadosActivos)
         .gte('fecha_inicio', startOfDay(ahora).toISOString())
         .lte('fecha_inicio', finHoy.toISOString()),
-      
+
       supabase
         .from('evento')
         .select('id', { count: 'exact', head: true })
         .eq('vendedor_id', user.id)
-        .eq('estado', 'programado')
+        .in('estado', estadosActivos)
         .gte('fecha_inicio', ahora.toISOString())
         .lte('fecha_inicio', finSemana.toISOString()),
     ]);
@@ -142,7 +145,122 @@ const RecordatorioSchema = z.object({
 
 type VistaCalendario = 'mes' | 'semana' | 'dia';
 
-export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'): Promise<Evento[]> {
+// =====================================================
+// AUTO-VENCIMIENTO DE EVENTOS
+// =====================================================
+
+/**
+ * Marca como 'vencida' todos los eventos pendientes cuya fecha ya pasó.
+ * Se llama al cargar la agenda para mantener los estados sincronizados.
+ */
+export async function marcarEventosVencidos(): Promise<void> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from('evento')
+      .update({ estado: 'vencida' as EstadoEvento })
+      .eq('vendedor_id', user.id)
+      .in('estado', ['pendiente', 'en_progreso'])
+      .lt('fecha_inicio', new Date().toISOString());
+  } catch (error) {
+    console.warn('Error marcando eventos vencidos:', error);
+  }
+}
+
+// =====================================================
+// VENDEDORES PARA VISTA ADMIN
+// =====================================================
+
+/**
+ * Obtiene la lista de vendedores activos para el selector de admin.
+ * Solo devuelve datos si el usuario es admin o gerente.
+ */
+export async function obtenerVendedoresAgenda(): Promise<Array<{ id: string; nombre: string }>> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const permisos = await obtenerPermisosUsuario();
+
+    if (!permisos || !['ROL_ADMIN', 'ROL_GERENTE', 'ROL_COORDINADOR_VENTAS'].includes(permisos.rol)) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('usuario_perfil')
+      .select('id, nombre_completo, username')
+      .eq('activo', true)
+      .order('nombre_completo', { ascending: true });
+
+    if (error || !data) return [];
+
+    return data.map((v) => ({
+      id: v.id,
+      nombre: v.nombre_completo || v.username || v.id,
+    }));
+  } catch (error) {
+    console.warn('Error obteniendo vendedores para agenda:', error);
+    return [];
+  }
+}
+
+// =====================================================
+// BÚSQUEDA DE LOTES PARA SELECTOR EN MODAL
+// =====================================================
+
+export async function buscarLotes(query: string): Promise<Array<{
+  id: string;
+  codigo: string;
+  sup_m2: number | null;
+  estado: string;
+  precio: number | null;
+  moneda: string | null;
+  proyecto_id: string;
+  proyecto_nombre: string;
+}>> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('lote')
+      .select(`
+        id,
+        codigo,
+        sup_m2,
+        estado,
+        precio,
+        moneda,
+        proyecto:proyecto!proyecto_id(id, nombre)
+      `)
+      .ilike('codigo', `%${query}%`)
+      .in('estado', ['disponible', 'reservado'])
+      .limit(20);
+
+    if (error || !data) return [];
+
+    return data.map((l: any) => {
+      const proyecto = Array.isArray(l.proyecto) ? l.proyecto[0] : l.proyecto;
+      return {
+        id: l.id,
+        codigo: l.codigo,
+        sup_m2: l.sup_m2,
+        estado: l.estado,
+        precio: l.precio,
+        moneda: l.moneda,
+        proyecto_id: proyecto?.id ?? '',
+        proyecto_nombre: proyecto?.nombre ?? 'Sin proyecto',
+      };
+    });
+  } catch (err) {
+    console.warn('Error buscando lotes:', err);
+    return [];
+  }
+}
+
+export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes', vendedorFiltroId?: string | null): Promise<Evento[]> {
   try {
     const supabase = await createServerOnlyClient();
     const {
@@ -177,7 +295,7 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
         break;
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('evento')
       .select(`
         id,
@@ -219,11 +337,25 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
         updated_at,
         cliente:cliente_id(id, nombre, telefono, email)
       `)
-      .eq('vendedor_id', user.id)
       .gte('fecha_inicio', inicioRango.toISOString())
       .lte('fecha_inicio', finRango.toISOString())
       .order('fecha_inicio', { ascending: true })
       .limit(1000);
+
+    // Filtro por vendedor:
+    // - Si se pasa un vendedorFiltroId específico, filtrar por ese vendedor
+    // - Si no, los admins/gerentes ven todos; los vendedores solo los suyos
+    if (vendedorFiltroId) {
+      query = query.eq('vendedor_id', vendedorFiltroId);
+    } else {
+      const permisos = await obtenerPermisosUsuario();
+      const esAdminOGerente = permisos && ['ROL_ADMIN', 'ROL_GERENTE', 'ROL_COORDINADOR_VENTAS'].includes(permisos.rol);
+      if (!esAdminOGerente) {
+        query = query.eq('vendedor_id', user.id);
+      }
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw error;
@@ -471,6 +603,150 @@ export async function eliminarEvento(eventoId: string) {
   }
 }
 
+// =====================================================
+// COMPLETAR EVENTO CON RESULTADO (flujo comercial)
+// =====================================================
+
+export interface DatosCompletarEvento {
+  resultado: 'interesado' | 'necesita_tiempo' | 'no_interesado' | 'separo_lote' | 'perdido';
+  notas?: string;
+  proximaAccion?: {
+    tipo: string;
+    titulo: string;
+    fecha: string;
+    duracion_minutos?: number;
+  };
+}
+
+export async function completarEventoConResultado(
+  eventoId: string,
+  datos: DatosCompletarEvento
+) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autorizado');
+
+    // Obtener datos del evento
+    const { data: evento } = await supabase
+      .from('evento')
+      .select('vendedor_id, titulo, cliente_id, tipo, duracion_minutos, propiedad_id')
+      .eq('id', eventoId)
+      .single();
+
+    if (!evento || evento.vendedor_id !== user.id) {
+      throw new Error('No tienes permisos para modificar este evento');
+    }
+
+    // Construir nota combinada
+    const notaCompleta = [
+      `Resultado: ${datos.resultado.replace(/_/g, ' ')}`,
+      datos.notas || '',
+    ].filter(Boolean).join(' — ');
+
+    // Marcar evento como completado con resultado
+    await supabase
+      .from('evento')
+      .update({
+        estado: 'completado' as EstadoEvento,
+        resultado_notas: notaCompleta,
+      })
+      .eq('id', eventoId);
+
+    // Registrar interacción en el cliente
+    if (evento.cliente_id) {
+      try {
+        const { data: perfil } = await supabase
+          .from('usuario_perfil')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+
+        if (perfil?.username) {
+          const tipoInteraccion = EVENTO_INTERACCION_MAP[evento.tipo] ?? 'mensaje';
+          await supabase
+            .from('cliente_interaccion')
+            .insert({
+              cliente_id: evento.cliente_id,
+              vendedor_username: perfil.username,
+              tipo: tipoInteraccion,
+              resultado: datos.resultado === 'separo_lote' ? 'exitoso' :
+                         datos.resultado === 'interesado' ? 'exitoso' :
+                         datos.resultado === 'perdido' ? 'no_exitoso' :
+                         datos.resultado === 'no_interesado' ? 'no_exitoso' : 'pendiente',
+              notas: notaCompleta,
+              duracion_minutos: evento.duracion_minutos ?? undefined,
+            });
+
+          revalidatePath(`/dashboard/clientes/${evento.cliente_id}`);
+        }
+      } catch (err) {
+        console.warn('Error registrando interacción:', err);
+      }
+    }
+
+    // Crear siguiente evento si se especificó próxima acción
+    let nuevoEventoId: string | null = null;
+    if (datos.proximaAccion) {
+      try {
+        const { data: nuevoEvento } = await supabase
+          .from('evento')
+          .insert({
+            titulo: datos.proximaAccion.titulo,
+            tipo: datos.proximaAccion.tipo as any,
+            fecha_inicio: datos.proximaAccion.fecha,
+            duracion_minutos: datos.proximaAccion.duracion_minutos ?? 30,
+            prioridad: 'media',
+            estado: 'pendiente' as EstadoEvento,
+            vendedor_id: user.id,
+            created_by: user.id,
+            cliente_id: evento.cliente_id ?? null,
+            propiedad_id: evento.propiedad_id ?? null,
+            notificar_email: true,
+            notificar_push: false,
+            todo_el_dia: false,
+            es_recurrente: false,
+            etiquetas: [],
+            color: '#3B82F6',
+            recordar_antes_minutos: 15,
+          })
+          .select('id')
+          .single();
+
+        nuevoEventoId = nuevoEvento?.id ?? null;
+      } catch (err) {
+        console.warn('Error creando próxima acción:', err);
+      }
+    }
+
+    revalidatePath('/dashboard/agenda');
+    return {
+      success: true,
+      message: datos.proximaAccion
+        ? 'Evento completado y próxima acción agendada'
+        : 'Evento completado exitosamente',
+      nuevoEventoId,
+    };
+  } catch (error) {
+    console.error('Error completando evento:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error desconocido',
+    };
+  }
+}
+
+// Mapa de tipo de evento → tipo de interacción CRM
+const EVENTO_INTERACCION_MAP: Record<string, string> = {
+  llamada:      'llamada',
+  email:        'email',
+  visita:       'visita',
+  cita:         'reunion',
+  seguimiento:  'mensaje',
+  tarea:        'mensaje',
+  recordatorio: 'mensaje',
+};
+
 export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoEvento) {
   try {
     const supabase = await createServerOnlyClient();
@@ -480,10 +756,10 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
       throw new Error("No autorizado");
     }
 
-    // Verificar que el evento pertenece al usuario
+    // Obtener datos completos del evento para usarlos si se completa
     const { data: eventoExistente } = await supabase
       .from('evento')
-      .select('vendedor_id, titulo')
+      .select('vendedor_id, titulo, cliente_id, tipo, duracion_minutos, notas')
       .eq('id', eventoId)
       .single();
 
@@ -501,8 +777,8 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
       throw new Error(`Error actualizando estado: ${error.message}`);
     }
 
-    // Crear notificación
     if (nuevoEstado === 'completado') {
+      // 1. Crear notificación
       try {
         await crearNotificacion(
           user.id,
@@ -513,6 +789,38 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
         );
       } catch (notifyError) {
         console.warn("No se pudo crear notificación:", notifyError);
+      }
+
+      // 2. Registrar interacción en el cliente si el evento está vinculado a uno
+      if (eventoExistente.cliente_id) {
+        try {
+          // Obtener username del vendedor para cliente_interaccion
+          const { data: perfil } = await supabase
+            .from('usuario_perfil')
+            .select('username')
+            .eq('id', user.id)
+            .single();
+
+          if (perfil?.username) {
+            const tipoInteraccion = EVENTO_INTERACCION_MAP[eventoExistente.tipo] ?? 'mensaje';
+            await supabase
+              .from('cliente_interaccion')
+              .insert({
+                cliente_id: eventoExistente.cliente_id,
+                vendedor_username: perfil.username,
+                tipo: tipoInteraccion,
+                resultado: 'exitoso',
+                notas: eventoExistente.notas
+                  ? `[Evento completado: ${eventoExistente.titulo}] ${eventoExistente.notas}`
+                  : `Evento completado: ${eventoExistente.titulo}`,
+                duracion_minutos: eventoExistente.duracion_minutos ?? undefined,
+              });
+
+            revalidatePath(`/dashboard/clientes/${eventoExistente.cliente_id}`);
+          }
+        } catch (interaccionError) {
+          console.warn("No se pudo registrar interacción al completar evento:", interaccionError);
+        }
       }
     }
 

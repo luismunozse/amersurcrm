@@ -7,6 +7,10 @@ import { Users, UserX, UserCheck, Clock, AlertCircle, Loader2, Filter } from "lu
 import { obtenerReporteGestionClientes } from "../_actions";
 import toast from "react-hot-toast";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { CRMBadge } from "@/components/ui/crm-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ReporteGestionClientesProps {
   periodo: string;
@@ -171,16 +175,16 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
     );
   };
 
-  const getEstadoColor = (estado: string) => {
+  const getEstadoVariant = (estado: string): "success" | "info" | "purple" | "default" | "warning" | "danger" => {
     switch (estado.toLowerCase()) {
-      case 'activo': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
-      case 'prospecto': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
-      case 'lead': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300';
-      case 'inactivo': return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
-      case 'por_contactar': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300';
-      case 'contactado': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
-      case 'transferido': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300';
-      default: return 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300';
+      case 'activo': return 'success';
+      case 'prospecto': return 'info';
+      case 'lead': return 'purple';
+      case 'inactivo': return 'default';
+      case 'por_contactar': return 'warning';
+      case 'contactado': return 'success';
+      case 'transferido': return 'info';
+      default: return 'default';
     }
   };
 
@@ -207,18 +211,25 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
               <label className="block text-sm font-medium text-crm-text-secondary mb-2">
                 Filtrar por Vendedor
               </label>
-              <select
-                value={vendedorSeleccionado}
-                onChange={(e) => setVendedorSeleccionado(e.target.value)}
-                className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-              >
-                <option value="todos">- Todos los vendedores -</option>
-                {distribucionPorVendedor.map((vendedor: any) => (
-                  <option key={vendedor.vendedor} value={vendedor.vendedor}>
-                    {vendedor.vendedor} ({vendedor.total} clientes)
-                  </option>
-                ))}
-              </select>
+              <Select value={vendedorSeleccionado} onValueChange={setVendedorSeleccionado}>
+                <SelectTrigger className="w-full bg-crm-card border-crm-border text-crm-text-primary">
+                  <SelectValue placeholder="- Todos los vendedores -" />
+                </SelectTrigger>
+                <SelectContent className="bg-crm-card border-crm-border max-h-[300px]">
+                  <SelectItem value="todos" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">
+                    - Todos los vendedores -
+                  </SelectItem>
+                  {distribucionPorVendedor.map((vendedor: any) => (
+                    <SelectItem
+                      key={vendedor.vendedor}
+                      value={vendedor.vendedor}
+                      className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer"
+                    >
+                      {vendedor.vendedor} ({vendedor.total} clientes)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button
               onClick={() => setVendedorSeleccionado("todos")}
@@ -401,17 +412,12 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
               {distribucionEstados.map((item: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-crm-card-hover rounded-lg">
                   <div className="flex items-center gap-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(item.estado)}`}>
+                    <CRMBadge variant={getEstadoVariant(item.estado)}>
                       {item.estado}
-                    </span>
+                    </CRMBadge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-crm-primary h-2 rounded-full transition-all"
-                        style={{ width: `${item.porcentaje}%` }}
-                      />
-                    </div>
+                    <Progress value={item.porcentaje} className="w-24 h-2" />
                     <span className="text-lg font-bold text-crm-text-primary">{item.cantidad}</span>
                     <span className="text-sm text-crm-text-muted">({item.porcentaje}%)</span>
                   </div>
@@ -448,12 +454,7 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
                     <span className="text-sm font-bold text-crm-text-primary">{item.total} clientes</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-green-500 h-2 rounded-full transition-all"
-                        style={{ width: `${item.porcentajeContactados}%` }}
-                      />
-                    </div>
+                    <Progress value={item.porcentajeContactados} className="flex-1 h-2 [&>div]:bg-green-500" />
                     <span className="text-xs text-crm-text-muted">{item.porcentajeContactados}%</span>
                   </div>
                   <div className="flex gap-4 mt-2 text-xs">
@@ -473,25 +474,17 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
 
       {/* Alerta de clientes sin contactar */}
       {resumenFiltrado.sinContactar > 0 && (
-        <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-red-800 dark:text-red-200">
-                  Atencion: {resumenFiltrado.sinContactar} clientes sin contactar
-                  {vendedorSeleccionado !== "todos" && ` (${vendedorSeleccionado})`}
-                </h3>
-                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                  Estos clientes fueron captados pero aun no han recibido ningun contacto.
-                  Se recomienda asignar seguimiento inmediato.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Alert variant="destructive" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle>
+            Atencion: {resumenFiltrado.sinContactar} clientes sin contactar
+            {vendedorSeleccionado !== "todos" && ` (${vendedorSeleccionado})`}
+          </AlertTitle>
+          <AlertDescription>
+            Estos clientes fueron captados pero aun no han recibido ningun contacto.
+            Se recomienda asignar seguimiento inmediato.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );

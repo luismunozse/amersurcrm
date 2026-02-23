@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
 import {
   exportFilteredProyectos,
@@ -72,6 +72,13 @@ export default function ExportButton({
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // Preload heavy export libraries on hover (~750KB cargados antes del click)
+  const handlePreload = useCallback(() => {
+    import('xlsx').catch(() => {});
+    import('jspdf').catch(() => {});
+    import('jspdf-autotable').catch(() => {});
+  }, []);
 
   /**
    * Manejar la exportación en el formato seleccionado
@@ -165,6 +172,7 @@ export default function ExportButton({
     return (
       <button
         onClick={() => handleExport('excel')}
+        onMouseEnter={handlePreload}
         disabled={isExporting}
         className={`${sizeStyles[size]} ${variantStyles[variant]} border rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
@@ -183,6 +191,7 @@ export default function ExportButton({
     <div className="relative">
       <button
         onClick={() => setShowDropdown(!showDropdown)}
+        onMouseEnter={handlePreload}
         disabled={isExporting}
         className={`${sizeStyles[size]} ${variantStyles[variant]} border rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
       >

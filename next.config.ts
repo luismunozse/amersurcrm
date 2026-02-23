@@ -10,10 +10,15 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       '@supabase/supabase-js',
       'react-hot-toast',
-      'recharts',        // Gráficos - tree-shake componentes no usados
-      'date-fns',        // Utilidades de fecha - importar solo funciones usadas
-      'lucide-react',    // Iconos - importar solo los usados
-      'papaparse',       // CSV parsing
+      'recharts',
+      'date-fns',
+      'lucide-react',
+      'papaparse',
+      '@headlessui/react',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-progress',
+      '@radix-ui/react-tooltip',
     ],
     serverActions: {
       bodySizeLimit: '50mb', // Límite aumentado para subida de múltiples imágenes (logo + galería)

@@ -10,7 +10,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // lee preferencia
-    const saved = (localStorage.getItem("theme") as Theme) || null;
+    let saved: Theme | null = null;
+    try {
+      saved = (localStorage.getItem("theme") as Theme) || null;
+    } catch {
+      // localStorage no disponible (modo incógnito, etc.)
+    }
     const prefersDark =
       window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     const next: Theme = saved ?? (prefersDark ? "dark" : "light");
@@ -20,7 +25,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const el = document.documentElement;
     el.classList.toggle("dark", theme === "dark"); // tailwind darkMode: "class"
-    localStorage.setItem("theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {
+      // localStorage no disponible o quota excedida
+    }
   }, [theme]);
 
   const toggle = () => setThemeState((t) => (t === "dark" ? "light" : "dark"));

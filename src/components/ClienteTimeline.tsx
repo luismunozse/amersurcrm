@@ -1,12 +1,12 @@
 "use client";
 
-import { Phone, Mail, MessageSquare, Users, Video, FileText, Eye, Tag, DollarSign, CreditCard, Calendar } from "lucide-react";
+import { Phone, Mail, MessageSquare, Users, Video, FileText, Eye, Tag, DollarSign, CreditCard, Calendar, CalendarCheck, CalendarClock } from "lucide-react";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import { getSmallBadgeClasses, getTimelineIconClasses } from "@/lib/utils/badge";
 
 interface TimelineEvent {
   id: string;
-  type: 'interaccion' | 'visita' | 'reserva' | 'venta' | 'pago';
+  type: 'interaccion' | 'visita' | 'reserva' | 'venta' | 'pago' | 'evento_agenda';
   fecha: string;
   titulo: string;
   descripcion?: string;
@@ -35,6 +35,11 @@ export default function ClienteTimeline({ eventos }: Props) {
     if (type === 'reserva') return <Tag className="h-4 w-4" />;
     if (type === 'venta') return <DollarSign className="h-4 w-4" />;
     if (type === 'pago') return <CreditCard className="h-4 w-4" />;
+    if (type === 'evento_agenda') {
+      const estado = metadata?.estado;
+      if (estado === 'completado') return <CalendarCheck className="h-4 w-4" />;
+      return <CalendarClock className="h-4 w-4" />;
+    }
     return <FileText className="h-4 w-4" />;
   };
 
@@ -45,6 +50,7 @@ export default function ClienteTimeline({ eventos }: Props) {
       'reserva': 'yellow',
       'venta': 'green',
       'pago': 'teal',
+      'evento_agenda': 'orange',
     };
     return colores[type as keyof typeof colores] || 'gray';
   };
@@ -238,6 +244,36 @@ export default function ClienteTimeline({ eventos }: Props) {
                         {evento.metadata.venta_codigo && (
                           <span className="text-crm-text-muted">
                             Venta: <strong className="text-crm-text font-mono">{evento.metadata.venta_codigo}</strong>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Eventos de agenda */}
+                    {evento.type === 'evento_agenda' && (
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        {evento.metadata.tipo && (
+                          <span className="text-crm-text-muted">
+                            Tipo: <strong className="text-crm-text capitalize">{evento.metadata.tipo}</strong>
+                          </span>
+                        )}
+                        {evento.metadata.estado && (
+                          <span className="text-crm-text-muted">
+                            Estado: <strong className={`${
+                              evento.metadata.estado === 'completado' ? 'text-green-600 dark:text-green-400' :
+                              evento.metadata.estado === 'pendiente' ? 'text-orange-600 dark:text-orange-400' :
+                              'text-crm-text'
+                            } capitalize`}>{evento.metadata.estado}</strong>
+                          </span>
+                        )}
+                        {evento.metadata.duracion_minutos && (
+                          <span className="text-crm-text-muted">
+                            Duración: <strong className="text-crm-text">{evento.metadata.duracion_minutos} min</strong>
+                          </span>
+                        )}
+                        {evento.metadata.prioridad && (
+                          <span className="text-crm-text-muted">
+                            Prioridad: <strong className="text-crm-text capitalize">{evento.metadata.prioridad}</strong>
                           </span>
                         )}
                       </div>
