@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
-import { Clock, Loader2, Filter, AlertTriangle, AlertCircle, Bell, Users, TrendingUp, Phone, Mail } from "lucide-react";
+import { Clock, Loader2, Filter, AlertTriangle, AlertCircle, Bell, Users, TrendingUp, Phone, Mail, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { obtenerReporteTiempoRespuesta } from "../_actions";
 import toast from "react-hot-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
@@ -19,6 +19,7 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
   const [fechaInicio, setFechaInicio] = useState<string>("");
   const [fechaFin, setFechaFin] = useState<string>("");
   const [tabActiva, setTabActiva] = useState<'ranking' | 'alertas'>('ranking');
+  const [sortConfig, setSortConfig] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
 
   const cargarDatos = useCallback(async (usarFechas = false) => {
     setLoading(true);
@@ -102,6 +103,31 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
   }
 
   const { resumen, rankingVendedores, rangosDistribucion, clientesSinContactar, tendenciaData } = data;
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev =>
+      prev?.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' }
+    );
+  };
+
+  const sortedRanking = [...rankingVendedores].sort((a: any, b: any) => {
+    if (!sortConfig) return 0;
+    const { key, dir } = sortConfig;
+    const va = key === 'tasaContacto' ? parseFloat(a[key]) : a[key];
+    const vb = key === 'tasaContacto' ? parseFloat(b[key]) : b[key];
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortConfig?.key !== col) return <ChevronsUpDown className="w-3 h-3 ml-1 opacity-40 inline" />;
+    return sortConfig.dir === 'asc'
+      ? <ChevronUp className="w-3 h-3 ml-1 text-crm-primary inline" />
+      : <ChevronDown className="w-3 h-3 ml-1 text-crm-primary inline" />;
+  };
 
   return (
     <div className="space-y-6">
@@ -362,17 +388,27 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
                   <tr className="border-b border-crm-border">
                     <th className="text-left py-3 px-2 font-medium text-crm-text-secondary">#</th>
                     <th className="text-left py-3 px-2 font-medium text-crm-text-secondary">Vendedor</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">Clientes</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">Contactados</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">Sin Contactar</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">Promedio</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">Mejor</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">Peor</th>
-                    <th className="text-center py-3 px-2 font-medium text-crm-text-secondary">% Contacto</th>
+                    {([
+                      { label: 'Clientes',      key: 'totalClientes' },
+                      { label: 'Contactados',   key: 'clientesAtendidos' },
+                      { label: 'Sin Contactar', key: 'clientesSinContactar' },
+                      { label: 'Promedio',      key: 'promedioHoras' },
+                      { label: 'Mejor',         key: 'minimoHoras' },
+                      { label: 'Peor',          key: 'maximoHoras' },
+                      { label: '% Contacto',    key: 'tasaContacto' },
+                    ] as const).map(({ label, key }) => (
+                      <th
+                        key={key}
+                        className="text-center py-3 px-2 font-medium text-crm-text-secondary cursor-pointer select-none hover:text-crm-primary transition-colors whitespace-nowrap"
+                        onClick={() => handleSort(key)}
+                      >
+                        {label}<SortIcon col={key} />
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {rankingVendedores.map((vendedor: any, index: number) => (
+                  {sortedRanking.map((vendedor: any, index: number) => (
                     <tr key={vendedor.username} className="border-b border-crm-border hover:bg-crm-card-hover">
                       <td className="py-3 px-2">
                         <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
