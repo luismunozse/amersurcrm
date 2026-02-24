@@ -57,6 +57,7 @@ interface GoogleMapProps {
   onMarkerDragEnd?: (loteId: string, lat: number, lng: number) => void;
   focusLoteRequest?: { id: string; ts: number } | null;
   onFocusHandled?: () => void;
+  onMapClick?: (lat: number, lng: number) => void;
 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -327,10 +328,12 @@ export default function GoogleMap({
   onMarkerDragEnd,
   focusLoteRequest,
   onFocusHandled,
+  onMapClick,
 }: GoogleMapProps) {
   const [centerLat, centerLng] = defaultCenter;
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const onMapClickRef = useRef(onMapClick);
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
   const projectPolygonRef = useRef<google.maps.Polygon | null>(null);
   const projectPolygonListenersRef = useRef<google.maps.MapsEventListener[]>([]);
@@ -480,6 +483,9 @@ export default function GoogleMap({
     lotesLabelsRef.current.clear();
   }, []);
 
+  // Mantener ref de onMapClick actualizado sin re-inicializar el mapa
+  useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+
   // Cargar script de Google Maps cuando no esté presente
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) {
@@ -574,8 +580,15 @@ export default function GoogleMap({
       }
     });
 
+    // Listener para click en el mapa (modo pinear)
+    const mapClickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng || !onMapClickRef.current) return;
+      onMapClickRef.current(event.latLng.lat(), event.latLng.lng());
+    });
+
     return () => {
       centerChangedListener.remove();
+      mapClickListener.remove();
       drawingManager.setMap(null);
       google.maps.event.clearInstanceListeners(map);
       mapInstanceRef.current = null;

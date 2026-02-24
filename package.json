@@ -54,6 +54,7 @@
     "node-cron": "^4.2.1",
     "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.624",
     "qrcode.react": "^4.2.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

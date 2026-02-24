@@ -4,8 +4,7 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/permissions/server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
-import MapeoLotesMejorado from "./_MapeoLotesMejorado";
-import MapeoLotesVisualizacion from "./_MapeoLotesVisualizacion";
+import MapeoLotes from "./_MapeoLotes";
 import DeleteProjectButton from "./_DeleteProjectButton";
 import { PaginationClient } from "./_PaginationClient";
 import ProjectTabs from "./_ProjectTabs";
@@ -141,11 +140,22 @@ export default async function ProyLotesPage({
   if (eCount) throw eCount;
 
   // Lotes para mapeo (todos)
-  const { data: lotesParaMapeo, error: eLotesMap } = await supabase
+  let { data: lotesParaMapeo, error: eLotesMap } = await supabase
     .from("lote")
-    .select("id,codigo,estado,data,plano_poligono")
+    .select("id,codigo,estado,data,plano_poligono,coordenada_lat,coordenada_lng")
     .eq("proyecto_id", id)
     .order("codigo", { ascending: true });
+
+  // Si coordenada_lat/lng no existen en la BD (código 42703), caer sin esas columnas
+  if (eLotesMap?.code === "42703") {
+    const fallback = await supabase
+      .from("lote")
+      .select("id,codigo,estado,data,plano_poligono")
+      .eq("proyecto_id", id)
+      .order("codigo", { ascending: true });
+    lotesParaMapeo = fallback.data;
+    eLotesMap = fallback.error;
+  }
   if (eLotesMap) throw eLotesMap;
 
   const total = count ?? 0;
@@ -328,27 +338,16 @@ export default async function ProyLotesPage({
   const lotesMapeoSource = lotesParaMapeo ?? [];
   const lotesForMapeo = lotesMapeoSource.map((lote) => {
     const planoPoligonoRaw = (lote as { plano_poligono?: unknown }).plano_poligono;
-    const planoPoligono = isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : undefined;
-
-    let ubicacion: { lat: number; lng: number } | null = null;
-    if (planoPoligono && planoPoligono.length > 0) {
-      const [sumLat, sumLng] = planoPoligono.reduce(
-        (acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]],
-        [0, 0]
-      );
-      ubicacion = {
-        lat: sumLat / planoPoligono.length,
-        lng: sumLng / planoPoligono.length,
-      };
-    }
-
+    const planoPoligono = isLatLngTupleArray(planoPoligonoRaw) ? planoPoligonoRaw : null;
+    const loteAny = lote as Record<string, unknown>;
     return {
       id: lote.id,
       codigo: lote.codigo,
       estado: lote.estado,
       data: lote.data,
       plano_poligono: planoPoligono,
-      ubicacion,
+      coordenada_lat: typeof loteAny.coordenada_lat === 'number' ? loteAny.coordenada_lat : null,
+      coordenada_lng: typeof loteAny.coordenada_lng === 'number' ? loteAny.coordenada_lng : null,
     };
   });
 
@@ -505,33 +504,16 @@ export default async function ProyLotesPage({
           </>
         }
         mapeoSection={
-          isAdmin ? (
-            <MapeoLotesMejorado
-              key="mapeo-mejorado"
-              proyectoId={proyecto.id}
-              planosUrl={primaryOverlayLayer?.url ?? planosUrl}
-              proyectoNombre={proyecto.nombre}
-              proyectoLatitud={proyecto.latitud}
-              proyectoLongitud={proyecto.longitud}
-              initialBounds={normalizeBoundsTo2Points(primaryOverlayBounds ?? overlayBoundsValue)}
-              initialRotation={overlayRotationValue}
-              initialOpacity={primaryOverlayLayer?.opacity ?? overlayOpacityValue}
-              initialOverlayLayers={overlayLayers}
-              lotes={lotesForMapeo}
-            />
-          ) : (
-            <MapeoLotesVisualizacion
-              key="mapeo-visualizacion"
-              proyectoNombre={proyecto.nombre}
-              planosUrl={primaryOverlayLayer?.url ?? planosUrl}
-              proyectoLatitud={proyecto.latitud}
-              proyectoLongitud={proyecto.longitud}
-              overlayBounds={primaryOverlayBounds ?? overlayBoundsValue}
-              overlayRotation={overlayRotationValue}
-              overlayLayers={overlayLayers}
-              lotes={lotesForMapeo}
-            />
-          )
+          <MapeoLotes
+            key="mapeo-lotes"
+            proyectoId={proyecto.id}
+            proyectoNombre={proyecto.nombre}
+            proyectoLatitud={proyecto.latitud}
+            proyectoLongitud={proyecto.longitud}
+            overlayLayers={overlayLayers}
+            lotes={lotesForMapeo}
+            isAdmin={isAdmin}
+          />
         }
       />
     </div>

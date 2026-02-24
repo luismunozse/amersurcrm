@@ -13,6 +13,32 @@ interface BlueprintUploaderProps {
   acceptedTypes?: string[];
 }
 
+const convertPdfToPng = async (pdfFile: File): Promise<File> => {
+  const pdfjsLib = await import('pdfjs-dist');
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  }
+  const arrayBuffer = await pdfFile.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.0 });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('No se pudo crear contexto canvas');
+  // pdfjs-dist v4 espera canvasContext como Object
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await page.render({ canvasContext: ctx as unknown as object, viewport } as any).promise;
+  return new Promise<File>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return reject(new Error('Canvas to Blob falló'));
+      resolve(new File([blob], pdfFile.name.replace(/\.pdf$/i, '.png'), { type: 'image/png' }));
+    }, 'image/png', 0.95);
+  });
+};
+
 export default function BlueprintUploader({
   onFileSelect,
   isUploading,
@@ -25,6 +51,7 @@ export default function BlueprintUploader({
   const [preview, setPreview] = useState<string | null>(null);
   const [fileInfo, setFileInfo] = useState<{ name: string; size: number; type: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isConverting, setIsConverting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -73,56 +100,55 @@ export default function BlueprintUploader({
     return { valid: true };
   };
 
-  const handleFile = useCallback((file: File) => {
-    const validation = validateFile(file);
-    
-    if (!validation.valid) {
-      toast.error(validation.error!);
-      return;
-    }
-
-    setFileInfo({
-      name: file.name,
-      size: file.size,
-      type: file.type
-    });
-
-    // Crear preview para imágenes
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setPreview(null);
-    }
-
-    // Limpiar intervalo anterior si existe
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-
-    // Iniciar progreso de carga
+  const startProgress = useCallback(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     setUploadProgress(0);
-    
-    // Simular progreso de carga
     progressIntervalRef.current = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
-          if (progressIntervalRef.current) {
-            clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
-          }
+          if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; }
           return 100;
         }
         return prev + Math.random() * 30;
       });
     }, 100);
+  }, []);
 
-    // Llamar onFileSelect inmediatamente, sin esperar al progreso
+  const handleFile = useCallback(async (file: File) => {
+    const validation = validateFile(file);
+    if (!validation.valid) { toast.error(validation.error!); return; }
+
+    if (file.type === 'application/pdf') {
+      setIsConverting(true);
+      setFileInfo({ name: file.name, size: file.size, type: file.type });
+      try {
+        const pngFile = await convertPdfToPng(file);
+        setIsConverting(false);
+        setFileInfo({ name: pngFile.name, size: pngFile.size, type: pngFile.type });
+        const reader = new FileReader();
+        reader.onload = (e) => setPreview(e.target?.result as string);
+        reader.readAsDataURL(pngFile);
+        startProgress();
+        onFileSelect(pngFile);
+      } catch {
+        setIsConverting(false);
+        setFileInfo(null);
+        toast.error('No se pudo convertir el PDF. Intenta con una imagen PNG o JPG.');
+      }
+      return;
+    }
+
+    setFileInfo({ name: file.name, size: file.size, type: file.type });
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreview(null);
+    }
+    startProgress();
     onFileSelect(file);
-  }, [onFileSelect, maxSize, acceptedTypes]);
+  }, [onFileSelect, maxSize, acceptedTypes, startProgress]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -217,7 +243,15 @@ export default function BlueprintUploader({
           disabled={isUploading}
         />
 
-        {isUploading ? (
+        {isConverting ? (
+          <div className="space-y-4">
+            <Loader2 className="w-12 h-12 text-purple-500 animate-spin mx-auto" />
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-gray-700">Convirtiendo PDF a imagen...</h3>
+              <p className="text-sm text-gray-500">Esto puede tomar unos segundos</p>
+            </div>
+          </div>
+        ) : isUploading ? (
           <div className="space-y-4">
             <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
             <div className="space-y-2">

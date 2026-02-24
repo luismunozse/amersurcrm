@@ -345,11 +345,17 @@ export async function eliminarUsuario(userId: string) {
     const { error: authError } = await serviceRole.auth.admin.deleteUser(userId);
 
     if (authError) {
-      throw new Error(`Error eliminando usuario de Auth: ${authError.message}`);
+      // Si el usuario ya no existe en Auth (eliminado previamente), continuar con la eliminación del perfil
+      const isNotFound = authError.message?.toLowerCase().includes('not found') ||
+                         authError.message?.toLowerCase().includes('no encontrado');
+      if (!isNotFound) {
+        throw new Error(`Error eliminando usuario de Auth: ${authError.message}`);
+      }
+      console.log(`[EliminarUsuario] Auth user ${userId} ya no existe, continuando con eliminación del perfil`);
     }
 
-    // Luego eliminar el perfil del usuario
-    const { error: profileError } = await supabase
+    // Luego eliminar el perfil del usuario (usar serviceRole para bypasear RLS)
+    const { error: profileError } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
       .delete()

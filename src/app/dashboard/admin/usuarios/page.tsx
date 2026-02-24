@@ -119,7 +119,7 @@ function GestionUsuarios() {
         setMostrarFormulario(false);
         setRolSeleccionado("");
         setMostrarPassword(false);
-        cargarUsuarios();
+        await cargarUsuarios();
       } else {
         toast.error(data.message || 'Error creando usuario');
       }
@@ -177,7 +177,7 @@ function GestionUsuarios() {
 
     if (result.success) {
       toast.success(result.message || 'Estado cambiado correctamente');
-      cargarUsuarios();
+      await cargarUsuarios();
       setEstadoModalOpen(false);
       setUserCambiandoEstado(null);
     } else {
@@ -192,7 +192,7 @@ function GestionUsuarios() {
       setUserResetPassword(u);
       setPasswordTemporal(result.passwordTemporal);
       setResetModalOpen(true);
-      cargarUsuarios();
+      await cargarUsuarios();
     } else {
       toast.error(result.error || 'Error reseteando contraseña');
     }
@@ -213,7 +213,8 @@ function GestionUsuarios() {
 
     if (result.success) {
       toast.success(result.message || 'Usuario eliminado exitosamente');
-      cargarUsuarios();
+      // Actualizar estado local inmediatamente para reflejar la eliminación
+      setUsuarios(prev => prev.filter(u => u.id !== userId));
       setDeleteModalOpen(false);
       setUserToDelete(null);
       return { success: true };
@@ -823,7 +824,7 @@ function GestionUsuarios() {
           const ok = await patchUsuario(payload);
           if (ok) {
             toast.success('Usuario actualizado');
-            cargarUsuarios();
+            await cargarUsuarios();
             return true;
           }
           return false;
