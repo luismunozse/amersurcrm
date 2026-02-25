@@ -111,11 +111,7 @@ export default function ChangelogModal({ isOpen, onClose }: ChangelogModalProps)
         </div>
 
         {/* Header */}
-        <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-br from-crm-primary to-crm-primary/85 px-5 py-5 sm:px-6 sm:py-7 text-white">
-          {/* Círculos decorativos sutiles */}
-          <div className="absolute -top-6 -right-6 w-20 h-20 sm:w-28 sm:h-28 bg-white/5 rounded-full" />
-          <div className="absolute -bottom-4 -left-4 w-14 h-14 sm:w-20 sm:h-20 bg-white/5 rounded-full" />
-
+        <div className="relative rounded-t-2xl bg-gradient-to-br from-crm-primary to-crm-primary/85 px-5 pb-6 pt-5 sm:px-6 sm:pb-7 sm:pt-6 text-white">
           <button
             type="button"
             onClick={onClose}
@@ -125,13 +121,13 @@ export default function ChangelogModal({ isOpen, onClose }: ChangelogModalProps)
             <X className="w-5 h-5" />
           </button>
 
-          <div className="relative z-[1] flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 pr-8">
             <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl flex-shrink-0">
               <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-lg sm:text-2xl font-bold leading-tight">Novedades del CRM</h2>
-              <p className="text-white/90 text-sm sm:text-base mt-0.5">
+            <div>
+              <h2 className="text-lg sm:text-2xl font-bold">Novedades del CRM</h2>
+              <p className="text-white/90 text-sm sm:text-base mt-1">
                 Versión {CURRENT_VERSION}
               </p>
             </div>
