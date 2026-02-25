@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Spinner } from '@/components/ui/Spinner';
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase.client";
@@ -232,7 +233,7 @@ export default function CambiarPasswordPage() {
             >
               {pending ? (
                 <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <Spinner size="sm" color="white" />
                   <span>Cambiando contraseña...</span>
                 </div>
               ) : (

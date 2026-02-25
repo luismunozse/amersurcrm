@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
-import { Camera, Upload, X, Loader2 } from "lucide-react";
+import { Camera, Upload, X } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -138,7 +139,7 @@ export default function AvatarUpload({ currentAvatarUrl, userName }: AvatarUploa
         {/* Overlay de carga */}
         {uploading && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
+            <Spinner size="lg" color="white" />
           </div>
         )}
       </div>

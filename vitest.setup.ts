@@ -36,6 +36,12 @@ vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
 }));
 
+// Mock Next.js server (after() used in server actions)
+vi.mock('next/server', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('next/server')>();
+  return { ...mod, after: vi.fn((fn: () => void) => fn()) };
+});
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

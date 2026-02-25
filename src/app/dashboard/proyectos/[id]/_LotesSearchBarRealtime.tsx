@@ -1,6 +1,7 @@
 'use client';
 
 import { useRealtimeSearch } from '@/hooks/useRealtimeSearch';
+import { Spinner } from '@/components/ui/Spinner';
 import { useSearchParams } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Search, X, Clock, Trash2, TrendingUp, Filter, ChevronDown } from 'lucide-react';
@@ -145,7 +146,7 @@ export default function LotesSearchBarRealtime({
             {/* Indicador de carga y botón limpiar */}
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
               {isSearching && (
-                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                <Spinner size="sm" color="primary" />
               )}
               {searchValue && !isSearching && (
                 <button
@@ -371,7 +372,7 @@ export default function LotesSearchBarRealtime({
         <div className="flex items-center gap-3">
           {isSearching && (
             <div className="text-blue-600 flex items-center gap-2">
-              <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full" />
+              <Spinner size="xs" color="primary" />
               Buscando...
             </div>
           )}

@@ -5,7 +5,8 @@ export const fetchCache = "force-no-store";
 
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { createServerOnlyClient, getCachedAuthUser } from "@/lib/supabase.server";
+import { after } from "next/server";
+import { createServerOnlyClient, createServiceRoleClient, getCachedAuthUser } from "@/lib/supabase.server";
 import DashboardClient from "./DashboardClient";
 import { getCachedNotificacionesNoLeidas, getCachedNotificacionesCount } from "@/lib/cache.server";
 import { getSunatExchangeRates } from "@/lib/exchange";
@@ -44,6 +45,20 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (perfil?.requiere_cambio_password === true) {
     redirect("/auth/cambiar-password");
   }
+
+  // Actualizar ultimo_acceso del usuario (no bloquea la respuesta)
+  after(async () => {
+    try {
+      const srv = createServiceRoleClient();
+      await srv
+        .schema('crm')
+        .from('usuario_perfil')
+        .update({ ultimo_acceso: new Date().toISOString() })
+        .eq('id', user.id);
+    } catch {
+      // Silenciar errores — no afectar la experiencia del usuario
+    }
+  });
 
   // Separar queries críticas (configuración) de no-críticas (notificaciones, exchange)
   // Las no-críticas usan catch para no bloquear si fallan

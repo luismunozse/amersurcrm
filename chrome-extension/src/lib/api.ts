@@ -7,12 +7,21 @@ import { createLogger } from './logger';
 
 const logger = createLogger('CRMApiClient');
 
+// ─── Rate limiting y deduplicación ────────────────────────────────────
+const MIN_REQUEST_INTERVAL_MS = 300;
+const lastRequestTime = new Map<string, number>();
+const inflightRequests = new Map<string, Promise<any>>();
+
+function getThrottleKey(method: string, endpoint: string): string {
+  return `${method}:${endpoint}`;
+}
+
 export class CRMApiClient {
   private baseUrl: string;
   private token: string | null;
 
   constructor(baseUrl: string, token: string | null = null) {
-    this.baseUrl = baseUrl.replace(/\/$/, ''); // Remover trailing slash
+    this.baseUrl = baseUrl.replace(/\/$/, '');
     this.token = token;
     logger.info('CRMApiClient inicializado', { baseUrl: this.baseUrl, hasToken: !!token });
   }
@@ -29,6 +38,21 @@ export class CRMApiClient {
     const url = `${this.baseUrl}${endpoint}`;
     const method = options.method || 'GET';
     const requestId = `${method} ${endpoint}`;
+    const throttleKey = getThrottleKey(method, endpoint);
+
+    // Deduplicar GET requests en vuelo al mismo endpoint
+    if (method === 'GET' && inflightRequests.has(throttleKey)) {
+      logger.debug('Request deduplicado (en vuelo)', { requestId });
+      return inflightRequests.get(throttleKey) as Promise<T>;
+    }
+
+    // Throttle: esperar si el último request al mismo endpoint fue muy reciente
+    const lastTime = lastRequestTime.get(throttleKey) || 0;
+    const elapsed = Date.now() - lastTime;
+    if (elapsed < MIN_REQUEST_INTERVAL_MS) {
+      await new Promise(r => setTimeout(r, MIN_REQUEST_INTERVAL_MS - elapsed));
+    }
+    lastRequestTime.set(throttleKey, Date.now());
 
     logger.debug(`Iniciando petición`, {
       method,
@@ -47,6 +71,8 @@ export class CRMApiClient {
 
     const startTime = Date.now();
 
+    // Registrar request en vuelo para deduplicación de GETs
+    const executeRequest = async (): Promise<T> => {
     try {
       const response = await fetch(url, {
         ...options,
@@ -121,9 +147,18 @@ export class CRMApiClient {
         requestId,
         responseTime: `${responseTime}ms`,
       });
-      
+
       throw error;
     }
+    }; // fin executeRequest
+
+    // Registrar y limpiar inflight
+    const promise = executeRequest();
+    if (method === 'GET') {
+      inflightRequests.set(throttleKey, promise);
+      promise.finally(() => inflightRequests.delete(throttleKey));
+    }
+    return promise;
   }
 
   /**
@@ -137,45 +172,36 @@ export class CRMApiClient {
         return false;
       }
 
-      const stored = await chrome.storage.local.get(['refreshToken', 'crmUrl']);
+      const storage = getSecureStorage();
+      const stored = await storage.get(['refreshToken']);
+      const localStored = await chrome.storage.local.get(['crmUrl']);
 
       if (!stored.refreshToken) {
-        console.error('[API] No hay refresh token disponible');
+        logger.warn('No hay refresh token disponible');
         return false;
       }
 
-      // Intentar renovar usando refresh token
-      const url = stored.crmUrl || this.baseUrl;
+      const url = localStored.crmUrl || this.baseUrl;
       const response = await fetch(`${url}/api/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          refreshToken: stored.refreshToken
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: stored.refreshToken }),
       });
 
       if (!response.ok) {
-        console.error('[API] Error renovando token con refresh token');
-        // Limpiar tokens inválidos
+        logger.warn('Error renovando token con refresh token');
         await clearCRMConfig();
         return false;
       }
 
       const data = await response.json();
-
-      // Actualizar tokens
       this.setToken(data.token);
-      await chrome.storage.local.set({
-        authToken: data.token,
-        refreshToken: data.refreshToken || stored.refreshToken,
-      });
+      await saveTokens(data.token, data.refreshToken || stored.refreshToken);
 
-      console.log('[API] Token renovado exitosamente con refresh token');
+      logger.info('Token renovado exitosamente');
       return true;
     } catch (error) {
-      console.error('[API] Error renovando token:', error);
+      logger.error('Error renovando token', error instanceof Error ? error : undefined);
       return false;
     }
   }
@@ -201,15 +227,11 @@ export class CRMApiClient {
         hasRefreshToken: !!response.refreshToken,
       });
 
-      // Guardar tokens para persistencia de sesión
+      // Guardar tokens en session storage (se borra al cerrar navegador)
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        await chrome.storage.local.set({
-          authToken: response.token,
-          refreshToken: response.refreshToken || null,
-          crmUrl: this.baseUrl,
-          lastLogin: Date.now(),
-        });
-        logger.debug('Tokens guardados en storage');
+        await saveTokens(response.token, response.refreshToken || null);
+        await chrome.storage.local.set({ crmUrl: this.baseUrl });
+        logger.debug('Tokens guardados en session storage');
       }
 
       // Actualizar token en el cliente
@@ -389,6 +411,38 @@ export class CRMApiClient {
   }
 
   /**
+   * Obtener plantillas de mensaje desde el backend.
+   * Cache en chrome.storage.local con TTL de 1 hora.
+   */
+  async getTemplates(): Promise<any[]> {
+    try {
+      // Verificar cache
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        const cached = await new Promise<any>((resolve) =>
+          chrome.storage.local.get(['templateCache', 'templateCacheTs'], resolve)
+        );
+        const ONE_HOUR = 60 * 60 * 1000;
+        if (cached.templateCache && cached.templateCacheTs && (Date.now() - cached.templateCacheTs) < ONE_HOUR) {
+          return cached.templateCache;
+        }
+      }
+
+      const response = await this.request<{ templates: any[] }>('/api/extension/templates');
+      const templates = response.templates || [];
+
+      // Guardar en cache
+      if (typeof chrome !== 'undefined' && chrome.storage && templates.length > 0) {
+        chrome.storage.local.set({ templateCache: templates, templateCacheTs: Date.now() });
+      }
+
+      return templates;
+    } catch (error) {
+      logger.error('Error obteniendo plantillas', error instanceof Error ? error : undefined);
+      return [];
+    }
+  }
+
+  /**
    * Obtener tareas pendientes de un cliente
    */
   async getPendientes(clienteId: string): Promise<{ pendientes: number; tiene_pendientes: boolean }> {
@@ -404,38 +458,83 @@ export class CRMApiClient {
   }
 }
 
+// ─── Storage helpers ──────────────────────────────────────────────────
+// Tokens sensibles van en session storage (se borra al cerrar navegador).
+// crmUrl va en local storage (no es sensible, conviene que persista).
+
+/**
+ * Retorna chrome.storage.session si disponible, sino fallback a local.
+ */
+function getSecureStorage(): chrome.storage.StorageArea {
+  if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+    return chrome.storage.session;
+  }
+  return chrome.storage.local;
+}
+
+/**
+ * Guardar tokens en storage seguro
+ */
+async function saveTokens(token: string, refreshToken: string | null): Promise<void> {
+  const storage = getSecureStorage();
+  return new Promise((resolve) => {
+    storage.set({ authToken: token, refreshToken: refreshToken }, () => resolve());
+  });
+}
+
 /**
  * Obtener configuración de CRM desde storage
  */
 export async function getCRMConfig(): Promise<{ url: string; token: string | null }> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['crmUrl', 'authToken'], (result) => {
-      resolve({
-        url: result.crmUrl || 'https://crm.amersursac.com',
-        token: result.authToken || null,
-      });
-    });
-  });
+  const storage = getSecureStorage();
+
+  // crmUrl está en local, tokens en session
+  const [localResult, secureResult] = await Promise.all([
+    new Promise<any>((resolve) => chrome.storage.local.get(['crmUrl'], resolve)),
+    new Promise<any>((resolve) => storage.get(['authToken'], resolve)),
+  ]);
+
+  // Migración: si hay token en local pero no en session, migrar
+  if (!secureResult.authToken && storage !== chrome.storage.local) {
+    const legacy = await new Promise<any>((resolve) =>
+      chrome.storage.local.get(['authToken', 'refreshToken'], resolve)
+    );
+    if (legacy.authToken) {
+      await saveTokens(legacy.authToken, legacy.refreshToken || null);
+      chrome.storage.local.remove(['authToken', 'refreshToken']);
+      return {
+        url: localResult.crmUrl || 'https://crm.amersursac.com',
+        token: legacy.authToken,
+      };
+    }
+  }
+
+  return {
+    url: localResult.crmUrl || 'https://crm.amersursac.com',
+    token: secureResult.authToken || null,
+  };
 }
 
 /**
  * Guardar configuración de CRM en storage
  */
 export async function saveCRMConfig(url: string, token: string): Promise<void> {
+  await saveTokens(token, null);
   return new Promise((resolve) => {
-    chrome.storage.local.set({ crmUrl: url, authToken: token }, () => {
-      resolve();
-    });
+    chrome.storage.local.set({ crmUrl: url }, () => resolve());
   });
 }
 
 /**
- * Limpiar configuración de CRM
+ * Limpiar configuración de CRM (logout)
  */
 export async function clearCRMConfig(): Promise<void> {
-  return new Promise((resolve) => {
-    chrome.storage.local.remove(['authToken', 'refreshToken', 'lastLogin'], () => {
-      resolve();
-    });
+  const storage = getSecureStorage();
+  await new Promise<void>((resolve) => {
+    storage.remove(['authToken', 'refreshToken'], () => resolve());
+  });
+  // Limpiar legacy tokens de local si quedaron
+  await new Promise<void>((resolve) => {
+    chrome.storage.local.remove(['authToken', 'refreshToken', 'lastLogin'], () => resolve());
   });
 }

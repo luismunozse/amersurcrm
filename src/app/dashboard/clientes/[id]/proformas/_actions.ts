@@ -34,11 +34,16 @@ async function generarNumeroProforma(
   const now = new Date();
   const year = now.getFullYear();
 
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
+    .schema("crm")
     .from("proforma")
     .select("id", { count: "exact", head: true })
     .gte("created_at", `${year}-01-01`)
     .lt("created_at", `${year + 1}-01-01`);
+
+  if (countError) {
+    console.error("Error contando proformas para numeración:", countError);
+  }
 
   const consecutivo = ((count ?? 0) + 1).toString().padStart(4, "0");
   return `PF-${year}-${consecutivo}`;
@@ -62,6 +67,7 @@ export async function crearProformaAction(input: CrearProformaInput): Promise<Cr
     }
 
     const { data: asesorPerfil, error: asesorError } = await supabase
+      .schema("crm")
       .from("usuario_perfil")
       .select("id, nombre_completo, username, telefono")
       .eq("id", user.id)
@@ -77,6 +83,7 @@ export async function crearProformaAction(input: CrearProformaInput): Promise<Cr
     const descuento = input.descuento ?? input.datos.precios.descuento ?? null;
 
     const { data, error } = await supabase
+      .schema("crm")
       .from("proforma")
       .insert({
         numero,
@@ -203,6 +210,7 @@ export async function actualizarProformaAction(
     }
 
     const { data: existente, error: existenteError } = await supabase
+      .schema("crm")
       .from("proforma")
       .select("*")
       .eq("id", proformaId)
@@ -213,6 +221,7 @@ export async function actualizarProformaAction(
     }
 
     const { data, error } = await supabase
+      .schema("crm")
       .from("proforma")
       .update({
         lote_id: input.loteId ?? null,

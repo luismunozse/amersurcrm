@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PageLoader } from '@/components/ui/PageLoader';
 import type { OverlayLayerConfig } from '@/types/overlay-layers';
 
 interface LatLngLiteral {
@@ -1125,10 +1126,7 @@ export default function GoogleMap({
 
   const loadingFallback = (
     <div className="w-full h-full flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-        <p className="text-gray-600">Cargando Google Maps...</p>
-      </div>
+      <PageLoader text="Cargando mapa..." size="sm" />
     </div>
   );
 

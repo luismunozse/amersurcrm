@@ -1,10 +1,11 @@
-import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { createServerOnlyClient } from "@/lib/supabase.server";
 import { PERMISOS } from "@/lib/permissions";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { redirect, notFound } from "next/navigation";
 import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
 import AgendarEventoButton from "./_AgendarEventoButton";
-import { ArrowLeft, User, Phone, Mail, MapPin } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, MapPin, AlertTriangle } from "lucide-react";
+import { contarSeguimientosVencidos } from "@/lib/utils/seguimientos";
 import Link from "next/link";
 import { getEstadoClienteColor, getEstadoClienteLabel } from "@/lib/types/clientes";
 import { getStatusBadgeClasses } from "@/lib/utils/badge";
@@ -92,8 +93,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
   // OPTIMIZADO: Segunda ronda de queries en paralelo (todos los datos del cliente)
   // Antes: ~8 queries secuenciales (~1.6-3.2s)
   // Ahora: ~1 ronda paralela (~200-400ms)
-  const serviceClient = createServiceRoleClient();
-
   const [
     interaccionesResult,
     propiedadesInteresResult,
@@ -134,8 +133,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       .order('fecha_agregado', { ascending: false }),
 
     // Reservas con JOIN (evita 3 queries adicionales de enriquecimiento)
-    serviceClient
-      .schema('crm')
+    supabase
       .from('reserva')
       .select(`
         *,
@@ -208,7 +206,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
   });
 
   // Procesar reservas (ya vienen con JOIN, no necesitan enriquecimiento adicional)
-  const reservas = (reservasRaw ?? []).map((r: any) => {
+  const reservas = (reservasRaw ?? []).map((r) => {
     const loteRelacion = Array.isArray(r.lote) ? r.lote[0] : r.lote;
     const vendedorRelacion = Array.isArray(r.vendedor) ? r.vendedor[0] : r.vendedor;
 
@@ -216,9 +214,9 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
       ...r,
       lote: loteRelacion ? {
         ...loteRelacion,
-        proyecto: Array.isArray(loteRelacion.proyecto) ? loteRelacion.proyecto[0] : loteRelacion.proyecto,
-      } : null,
-      vendedor: vendedorRelacion || null,
+        proyecto: (Array.isArray(loteRelacion.proyecto) ? loteRelacion.proyecto[0] : loteRelacion.proyecto) ?? undefined,
+      } : undefined,
+      vendedor: vendedorRelacion || undefined,
     };
   });
 
@@ -229,6 +227,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
 
   const vendedorAsignado = vendedores?.find((v) => v.username === cliente.vendedor_username);
 
+  const seguimientosVencidos = contarSeguimientosVencidos(interacciones || []);
   const estadoColor = getEstadoClienteColor(cliente.estado_cliente);
 
   return (
@@ -294,6 +293,21 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
               </div>
             )}
           </div>
+
+          {/* Banner de seguimientos vencidos */}
+          {seguimientosVencidos > 0 && (
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {seguimientosVencidos} seguimiento{seguimientosVencidos > 1 ? "s" : ""} vencido{seguimientosVencidos > 1 ? "s" : ""}
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Este cliente tiene acciones pendientes que requieren atencion inmediata.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -310,6 +324,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           vendedores={vendedores || []}
           defaultTab={defaultTab}
           isAdmin={usuarioActual.rol === "ROL_ADMIN"}
+          seguimientosVencidos={seguimientosVencidos}
         />
       </div>
     </div>

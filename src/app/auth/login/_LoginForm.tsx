@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -532,7 +533,7 @@ export default function LoginForm() {
             >
               {pending ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" aria-hidden />
+                  <Spinner size="md" color="white" />
                   Iniciando sesión...
                 </span>
               ) : (
@@ -651,7 +652,7 @@ export default function LoginForm() {
               >
                 {resetPending ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden />
+                    <Spinner size="sm" color="white" />
                     Enviando...
                   </>
                 ) : (

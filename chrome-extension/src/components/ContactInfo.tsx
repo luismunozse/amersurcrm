@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('ContactInfo');
 
 interface ContactInfoProps {
   contact: WhatsAppContact;
@@ -12,15 +15,6 @@ interface ContactInfoProps {
 export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInfoProps) {
   const [ultimaInteraccion, setUltimaInteraccion] = useState<any>(null);
   const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
-
-  // Log del cliente cuando cambia para debugging
-  useEffect(() => {
-    if (cliente) {
-      console.log('[ContactInfo] Cliente recibido:', cliente);
-      console.log('[ContactInfo] vendedor_asignado:', cliente.vendedor_asignado);
-      console.log('[ContactInfo] origen_lead:', cliente.origen_lead);
-    }
-  }, [cliente]);
 
   const estadoColors: Record<string, string> = {
     por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -61,7 +55,7 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
           setProyectosInteres(proyectos);
         })
         .catch(error => {
-          console.error('[ContactInfo] Error cargando info adicional:', error);
+          logger.error('Error cargando info adicional', error instanceof Error ? error : undefined);
         });
     } else {
       setUltimaInteraccion(null);

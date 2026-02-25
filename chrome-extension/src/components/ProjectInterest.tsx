@@ -46,36 +46,21 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
     setError(null);
 
     try {
-      console.log('[ProjectInterest] Cargando datos para cliente:', clienteId);
-
-      // Cargar proyectos disponibles y proyectos de interés en paralelo
       const [proyectosData, interesesData] = await Promise.all([
         apiClient.getProyectos(),
         apiClient.getProyectosInteres(clienteId),
       ]);
 
-      console.log('[ProjectInterest] Proyectos recibidos:', proyectosData);
-      console.log('[ProjectInterest] Proyectos de interés recibidos:', interesesData);
-
-      // Validar respuestas
       if (!Array.isArray(proyectosData)) {
-        console.error('[ProjectInterest] Proyectos no es un array:', proyectosData);
         setError('Error: respuesta de proyectos inválida');
         return;
       }
 
-      // interesesData puede ser un array o null/undefined
       const intereses = Array.isArray(interesesData) ? interesesData : [];
-
       setProyectos(proyectosData);
       setProyectosInteres(intereses);
-      console.log('[ProjectInterest] Datos cargados correctamente:', {
-        proyectos: proyectosData.length,
-        intereses: intereses.length
-      });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-      console.error('[ProjectInterest] Error cargando datos:', errorMsg, err);
       setError(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
@@ -87,23 +72,17 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
     setError(null);
 
     try {
-      console.log('[ProjectInterest] Cargando lotes para proyecto:', proyectoId);
       const lotesData = await apiClient.getLotes(proyectoId);
-      console.log('[ProjectInterest] Lotes recibidos:', lotesData);
 
-      // Validar respuesta
       if (!Array.isArray(lotesData)) {
-        console.error('[ProjectInterest] Lotes no es un array:', lotesData);
         setError('Error: respuesta de lotes inválida');
         setLotes([]);
         return;
       }
 
       setLotes(lotesData);
-      console.log('[ProjectInterest] Lotes cargados:', lotesData.length);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-      console.error('[ProjectInterest] Error cargando lotes:', errorMsg, err);
       setError(`Error cargando lotes: ${errorMsg}`);
       setLotes([]);
     } finally {
@@ -122,6 +101,13 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
       return;
     }
 
+    // Validar duplicados
+    const isDuplicate = proyectosInteres.some(p => p.lote?.id === selectedLote);
+    if (isDuplicate) {
+      setError('Este lote ya está agregado como proyecto de interés');
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -137,7 +123,6 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
       setLotes([]);
       setNotas('');
     } catch (err) {
-      console.error('[ProjectInterest] Error agregando lote:', err);
       setError('Error agregando lote de interés');
     } finally {
       setSaving(false);
@@ -151,7 +136,6 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
       await apiClient.removeProyectoInteres(clienteId, interesId);
       await loadData();
     } catch (err) {
-      console.error('[ProjectInterest] Error eliminando proyecto:', err);
       setError('Error eliminando proyecto');
     }
   }

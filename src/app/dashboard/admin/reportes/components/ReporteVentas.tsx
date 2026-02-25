@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { DollarSign, TrendingUp, Loader2 } from "lucide-react";
+import { DollarSign, TrendingUp } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteVentas, obtenerMetricasRendimiento, obtenerObjetivosVsRealidad } from "../_actions";
 import toast from "react-hot-toast";
 
@@ -53,7 +54,7 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+        <PageLoader size="sm" />
       </div>
     );
   }

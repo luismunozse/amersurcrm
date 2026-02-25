@@ -3,22 +3,27 @@
  * Inyecta el sidebar de AmersurChat
  */
 
-import { extractContactInfo, getLastReceivedMessage } from './lib/whatsapp';
+import { extractContactInfo, getLastReceivedMessage, insertTextIntoWhatsApp, observeChatChanges } from './lib/whatsapp';
 
 const EXTENSION_ORIGIN = new URL(chrome.runtime.getURL('')).origin;
 let sidebarWindow: Window | null = null;
 
-console.log('[AmersurChat] Content script cargado');
+/**
+ * Notifica al sidebar de un cambio de contacto (push, no polling).
+ */
+function pushContactToSidebar() {
+  if (!sidebarWindow) return;
+  const contact = extractContactInfo();
+  sidebarWindow.postMessage({ type: 'AMERSURCHAT_CONTACT_CHANGED', contact }, EXTENSION_ORIGIN);
+}
 
 // Esperar a que WhatsApp Web esté completamente cargado
 function waitForWhatsAppWeb(): Promise<void> {
   return new Promise((resolve) => {
     const checkInterval = setInterval(() => {
-      // Buscar elemento característico de WhatsApp Web
       const whatsappApp = document.querySelector('#app');
       if (whatsappApp && whatsappApp.childNodes.length > 0) {
         clearInterval(checkInterval);
-        console.log('[AmersurChat] WhatsApp Web detectado');
         resolve();
       }
     }, 500);
@@ -28,12 +33,7 @@ function waitForWhatsAppWeb(): Promise<void> {
 // Crear e inyectar el sidebar
 function injectSidebar() {
   // Verificar si ya existe
-  if (document.getElementById('amersurchat-sidebar')) {
-    console.log('[AmersurChat] Sidebar ya existe');
-    return;
-  }
-
-  console.log('[AmersurChat] Inyectando sidebar...');
+  if (document.getElementById('amersurchat-sidebar')) return;
 
   // Crear overlay de fondo (para cerrar al hacer click fuera)
   const overlay = document.createElement('div');
@@ -51,7 +51,7 @@ function injectSidebar() {
     transition: opacity 0.3s ease;
   `;
 
-  // Crear contenedor del sidebar (más estrecho)
+  // Crear contenedor del sidebar
   const sidebarContainer = document.createElement('div');
   sidebarContainer.id = 'amersurchat-sidebar';
   sidebarContainer.style.cssText = `
@@ -66,8 +66,6 @@ function injectSidebar() {
     transform: translateX(100%);
     transition: transform 0.3s ease;
   `;
-
-  // Agregar clase para toggle
   sidebarContainer.classList.add('amersurchat-hidden');
 
   // Crear iframe para el sidebar (aislado del CSS de WhatsApp)
@@ -105,7 +103,7 @@ function injectSidebar() {
       sidebarContainer.style.transform = 'translateX(0)';
       overlay.style.opacity = '1';
       overlay.style.pointerEvents = 'auto';
-      toggleButton.style.right = '320px'; // 300px sidebar + 20px margin
+      toggleButton.style.right = '320px';
     }
   };
 
@@ -175,8 +173,6 @@ function injectSidebar() {
   toggleButton.appendChild(badge);
 
   document.body.appendChild(toggleButton);
-
-  console.log('[AmersurChat] Sidebar inyectado correctamente');
 }
 
 /**
@@ -189,7 +185,6 @@ function updateBadge(count: number) {
   if (count > 0) {
     badge.textContent = count > 9 ? '9+' : count.toString();
     badge.style.display = 'flex';
-    console.log(`[AmersurChat] Badge actualizado: ${count} pendiente(s)`);
   } else {
     badge.style.display = 'none';
   }
@@ -198,45 +193,9 @@ function updateBadge(count: number) {
 // Inicializar cuando WhatsApp Web esté listo
 waitForWhatsAppWeb().then(() => {
   injectSidebar();
+  // Observar cambios de chat y notificar al sidebar proactivamente
+  observeChatChanges(() => pushContactToSidebar());
 });
-
-/**
- * Inserta texto automáticamente en el input de WhatsApp Web
- */
-function insertTextIntoWhatsApp(text: string): boolean {
-  try {
-    console.log('[AmersurChat] Insertando texto en WhatsApp:', text.substring(0, 50) + '...');
-
-    // Buscar el input de WhatsApp (contenteditable)
-    const inputBox = document.querySelector('[contenteditable="true"][data-tab="10"]') as HTMLElement;
-
-    if (!inputBox) {
-      console.error('[AmersurChat] No se encontró el input de WhatsApp');
-      return false;
-    }
-
-    // Insertar el texto
-    inputBox.focus();
-
-    // Método 1: Usar execCommand (más compatible)
-    document.execCommand('insertText', false, text);
-
-    // Si execCommand no funciona, usar textContent directo
-    if (!inputBox.textContent || inputBox.textContent.trim() === '') {
-      inputBox.textContent = text;
-
-      // Disparar eventos para que WhatsApp detecte el cambio
-      inputBox.dispatchEvent(new Event('input', { bubbles: true }));
-      inputBox.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    console.log('[AmersurChat] Texto insertado exitosamente');
-    return true;
-  } catch (error) {
-    console.error('[AmersurChat] Error insertando texto:', error);
-    return false;
-  }
-}
 
 // Escuchar mensajes del sidebar (comunicación con React)
 window.addEventListener('message', (event) => {
@@ -244,60 +203,40 @@ window.addEventListener('message', (event) => {
   if (!event.data || typeof event.data !== 'object') return;
   if (sidebarWindow && event.source !== sidebarWindow) return;
 
-  console.log('[AmersurChat] Mensaje recibido:', event.data.type, 'desde extensión');
-
   const reply = (payload: any) => {
     if (event.source && typeof (event.source as Window).postMessage === 'function') {
       (event.source as Window).postMessage(payload, EXTENSION_ORIGIN);
-    } else {
-      console.warn('[AmersurChat] No se pudo responder al mensaje (sin fuente válida)');
     }
   };
 
-  if (event.data.type === 'AMERSURCHAT_GET_CONTACT') {
-    console.log('[AmersurChat] Solicitando información del contacto...');
-
-    // El sidebar solicita información del contacto
-    const contact = extractContactInfo();
-
-    console.log('[AmersurChat] Contacto extraído:', contact);
-
-    reply({
-      type: 'AMERSURCHAT_CONTACT_INFO',
-      contact,
-    });
-  }
-
-  // Insertar plantilla de mensaje en WhatsApp
-  if (event.data.type === 'AMERSURCHAT_INSERT_TEMPLATE') {
-    console.log('[AmersurChat] Insertando plantilla en WhatsApp');
-    const { text } = event.data;
-
-    if (text) {
-      const success = insertTextIntoWhatsApp(text);
-
-      // Responder al sidebar con el resultado
-      reply({
-        type: 'AMERSURCHAT_TEMPLATE_INSERTED',
-        success,
-      });
+  switch (event.data.type) {
+    case 'AMERSURCHAT_GET_CONTACT': {
+      const contact = extractContactInfo();
+      reply({ type: 'AMERSURCHAT_CONTACT_INFO', contact });
+      break;
     }
-  }
 
-  // Actualizar badge con pendientes
-  if (event.data.type === 'AMERSURCHAT_UPDATE_BADGE') {
-    console.log('[AmersurChat] Actualizando badge');
-    const { count } = event.data;
-    if (typeof count === 'number') {
-      updateBadge(count);
+    case 'AMERSURCHAT_INSERT_TEMPLATE': {
+      const { text } = event.data;
+      if (text) {
+        const success = insertTextIntoWhatsApp(text);
+        reply({ type: 'AMERSURCHAT_TEMPLATE_INSERTED', success });
+      }
+      break;
     }
-  }
 
-  if (event.data.type === 'AMERSURCHAT_GET_LAST_MESSAGE') {
-    const message = getLastReceivedMessage();
-    reply({
-      type: 'AMERSURCHAT_LAST_MESSAGE',
-      message,
-    });
+    case 'AMERSURCHAT_UPDATE_BADGE': {
+      const { count } = event.data;
+      if (typeof count === 'number') {
+        updateBadge(count);
+      }
+      break;
+    }
+
+    case 'AMERSURCHAT_GET_LAST_MESSAGE': {
+      const message = getLastReceivedMessage();
+      reply({ type: 'AMERSURCHAT_LAST_MESSAGE', message });
+      break;
+    }
   }
 });

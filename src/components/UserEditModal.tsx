@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 
 type Rol = {
   id: string;
@@ -50,6 +51,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
   const [meta, setMeta] = useState<string>("");
   const [comision, setComision] = useState<string>("");
   const [activo, setActivo] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Valores iniciales para detectar cambios
   const initial = useMemo(() => ({
@@ -100,20 +102,25 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
       return;
     }
 
-    const ok = await onSave(payload);
-    if (ok) onClose();
+    setIsLoading(true);
+    try {
+      const ok = await onSave(payload);
+      if (ok) onClose();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50" onClick={isLoading ? undefined : onClose} />
 
       {/* Modal */}
       <div className="relative w-full max-w-lg mx-4 bg-crm-card border border-crm-border rounded-xl shadow-crm-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b border-crm-border">
           <h3 className="text-lg font-semibold text-crm-text-primary">Editar Usuario</h3>
-          <button onClick={onClose} className="text-crm-text-muted hover:text-crm-text-primary">✕</button>
+          <button onClick={onClose} disabled={isLoading} className="text-crm-text-muted hover:text-crm-text-primary disabled:opacity-50">✕</button>
         </div>
 
         <form onSubmit={onSubmit} className="p-6 space-y-4">
@@ -214,11 +221,18 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors">
+            <button type="button" onClick={onClose} disabled={isLoading} className="px-4 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors disabled:opacity-50">
               Cancelar
             </button>
-            <button type="submit" className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium">
-              Guardar cambios
+            <button type="submit" disabled={isLoading} className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Spinner size="sm" color="white" />
+                  Guardando...
+                </div>
+              ) : (
+                'Guardar cambios'
+              )}
             </button>
           </div>
         </form>

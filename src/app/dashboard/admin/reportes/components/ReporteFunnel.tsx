@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { TrendingUp, Loader2, AlertCircle, Users, DollarSign, Target } from "lucide-react";
+import { TrendingUp, AlertCircle, Users, DollarSign, Target } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteFunnel } from "../_actions";
 import toast from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -85,7 +86,7 @@ export default function ReporteFunnel({ periodo }: ReporteFunnelProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+        <PageLoader size="sm" />
       </div>
     );
   }

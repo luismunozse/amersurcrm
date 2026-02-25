@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 import { useRouter } from "next/navigation";
 
 interface SearchFilters {
@@ -156,7 +157,7 @@ export default function AdvancedClientSearch({ clientes, onFiltersChange }: Adva
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   {isSearching ? (
-                    <div className="w-5 h-5 border-2 border-crm-primary border-t-transparent rounded-full animate-spin"></div>
+                    <Spinner size="md" color="primary" />
                   ) : (
                     <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>

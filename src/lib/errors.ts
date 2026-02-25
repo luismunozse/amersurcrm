@@ -78,3 +78,34 @@ export function handleError(error: unknown, context?: Record<string, unknown>): 
   errorLogger.error('Handled error', error instanceof Error ? error : new Error(message), context);
   throw new AppError(message, 'HANDLED_ERROR', 500, context);
 }
+
+/**
+ * Maneja errores de Supabase de forma consistente.
+ * Convierte códigos de error PostgreSQL/PostgREST a mensajes amigables.
+ * Retorna null si no hay error.
+ */
+export function handleSupabaseError(
+  error: { message: string; code?: string; details?: string; hint?: string } | null,
+  context: string,
+): { success: false; error: string } | null {
+  if (!error) return null;
+
+  errorLogger.error(`[Supabase:${context}]`, new Error(error.message), {
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  });
+
+  const SUPABASE_ERROR_MAP: Record<string, string> = {
+    'PGRST116': 'No se encontró el registro',
+    '23505': 'Ya existe un registro con esos datos',
+    '23503': 'No se puede realizar: existen registros relacionados',
+    '42501': 'No tienes permisos para realizar esta acción',
+    'PGRST301': 'Sesión expirada, por favor vuelve a iniciar sesión',
+    '23502': 'Faltan datos obligatorios',
+    '22P02': 'Formato de datos inválido',
+  };
+
+  const userMessage = (error.code && SUPABASE_ERROR_MAP[error.code]) || error.message || 'Error inesperado';
+  return { success: false, error: userMessage };
+}

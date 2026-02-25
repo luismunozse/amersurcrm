@@ -10,7 +10,7 @@ interface TimelineEvent {
   fecha: string;
   titulo: string;
   descripcion?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- metadata is polymorphic per event type
 }
 
 interface Props {

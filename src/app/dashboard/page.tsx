@@ -6,6 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LazyDashboardStats } from "@/components/LazyDashboardStats";
 import { RecentActivities } from "@/components/RecentActivities";
 import { RecentProjects } from "@/components/RecentProjects";
+import { SeguimientosHoy } from "@/components/SeguimientosHoy";
+import { MiniFunnelVentas } from "@/components/MiniFunnelVentas";
+import { DashboardVentasChart } from "@/components/DashboardVentasChart";
+import { DashboardLotesDonut } from "@/components/DashboardLotesDonut";
 import { getCachedClientes, getCachedProyectos, getCachedNotificacionesNoLeidas, getCachedClientesDashboardMetrics } from "@/lib/cache.server";
 import SecondaryPanelDrawer from "@/components/dashboard/SecondaryPanelDrawer";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
@@ -494,15 +498,32 @@ async function DashboardContent() {
 
       <LazyDashboardStats />
 
-      <section className="grid gap-6">
+      {/* Seguimientos del día + Acciones rápidas */}
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),minmax(0,2fr)]">
+        <Suspense fallback={
+          <Card className="animate-pulse">
+            <CardContent className="p-6 space-y-4">
+              <div className="h-5 bg-crm-border rounded w-40" />
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-crm-border" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 bg-crm-border rounded w-32" />
+                    <div className="h-2.5 bg-crm-border rounded w-20" />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        }>
+          <SeguimientosHoy />
+        </Suspense>
+
         <div>
           <div className="flex items-center justify-between gap-4 pb-4">
             <h2 className="text-xl font-semibold text-crm-text-primary">Acciones rápidas</h2>
-            <Link href="/dashboard" className="text-sm text-crm-primary hover:text-crm-primary/80">
-              Personalizar
-            </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
             {quickActions.map((action) => (
               <Link
                 key={action.title}
@@ -532,7 +553,52 @@ async function DashboardContent() {
         </div>
       </section>
 
-      <section className="hidden xl:block">
+      {/* Ventas mensuales + Estado de lotes */}
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,3fr),minmax(0,2fr)]">
+        <Suspense fallback={
+          <Card className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="h-5 bg-crm-border rounded w-40 mb-4" />
+              <div className="h-64 bg-crm-border/30 rounded-xl" />
+            </CardContent>
+          </Card>
+        }>
+          <DashboardVentasChart />
+        </Suspense>
+
+        <Suspense fallback={
+          <Card className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="h-5 bg-crm-border rounded w-36 mb-4" />
+              <div className="h-64 bg-crm-border/30 rounded-xl" />
+            </CardContent>
+          </Card>
+        }>
+          <DashboardLotesDonut />
+        </Suspense>
+      </section>
+
+      {/* Pipeline de ventas + Prioridades del equipo */}
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),minmax(0,1fr)]">
+        <Suspense fallback={
+          <Card className="animate-pulse">
+            <CardContent className="p-6 space-y-3">
+              <div className="h-5 bg-crm-border rounded w-40" />
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <div className="h-3 bg-crm-border rounded w-24" />
+                    <div className="h-3 bg-crm-border rounded w-12" />
+                  </div>
+                  <div className="h-2 bg-crm-border/50 rounded-full" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        }>
+          <MiniFunnelVentas />
+        </Suspense>
+
         <Card variant="elevated" className="h-full">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-crm-text-primary">Prioridades del equipo</CardTitle>

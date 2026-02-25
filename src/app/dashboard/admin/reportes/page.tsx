@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
   Calendar, Download, BarChart3, UserCheck, UserCog, MessageSquare,
   Users, PieChart, Target, Clock, AlertCircle, Building, DollarSign,
-  TrendingUp, Loader2, GitCompare,
+  TrendingUp, GitCompare,
 } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
@@ -22,6 +22,7 @@ import toast from "react-hot-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageLoader } from "@/components/ui/PageLoader";
 
 // Lazy load de componentes pesados (recharts ~100KB+)
 const GraficosTendencias = dynamic(
@@ -41,9 +42,7 @@ const ReporteFunnel = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
-      </div>
+      <PageLoader size="sm" />
     )
   }
 );
@@ -123,9 +122,7 @@ export default function ReportesPage() {
   const renderOverviewContent = (factory: () => React.ReactNode) => {
     if (loading) {
       return (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
-        </div>
+        <PageLoader size="sm" />
       );
     }
     if (error) {

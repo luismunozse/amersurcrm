@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, FormEvent, useRef, useEffect } from "react";
+import { useState, FormEvent, useRef, useEffect, useCallback } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 import { crearCliente, actualizarCliente, obtenerVendedores } from "@/app/dashboard/clientes/_actions";
+import { detectarDuplicados } from "@/app/dashboard/clientes/_actions-duplicates";
+import type { DuplicadoEncontrado } from "@/app/dashboard/clientes/_actions-helpers";
+import DuplicateWarning from "./DuplicateWarning";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import {
@@ -73,6 +77,13 @@ export default function ClienteForm({
   const esSupervisor = esAdminOCoordinador();
   const puedeGestionarVendedor = !permisosLoading && (esSupervisor || tienePermiso(PERMISOS.CLIENTES.REASIGNAR));
 
+  // Duplicate detection state
+  const [duplicados, setDuplicados] = useState<DuplicadoEncontrado[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [nombreForCheck, setNombreForCheck] = useState(cliente?.nombre || "");
+  const [emailForCheck, setEmailForCheck] = useState(cliente?.email || "");
+  const [telefonoForCheck, setTelefonoForCheck] = useState(cliente?.telefono || "");
+
   // Cargar vendedores al montar el componente
   useEffect(() => {
     const cargarVendedores = async () => {
@@ -92,6 +103,39 @@ export default function ClienteForm({
 
     cargarVendedores();
   }, []);
+
+  // Debounced duplicate check
+  useEffect(() => {
+    if (!nombreForCheck && !emailForCheck && !telefonoForCheck) {
+      setDuplicados([]);
+      return;
+    }
+
+    // Don't check if name is too short
+    if (nombreForCheck.length < 3 && !emailForCheck && !telefonoForCheck) {
+      setDuplicados([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingDuplicates(true);
+      try {
+        const result = await detectarDuplicados({
+          nombre: nombreForCheck,
+          telefono: telefonoForCheck || undefined,
+          email: emailForCheck || undefined,
+          excludeId: isEditing ? cliente?.id : undefined,
+        });
+        setDuplicados(result.duplicados);
+      } catch {
+        // Silently fail - this is a non-blocking check
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [nombreForCheck, emailForCheck, telefonoForCheck, isEditing, cliente?.id]);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -198,6 +242,7 @@ export default function ClienteForm({
                   className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                   disabled={pending}
                   placeholder={tipoCliente === 'persona' ? 'Juan Pérez García' : 'Empresa Constructora S.A.C.'}
+                  onChange={(e) => setNombreForCheck(e.target.value)}
                   onInvalid={(e) => {
                     const target = e.target as HTMLInputElement;
                     if (target.validity.valueMissing) {
@@ -224,6 +269,7 @@ export default function ClienteForm({
                   className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                   disabled={pending}
                   placeholder="cliente@ejemplo.com"
+                  onChange={(e) => setEmailForCheck(e.target.value)}
                 />
               </div>
 
@@ -294,6 +340,7 @@ export default function ClienteForm({
                 disabled={pending}
                 label="Teléfono"
                 required
+                onValueChange={setTelefonoForCheck}
               />
 
               <PhoneInput
@@ -502,6 +549,8 @@ export default function ClienteForm({
             </div>
           </div>
         </div>
+        {/* Duplicate Warning */}
+        <DuplicateWarning duplicados={duplicados} checking={checkingDuplicates} />
       </form>
 
       {/* Botones de Acción - Fijos en la parte inferior */}
@@ -517,10 +566,8 @@ export default function ClienteForm({
           </button>
         )}
         <button
-          type="submit"
-          form={formRef.current?.id}
-          onClick={(e) => {
-            e.preventDefault();
+          type="button"
+          onClick={() => {
             formRef.current?.requestSubmit();
           }}
           disabled={pending || loadingVendedores}
@@ -528,12 +575,12 @@ export default function ClienteForm({
         >
           {pending ? (
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <Spinner size="xs" color="white" />
               <span>Guardando...</span>
             </div>
           ) : loadingVendedores ? (
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <Spinner size="xs" color="white" />
               <span>Cargando...</span>
             </div>
           ) : (

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 19292 //F)",
+      "Bash(npx vitest run src/__tests__/unit/auditoria-usuarios.test.ts src/__tests__/unit/username-generator.test.ts src/__tests__/unit/usuarios-csv-import.test.ts src/__tests__/unit/usuarios-api-route.test.ts src/__tests__/unit/usuarios-actions.test.ts src/__tests__/unit/usuarios-firma-api.test.ts)",
+      "Bash(npx vitest run)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npx jest --testPathPattern=\"\\(agenda-criterios|notificaciones-criterios|notifications.smoke\\)\" --no-coverage)",
+      "Bash(npx jest --testPathPatterns=\"\\(agenda-criterios|notificaciones-criterios|notifications.smoke\\)\" --no-coverage)",
+      "Bash(npx vitest run --reporter=verbose src/__tests__/prd/agenda-criterios.test.ts src/__tests__/prd/notificaciones-criterios.test.ts src/__tests__/smoke/notifications.smoke.test.ts)",
+      "Bash(git stash)",
+      "Bash(git stash pop)",
+      "Bash(echo \"STATUS=$?\")",
+      "Bash(head -20 /c/Users/LUIS/Desktop/amersurcrm/src/lib/utils/*.ts)",
+      "Bash(npx jest --testPathPattern=\"reportes\" --no-coverage)",
+      "Bash(npx jest --testPathPatterns=\"reportes\" --no-coverage)",
+      "Bash(npx vitest run src/__tests__/prd/reportes-criterios.test.ts)",
+      "Bash(npx vitest run src/__tests__/unit/reportes-sincronizacion.test.ts src/__tests__/prd/reportes-criterios.test.ts)",
+      "Bash(npx vitest run src/__tests__/unit/clientes-labels.test.ts)",
+      "Bash(npx vitest run src/__tests__/unit/usuarios-api-route.test.ts)"
+    ]
+  }
+}

@@ -1,18 +1,26 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { User, Mail, Phone, MapPin, DollarSign, FileText, UserCheck } from "lucide-react";
+import { User, Mail, Phone, MapPin, DollarSign, FileText, UserCheck, PenSquare } from "lucide-react";
 import { TIPOS_DOCUMENTO_OPTIONS, ESTADO_CIVIL_OPTIONS, ORIGENES_LEAD_OPTIONS, INTERESES_PRINCIPALES_OPTIONS, FORMAS_PAGO_OPTIONS } from "@/lib/types/clientes";
 import { formatCapacidadCompra } from "@/lib/types/clientes";
 import toast from "react-hot-toast";
 import { asignarVendedorCliente } from "@/app/dashboard/clientes/_actions";
+import { useRouter } from "next/navigation";
+import { usePermissions, PERMISOS } from "@/lib/permissions";
+import EditarClienteModal from "@/components/EditarClienteModal";
+
+import type { ClienteCompleto } from "@/lib/types/clientes";
 
 interface Props {
-  cliente: any;
+  cliente: ClienteCompleto;
   vendedores: Array<{ id: string; username: string; nombre_completo?: string | null; telefono?: string | null; email?: string | null }>;
 }
 
 export default function TabInformacionBasica({ cliente, vendedores }: Props) {
+  const router = useRouter();
+  const { tienePermiso, esAdminOCoordinador } = usePermissions();
+  const puedeEditar = esAdminOCoordinador() || tienePermiso(PERMISOS.CLIENTES.EDITAR_TODOS) || tienePermiso(PERMISOS.CLIENTES.EDITAR_ASIGNADOS);
   const tipoDoc = TIPOS_DOCUMENTO_OPTIONS.find(t => t.value === cliente.tipo_documento)?.label;
   const estadoCivil = ESTADO_CIVIL_OPTIONS.find(e => e.value === cliente.estado_civil)?.label;
   const origenLead = ORIGENES_LEAD_OPTIONS.find(o => o.value === cliente.origen_lead)?.label;
@@ -20,6 +28,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
   const formaPago = FORMAS_PAGO_OPTIONS.find(f => f.value === cliente.forma_pago_preferida)?.label;
   const [isAssigning, startTransition] = useTransition();
   const [selectedVendedor, setSelectedVendedor] = useState<string>(cliente.vendedor_username || "");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     setSelectedVendedor(cliente.vendedor_username || "");
@@ -41,6 +50,19 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Botón Editar */}
+      {puedeEditar && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-crm-border rounded-lg text-crm-text hover:border-crm-primary hover:text-crm-primary transition-colors"
+          >
+            <PenSquare className="h-4 w-4" />
+            Editar informacion
+          </button>
+        </div>
+      )}
+
       <div>
         <h3 className="text-lg font-semibold text-crm-text mb-4 flex items-center gap-2">
           <UserCheck className="h-5 w-5 text-crm-primary" />
@@ -296,6 +318,16 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
           </div>
         </div>
       )}
+
+      {/* Modal de edición */}
+      <EditarClienteModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          router.refresh();
+        }}
+        cliente={cliente}
+      />
     </div>
   );
 }

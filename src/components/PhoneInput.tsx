@@ -44,6 +44,7 @@ interface PhoneInputProps {
   label?: string;
   required?: boolean;
   className?: string;
+  onValueChange?: (fullNumber: string) => void;
 }
 
 export default function PhoneInput({
@@ -53,7 +54,8 @@ export default function PhoneInput({
   disabled = false,
   label,
   required = false,
-  className = ""
+  className = "",
+  onValueChange,
 }: PhoneInputProps) {
   const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]); // Perú por defecto
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -89,6 +91,10 @@ export default function PhoneInput({
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, ""); // Solo números
     setPhoneNumber(value);
+    if (onValueChange) {
+      const full = value ? `${selectedCountry.dialCode}${value}` : "";
+      onValueChange(full);
+    }
   };
 
   const formatPhoneNumber = (number: string) => {

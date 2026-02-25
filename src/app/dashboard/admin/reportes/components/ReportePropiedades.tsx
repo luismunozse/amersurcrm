@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Building, Loader2 } from "lucide-react";
+import { Building } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReportePropiedades } from "../_actions";
 import toast from "react-hot-toast";
 import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
@@ -42,7 +43,7 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+        <PageLoader size="sm" />
       </div>
     );
   }

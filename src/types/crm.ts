@@ -58,6 +58,14 @@ export type ClienteCached = {
     totalClientes: number;
     totalProyectos: number;
     totalLotes: number;
+    // Enhanced stats
+    lotesVendidos: number;
+    lotesReservados: number;
+    lotesDisponibles: number;
+    ventasMesActual: number;
+    ventasMesAnterior: number;
+    clientesNuevosMes: number;
+    clientesNuevosMesAnterior: number;
   };
 
   export type NotificacionTipoCliente =

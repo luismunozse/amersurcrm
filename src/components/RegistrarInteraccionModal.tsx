@@ -114,6 +114,9 @@ export default function RegistrarInteraccionModal({
 
   return createPortal(
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="registrar-interaccion-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -125,7 +128,7 @@ export default function RegistrarInteraccionModal({
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold text-crm-text-primary">
+            <h2 id="registrar-interaccion-title" className="text-xl font-bold text-crm-text-primary">
               {isEditMode ? "Editar Interacción" : "Registrar Interacción"}
             </h2>
             <p className="text-sm text-crm-text-secondary mt-1">
@@ -134,6 +137,7 @@ export default function RegistrarInteraccionModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="text-crm-text-muted hover:text-crm-text-primary transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

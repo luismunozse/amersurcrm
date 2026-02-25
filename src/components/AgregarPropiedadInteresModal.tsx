@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import toast from "react-hot-toast";
 import { agregarPropiedadInteres } from "@/app/dashboard/clientes/_actions_crm";
 import { useRouter } from "next/navigation";
@@ -227,7 +228,7 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
                     </option>
                   ))}
                 </select>
-                {loadingOptions && <Loader2 className="h-4 w-4 text-crm-primary animate-spin" />}
+                {loadingOptions && <Spinner size="sm" color="primary" />}
               </div>
               {optionsError && <p className="text-xs text-red-500 mt-1">{optionsError}</p>}
               {!loadingOptions && proyectos.length === 0 && (

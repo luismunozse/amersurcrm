@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions } from '@/lib/permissions/client';
+import { PageLoader } from '@/components/ui/PageLoader';
 import type { PermisoCodigo, RolNombre } from '@/lib/permissions/types';
 
 interface ProtectedPageProps {
@@ -121,10 +122,7 @@ export function ProtectedPage({
       <>
         {loadingComponent || (
           <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-              <p className="mt-4 text-gray-600">Verificando permisos...</p>
-            </div>
+            <PageLoader text="Verificando permisos..." size="sm" />
           </div>
         )}
       </>

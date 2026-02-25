@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AlertCircle, Download, RefreshCw, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import { PageLoader } from "@/components/ui/PageLoader";
 
 interface ExtensionLog {
   id: string;
@@ -270,8 +271,7 @@ export default function ExtensionLogsPage() {
             <div className="crm-card overflow-hidden">
               {loading ? (
                 <div className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crm-primary mx-auto"></div>
-                  <p className="mt-4 text-crm-text-muted">Cargando logs...</p>
+                  <PageLoader size="sm" text="Cargando logs..." />
                 </div>
               ) : filteredLogs.length === 0 ? (
                 <div className="p-8 text-center">
@@ -352,8 +352,7 @@ export default function ExtensionLogsPage() {
           <div className="crm-card p-6">
             {loading ? (
               <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crm-primary mx-auto"></div>
-                <p className="mt-4 text-crm-text-muted">Cargando métricas...</p>
+                <PageLoader size="sm" text="Cargando métricas..." />
               </div>
             ) : metrics.length === 0 ? (
               <div className="text-center">

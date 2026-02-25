@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, FileType } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   exportFilteredProyectos,
   exportFilteredLotes,
@@ -13,17 +14,18 @@ import {
   formatFilterSummary,
   addCountToFilters,
 } from '@/lib/export/filteredExport';
+import { exportFilteredUsuarios, type UsuarioExportFilters } from '@/lib/export/usuariosExport';
 
 /**
  * Props para el componente ExportButton
  */
 export interface ExportButtonProps {
   /** Tipo de datos a exportar */
-  type: 'proyectos' | 'lotes' | 'clientes';
+  type: 'proyectos' | 'lotes' | 'clientes' | 'usuarios';
   /** Datos a exportar */
   data: any[];
   /** Filtros actuales aplicados */
-  filters: ProyectoExportFilters | LoteExportFilters | ClienteExportFilters;
+  filters: ProyectoExportFilters | LoteExportFilters | ClienteExportFilters | UsuarioExportFilters;
   /** Nombre base del archivo */
   fileName?: string;
   /** Texto del botón */
@@ -91,39 +93,20 @@ export default function ExportButton({
       // Agregar el conteo a los filtros
       const filtersWithCount = addCountToFilters(filters, data.length);
 
+      const exportOpts = {
+        fileName: fileName || type,
+        includeFiltersSheet,
+        includeTimestamp: true,
+      };
+
       if (type === 'proyectos') {
-        await exportFilteredProyectos(
-          data,
-          filtersWithCount as ProyectoExportFilters,
-          format,
-          {
-            fileName: fileName || 'proyectos',
-            includeFiltersSheet,
-            includeTimestamp: true,
-          }
-        );
+        await exportFilteredProyectos(data, filtersWithCount as ProyectoExportFilters, format, exportOpts);
       } else if (type === 'lotes') {
-        await exportFilteredLotes(
-          data,
-          filtersWithCount as LoteExportFilters,
-          format,
-          {
-            fileName: fileName || 'lotes',
-            includeFiltersSheet,
-            includeTimestamp: true,
-          }
-        );
+        await exportFilteredLotes(data, filtersWithCount as LoteExportFilters, format, exportOpts);
+      } else if (type === 'usuarios') {
+        await exportFilteredUsuarios(data, filtersWithCount as UsuarioExportFilters, format, exportOpts);
       } else {
-        await exportFilteredClientes(
-          data,
-          filtersWithCount as ClienteExportFilters,
-          format,
-          {
-            fileName: fileName || 'clientes',
-            includeFiltersSheet,
-            includeTimestamp: true,
-          }
-        );
+        await exportFilteredClientes(data, filtersWithCount as ClienteExportFilters, format, exportOpts);
       }
 
     } catch (error) {
@@ -177,7 +160,7 @@ export default function ExportButton({
         className={`${sizeStyles[size]} ${variantStyles[variant]} border rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         {isExporting ? (
-          <Loader2 className={`${iconSizes[size]} animate-spin`} />
+          <Spinner size={size === 'lg' ? 'md' : 'sm'} />
         ) : (
           <Download className={iconSizes[size]} />
         )}
@@ -196,7 +179,7 @@ export default function ExportButton({
         className={`${sizeStyles[size]} ${variantStyles[variant]} border rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         {isExporting ? (
-          <Loader2 className={`${iconSizes[size]} animate-spin`} />
+          <Spinner size={size === 'lg' ? 'md' : 'sm'} />
         ) : (
           <Download className={iconSizes[size]} />
         )}

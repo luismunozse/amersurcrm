@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { PageLoader } from '@/components/ui/PageLoader';
 
 // ============================================================================
 // BASE SKELETON COMPONENTS
@@ -227,10 +228,7 @@ export function MapSkeleton() {
   return (
     <div className="relative w-full h-full bg-gray-100 rounded-xl overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <SkeletonText width="1/2" className="mx-auto" />
-        </div>
+        <PageLoader text="Cargando mapa..." size="sm" />
       </div>
 
       {/* Map controls skeleton */}

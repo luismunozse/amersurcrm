@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 import { useRouter } from "next/navigation";
 import { SearchResult, PropiedadSearchResult, EventoSearchResult } from "@/types/search";
 import { globalSearch } from "@/app/dashboard/actions/search";
@@ -152,7 +153,7 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
         />
         {isLoading && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-            <div className="animate-spin h-4 w-4 border-2 border-crm-primary border-t-transparent rounded-full"></div>
+            <Spinner size="sm" color="primary" />
           </div>
         )}
       </div>

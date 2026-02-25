@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
-import { PieChart as PieChartIcon, Loader2, Filter } from "lucide-react";
+import { PieChart as PieChartIcon, Filter } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteNivelInteres } from "../_actions";
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -74,7 +75,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+        <PageLoader size="sm" />
       </div>
     );
   }

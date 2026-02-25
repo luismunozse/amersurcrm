@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, CheckCircle, AlertCircle, Image as ImageIcon, FileText, Loader2 } from 'lucide-react';
+import { Upload, X, CheckCircle, AlertCircle, Image as ImageIcon, FileText } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import { toast } from 'sonner';
 
 interface BlueprintUploaderProps {
@@ -245,7 +246,7 @@ export default function BlueprintUploader({
 
         {isConverting ? (
           <div className="space-y-4">
-            <Loader2 className="w-12 h-12 text-purple-500 animate-spin mx-auto" />
+            <Spinner size="lg" className="text-purple-500 w-12 h-12 mx-auto" />
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-gray-700">Convirtiendo PDF a imagen...</h3>
               <p className="text-sm text-gray-500">Esto puede tomar unos segundos</p>
@@ -253,7 +254,7 @@ export default function BlueprintUploader({
           </div>
         ) : isUploading ? (
           <div className="space-y-4">
-            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
+            <Spinner size="lg" className="text-blue-500 w-12 h-12 mx-auto" />
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-gray-700">Subiendo plano...</h3>
               <div className="w-full bg-gray-200 rounded-full h-2">

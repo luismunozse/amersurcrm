@@ -402,7 +402,12 @@ export const getCachedLotes = cache(async (proyectoId: string): Promise<LoteCach
 export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> => {
   const supabase = await createOptimizedServerClient();
   const userId = await getUserIdOrNull(supabase);
-  if (!userId) return { totalClientes: 0, totalProyectos: 0, totalLotes: 0 };
+  if (!userId) return {
+    totalClientes: 0, totalProyectos: 0, totalLotes: 0,
+    lotesVendidos: 0, lotesReservados: 0, lotesDisponibles: 0,
+    ventasMesActual: 0, ventasMesAnterior: 0,
+    clientesNuevosMes: 0, clientesNuevosMesAnterior: 0,
+  };
 
   const { data: perfil } = await supabase
     .schema('crm')
@@ -416,6 +421,12 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
   const esAdmin = rolNombre === 'ROL_ADMIN';
   const esGerente = rolNombre === 'ROL_GERENTE';
   const username = perfil?.username;
+
+  // Fechas para tendencias
+  const ahora = new Date();
+  const inicioMesActual = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
+  const inicioMesAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1).toISOString();
+  const finMesAnterior = new Date(ahora.getFullYear(), ahora.getMonth(), 0, 23, 59, 59).toISOString();
 
   // Total de clientes según permisos (usa la misma lógica que el dashboard de clientes)
   const { data: clienteMetrics, error: clienteMetricsError } = await supabase
@@ -437,7 +448,6 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
     const usarVistaAccesible = !esAdmin && !esGerente && username;
     const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
 
-    // IMPORTANTE: .select() debe llamarse PRIMERO para que .or() esté disponible
     let clientesQuery = supabase.schema('crm').from(tablaClientes).select('id', { count: 'exact', head: true });
 
     if (usarVistaAccesible) {
@@ -454,15 +464,45 @@ export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> =
     }
   }
 
-  const [pRes, lRes] = await Promise.all([
+  const [pRes, lRes, lotesEstados, ventasMesActualRes, ventasMesAnteriorRes, clientesNuevosMesRes, clientesNuevosMesAnteriorRes] = await Promise.all([
     supabase.schema('crm').from("proyecto").select("*", { count: "exact", head: true }),
     supabase.schema('crm').from("lote").select("*", { count: "exact", head: true }),
+    // Lotes por estado (global)
+    supabase.schema('crm').from("lote").select("estado"),
+    // Ventas mes actual
+    supabase.schema('crm').from("venta").select("id", { count: "exact", head: true })
+      .eq("estado", "finalizada")
+      .gte("fecha_venta", inicioMesActual),
+    // Ventas mes anterior
+    supabase.schema('crm').from("venta").select("id", { count: "exact", head: true })
+      .eq("estado", "finalizada")
+      .gte("fecha_venta", inicioMesAnterior)
+      .lte("fecha_venta", finMesAnterior),
+    // Clientes nuevos mes actual
+    supabase.schema('crm').from("cliente").select("id", { count: "exact", head: true })
+      .gte("created_at", inicioMesActual),
+    // Clientes nuevos mes anterior
+    supabase.schema('crm').from("cliente").select("id", { count: "exact", head: true })
+      .gte("created_at", inicioMesAnterior)
+      .lte("created_at", finMesAnterior),
   ]);
+
+  const lotes = (lotesEstados.data ?? []) as { estado: string }[];
+  const lotesVendidos = lotes.filter(l => l.estado === 'vendido').length;
+  const lotesReservados = lotes.filter(l => l.estado === 'reservado').length;
+  const lotesDisponibles = lotes.filter(l => l.estado === 'disponible').length;
 
   return {
     totalClientes,
     totalProyectos: pRes.count ?? 0,
     totalLotes: lRes.count ?? 0,
+    lotesVendidos,
+    lotesReservados,
+    lotesDisponibles,
+    ventasMesActual: ventasMesActualRes.count ?? 0,
+    ventasMesAnterior: ventasMesAnteriorRes.count ?? 0,
+    clientesNuevosMes: clientesNuevosMesRes.count ?? 0,
+    clientesNuevosMesAnterior: clientesNuevosMesAnteriorRes.count ?? 0,
   };
 });
 
@@ -525,6 +565,183 @@ export const getCachedNotificacionesCount = cache(async (): Promise<number> => {
 
   if (error) throw error;
   return count ?? 0;
+});
+
+/* ========= Ventas mensuales (últimos 6 meses) ========= */
+export const getCachedVentasMensuales = cache(async (): Promise<Record<string, number>> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) return {};
+
+  const ahora = new Date();
+  const hace6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1).toISOString();
+
+  const { data, error } = await supabase
+    .schema('crm')
+    .from('venta')
+    .select('fecha_venta')
+    .eq('estado', 'finalizada')
+    .gte('fecha_venta', hace6Meses)
+    .order('fecha_venta', { ascending: true });
+
+  if (error) {
+    console.error('Error obteniendo ventas mensuales:', error);
+    return {};
+  }
+
+  // Inicializar los 6 meses con 0
+  const resultado: Record<string, number> = {};
+  for (let i = 5; i >= 0; i--) {
+    const fecha = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+    const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+    resultado[key] = 0;
+  }
+
+  // Agrupar ventas por mes
+  for (const venta of (data ?? []) as { fecha_venta: string }[]) {
+    const fecha = new Date(venta.fecha_venta);
+    const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+    if (key in resultado) {
+      resultado[key] += 1;
+    }
+  }
+
+  return resultado;
+});
+
+/* ========= Funnel de clientes por estado ========= */
+export const getCachedFunnelClientes = cache(async (): Promise<Record<string, number>> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) return {};
+
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+    .eq('id', userId)
+    .single();
+
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
+  const username = perfil?.username;
+
+  let query = supabase.schema('crm').from('cliente').select('estado_cliente');
+
+  // Vendedores solo ven sus clientes
+  if (!esAdmin && !esGerente && username) {
+    query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error obteniendo funnel de clientes:', error);
+    return {};
+  }
+
+  const funnel: Record<string, number> = {
+    por_contactar: 0,
+    contactado: 0,
+    intermedio: 0,
+    potencial: 0,
+    desestimado: 0,
+    transferido: 0,
+  };
+
+  for (const cliente of (data ?? []) as { estado_cliente: string }[]) {
+    const estado = cliente.estado_cliente || 'por_contactar';
+    if (estado in funnel) {
+      funnel[estado] += 1;
+    }
+  }
+
+  return funnel;
+});
+
+/* ========= Seguimientos del día ========= */
+export type SeguimientoHoy = {
+  id: string;
+  nombre: string;
+  estado_cliente: string;
+  ultimo_contacto: string | null;
+  proxima_accion: string | null;
+  telefono: string | null;
+};
+
+export const getCachedSeguimientosHoy = cache(async (): Promise<SeguimientoHoy[]> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) return [];
+
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+    .eq('id', userId)
+    .single();
+
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
+  const username = perfil?.username;
+
+  // Clientes con proxima_accion para hoy o atrasados, o sin contacto reciente
+  const hoyInicio = new Date();
+  hoyInicio.setHours(0, 0, 0, 0);
+  const hoyFin = new Date();
+  hoyFin.setHours(23, 59, 59, 999);
+  const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Buscar clientes con próxima acción para hoy o vencida
+  let query = supabase.schema('crm')
+    .from('cliente')
+    .select('id, nombre, estado_cliente, ultimo_contacto, proxima_accion, telefono')
+    .lte('proxima_accion', hoyFin.toISOString())
+    .not('estado_cliente', 'in', '("desestimado","transferido")')
+    .order('proxima_accion', { ascending: true })
+    .limit(8);
+
+  // Vendedores solo ven sus clientes
+  if (!esAdmin && !esGerente && username) {
+    query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+  }
+
+  const { data: conAccion, error: errorAccion } = await query;
+
+  if (errorAccion) {
+    console.error('Error obteniendo seguimientos del día:', errorAccion);
+  }
+
+  // Si hay pocos con acción programada, buscar también sin contacto reciente
+  const resultados = (conAccion ?? []) as SeguimientoHoy[];
+
+  if (resultados.length < 5) {
+    const idsExistentes = new Set(resultados.map(r => r.id));
+    let queryFuera = supabase.schema('crm')
+      .from('cliente')
+      .select('id, nombre, estado_cliente, ultimo_contacto, proxima_accion, telefono')
+      .not('estado_cliente', 'in', '("desestimado","transferido")')
+      .or(`ultimo_contacto.is.null,ultimo_contacto.lt.${hace7Dias}`)
+      .order('ultimo_contacto', { ascending: true, nullsFirst: true })
+      .limit(8 - resultados.length);
+
+    if (!esAdmin && !esGerente && username) {
+      queryFuera = queryFuera.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+    }
+
+    const { data: sinContacto } = await queryFuera;
+    for (const c of (sinContacto ?? []) as SeguimientoHoy[]) {
+      if (!idsExistentes.has(c.id)) {
+        resultados.push(c);
+      }
+    }
+  }
+
+  return resultados.slice(0, 8);
 });
 
 export function invalidateCache() {

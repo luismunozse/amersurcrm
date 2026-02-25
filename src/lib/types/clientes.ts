@@ -58,6 +58,8 @@ export interface DireccionCliente {
   barrio?: string;
   ciudad?: string;
   provincia?: string;
+  departamento?: string;
+  distrito?: string;
   pais?: string;
   codigo_postal?: string;
   coordenadas?: {
@@ -84,6 +86,8 @@ export interface ClienteCompleto {
   estado_cliente: EstadoCliente;
   origen_lead?: OrigenLead;
   vendedor_asignado?: string;
+  vendedor_username?: string;
+  created_by?: string;
   fecha_alta: string;
   ultimo_contacto?: string;
   proxima_accion?: ProximaAccion;

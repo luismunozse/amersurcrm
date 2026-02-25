@@ -16,9 +16,9 @@ import {
   Eye,
   EyeOff,
   Star,
-  Loader2,
   Plus,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import BlueprintUploader from '@/components/BlueprintUploader';
 import { toast } from 'sonner';
 import {
@@ -1576,7 +1576,7 @@ export default function MapeoLotesMejorado({
                                 >
                                   {uploadingLayerId === layer.id && isUploadingLayer ? (
                                     <>
-                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <Spinner size="sm" />
                                       Subiendo...
                                     </>
                                   ) : (

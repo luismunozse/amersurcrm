@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import { PageLoader } from "@/components/ui/PageLoader";
 import EliminarVendedorActivoModal from "@/components/EliminarVendedorActivoModal";
 import CambiarEstadoVendedorActivoModal from "@/components/CambiarEstadoVendedorActivoModal";
 import EliminarVendedoresMultipleModal from "@/components/EliminarVendedoresMultipleModal";
@@ -347,10 +348,7 @@ export default function VendedoresActivosPage() {
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando...</p>
-        </div>
+        <PageLoader text="Cargando..." size="sm" />
       </div>
     );
   }
@@ -505,7 +503,7 @@ export default function VendedoresActivosPage() {
 
         {cargando ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <PageLoader size="sm" />
           </div>
         ) : vendedores.length === 0 ? (
           <div className="p-8 text-center text-gray-600">

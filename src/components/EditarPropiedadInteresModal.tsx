@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { actualizarPropiedadInteres } from "@/app/dashboard/clientes/_actions_crm";
@@ -142,7 +142,7 @@ export default function EditarPropiedadInteresModal({ isOpen, onClose, propiedad
             disabled={submitting}
             className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-crm-primary text-white py-2 font-medium disabled:opacity-60"
           >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {submitting && <Spinner size="sm" />}
             Guardar cambios
           </button>
         </form>

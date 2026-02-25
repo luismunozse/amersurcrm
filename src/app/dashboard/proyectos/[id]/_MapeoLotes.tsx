@@ -3,7 +3,8 @@
 import { createPortal } from 'react-dom';
 import { useCallback, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Eye, Settings, MapPin, Loader2, Search, X, Trash2 } from 'lucide-react';
+import { Eye, Settings, MapPin, Search, X, Trash2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import { toast } from 'sonner';
 import BlueprintUploader from '@/components/BlueprintUploader';
 import {
@@ -447,7 +448,7 @@ export default function MapeoLotes({
               className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-60 transition-colors"
             >
               {isSavingCalibration ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Spinner size="sm" />
               ) : null}
               Guardar calibración
             </button>
@@ -455,7 +456,7 @@ export default function MapeoLotes({
 
           {mode === 'pinear' && (
             <span className="ml-auto text-xs text-crm-text-muted flex items-center gap-1.5">
-              {isSavingPin && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isSavingPin && <Spinner size="xs" />}
               Haz clic en el mapa para colocar un pin
             </span>
           )}

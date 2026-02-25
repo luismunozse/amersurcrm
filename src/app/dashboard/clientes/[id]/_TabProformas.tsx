@@ -4,19 +4,27 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Download, FilePlus2, FileText, PenSquare, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import dynamic from "next/dynamic";
 import type { ProformaRecord } from "@/types/proforma";
-import CrearProformaModal from "./_CrearProformaModal";
+const CrearProformaModal = dynamic(() => import("./_CrearProformaModal"), { ssr: false });
 import { generarProformaPdf } from "@/components/proforma/generarProformaPdf";
 import { eliminarProformaAction } from "./proformas/_actions";
 import { useSearchParams } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
+import type { ClienteCompleto } from "@/lib/types/clientes";
+import type {
+  ReservaConRelaciones,
+  VentaConRelaciones,
+  AsesorActual,
+} from "@/lib/types/cliente-detail";
+
 interface TabProformasProps {
-  cliente: any;
+  cliente: ClienteCompleto;
   proformas: ProformaRecord[];
-  reservas: any[];
-  ventas: any[];
-  asesorActual: any | null;
+  reservas: ReservaConRelaciones[];
+  ventas: VentaConRelaciones[];
+  asesorActual: AsesorActual | null;
   isAdmin?: boolean;
 }
 

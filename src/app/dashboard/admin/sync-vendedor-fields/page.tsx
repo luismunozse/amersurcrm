@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { RefreshCw, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { LoadingButton } from "@/components/form/LoadingButton";
 
 interface Inconsistencia {
@@ -128,7 +129,7 @@ export default function SyncVendedorFieldsPage() {
           >
             {verificando ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Spinner size="sm" />
                 Verificando...
               </>
             ) : (

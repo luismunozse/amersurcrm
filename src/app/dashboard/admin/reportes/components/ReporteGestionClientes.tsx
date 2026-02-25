@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Users, UserX, UserCheck, Clock, AlertCircle, Loader2, Filter } from "lucide-react";
+import { Users, UserX, UserCheck, Clock, AlertCircle, Filter } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteGestionClientes } from "../_actions";
 import toast from "react-hot-toast";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
@@ -45,7 +46,7 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+        <PageLoader size="sm" />
       </div>
     );
   }

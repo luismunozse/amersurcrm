@@ -5,12 +5,14 @@ import Link from "next/link";
 import {
   eliminarCliente,
   actualizarEstadoCliente,
-  eliminarClientesMasivo,
-  asignarVendedorMasivo,
-  cambiarEstadoMasivo,
   obtenerVendedores,
   obtenerTodosLosClientes
 } from "@/app/dashboard/clientes/_actions";
+import {
+  eliminarClientesMasivo,
+  asignarVendedorMasivo,
+  cambiarEstadoMasivo,
+} from "@/app/dashboard/clientes/_actions-bulk";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -20,7 +22,8 @@ import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 import {
   getEstadoClienteLabel,
@@ -538,6 +541,7 @@ export default function ClientesTable({
         <div className="relative">
           <input
             type="text"
+            aria-label="Buscar clientes"
             placeholder="Buscar por nombre, email, teléfono o código..."
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
@@ -586,10 +590,11 @@ export default function ClientesTable({
           {/* Filtro por vendedor */}
           {puedeFiltrarPorVendedor && (
             <div className="flex-1">
-              <label className="block text-sm font-medium text-crm-text-primary mb-1">
+              <label htmlFor="filtro-vendedor" className="block text-sm font-medium text-crm-text-primary mb-1">
                 Vendedor asignado
               </label>
               <select
+                id="filtro-vendedor"
                 value={vendedor || ''}
                 onChange={(e) => handleVendedorFilterChange(e.target.value)}
                 disabled={loadingVendedores}
@@ -612,10 +617,11 @@ export default function ClientesTable({
 
           {/* Filtro por origen del lead */}
           <div className="flex-1">
-            <label className="block text-sm font-medium text-crm-text-primary mb-1">
+            <label htmlFor="filtro-origen" className="block text-sm font-medium text-crm-text-primary mb-1">
               Origen del lead
             </label>
             <select
+              id="filtro-origen"
               value={origen || ''}
               onChange={(e) => handleOrigenFilterChange(e.target.value)}
               className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
@@ -783,7 +789,7 @@ export default function ClientesTable({
                 className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-crm-border text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50"
               >
                 {exportingSelected ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size="sm" />
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
@@ -819,7 +825,7 @@ export default function ClientesTable({
                 disabled={exportingAll}
                 className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
               >
-                {exportingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {exportingAll ? <Spinner size="sm" /> : <Download className="w-4 h-4" />}
                 {exportingAll ? 'Exportando todo...' : 'Exportar todos'}
               </button>
             </div>
@@ -904,7 +910,7 @@ export default function ClientesTable({
         {/* Vista escritorio */}
         <div className="hidden sm:block">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full" aria-label="Tabla de clientes">
               <thead className="bg-crm-card-hover border-b border-crm-border">
                 <tr>
                   {/* Checkbox de selección - Solo visible para usuarios autorizados */}
@@ -919,6 +925,7 @@ export default function ClientesTable({
                           }
                         }}
                         onChange={toggleSelectAll}
+                        aria-label="Seleccionar todos los clientes"
                         className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
                       />
                     </th>
@@ -1175,6 +1182,7 @@ const ClienteRow = memo(function ClienteRow({
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleSelect(cliente.id)}
+            aria-label={`Seleccionar ${cliente.nombre}`}
             className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
           />
         </td>
@@ -1191,7 +1199,7 @@ const ClienteRow = memo(function ClienteRow({
             </svg>
           </div>
           <div>
-            <div className="text-sm font-medium group-hover:text-crm-primary transition-colors">{cliente.nombre}</div>
+            <span className="text-sm font-medium group-hover:text-crm-primary transition-colors">{cliente.nombre}</span>
             <div className="text-xs text-crm-text-muted capitalize">
               {cliente.tipo_cliente === 'persona' ? 'Persona' :
                cliente.tipo_cliente === 'empresa' ? 'Empresa' : 'No especificado'}

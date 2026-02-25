@@ -12,8 +12,8 @@ import {
   Clock,
   Folder,
   X,
-  Loader2
 } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import GoogleDriveFolders from "./_GoogleDriveFolders";
 import DocumentosList, { GoogleDriveDocumento } from "./_DocumentosList";
 import GoogleDriveStatus from "./_GoogleDriveStatus";
@@ -544,13 +544,7 @@ export default function DocumentosClient({
 
             {cargandoDocumentos ? (
               <div className="crm-card p-12 rounded-xl text-center">
-                <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Loader2 className="w-8 h-8 text-crm-primary animate-spin" />
-                </div>
-                <h3 className="text-lg font-semibold text-crm-text-primary mb-2">Cargando documentos...</h3>
-                <p className="text-sm text-crm-text-secondary">
-                  Obteniendo archivos desde Google Drive
-                </p>
+                <PageLoader size="sm" text="Obteniendo archivos desde Google Drive" />
               </div>
             ) : (
               <DocumentosList

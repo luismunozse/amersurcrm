@@ -6,6 +6,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, HomeModernIcon, DocumentTextIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { PageLoader } from '@/components/ui/PageLoader';
 
 interface PropiedadInteres {
   id: string;
@@ -573,8 +574,7 @@ export default function ClienteDetailModalComplete({ isOpen, onClose, cliente }:
 
                     {loadingPropiedades ? (
                       <div className="flex items-center justify-center py-6">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-crm-primary"></div>
-                        <span className="ml-2 text-sm text-gray-500">Cargando...</span>
+                        <PageLoader size="sm" />
                       </div>
                     ) : propiedadesInteres.length > 0 ? (
                       <div className="space-y-3">

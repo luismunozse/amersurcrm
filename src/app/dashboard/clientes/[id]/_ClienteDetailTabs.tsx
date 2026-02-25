@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Info, MessageSquare, Heart, FileText, DollarSign, Clock, FileSpreadsheet } from "lucide-react";
 import TabInformacionBasica from "./_TabInformacionBasica";
 import TabInteracciones from "./_TabInteracciones";
@@ -9,18 +9,28 @@ import TabReservas from "./_TabReservas";
 import TabVentas from "./_TabVentas";
 import TabTimeline from "./_TabTimeline";
 import TabProformas from "./_TabProformas";
+import type { ClienteCompleto } from "@/lib/types/clientes";
+import type {
+  InteraccionConVendedor,
+  ReservaConRelaciones,
+  VentaConRelaciones,
+  AsesorActual,
+} from "@/lib/types/cliente-detail";
+import type { ProformaRecord } from "@/types/proforma";
+import type { PropiedadInteres } from "@/types/propiedades-interes";
 
 interface Props {
-  cliente: any;
-  interacciones: any[];
-  propiedadesInteres: any[];
-  reservas: any[];
-  ventas: any[];
-  proformas: any[];
-  asesorActual: any | null;
+  cliente: ClienteCompleto;
+  interacciones: InteraccionConVendedor[];
+  propiedadesInteres: PropiedadInteres[];
+  reservas: ReservaConRelaciones[];
+  ventas: VentaConRelaciones[];
+  proformas: ProformaRecord[];
+  asesorActual: AsesorActual | null;
   defaultTab?: ClienteTabType;
   vendedores: Array<{ id: string; username: string; nombre_completo?: string | null; telefono?: string | null; email?: string | null }>;
   isAdmin?: boolean;
+  seguimientosVencidos?: number;
 }
 
 export type ClienteTabType =
@@ -43,12 +53,23 @@ export default function ClienteDetailTabs({
   vendedores,
   defaultTab = 'info',
   isAdmin = false,
+  seguimientosVencidos = 0,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ClienteTabType>(defaultTab);
+  const [interaccionesCount, setInteraccionesCount] = useState(interacciones.length);
 
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
+
+  // Sync interacciones count when props change (e.g., after router.refresh)
+  useEffect(() => {
+    setInteraccionesCount(interacciones.length);
+  }, [interacciones.length]);
+
+  const handleInteraccionesCountChange = useCallback((count: number) => {
+    setInteraccionesCount(count);
+  }, []);
 
   const tabs = [
     {
@@ -67,7 +88,7 @@ export default function ClienteDetailTabs({
       id: 'interacciones' as ClienteTabType,
       label: 'Interacciones',
       icon: MessageSquare,
-      count: interacciones.length,
+      count: interaccionesCount,
     },
     {
       id: 'propiedades' as ClienteTabType,
@@ -130,6 +151,12 @@ export default function ClienteDetailTabs({
                     {tab.count}
                   </span>
                 )}
+                {tab.id === 'interacciones' && seguimientosVencidos > 0 && (
+                  <span className="relative flex h-2.5 w-2.5" title={`${seguimientosVencidos} seguimiento${seguimientosVencidos > 1 ? 's' : ''} vencido${seguimientosVencidos > 1 ? 's' : ''}`}>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                  </span>
+                )}
               </button>
             );
           })}
@@ -142,7 +169,14 @@ export default function ClienteDetailTabs({
           <TabInformacionBasica cliente={cliente} vendedores={vendedores} />
         )}
         {activeTab === 'timeline' && <TabTimeline clienteId={cliente.id} />}
-        {activeTab === 'interacciones' && <TabInteracciones clienteId={cliente.id} clienteNombre={cliente.nombre} interacciones={interacciones} />}
+        {activeTab === 'interacciones' && (
+          <TabInteracciones
+            clienteId={cliente.id}
+            clienteNombre={cliente.nombre}
+            interacciones={interacciones}
+            onCountChange={handleInteraccionesCountChange}
+          />
+        )}
         {activeTab === 'propiedades' && (
           <TabPropiedadesInteres
             propiedades={propiedadesInteres}

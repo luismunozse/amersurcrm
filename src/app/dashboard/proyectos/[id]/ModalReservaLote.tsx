@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { X, UserPlus, Loader2, Search, Download } from "lucide-react";
+import { X, UserPlus, Search, Download } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { toast } from "sonner";
 import {
   crearReservaConVinculacion,
@@ -507,7 +508,7 @@ export default function ModalReservaLote({
                 <div className="bg-white border border-crm-border rounded-lg overflow-hidden">
                   {isGeneratingPdf ? (
                     <div className="flex items-center justify-center py-16">
-                      <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
+                      <Spinner size="lg" color="primary" />
                       <span className="ml-3 text-crm-text-muted">Generando cotización...</span>
                     </div>
                   ) : pdfUrl ? (
@@ -550,8 +551,8 @@ export default function ModalReservaLote({
               >
                 {loading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generando Reserva...
+                    <Spinner size="sm" />
+                    <span className="ml-2">Generando Reserva...</span>
                   </>
                 ) : (
                   'Generar Reserva'

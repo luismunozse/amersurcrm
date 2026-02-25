@@ -12,6 +12,7 @@ import { usePagination } from "@/hooks/usePagination";
 import ClienteForm from "@/components/ClienteForm";
 import SimpleModal from "@/components/SimpleModal";
 import DateTimePicker from "@/components/ui/DateTimePicker";
+import { getEstadoClienteLabel, type EstadoCliente } from "@/lib/types/clientes";
 
 type Cliente = { 
   id: string; 
@@ -142,15 +143,6 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
     }
   };
 
-  const getEstadoText = (estado: string) => {
-    switch (estado) {
-      case 'por_contactar': return 'Por Contactar';
-      case 'contactado': return 'Contactado';
-      case 'transferido': return 'Transferido';
-      default: return 'Prospecto';
-    }
-  };
-
   const handleEstadoChange = async (clienteId: string, nuevoEstado: string) => {
     try {
       // Actualización optimista
@@ -163,7 +155,7 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
       );
 
       await actualizarEstadoCliente(clienteId, nuevoEstado);
-      toast.success(`Estado cambiado a ${getEstadoText(nuevoEstado)}`);
+      toast.success(`Estado cambiado a ${getEstadoClienteLabel(nuevoEstado as EstadoCliente)}`);
     } catch (error) {
       // Revertir cambios en caso de error
       setClientesState(clientes);
@@ -304,15 +296,6 @@ const ClienteItem = memo(function ClienteItem({
     }
   };
 
-  const getEstadoText = (estado: string) => {
-    switch (estado) {
-      case 'por_contactar': return 'Por Contactar';
-      case 'contactado': return 'Contactado';
-      case 'transferido': return 'Transferido';
-      default: return 'Prospecto';
-    }
-  };
-
   const getEstadoButtons = (cliente: Cliente) => {
     const buttons = [];
     let currentEstado = cliente.estado_cliente || 'prospecto';
@@ -412,7 +395,7 @@ const ClienteItem = memo(function ClienteItem({
           </div>
           <div className="flex items-center gap-2">
             <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getEstadoColor(cliente.estado_cliente || 'prospecto')}`}>
-              {getEstadoText(cliente.estado_cliente || 'prospecto')}
+              {getEstadoClienteLabel((cliente.estado_cliente || 'por_contactar') as EstadoCliente)}
             </span>
             <div className="flex items-center gap-1">
               {getEstadoButtons(cliente)}

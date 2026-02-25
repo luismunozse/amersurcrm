@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient, getCRMConfig } from '@/lib/api';
 import { LoginForm } from './LoginForm';
@@ -23,25 +23,34 @@ export function Sidebar() {
   const [searchingCliente, setSearchingCliente] = useState(false);
   const [apiClient, setApiClient] = useState<CRMApiClient | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
-  const [lastProcessedPhone, setLastProcessedPhone] = useState<string | null>(null); // Último teléfono procesado
-  const [clienteAsignadoAOtro, setClienteAsignadoAOtro] = useState<string | null>(null); // Mensaje si cliente está asignado a otro
+  const [clienteAsignadoAOtro, setClienteAsignadoAOtro] = useState<string | null>(null);
+
+  // Ref para tracking de último teléfono procesado (evita re-renders innecesarios)
+  const lastProcessedPhoneRef = useRef<string | null>(null);
+  // Ref para saber si el componente está montado (previene memory leaks)
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Inicializar autenticación
   useEffect(() => {
     initAuth();
   }, []);
 
-  // Solicitar info del contacto cuando se autentica y periódicamente para detectar cambios
+  // Solicitar info del contacto al autenticarse + safety net cada 30s
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Solicitar inmediatamente al autenticarse
+    // Solicitar una vez al autenticarse
     requestContactInfo();
 
-    // Luego verificar cambios cada 10 segundos (más eficiente)
+    // Safety net: polling lento cada 30s por si el push del content script falla
     const interval = setInterval(() => {
-      requestContactInfo();
-    }, 10000); // Cambiado de 2000 a 10000 (10 segundos)
+      if (mountedRef.current) requestContactInfo();
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [isAuthenticated]);
@@ -50,35 +59,35 @@ export function Sidebar() {
   useEffect(() => {
     if (contact && apiClient) {
       // Solo buscar si el teléfono cambió (evita búsquedas redundantes)
-      if (contact.phone !== lastProcessedPhone) {
+      if (contact.phone !== lastProcessedPhoneRef.current) {
         logger.info('Nuevo contacto detectado', { phone: contact.phone });
-        setLastProcessedPhone(contact.phone);
+        lastProcessedPhoneRef.current = contact.phone;
         searchCliente(contact.phone);
       }
     } else if (!contact) {
-      // Si no hay contacto, limpiar estado
       setCliente(null);
-      setLastProcessedPhone(null);
+      lastProcessedPhoneRef.current = null;
       setClienteAsignadoAOtro(null);
     }
-  }, [contact, apiClient, lastProcessedPhone]);
+  }, [contact, apiClient]);
 
   // Verificar pendientes cuando cambia el cliente
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     async function checkPendientes() {
       if (cliente && apiClient) {
         try {
           const { pendientes } = await apiClient.getPendientes(cliente.id);
-          // Enviar mensaje al content script para actualizar badge
-        window.parent.postMessage({
-          type: 'AMERSURCHAT_UPDATE_BADGE',
-          count: pendientes,
-        }, WHATSAPP_WEB_ORIGIN);
+          if (!mountedRef.current) return;
+          window.parent.postMessage({
+            type: 'AMERSURCHAT_UPDATE_BADGE',
+            count: pendientes,
+          }, WHATSAPP_WEB_ORIGIN);
         } catch (error) {
           logger.error('Error verificando pendientes', error instanceof Error ? error : undefined);
         }
       } else {
-        // Sin cliente, limpiar badge
         window.parent.postMessage({
           type: 'AMERSURCHAT_UPDATE_BADGE',
           count: 0,
@@ -123,13 +132,13 @@ export function Sidebar() {
 
     logger.info('Buscando cliente', { phone });
     setSearchingCliente(true);
-    setClienteAsignadoAOtro(null); // Limpiar mensaje anterior
+    setClienteAsignadoAOtro(null);
 
     try {
       const result = await apiClient.searchClienteByPhone(phone);
+      if (!mountedRef.current) return;
 
       if (result.cliente) {
-        // Cliente existe en el CRM y está asignado a este vendedor (o es admin)
         setCliente(result.cliente);
         logger.info('Cliente encontrado en CRM', { clienteId: result.cliente.id, nombre: result.cliente.nombre });
 
@@ -141,30 +150,33 @@ export function Sidebar() {
           return { ...prev, name: normalizedName };
         });
       } else if (result.asignadoAOtro) {
-        // Cliente existe pero está asignado a otro vendedor
         logger.info('Cliente asignado a otro vendedor', { phone, mensaje: result.mensaje });
         setCliente(null);
         setClienteAsignadoAOtro(result.mensaje || 'Cliente asignado a otro vendedor');
       } else {
-        // Cliente NO existe - mostrar formulario para crear lead manualmente
-        logger.info('Cliente no encontrado. Mostrar formulario de creación manual.', { phone });
+        logger.info('Cliente no encontrado, mostrar formulario de creación', { phone });
         setCliente(null);
       }
     } catch (error) {
       logger.error('Error buscando cliente', error instanceof Error ? error : undefined, { phone });
-      setCliente(null);
+      if (mountedRef.current) setCliente(null);
     } finally {
-      setSearchingCliente(false);
+      if (mountedRef.current) setSearchingCliente(false);
     }
   }
 
-  // Escuchar respuestas del content script
+  // Escuchar respuestas y pushes del content script
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (event.origin !== WHATSAPP_WEB_ORIGIN) return;
       if (!event.data || typeof event.data !== 'object') return;
 
+      // Respuesta a polling (GET_CONTACT)
       if (event.data.type === 'AMERSURCHAT_CONTACT_INFO') {
+        setContact(event.data.contact);
+      }
+      // Push proactivo del content script cuando cambia el chat
+      if (event.data.type === 'AMERSURCHAT_CONTACT_CHANGED') {
         setContact(event.data.contact);
       }
     }
@@ -195,6 +207,7 @@ export function Sidebar() {
     setApiClient(null);
     setContact(null);
     setCliente(null);
+    lastProcessedPhoneRef.current = null;
   }
 
   async function handleLeadCreated(nuevoCliente?: Cliente) {
@@ -205,7 +218,6 @@ export function Sidebar() {
         vendedor_asignado: nuevoCliente.vendedor_asignado,
         origen_lead: nuevoCliente.origen_lead,
       });
-      console.log('[Sidebar] Cliente recibido completo:', nuevoCliente);
       setCliente(nuevoCliente);
       setClienteAsignadoAOtro(null);
     } else if (contact && apiClient) {
@@ -355,6 +367,7 @@ export function Sidebar() {
               onSelectTemplate={handleSelectTemplate}
               userName={userName || undefined}
               clientName={cliente?.nombre || contact?.name || undefined}
+              apiClient={apiClient || undefined}
             />
           </>
         )}

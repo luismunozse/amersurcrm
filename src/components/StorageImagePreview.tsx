@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface StorageImagePreviewProps {
   src: string;
@@ -47,8 +48,8 @@ export default function StorageImagePreview({
       {isLoading && (
         <div className="absolute inset-0 bg-crm-card-hover rounded-lg flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crm-primary mx-auto mb-2"></div>
-            <p className="text-sm text-crm-text-muted">Cargando...</p>
+            <Spinner size="md" color="primary" />
+            <p className="text-sm text-crm-text-muted mt-2">Cargando...</p>
           </div>
         </div>
       )}

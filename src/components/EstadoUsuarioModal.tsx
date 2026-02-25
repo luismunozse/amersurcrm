@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Spinner } from '@/components/ui/Spinner';
 
 type Props = {
   open: boolean;
   userName: string;
   currentState: boolean;
-  onConfirm: (motivo: string) => void;
+  onConfirm: (motivo: string) => Promise<void>;
   onClose: () => void;
 };
 
@@ -19,6 +20,7 @@ export default function EstadoUsuarioModal({
   onClose,
 }: Props) {
   const [motivo, setMotivo] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -28,6 +30,7 @@ export default function EstadoUsuarioModal({
   useEffect(() => {
     if (!open) {
       setMotivo("");
+      setIsLoading(false);
       return;
     }
     const prevOverflow = document.documentElement.style.overflow;
@@ -47,11 +50,16 @@ export default function EstadoUsuarioModal({
 
   if (!open) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (motivo.trim().length < 10) {
       return;
     }
-    onConfirm(motivo.trim());
+    setIsLoading(true);
+    try {
+      await onConfirm(motivo.trim());
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isValid = motivo.trim().length >= 10;
@@ -63,7 +71,7 @@ export default function EstadoUsuarioModal({
       role="dialog"
       aria-labelledby="estado-title"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !isLoading) onClose();
       }}
     >
       {/* Overlay */}
@@ -112,6 +120,8 @@ export default function EstadoUsuarioModal({
             placeholder={`Ingrese el motivo para ${action} este usuario (mínimo 10 caracteres)...`}
             className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary resize-none"
             rows={4}
+            maxLength={500}
+            disabled={isLoading}
           />
           <p className={`text-xs mt-1 ${
             motivo.length === 0
@@ -129,14 +139,15 @@ export default function EstadoUsuarioModal({
           <button
             ref={cancelRef}
             type="button"
-            className="px-4 py-2 text-sm font-medium text-crm-text-primary bg-crm-card-hover border border-crm-border rounded-lg hover:bg-crm-border transition-colors"
+            className="px-4 py-2 text-sm font-medium text-crm-text-primary bg-crm-card-hover border border-crm-border rounded-lg hover:bg-crm-border transition-colors disabled:opacity-50"
             onClick={onClose}
+            disabled={isLoading}
           >
             Cancelar
           </button>
           <button
             type="button"
-            disabled={!isValid}
+            disabled={!isValid || isLoading}
             className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-lg ${
               newState
                 ? 'bg-green-600 hover:bg-green-700 shadow-green-600/20 disabled:bg-green-400'
@@ -144,7 +155,14 @@ export default function EstadoUsuarioModal({
             } disabled:opacity-50 disabled:cursor-not-allowed`}
             onClick={handleSubmit}
           >
-            {action.charAt(0).toUpperCase() + action.slice(1)}
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Spinner size="sm" color="white" />
+                {newState ? 'Activando...' : 'Desactivando...'}
+              </div>
+            ) : (
+              action.charAt(0).toUpperCase() + action.slice(1)
+            )}
           </button>
         </div>
       </div>

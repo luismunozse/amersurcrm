@@ -3,10 +3,12 @@
 import { DollarSign, FileText, Calendar, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import type { Pago } from "@/lib/types/crm-flujo";
+import type { VentaConRelaciones } from "@/lib/types/cliente-detail";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
-  ventas: any[];
+  ventas: VentaConRelaciones[];
 }
 
 export default function TabVentas({ ventas }: Props) {
@@ -88,7 +90,7 @@ export default function TabVentas({ ventas }: Props) {
                         href={`/dashboard/proyectos/${venta.lote.proyecto?.id}`}
                         className="text-sm text-crm-text-muted hover:text-crm-primary transition-colors"
                       >
-                        Lote {venta.lote.numero_lote} - {venta.lote.proyecto?.nombre}
+                        Lote {venta.lote.codigo} - {venta.lote.proyecto?.nombre}
                       </Link>
                     )}
                   </div>
@@ -201,7 +203,7 @@ export default function TabVentas({ ventas }: Props) {
                       Historial de Pagos ({venta.pagos.length})
                     </p>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {venta.pagos.map((pago: any) => (
+                      {venta.pagos.map((pago: Pago) => (
                         <div
                           key={pago.id}
                           className="flex items-center justify-between p-2 bg-crm-card rounded text-sm"

@@ -153,7 +153,7 @@ export default async function ProyLotesPage({
       .select("id,codigo,estado,data,plano_poligono")
       .eq("proyecto_id", id)
       .order("codigo", { ascending: true });
-    lotesParaMapeo = fallback.data;
+    lotesParaMapeo = fallback.data as typeof lotesParaMapeo;
     eLotesMap = fallback.error;
   }
   if (eLotesMap) throw eLotesMap;

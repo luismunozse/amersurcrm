@@ -5,7 +5,8 @@
   "description": "Integración de WhatsApp Web con Amersur CRM para gestión de leads inmobiliarios",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "alarms"
   ],
   "host_permissions": [
     "https://web.whatsapp.com/*",

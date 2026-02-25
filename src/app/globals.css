@@ -271,6 +271,32 @@
 .sidebar-collapsed { --sidebar-w: 5rem; } /* w-20 al colapsar */
 
 /* === Animaciones === */
+@keyframes loader-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.88);
+  }
+}
+
+.animate-loader-pulse {
+  animation: loader-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Accesibilidad: respetar preferencia de reducción de movimiento */
+@media (prefers-reduced-motion: reduce) {
+  .animate-loader-pulse {
+    animation: none;
+    opacity: 0.7;
+  }
+  .animate-spin {
+    animation-duration: 3s;
+  }
+}
+
 @keyframes slide-up {
   from {
     opacity: 0;

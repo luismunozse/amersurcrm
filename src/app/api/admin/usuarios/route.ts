@@ -3,9 +3,10 @@ import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.
 import { esAdmin } from "@/lib/permissions/server";
 import { generarUsername, generarUsernameConNumero, validarUsername } from "@/lib/utils/username-generator";
 import { crearNotificacion } from "@/app/_actionsNotifications";
+import { registrarAuditoriaUsuario } from "@/lib/auditoria-usuarios";
 
-// GET - Obtener lista de usuarios
-export async function GET() {
+// GET - Obtener lista de usuarios con paginación server-side
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -19,8 +20,25 @@ export async function GET() {
       return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
-    // Obtener usuarios con sus perfiles
-    const { data: usuarios, error } = await supabase
+    // Parámetros de paginación y filtros
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)));
+    const search = searchParams.get('search')?.trim() || '';
+    const rol = searchParams.get('rol') || '';
+    const estado = searchParams.get('estado') || ''; // 'activo', 'inactivo', ''
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const sortBy = searchParams.get('sortBy') || ''; // 'ultimo_acceso'
+    const sortDir = searchParams.get('sortDir') || 'desc'; // 'asc' | 'desc'
+    const historialUserId = searchParams.get('historial') || '';
+
+    // Si se pide historial de un usuario específico
+    if (historialUserId) {
+      return await getHistorialCambios(supabase, historialUserId);
+    }
+
+    // Query base
+    let query = supabase
       .schema('crm')
       .from('usuario_perfil')
       .select(`
@@ -36,89 +54,172 @@ export async function GET() {
         activo,
         requiere_cambio_password,
         motivo_estado,
+        avatar_url,
+        firma_url,
+        ultimo_acceso,
+        deleted_at,
+        deleted_motivo,
         created_at,
         rol:rol!usuario_perfil_rol_id_fkey (
           id,
           nombre,
           descripcion
         )
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' });
 
-    if (error) {
-      console.error('Error obteniendo usuarios:', error);
-      
-      // Si las tablas no existen, devolver datos simulados
-      if (error.code === 'PGRST205') {
-        return NextResponse.json({ 
-          success: true, 
-          usuarios: [
-            {
-              id: "049a7662-649a-41a2-b6de-fe7a8509e69f",
-              email: "admin@amersur.test",
-              nombre_completo: "Administrador AMERSUR",
-              dni: "12345678",
-              telefono: "987654321",
-              rol: {
-                id: "admin-rol-id",
-                nombre: "ROL_ADMIN",
-                descripcion: "Administrador del sistema"
-              },
-              activo: true,
-              created_at: "2025-09-14T01:55:52.411816Z",
-              meta_mensual: 0,
-              comision_porcentaje: 0
-            },
-            {
-              id: "d64089d1-1799-4353-87ba-b940ac70d5e8",
-              email: "vendedor@amersur.test",
-              nombre_completo: "Vendedor Demo",
-              dni: "87654321",
-              telefono: "987654322",
-              rol: {
-                id: "vendedor-rol-id",
-                nombre: "ROL_VENDEDOR",
-                descripcion: "Vendedor con permisos limitados"
-              },
-              activo: true,
-              created_at: "2025-09-15T03:17:46.360659Z",
-              meta_mensual: 50000,
-              comision_porcentaje: 2.5
-            }
-          ]
-        });
-      }
-      
-      return NextResponse.json({ error: "Error obteniendo usuarios" }, { status: 500 });
+    // Filtro soft delete
+    if (!includeDeleted) {
+      query = query.is('deleted_at', null);
     }
 
-    // Retornar perfiles directamente sin combinar con auth.users
-    // IMPORTANTE: Mapeo de campos para compatibilidad con el frontend
-    // La base de datos usa 'meta_mensual_ventas' pero el frontend espera 'meta_mensual'
+    // Filtro de búsqueda
+    if (search) {
+      query = query.or(
+        `nombre_completo.ilike.%${search}%,username.ilike.%${search}%,email.ilike.%${search}%,dni.ilike.%${search}%`
+      );
+    }
+
+    // Filtro de rol
+    if (rol) {
+      query = query.eq('rol_id', rol);
+    }
+
+    // Filtro de estado
+    if (estado === 'activo') {
+      query = query.eq('activo', true);
+    } else if (estado === 'inactivo') {
+      query = query.eq('activo', false);
+    }
+
+    // Paginación
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Si se ordena por ultimo_acceso, NO paginar en la BD (se ordena en memoria
+    // después de mergear con last_sign_in_at de Auth, ya que ultimo_acceso puede
+    // estar vacío para usuarios que no navegaron después de la migración).
+    const sortByAcceso = sortBy === 'ultimo_acceso';
+
+    // Orden default por created_at
+    query = query.order('created_at', { ascending: false });
+
+    let allUsuarios: any[] = [];
+    let totalCount = 0;
+
+    if (sortByAcceso) {
+      // Traer TODOS los que matchean los filtros (sin .range)
+      const { data, error: fetchErr, count: cnt } = await query;
+      if (fetchErr) {
+        console.error('Error obteniendo usuarios:', fetchErr);
+        if (fetchErr.code === 'PGRST205') {
+          return NextResponse.json({ success: true, usuarios: [], total: 0, page, limit });
+        }
+        return NextResponse.json({ error: "Error obteniendo usuarios" }, { status: 500 });
+      }
+      allUsuarios = data || [];
+      totalCount = cnt || allUsuarios.length;
+    } else {
+      // Paginación normal en la BD
+      const { data, error: fetchErr, count: cnt } = await query.range(from, to);
+      if (fetchErr) {
+        console.error('Error obteniendo usuarios:', fetchErr);
+        if (fetchErr.code === 'PGRST205') {
+          return NextResponse.json({ success: true, usuarios: [], total: 0, page, limit });
+        }
+        return NextResponse.json({ error: "Error obteniendo usuarios" }, { status: 500 });
+      }
+      allUsuarios = data || [];
+      totalCount = cnt || 0;
+    }
+
+    // Obtener last_sign_in_at desde auth.users via serviceRole
+    const serviceRole = createServiceRoleClient();
+    const lastSignInMap: Record<string, string | null> = {};
+
+    try {
+      const { data: authList } = await serviceRole.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+
+      if (authList?.users) {
+        for (const authUser of authList.users) {
+          lastSignInMap[authUser.id] = authUser.last_sign_in_at || null;
+        }
+      }
+    } catch (authErr) {
+      console.warn('[GET usuarios] No se pudo obtener last_sign_in_at:', authErr);
+    }
+
+    // Mapear campos
     type Usuario = {
       [key: string]: unknown;
+      id: string;
       meta_mensual_ventas?: number | string;
+      ultimo_acceso?: string | null;
     };
 
-    const usuariosCompat = (usuarios || []).map((u: Usuario) => {
-      const { meta_mensual_ventas, ...resto } = u;
+    let usuariosCompat = allUsuarios.map((u: Usuario) => {
+      const { meta_mensual_ventas, ultimo_acceso, ...resto } = u;
+      // ultimo_acceso (actualizado en cada navegación) > last_sign_in_at (solo login) > null
+      const lastAccess = ultimo_acceso || lastSignInMap[u.id] || null;
       return {
         ...resto,
-        // Mapear meta_mensual_ventas -> meta_mensual para el frontend
         meta_mensual: typeof meta_mensual_ventas === 'number'
           ? meta_mensual_ventas
           : (meta_mensual_ventas ? Number(meta_mensual_ventas) : undefined),
+        ultimo_acceso: lastAccess,
+        last_sign_in_at: lastAccess,
       };
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      usuarios: usuariosCompat 
+    // Si se ordena por ultimo_acceso, ordenar en memoria con el valor real y paginar manualmente
+    if (sortByAcceso) {
+      usuariosCompat.sort((a, b) => {
+        const dateA = a.ultimo_acceso ? new Date(a.ultimo_acceso).getTime() : 0;
+        const dateB = b.ultimo_acceso ? new Date(b.ultimo_acceso).getTime() : 0;
+        return sortDir === 'asc' ? dateA - dateB : dateB - dateA;
+      });
+      usuariosCompat = usuariosCompat.slice(from, to + 1);
+    }
+
+    return NextResponse.json({
+      success: true,
+      usuarios: usuariosCompat,
+      total: totalCount,
+      page,
+      limit,
     });
 
   } catch (error) {
     console.error('Error en GET /api/admin/usuarios:', error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+  }
+}
+
+// Helper: obtener historial de cambios de un usuario
+async function getHistorialCambios(supabase: any, userId: string) {
+  try {
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('historial_cambios_usuario')
+      .select('id, campo, valor_anterior, valor_nuevo, modificado_por, created_at')
+      .eq('usuario_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      // Si la tabla no existe, retornar vacío
+      if (error.code === 'PGRST205') {
+        return NextResponse.json({ success: true, historial: [] });
+      }
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, historial: data || [] });
+  } catch (err) {
+    console.error('Error obteniendo historial:', err);
+    return NextResponse.json({ error: "Error obteniendo historial" }, { status: 500 });
   }
 }
 
@@ -148,8 +249,8 @@ export async function POST(request: NextRequest) {
     const comision_porcentaje = formData.get("comision_porcentaje") as string;
     let username = formData.get("username") as string;
 
-    if (!password || !rol_id) {
-      return NextResponse.json({ error: "Faltan campos requeridos: contraseña y rol son obligatorios" }, { status: 400 });
+    if (!password || password.length < 6 || !rol_id) {
+      return NextResponse.json({ error: "Faltan campos requeridos: contraseña (mínimo 6 caracteres) y rol son obligatorios" }, { status: 400 });
     }
 
     // Verificar rol + validaciones de formato primero (sin DB)
@@ -176,6 +277,9 @@ export async function POST(request: NextRequest) {
     } else {
       if (!nombre_completo || !dni) {
         return NextResponse.json({ error: "Nombre completo y DNI son requeridos para vendedores" }, { status: 400 });
+      }
+      if (!/^\d{8}$/.test(dni)) {
+        return NextResponse.json({ error: "El DNI debe contener exactamente 8 dígitos numéricos" }, { status: 400 });
       }
       if (!username) {
         username = generarUsername(nombre_completo);
@@ -222,28 +326,24 @@ export async function POST(request: NextRequest) {
         : Promise.resolve({ data: null }),
     ]);
 
-    // Validar email duplicado
     if (existingEmail) {
       return NextResponse.json({
         error: `El email "${emailFinal}" ya está en uso.`
       }, { status: 400 });
     }
 
-    // Validar DNI duplicado
     if (existingDniResult?.data) {
       return NextResponse.json({
         error: `El DNI "${dni}" ya está registrado.`
       }, { status: 400 });
     }
 
-    // Validar username duplicado
     if (existingUser) {
       if (esRolAdmin) {
         return NextResponse.json({
           error: `El username "${username}" ya está en uso. Por favor, elige otro.`
         }, { status: 400 });
       } else {
-        // Para vendedores, buscar variantes disponibles en batch
         const usernameCandidates = Array.from({ length: 98 }, (_, i) =>
           generarUsernameConNumero(username, i + 2)
         );
@@ -265,7 +365,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear usuario en auth con client de service role (requiere key SRV)
+    // Crear usuario en auth con client de service role
     const srv = createServiceRoleClient();
     const { data: authData, error: authError } = await srv.auth.admin.createUser({
       email: emailFinal,
@@ -285,7 +385,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No se pudo crear el usuario" }, { status: 500 });
     }
 
-    // Crear perfil de usuario con username y requiere_cambio_password = true
+    // Validar rangos de meta y comisión
+    const metaValue = meta_mensual ? parseInt(meta_mensual, 10) : null;
+    if (metaValue !== null && (isNaN(metaValue) || metaValue < 0)) {
+      return NextResponse.json({ error: "La meta mensual no puede ser negativa" }, { status: 400 });
+    }
+    const comisionValue = comision_porcentaje ? parseFloat(comision_porcentaje) : null;
+    if (comisionValue !== null && (isNaN(comisionValue) || comisionValue < 0 || comisionValue > 100)) {
+      return NextResponse.json({ error: "La comisión debe estar entre 0 y 100" }, { status: 400 });
+    }
+
+    // Crear perfil de usuario
     const { error: perfilError } = await supabase
       .schema('crm')
       .from('usuario_perfil')
@@ -293,26 +403,41 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         username: username,
         email: emailFinal,
-        nombre_completo: nombre_completo || username, // Para admin, usar username como nombre si no hay nombre
-        dni: dni || null, // DNI es null para admin
+        nombre_completo: nombre_completo || username,
+        dni: dni || null,
         telefono: telefono || null,
         rol_id: rol.id,
-        meta_mensual_ventas: meta_mensual ? parseInt(meta_mensual, 10) : null,
-        comision_porcentaje: comision_porcentaje ? parseFloat(comision_porcentaje) : null,
+        meta_mensual_ventas: metaValue,
+        comision_porcentaje: comisionValue,
         activo: true,
-        requiere_cambio_password: true // Siempre true para nuevos usuarios
+        requiere_cambio_password: true
       });
 
     if (perfilError) {
       console.error('Error creando perfil:', perfilError);
-      // Intentar eliminar el usuario de auth si falla la creación del perfil
       await srv.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ error: "Error creando perfil de usuario" }, { status: 500 });
     }
 
-    // Notificar a todos los administradores sobre el nuevo usuario
+    // Auditoría de creación
+    const { data: adminPerfil } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('nombre_completo')
+      .eq('id', user.id)
+      .single();
+
+    await registrarAuditoriaUsuario(srv, {
+      adminId: user.id,
+      adminNombre: adminPerfil?.nombre_completo || user.email || 'Admin',
+      usuarioId: authData.user.id,
+      usuarioNombre: nombre_completo || username,
+      accion: 'crear',
+      detalles: { username, email: emailFinal, rol: rol.nombre },
+    });
+
+    // Notificar a administradores
     try {
-      // Obtener todos los usuarios con rol de administrador
       const { data: admins, error: adminsError } = await supabase
         .schema('crm')
         .from('usuario_perfil')
@@ -327,12 +452,11 @@ export async function POST(request: NextRequest) {
           })
           .filter((id): id is string => Boolean(id));
 
-        // Notificar a cada administrador
         for (const adminId of adminIds) {
           await crearNotificacion(
             adminId,
             "sistema",
-            "👥 Nuevo usuario registrado",
+            "Nuevo usuario registrado",
             `Se ha registrado un nuevo usuario: ${nombre_completo || username} (@${username}) con rol ${rol.nombre}`,
             {
               usuario_id: authData.user.id,
@@ -346,7 +470,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (notifError) {
       console.error("Error enviando notificaciones a admins:", notifError);
-      // No fallar la creación del usuario si falla la notificación
     }
 
     return NextResponse.json({
@@ -368,7 +491,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH - Editar/activar/desactivar usuario
+// PATCH - Editar usuario con registro de historial de cambios
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createServerOnlyClient();
@@ -385,12 +508,12 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
     const {
-      id, // requerido
+      id,
       username,
       nombre_completo,
       dni,
       telefono,
-      email, // nuevo: permitir actualizar email
+      email,
       rol_id,
       meta_mensual,
       comision_porcentaje,
@@ -401,26 +524,49 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
     }
 
+    // Leer valores actuales para historial de cambios
+    const { data: currentUser, error: currentError } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('username, nombre_completo, dni, telefono, email, rol_id, meta_mensual_ventas, comision_porcentaje, activo')
+      .eq('id', id)
+      .single();
+
+    if (currentError || !currentUser) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    }
+
     // Si se proporciona email, actualizar en Supabase Auth primero
     if (typeof email === 'string' && email.trim()) {
       const newEmail = email.trim().toLowerCase();
-      
-      // Validar formato de email
+
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(newEmail)) {
         return NextResponse.json({ error: "El formato del email no es válido" }, { status: 400 });
       }
-      
-      // Validar que no sea un dominio local/inválido
+
       const domain = newEmail.split('@')[1];
       const invalidDomains = ['.local', '.admin', '.test', '.localhost'];
       if (invalidDomains.some(inv => domain.endsWith(inv))) {
-        return NextResponse.json({ 
-          error: "El email debe tener un dominio válido de internet" 
+        return NextResponse.json({
+          error: "El email debe tener un dominio válido de internet"
         }, { status: 400 });
       }
 
-      // Actualizar email en Supabase Auth usando service role
+      const { data: existingEmail } = await supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('id')
+        .eq('email', newEmail)
+        .neq('id', id)
+        .single();
+
+      if (existingEmail) {
+        return NextResponse.json({
+          error: `El email "${newEmail}" ya está en uso por otro usuario.`
+        }, { status: 400 });
+      }
+
       const serviceRole = createServiceRoleClient();
       const { error: authError } = await serviceRole.auth.admin.updateUserById(
         id,
@@ -429,15 +575,13 @@ export async function PATCH(request: NextRequest) {
 
       if (authError) {
         console.error('Error actualizando email en Auth:', authError);
-        return NextResponse.json({ 
-          error: `Error actualizando email: ${authError.message}` 
+        return NextResponse.json({
+          error: `Error actualizando email: ${authError.message}`
         }, { status: 500 });
       }
-      
-      console.log(`[Admin] Email actualizado en Auth para usuario ${id}: ${newEmail}`);
     }
 
-    // Validar formato de username (sin DB)
+    // Validar formato de username
     if (typeof username === 'string' && username.trim()) {
       const validacion = validarUsername(username.trim());
       if (!validacion.valido) {
@@ -445,7 +589,7 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    // Verificar username y rol en paralelo (Promise.all)
+    // Verificar username y rol en paralelo
     const needsUsernameCheck = typeof username === 'string' && username.trim();
     const needsRolCheck = typeof rol_id === 'string' && rol_id.trim();
 
@@ -470,9 +614,27 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    // Construir payload de update solo con campos presentes
-    // IMPORTANTE: Mapeo de campos desde el frontend a la base de datos
-    // El frontend envía 'meta_mensual' pero la BD espera 'meta_mensual_ventas'
+    // Validar DNI
+    if (typeof dni === 'string' && dni && !/^\d{8}$/.test(dni)) {
+      return NextResponse.json({ error: "El DNI debe contener exactamente 8 dígitos numéricos" }, { status: 400 });
+    }
+
+    // Validar meta mensual
+    if (typeof meta_mensual !== 'undefined' && meta_mensual !== null) {
+      const metaVal = parseInt(String(meta_mensual), 10);
+      if (isNaN(metaVal) || metaVal < 0) {
+        return NextResponse.json({ error: "La meta mensual no puede ser negativa" }, { status: 400 });
+      }
+    }
+
+    // Validar comisión
+    if (typeof comision_porcentaje !== 'undefined' && comision_porcentaje !== null) {
+      const comVal = Number(comision_porcentaje);
+      if (isNaN(comVal) || comVal < 0 || comVal > 100) {
+        return NextResponse.json({ error: "La comisión debe estar entre 0 y 100" }, { status: 400 });
+      }
+    }
+
     const updatePayload: Record<string, unknown> = {};
     if (typeof username === 'string' && username.trim()) updatePayload.username = username.trim();
     if (typeof nombre_completo === 'string') updatePayload.nombre_completo = nombre_completo;
@@ -480,7 +642,6 @@ export async function PATCH(request: NextRequest) {
     if (typeof telefono === 'string' || telefono === null) updatePayload.telefono = telefono ?? null;
     if (typeof email === 'string' && email.trim()) updatePayload.email = email.trim().toLowerCase();
     if (typeof rol_id === 'string' && rol_id.trim()) updatePayload.rol_id = rol_id;
-    // Mapear meta_mensual (frontend) -> meta_mensual_ventas (BD)
     if (typeof meta_mensual !== 'undefined') updatePayload.meta_mensual_ventas = meta_mensual === null ? null : parseInt(String(meta_mensual), 10);
     if (typeof comision_porcentaje !== 'undefined') updatePayload.comision_porcentaje = comision_porcentaje === null ? null : Number(comision_porcentaje);
     if (typeof activo === 'boolean') updatePayload.activo = activo;
@@ -500,6 +661,70 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Error actualizando usuario" }, { status: 500 });
     }
 
+    // Registrar historial de cambios campo por campo
+    const cambios: { campo: string; valor_anterior: string | null; valor_nuevo: string | null }[] = [];
+    const fieldMap: Record<string, string> = {
+      username: 'username',
+      nombre_completo: 'nombre_completo',
+      dni: 'dni',
+      telefono: 'telefono',
+      email: 'email',
+      rol_id: 'rol_id',
+      meta_mensual_ventas: 'meta_mensual',
+      comision_porcentaje: 'comision_porcentaje',
+      activo: 'activo',
+    };
+
+    for (const [dbField, displayName] of Object.entries(fieldMap)) {
+      const payloadField = dbField === 'meta_mensual_ventas' ? 'meta_mensual_ventas' : dbField;
+      if (payloadField in updatePayload) {
+        const oldVal = currentUser[dbField as keyof typeof currentUser];
+        const newVal = updatePayload[payloadField];
+        const oldStr = oldVal == null ? null : String(oldVal);
+        const newStr = newVal == null ? null : String(newVal);
+        if (oldStr !== newStr) {
+          cambios.push({
+            campo: displayName,
+            valor_anterior: oldStr,
+            valor_nuevo: newStr,
+          });
+        }
+      }
+    }
+
+    if (cambios.length > 0) {
+      try {
+        const historialRows = cambios.map(c => ({
+          usuario_id: id,
+          campo: c.campo,
+          valor_anterior: c.valor_anterior,
+          valor_nuevo: c.valor_nuevo,
+          modificado_por: user.id,
+        }));
+        await supabase.schema('crm').from('historial_cambios_usuario').insert(historialRows);
+      } catch (histErr) {
+        console.warn('[PATCH] Error registrando historial de cambios:', histErr);
+      }
+
+      // Auditoría
+      const serviceRole = createServiceRoleClient();
+      const { data: adminPerfil } = await supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('nombre_completo')
+        .eq('id', user.id)
+        .single();
+
+      await registrarAuditoriaUsuario(serviceRole, {
+        adminId: user.id,
+        adminNombre: adminPerfil?.nombre_completo || user.email || 'Admin',
+        usuarioId: id,
+        usuarioNombre: currentUser.nombre_completo || id,
+        accion: 'editar',
+        detalles: { campos_modificados: cambios.map(c => c.campo) },
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error en PATCH /api/admin/usuarios:', error);
@@ -507,82 +732,6 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE - Eliminar usuario
-export async function DELETE(request: NextRequest) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
-      return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('id');
-
-    if (!userId) {
-      return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
-    }
-
-    // Verificar que no se está eliminando a sí mismo
-    if (userId === user.id) {
-      return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
-    }
-
-    // Verificar que el usuario existe
-    const { data: usuarioExistente, error: fetchError } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .select('id, username, nombre_completo')
-      .eq('id', userId)
-      .single();
-
-    if (fetchError || !usuarioExistente) {
-      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
-    }
-
-    // Verificar si el usuario tiene clientes asignados
-    const { data: clientesAsignados, error: clientesError } = await supabase
-      .schema('crm')
-      .from('cliente')
-      .select('id')
-      .eq('vendedor_asignado', usuarioExistente.username)
-      .limit(1);
-
-    if (clientesError) {
-      console.error('Error verificando clientes asignados:', clientesError);
-      return NextResponse.json({ error: "Error verificando dependencias" }, { status: 500 });
-    }
-
-    if (clientesAsignados && clientesAsignados.length > 0) {
-      return NextResponse.json({ 
-        error: `No se puede eliminar el usuario porque tiene ${clientesAsignados.length} cliente(s) asignado(s). Primero debe reasignar o desactivar estos clientes.` 
-      }, { status: 400 });
-    }
-
-    // Eliminar el usuario del perfil (esto también eliminará el usuario de auth.users por cascada)
-    const { error: deleteError } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .delete()
-      .eq('id', userId);
-
-    if (deleteError) {
-      console.error('Error eliminando usuario:', deleteError);
-      return NextResponse.json({ error: "Error eliminando usuario" }, { status: 500 });
-    }
-
-    return NextResponse.json({ 
-      message: `Usuario ${usuarioExistente.nombre_completo} (@${usuarioExistente.username}) eliminado exitosamente` 
-    });
-
-  } catch (error) {
-    console.error('Error eliminando usuario:', error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
-  }
-}
+// DELETE eliminado: la eliminación de usuarios se maneja exclusivamente
+// mediante el server action eliminarUsuario() en _actions.ts que usa
+// serviceRole para bypasear RLS y maneja soft delete + auditoría.

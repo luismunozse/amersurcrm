@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban, Eye } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import type { ReservaConRelaciones } from "@/lib/types/cliente-detail";
 import CrearReservaModal from "@/components/CrearReservaModal";
 import CancelarReservaModal from "@/components/CancelarReservaModal";
 import EliminarReservaModal from "@/components/EliminarReservaModal";
@@ -13,7 +14,7 @@ import { getSmallBadgeClasses } from "@/lib/utils/badge";
 interface Props {
   clienteId: string;
   clienteNombre: string;
-  reservas: any[];
+  reservas: ReservaConRelaciones[];
   isAdmin?: boolean;
 }
 
@@ -23,15 +24,15 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
 
   // Estado para modal de cancelar reserva
   const [cancelarModalOpen, setCancelarModalOpen] = useState(false);
-  const [reservaACancelar, setReservaACancelar] = useState<any>(null);
+  const [reservaACancelar, setReservaACancelar] = useState<ReservaConRelaciones | null>(null);
 
   // Estado para modal de eliminar reserva (solo admin)
   const [eliminarModalOpen, setEliminarModalOpen] = useState(false);
-  const [reservaAEliminar, setReservaAEliminar] = useState<any>(null);
+  const [reservaAEliminar, setReservaAEliminar] = useState<ReservaConRelaciones | null>(null);
 
   // Estado para modal de detalle de reserva
   const [detalleModalOpen, setDetalleModalOpen] = useState(false);
-  const [reservaDetalle, setReservaDetalle] = useState<any>(null);
+  const [reservaDetalle, setReservaDetalle] = useState<ReservaConRelaciones | null>(null);
 
   const getEstadoColor = (estado: string) => {
     const colores = {
@@ -112,7 +113,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
                         href={`/dashboard/proyectos/${reserva.lote.proyecto?.id}`}
                         className="text-sm text-crm-text-muted hover:text-crm-primary transition-colors"
                       >
-                        Lote {reserva.lote.numero_lote} - {reserva.lote.proyecto?.nombre}
+                        Lote {reserva.lote.codigo} - {reserva.lote.proyecto?.nombre}
                       </Link>
                     )}
                   </div>
@@ -250,7 +251,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
           reservaId={reservaACancelar.id}
           reservaCodigo={reservaACancelar.codigo_reserva}
           clienteNombre={clienteNombre}
-          loteNombre={reservaACancelar.lote?.numero_lote}
+          loteNombre={reservaACancelar.lote?.codigo}
         />
       )}
 
@@ -265,7 +266,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
           reservaId={reservaAEliminar.id}
           reservaCodigo={reservaAEliminar.codigo_reserva}
           clienteNombre={clienteNombre}
-          loteNombre={reservaAEliminar.lote?.numero_lote}
+          loteNombre={reservaAEliminar.lote?.codigo}
           estado={reservaAEliminar.estado}
         />
       )}

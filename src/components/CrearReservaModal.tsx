@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { crearReserva } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, type Moneda } from "@/lib/types/crm-flujo";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import DateTimePicker from "@/components/DateTimePicker";
 
 interface Props {
@@ -307,7 +307,7 @@ export default function CrearReservaModal({
                   ))}
                 </select>
                 {optionsLoading && (
-                  <Loader2 className="h-4 w-4 text-crm-primary animate-spin" />
+                  <Spinner size="sm" color="primary" />
                 )}
               </div>
               {optionsError && (

@@ -164,13 +164,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     // Obtener el nombre del vendedor si hay uno asignado
+    // vendedor_asignado es un username (TEXT), no un UUID
     let vendedorNombre: string | null = null;
     if (clienteCreado?.vendedor_asignado) {
       const { data: vendedor } = await supabaseAdmin
         .schema("crm")
         .from("usuario_perfil")
         .select("nombre_completo, username")
-        .eq("id", clienteCreado.vendedor_asignado)
+        .eq("username", clienteCreado.vendedor_asignado)
         .single();
 
       vendedorNombre = vendedor?.nombre_completo || vendedor?.username || null;

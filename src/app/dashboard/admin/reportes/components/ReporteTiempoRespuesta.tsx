@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
-import { Clock, Loader2, Filter, AlertTriangle, AlertCircle, Bell, Users, TrendingUp, Phone, Mail, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Clock, Filter, AlertTriangle, AlertCircle, Bell, Users, TrendingUp, Phone, Mail, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteTiempoRespuesta } from "../_actions";
 import toast from "react-hot-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
@@ -88,8 +89,7 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-crm-primary" />
-        <span className="ml-3 text-crm-text-secondary">Cargando reporte...</span>
+        <PageLoader size="sm" text="Cargando reporte..." />
       </div>
     );
   }

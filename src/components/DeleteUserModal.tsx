@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 
 interface DeleteUserModalProps {
   open: boolean;
@@ -133,7 +134,7 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    <Spinner size="sm" color="white" />
                     Eliminando...
                   </div>
                 ) : (
