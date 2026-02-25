@@ -19,7 +19,8 @@
       "Bash(npx vitest run src/__tests__/prd/reportes-criterios.test.ts)",
       "Bash(npx vitest run src/__tests__/unit/reportes-sincronizacion.test.ts src/__tests__/prd/reportes-criterios.test.ts)",
       "Bash(npx vitest run src/__tests__/unit/clientes-labels.test.ts)",
-      "Bash(npx vitest run src/__tests__/unit/usuarios-api-route.test.ts)"
+      "Bash(npx vitest run src/__tests__/unit/usuarios-api-route.test.ts)",
+      "Bash(openssl rand -hex 32)"
     ]
   }
 }

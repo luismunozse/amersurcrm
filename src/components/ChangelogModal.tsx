@@ -111,9 +111,10 @@ export default function ChangelogModal({ isOpen, onClose }: ChangelogModalProps)
         </div>
 
         {/* Header */}
-        <div className="relative overflow-hidden rounded-t-2xl sm:rounded-t-2xl bg-crm-primary px-4 py-4 sm:p-6 text-white">
-          <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-16 sm:w-24 h-16 sm:h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+        <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-br from-crm-primary to-crm-primary/85 px-5 py-5 sm:px-6 sm:py-7 text-white">
+          {/* Círculos decorativos sutiles */}
+          <div className="absolute -top-6 -right-6 w-20 h-20 sm:w-28 sm:h-28 bg-white/5 rounded-full" />
+          <div className="absolute -bottom-4 -left-4 w-14 h-14 sm:w-20 sm:h-20 bg-white/5 rounded-full" />
 
           <button
             type="button"
@@ -124,15 +125,15 @@ export default function ChangelogModal({ isOpen, onClose }: ChangelogModalProps)
             <X className="w-5 h-5" />
           </button>
 
-          <div className="relative">
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-white/20 rounded-xl">
-                <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold">Novedades del CRM</h2>
-                <p className="text-white/80 text-xs sm:text-sm">Versión {CURRENT_VERSION}</p>
-              </div>
+          <div className="relative z-[1] flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl flex-shrink-0">
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold leading-tight">Novedades del CRM</h2>
+              <p className="text-white/90 text-sm sm:text-base mt-0.5">
+                Versión {CURRENT_VERSION}
+              </p>
             </div>
           </div>
         </div>
