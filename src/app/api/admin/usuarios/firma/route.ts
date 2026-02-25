@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/permissions/server";
-import { uploadFile, deleteFile, getPublicUrl } from "@/lib/storage";
 
 const BUCKET = "avatars";
 
@@ -31,18 +30,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "La firma no debe superar 1MB" }, { status: 400 });
     }
 
+    const serviceRole = createServiceRoleClient();
     const ext = file.name.split(".").pop() || "png";
     const path = `firmas/${userId}/firma-${Date.now()}.${ext}`;
 
-    const { data, error } = await uploadFile(BUCKET, file, path);
+    const { data, error } = await serviceRole.storage
+      .from(BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false });
     if (error || !data) {
       return NextResponse.json({ error: "Error subiendo firma" }, { status: 500 });
     }
 
-    const publicUrl = getPublicUrl(BUCKET, data.path);
+    const { data: urlData } = serviceRole.storage
+      .from(BUCKET)
+      .getPublicUrl(data.path);
+    const publicUrl = urlData.publicUrl;
 
     // Update profile
-    const serviceRole = createServiceRoleClient();
     const { error: updateError } = await serviceRole
       .schema("crm")
       .from("usuario_perfil")
@@ -88,7 +92,7 @@ export async function DELETE(request: NextRequest) {
       const url = new URL(perfil.firma_url);
       const pathMatch = url.pathname.match(/\/object\/public\/avatars\/(.+)/);
       if (pathMatch) {
-        await deleteFile(BUCKET, pathMatch[1]);
+        await serviceRole.storage.from(BUCKET).remove([pathMatch[1]]);
       }
     }
 

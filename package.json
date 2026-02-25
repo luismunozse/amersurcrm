@@ -1,6 +1,6 @@
 {
   "name": "amersur-crm-web",
-  "version": "0.1.0",
+  "version": "1.4.0",
   "private": true,
   "packageManager": "npm@10.2.4",
   "scripts": {

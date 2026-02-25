@@ -15,6 +15,18 @@ export interface ChangelogVersion {
 // Agregar nuevas versiones al inicio del array
 export const changelog: ChangelogVersion[] = [
   {
+    version: "1.4.0",
+    date: "2025-02-25",
+    title: "Optimización general del CRM y nuevas funcionalidades",
+    changes: [
+      { type: "improvement", description: "Optimización de todos los módulos del CRM para mayor rendimiento" },
+      { type: "feature", description: "Nuevas funcionalidades en los módulos principales" },
+      { type: "improvement", description: "Mejoras significativas de performance en toda la plataforma" },
+      { type: "improvement", description: "Optimización de AmersurChat con mejoras de estabilidad y velocidad" },
+      { type: "fix", description: "Correcciones generales y mejoras de estabilidad" },
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2025-01-15",
     title: "Nueva versión de AmersurChat y mejoras generales",
