@@ -25,6 +25,10 @@ interface ReporteData {
       disponibles: number;
       valorTotal: number;
     };
+    proyectos?: {
+      nuevos: number;
+      total: number;
+    };
     vendedores: {
       activos: number;
       topVendedores: Array<{
@@ -36,6 +40,12 @@ interface ReporteData {
       }>;
     };
   };
+  tendencias?: Array<{
+    mes: string;
+    ventas: number;
+    propiedades: number;
+    clientes: number;
+  }>;
 }
 
 export async function generarReportePDF(data: ReporteData): Promise<jsPDFType> {
@@ -188,6 +198,67 @@ export async function generarReportePDF(data: ReporteData): Promise<jsPDFType> {
     headStyles: { fillColor: primaryColor },
     margin: { left: 14, right: 14 }
   });
+
+  yPos = (doc as any).lastAutoTable.finalY + 10;
+
+  // SECCIÓN 5: Proyectos
+  if (data.metricas.proyectos) {
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('5. PROYECTOS', 14, yPos);
+    yPos += 8;
+
+    const proyectosData = [
+      ['Total Proyectos', data.metricas.proyectos.total.toString()],
+      ['Proyectos Nuevos (en período)', data.metricas.proyectos.nuevos.toString()],
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Concepto', 'Cantidad']],
+      body: proyectosData,
+      theme: 'striped',
+      headStyles: { fillColor: primaryColor },
+      margin: { left: 14, right: 14 }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // SECCIÓN 6: Tendencias Mensuales
+  if (data.tendencias && data.tendencias.length > 0) {
+    if (yPos > 220) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    const seccionNum = data.metricas.proyectos ? '6' : '5';
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(`${seccionNum}. TENDENCIAS MENSUALES`, 14, yPos);
+    yPos += 8;
+
+    const tendenciasData = data.tendencias.map(t => [
+      t.mes,
+      formatCurrency(t.ventas),
+      t.propiedades.toString(),
+      t.clientes.toString()
+    ]);
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Mes', 'Ventas', 'Propiedades', 'Clientes']],
+      body: tendenciasData,
+      theme: 'striped',
+      headStyles: { fillColor: primaryColor },
+      margin: { left: 14, right: 14 }
+    });
+  }
 
   // Pie de página en todas las páginas
   const pageCount = doc.internal.pages.length - 1; // Excluir página en blanco

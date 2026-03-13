@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { obtenerMetricasReportes, ReporteMetricas } from "@/app/dashboard/admin/reportes/_actions";
+import { clearReportCache } from "./useReporteData";
 
 export interface UseReportesOptions {
   periodo?: string;
@@ -21,6 +22,15 @@ export function useReportes(options: UseReportesOptions = {}) {
     fechaFin,
     autoLoad = true
   } = options;
+
+  // Clear sub-tab caches when period changes
+  const prevPeriodoRef = useRef(periodo);
+  useEffect(() => {
+    if (prevPeriodoRef.current !== periodo) {
+      clearReportCache();
+      prevPeriodoRef.current = periodo;
+    }
+  }, [periodo]);
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);

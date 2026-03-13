@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
 import { Progress } from "@/components/ui/progress";
 import { CRMBadge } from "@/components/ui/crm-badge";
+import { usePaginacion } from "@/hooks/usePaginacion";
+import PaginacionReporte from "@/components/reportes/PaginacionReporte";
 
 interface ReporteNivelInteresProps {
   periodo: string;
@@ -29,7 +31,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
   const [fechaInicio, setFechaInicio] = useState<string>(() => {
     if (fechaInicioDefault) return fechaInicioDefault;
     const date = new Date();
-    date.setDate(date.getDate() - 15);
+    date.setDate(date.getDate() - parseInt(periodo));
     return date.toISOString().split('T')[0];
   });
   const [fechaFin, setFechaFin] = useState<string>(() => {
@@ -42,6 +44,8 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
     if (fechaInicioDefault) setFechaInicio(fechaInicioDefault);
     if (fechaFinDefault) setFechaFin(fechaFinDefault);
   }, [fechaInicioDefault, fechaFinDefault]);
+
+  const paginacionProyectos = usePaginacion(data?.clientesPorProyecto || [], { tamanioPagina: 10 });
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -89,7 +93,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
     );
   }
 
-  const { resumen, clientesPorProyecto, proyectos } = data;
+  const { resumen, clientesPorProyecto, distribucionPorVendedor, proyectos } = data;
 
   return (
     <div className="space-y-6">
@@ -171,7 +175,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
         </CardContent>
       </Card>
 
-      {/* NUEVO: Clientes Interesados por Proyecto */}
+      {/* Clientes Interesados por Proyecto */}
       <Card>
         <CardHeader>
           <CardTitle>Clientes Interesados por Proyecto</CardTitle>
@@ -189,8 +193,8 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
               </CRMTableRow>
             </CRMTableHeader>
             <CRMTableBody>
-              {clientesPorProyecto && clientesPorProyecto.length > 0 ? (
-                clientesPorProyecto.map((item: any, index: number) => (
+              {paginacionProyectos.items.length > 0 ? (
+                paginacionProyectos.items.map((item: any, index: number) => (
                   <CRMTableRow key={index}>
                     <CRMTableCell className="font-medium">{item.proyecto}</CRMTableCell>
                     <CRMTableCell className="text-center">
@@ -217,6 +221,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
               )}
             </CRMTableBody>
           </CRMTable>
+          <PaginacionReporte {...paginacionProyectos} />
           {resumen.totalClientesConInteres > 0 && (
             <div className="p-4 border-t border-crm-border bg-crm-card-hover">
               <p className="text-sm text-crm-text-secondary">
@@ -226,6 +231,65 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
           )}
         </CardContent>
       </Card>
+
+      {/* Carga Comercial por Vendedor */}
+      {distribucionPorVendedor && distribucionPorVendedor.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Carga Comercial por Vendedor</CardTitle>
+            <CardDescription>
+              Distribucion de clientes interesados gestionados por cada vendedor
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <CRMTable>
+              <CRMTableHeader>
+                <CRMTableRow>
+                  <CRMTableHead>Vendedor</CRMTableHead>
+                  <CRMTableHead className="text-center">Interesados</CRMTableHead>
+                  <CRMTableHead className="text-center">% del Total</CRMTableHead>
+                  <CRMTableHead>Principales Proyectos</CRMTableHead>
+                  <CRMTableHead>Carga</CRMTableHead>
+                </CRMTableRow>
+              </CRMTableHeader>
+              <CRMTableBody>
+                {distribucionPorVendedor.map((item: any, index: number) => (
+                  <CRMTableRow key={index}>
+                    <CRMTableCell className="font-medium">
+                      {item.vendedor}
+                    </CRMTableCell>
+                    <CRMTableCell className="text-center">
+                      <CRMBadge variant={item.totalInteresados >= 20 ? "warning" : "info"} className="font-bold">
+                        {item.totalInteresados}
+                      </CRMBadge>
+                    </CRMTableCell>
+                    <CRMTableCell className="text-center text-sm text-crm-text-secondary">
+                      {item.porcentaje}%
+                    </CRMTableCell>
+                    <CRMTableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {item.proyectos.map((p: any, i: number) => (
+                          <span key={i} className="text-xs bg-crm-bg-primary border border-crm-border rounded px-2 py-0.5">
+                            {p.proyecto} ({p.cantidad})
+                          </span>
+                        ))}
+                      </div>
+                    </CRMTableCell>
+                    <CRMTableCell>
+                      <Progress
+                        value={resumen.totalClientesConInteres > 0
+                          ? (item.totalInteresados / resumen.totalClientesConInteres) * 100
+                          : 0}
+                        className="w-full max-w-[120px] h-2"
+                      />
+                    </CRMTableCell>
+                  </CRMTableRow>
+                ))}
+              </CRMTableBody>
+            </CRMTable>
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );

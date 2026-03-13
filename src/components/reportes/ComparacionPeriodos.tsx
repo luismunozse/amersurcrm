@@ -152,15 +152,19 @@ export default function ComparacionPeriodos({
     );
   }
 
-  // Usar datos reales del período actual y anterior
+  // Usar datos de ventas registradas en el período (tabla venta con fecha_venta filtrada)
+  // en lugar de estados globales de inventario para una comparación precisa
+  const ventasActual = datosActuales.metricas.ventas;
+  const ventasAnterior = datosAnteriores.metricas.ventas;
+
   const comparaciones = [
     {
-      titulo: "Ventas Totales",
-      actual: formatearMoneda(datosActuales.metricas.ventas.valorTotal),
-      anterior: formatearMoneda(datosAnteriores.metricas.ventas.valorTotal),
+      titulo: "Ventas del Período",
+      actual: formatearMoneda(ventasActual.ventasRegistradasEnPeriodo),
+      anterior: formatearMoneda(ventasAnterior.ventasRegistradasEnPeriodo),
       cambio: calcularCambio(
-        datosActuales.metricas.ventas.valorTotal,
-        datosAnteriores.metricas.ventas.valorTotal
+        ventasActual.ventasRegistradasEnPeriodo,
+        ventasAnterior.ventasRegistradasEnPeriodo
       )
     },
     {
@@ -173,21 +177,21 @@ export default function ComparacionPeriodos({
       )
     },
     {
-      titulo: "Propiedades Vendidas",
-      actual: datosActuales.metricas.ventas.propiedadesVendidas.toString(),
-      anterior: datosAnteriores.metricas.ventas.propiedadesVendidas.toString(),
+      titulo: "Unidades Vendidas",
+      actual: ventasActual.cantidadVentasEnPeriodo.toString(),
+      anterior: ventasAnterior.cantidadVentasEnPeriodo.toString(),
       cambio: calcularCambio(
-        datosActuales.metricas.ventas.propiedadesVendidas,
-        datosAnteriores.metricas.ventas.propiedadesVendidas
+        ventasActual.cantidadVentasEnPeriodo,
+        ventasAnterior.cantidadVentasEnPeriodo
       )
     },
     {
-      titulo: "Tasa de Conversión",
-      actual: formatearPorcentaje(datosActuales.metricas.clientes.tasaConversion),
-      anterior: formatearPorcentaje(datosAnteriores.metricas.clientes.tasaConversion),
+      titulo: "Nuevos Clientes",
+      actual: datosActuales.metricas.clientes.nuevos.toString(),
+      anterior: datosAnteriores.metricas.clientes.nuevos.toString(),
       cambio: calcularCambio(
-        datosActuales.metricas.clientes.tasaConversion,
-        datosAnteriores.metricas.clientes.tasaConversion
+        datosActuales.metricas.clientes.nuevos,
+        datosAnteriores.metricas.clientes.nuevos
       )
     }
   ];

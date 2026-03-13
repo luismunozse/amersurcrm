@@ -243,7 +243,13 @@ export default function ReportesPage() {
           </TabsContent>
 
           <TabsContent value="tiempo-respuesta" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("tiempo-respuesta") && <ReporteTiempoRespuesta periodo={selectedPeriod} />}
+            {visitedTabs.has("tiempo-respuesta") && (
+              <ReporteTiempoRespuesta
+                periodo={selectedPeriod}
+                fechaInicioDefault={fechasPeriodo.fechaInicio}
+                fechaFinDefault={fechasPeriodo.fechaFin}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="gestion" forceMount className="mt-0 data-[state=inactive]:hidden">

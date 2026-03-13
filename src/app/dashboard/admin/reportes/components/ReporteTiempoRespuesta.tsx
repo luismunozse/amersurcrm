@@ -9,18 +9,24 @@ import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteTiempoRespuesta } from "../_actions";
 import toast from "react-hot-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
+import { usePaginacion } from "@/hooks/usePaginacion";
+import PaginacionReporte from "@/components/reportes/PaginacionReporte";
 
 interface ReporteTiempoRespuestaProps {
   periodo: string;
+  fechaInicioDefault?: string;
+  fechaFinDefault?: string;
 }
 
-export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespuestaProps) {
+export default function ReporteTiempoRespuesta({ periodo, fechaInicioDefault, fechaFinDefault }: ReporteTiempoRespuestaProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [fechaInicio, setFechaInicio] = useState<string>("");
-  const [fechaFin, setFechaFin] = useState<string>("");
+  const [fechaInicio, setFechaInicio] = useState<string>(fechaInicioDefault || "");
+  const [fechaFin, setFechaFin] = useState<string>(fechaFinDefault || "");
   const [tabActiva, setTabActiva] = useState<'ranking' | 'alertas'>('ranking');
   const [sortConfig, setSortConfig] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+
+  const paginacionAlertas = usePaginacion(data?.clientesSinContactar || [], { tamanioPagina: 10 });
 
   const cargarDatos = useCallback(async (usarFechas = false) => {
     setLoading(true);
@@ -43,6 +49,12 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
       setLoading(false);
     }
   }, [periodo, fechaInicio, fechaFin]);
+
+  // Sincronizar fechas cuando cambia el período global
+  useEffect(() => {
+    if (fechaInicioDefault) setFechaInicio(fechaInicioDefault);
+    if (fechaFinDefault) setFechaFin(fechaFinDefault);
+  }, [fechaInicioDefault, fechaFinDefault]);
 
   useEffect(() => {
     cargarDatos(false);
@@ -478,7 +490,7 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
                   </tr>
                 </thead>
                 <tbody>
-                  {clientesSinContactar.map((cliente: any) => (
+                  {paginacionAlertas.items.map((cliente: any) => (
                     <tr key={cliente.id} className="border-b border-crm-border hover:bg-crm-card-hover">
                       <td className="py-3 px-2">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getAlertaColor(cliente.nivelAlerta)}`}>
@@ -530,6 +542,7 @@ export default function ReporteTiempoRespuesta({ periodo }: ReporteTiempoRespues
                   ))}
                 </tbody>
               </table>
+              <PaginacionReporte {...paginacionAlertas} />
               {clientesSinContactar.length === 0 && (
                 <div className="text-center py-8 text-green-600">
                   <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />

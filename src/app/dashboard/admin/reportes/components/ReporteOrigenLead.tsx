@@ -10,6 +10,8 @@ import { obtenerReporteOrigenLead } from "../_actions";
 import toast from "react-hot-toast";
 import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
 import { Progress } from "@/components/ui/progress";
+import { usePaginacion } from "@/hooks/usePaginacion";
+import PaginacionReporte from "@/components/reportes/PaginacionReporte";
 import {
   PieChart,
   Pie,
@@ -54,6 +56,8 @@ export default function ReporteOrigenLead({ periodo, fechaInicioDefault, fechaFi
     if (fechaInicioDefault) setFechaInicio(fechaInicioDefault);
     if (fechaFinDefault) setFechaFin(fechaFinDefault);
   }, [fechaInicioDefault, fechaFinDefault]);
+
+  const paginacionOrigen = usePaginacion(data?.distribucionOrigen || [], { tamanioPagina: 10 });
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -470,7 +474,7 @@ export default function ReporteOrigenLead({ periodo, fechaInicioDefault, fechaFi
               </CRMTableRow>
             </CRMTableHeader>
             <CRMTableBody>
-              {distribucionOrigen.map((item: any, index: number) => (
+              {paginacionOrigen.items.map((item: any, index: number) => (
                 <CRMTableRow key={index}>
                   <CRMTableCell>
                     <div className="flex items-center gap-2">
@@ -498,6 +502,7 @@ export default function ReporteOrigenLead({ periodo, fechaInicioDefault, fechaFi
               ))}
             </CRMTableBody>
           </CRMTable>
+          <PaginacionReporte {...paginacionOrigen} />
         </CardContent>
       </Card>
     </div>

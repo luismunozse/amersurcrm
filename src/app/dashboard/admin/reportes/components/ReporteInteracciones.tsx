@@ -10,6 +10,8 @@ import toast from "react-hot-toast";
 import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
 import { Progress } from "@/components/ui/progress";
 import { CRMBadge } from "@/components/ui/crm-badge";
+import { usePaginacion } from "@/hooks/usePaginacion";
+import PaginacionReporte from "@/components/reportes/PaginacionReporte";
 
 interface ReporteInteraccionesProps {
   periodo: string;
@@ -19,6 +21,8 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const paginacionRanking = usePaginacion(data?.rankingVendedores || [], { tamanioPagina: 10 });
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -178,54 +182,60 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
         </CardHeader>
         <CardContent className="p-0">
           {rankingVendedores.length > 0 ? (
-            <CRMTable>
-              <CRMTableHeader>
-                <CRMTableRow>
-                  <CRMTableHead>#</CRMTableHead>
-                  <CRMTableHead>Vendedor</CRMTableHead>
-                  <CRMTableHead className="text-center">Total</CRMTableHead>
-                  <CRMTableHead className="text-center">Clientes</CRMTableHead>
-                  <CRMTableHead className="text-center">Prom/Cliente</CRMTableHead>
-                  <CRMTableHead className="text-center">Min.</CRMTableHead>
-                  <CRMTableHead>Por Tipo</CRMTableHead>
-                </CRMTableRow>
-              </CRMTableHeader>
-              <CRMTableBody>
-                {rankingVendedores.map((vendedor: any, index: number) => (
-                  <CRMTableRow key={index}>
-                    <CRMTableCell>
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${
-                        index === 0 ? 'bg-yellow-500' :
-                        index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-400' :
-                        'bg-crm-primary'
-                      }`}>
-                        {index + 1}
-                      </div>
-                    </CRMTableCell>
-                    <CRMTableCell>
-                      <div className="font-medium">{vendedor.nombre}</div>
-                      <div className="text-xs text-crm-text-muted">@{vendedor.username}</div>
-                    </CRMTableCell>
-                    <CRMTableCell className="text-center">
-                      <span className="font-bold text-lg">{vendedor.totalInteracciones}</span>
-                    </CRMTableCell>
-                    <CRMTableCell className="text-center">{vendedor.clientesAtendidos}</CRMTableCell>
-                    <CRMTableCell className="text-center">{vendedor.promedioPorCliente}</CRMTableCell>
-                    <CRMTableCell className="text-center text-crm-text-muted">{vendedor.duracionTotal}</CRMTableCell>
-                    <CRMTableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {Object.entries(vendedor.porTipo || {}).map(([tipo, cantidad]: [string, any]) => (
-                          <CRMBadge key={tipo} variant={getTipoVariant(tipo)}>
-                            {tipo.charAt(0).toUpperCase() + tipo.slice(1)}: {cantidad}
-                          </CRMBadge>
-                        ))}
-                      </div>
-                    </CRMTableCell>
+            <>
+              <CRMTable>
+                <CRMTableHeader>
+                  <CRMTableRow>
+                    <CRMTableHead>#</CRMTableHead>
+                    <CRMTableHead>Vendedor</CRMTableHead>
+                    <CRMTableHead className="text-center">Total</CRMTableHead>
+                    <CRMTableHead className="text-center">Clientes</CRMTableHead>
+                    <CRMTableHead className="text-center">Prom/Cliente</CRMTableHead>
+                    <CRMTableHead className="text-center">Min.</CRMTableHead>
+                    <CRMTableHead>Por Tipo</CRMTableHead>
                   </CRMTableRow>
-                ))}
-              </CRMTableBody>
-            </CRMTable>
+                </CRMTableHeader>
+                <CRMTableBody>
+                  {paginacionRanking.items.map((vendedor: any, idx: number) => {
+                    const globalIndex = (paginacionRanking.paginaActual - 1) * paginacionRanking.tamanioPagina + idx;
+                    return (
+                      <CRMTableRow key={globalIndex}>
+                        <CRMTableCell>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${
+                            globalIndex === 0 ? 'bg-yellow-500' :
+                            globalIndex === 1 ? 'bg-gray-400' :
+                            globalIndex === 2 ? 'bg-orange-400' :
+                            'bg-crm-primary'
+                          }`}>
+                            {globalIndex + 1}
+                          </div>
+                        </CRMTableCell>
+                        <CRMTableCell>
+                          <div className="font-medium">{vendedor.nombre}</div>
+                          <div className="text-xs text-crm-text-muted">@{vendedor.username}</div>
+                        </CRMTableCell>
+                        <CRMTableCell className="text-center">
+                          <span className="font-bold text-lg">{vendedor.totalInteracciones}</span>
+                        </CRMTableCell>
+                        <CRMTableCell className="text-center">{vendedor.clientesAtendidos}</CRMTableCell>
+                        <CRMTableCell className="text-center">{vendedor.promedioPorCliente}</CRMTableCell>
+                        <CRMTableCell className="text-center text-crm-text-muted">{vendedor.duracionTotal}</CRMTableCell>
+                        <CRMTableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(vendedor.porTipo || {}).map(([tipo, cantidad]: [string, any]) => (
+                              <CRMBadge key={tipo} variant={getTipoVariant(tipo)}>
+                                {tipo.charAt(0).toUpperCase() + tipo.slice(1)}: {cantidad}
+                              </CRMBadge>
+                            ))}
+                          </div>
+                        </CRMTableCell>
+                      </CRMTableRow>
+                    );
+                  })}
+                </CRMTableBody>
+              </CRMTable>
+              <PaginacionReporte {...paginacionRanking} />
+            </>
           ) : (
             <div className="text-center py-8 text-crm-text-muted">
               No hay interacciones registradas en este periodo
