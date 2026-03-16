@@ -65,13 +65,33 @@ export default function PhoneInput({
   // Parsear el valor inicial si viene con código de país
   useEffect(() => {
     if (defaultValue) {
-      const country = COUNTRIES.find(c => defaultValue.startsWith(c.dialCode));
-      if (country) {
-        setSelectedCountry(country);
-        setPhoneNumber(defaultValue.replace(country.dialCode, "").trim());
-      } else {
-        setPhoneNumber(defaultValue);
+      const val = defaultValue.trim();
+
+      // 1. Intentar match con "+" (ej: +51999999999)
+      const countryWithPlus = COUNTRIES.find(c => val.startsWith(c.dialCode));
+      if (countryWithPlus) {
+        setSelectedCountry(countryWithPlus);
+        setPhoneNumber(val.replace(countryWithPlus.dialCode, "").trim());
+        return;
       }
+
+      // 2. Intentar match sin "+" (ej: 51999999999)
+      // Ordenar por longitud de dialCode descendente para matchear primero los más largos (+593 antes que +5)
+      const digits = val.replace(/\D/g, "");
+      const sortedCountries = [...COUNTRIES].sort((a, b) => b.dialCode.length - a.dialCode.length);
+      const countryWithoutPlus = sortedCountries.find(c => {
+        const code = c.dialCode.replace("+", "");
+        return digits.startsWith(code) && digits.length > code.length;
+      });
+      if (countryWithoutPlus) {
+        const code = countryWithoutPlus.dialCode.replace("+", "");
+        setSelectedCountry(countryWithoutPlus);
+        setPhoneNumber(digits.substring(code.length));
+        return;
+      }
+
+      // 3. Fallback: usar el valor tal cual como número local
+      setPhoneNumber(digits);
     }
   }, [defaultValue]);
 
