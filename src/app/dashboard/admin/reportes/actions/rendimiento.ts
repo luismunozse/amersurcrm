@@ -6,11 +6,13 @@ import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
  * Obtiene reporte de rendimiento de vendedores con datos reales
  */
 export async function obtenerReporteRendimiento(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, endDate, days } = calcularFechas(periodo);
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: vendedores } = await supabase
       .schema('crm')

@@ -13,9 +13,11 @@ import { CRMBadge } from "@/components/ui/crm-badge";
 
 interface ReportePropiedadesProps {
   periodo: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
-export default function ReportePropiedades({ periodo }: ReportePropiedadesProps) {
+export default function ReportePropiedades({ periodo, fechaInicio, fechaFin }: ReportePropiedadesProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
     setLoading(true);
     setError(null);
 
-    const result = await obtenerReportePropiedades(periodo);
+    const result = await obtenerReportePropiedades(periodo, fechaInicio, fechaFin);
 
     if (result.error) {
       setError(result.error);
@@ -34,7 +36,7 @@ export default function ReportePropiedades({ periodo }: ReportePropiedadesProps)
     }
 
     setLoading(false);
-  }, [periodo]);
+  }, [periodo, fechaInicio, fechaFin]);
 
   useEffect(() => {
     cargarDatos();

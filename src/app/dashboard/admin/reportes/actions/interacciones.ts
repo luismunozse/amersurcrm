@@ -6,11 +6,13 @@ import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
  * Obtiene reporte de interacciones por vendedor
  */
 export async function obtenerReporteInteracciones(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, days } = calcularFechas(periodo);
+    const { startDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: interacciones } = await supabase
       .schema('crm')

@@ -8,6 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { createServiceRoleClient } from "@/lib/supabase.server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { esAdmin } from "@/lib/permissions/server";
 import { PERMISOS } from "@/lib/permissions";
@@ -37,7 +38,9 @@ export async function eliminarClientesMasivo(ids: string[]) {
     return { success: false, count: 0 };
   }
 
-  const { error, count } = await supabase
+  const supabaseAdmin = createServiceRoleClient();
+  const { error, count } = await supabaseAdmin
+    .schema("crm")
     .from("cliente")
     .delete({ count: 'exact' })
     .in("id", ids);
@@ -48,8 +51,8 @@ export async function eliminarClientesMasivo(ids: string[]) {
   return { success: true, count: count ?? 0 };
 }
 
-// Asignar vendedor a múltiples clientes
-export async function asignarVendedorMasivo(ids: string[], vendedorUsername: string) {
+// Asignar o desasignar vendedor a múltiples clientes
+export async function asignarVendedorMasivo(ids: string[], vendedorUsername: string | null) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
@@ -60,31 +63,40 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
     throw new Error("No tienes permisos para asignar vendedores masivamente");
   }
 
-  // Validar que el vendedor existe
-  const { data: vendedor, error: vendedorError } = await supabase
-    .schema('crm')
-    .from('usuario_perfil')
-    .select('id, username, nombre_completo')
-    .eq('username', vendedorUsername)
-    .eq('activo', true)
-    .single();
+  let vendedor: { id: string; username: string; nombre_completo: string } | null = null;
 
-  if (vendedorError || !vendedor) {
-    throw new Error("Vendedor no encontrado o inactivo");
+  // Validar que el vendedor existe (solo si se está asignando, no desasignando)
+  if (vendedorUsername) {
+    const { data: vendedorData, error: vendedorError } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('id, username, nombre_completo')
+      .eq('username', vendedorUsername)
+      .eq('activo', true)
+      .single();
+
+    if (vendedorError || !vendedorData) {
+      throw new Error("Vendedor no encontrado o inactivo");
+    }
+    vendedor = vendedorData;
   }
 
-  const { data: clientesSeleccionados } = await supabase
+  const supabaseAdmin = createServiceRoleClient();
+
+  const { data: clientesSeleccionados } = await supabaseAdmin
+    .schema("crm")
     .from("cliente")
     .select("id, nombre")
     .in("id", ids);
 
-  // Actualizar ambos campos para mantener consistencia
+  // Actualizar ambos campos (null para desasignar)
   const payload = {
-    vendedor_username: vendedorUsername,
-    vendedor_asignado: vendedorUsername,
+    vendedor_username: vendedorUsername || null,
+    vendedor_asignado: vendedorUsername || null,
   };
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
+    .schema("crm")
     .from("cliente")
     .update(payload)
     .in("id", ids);
@@ -136,12 +148,16 @@ export async function cambiarEstadoMasivo(ids: string[], nuevoEstado: EstadoClie
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { data: clientes } = await supabase
+  const supabaseAdmin = createServiceRoleClient();
+
+  const { data: clientes } = await supabaseAdmin
+    .schema("crm")
     .from("cliente")
     .select("id, nombre, vendedor_username")
     .in("id", ids);
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
+    .schema("crm")
     .from("cliente")
     .update({ estado_cliente: nuevoEstado })
     .in("id", ids);

@@ -3,11 +3,13 @@
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
 
 export async function obtenerReportePropiedades(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, days } = calcularFechas(periodo);
+    const { startDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     // 1. Obtener LOTES
     const { data: lotes } = await supabase

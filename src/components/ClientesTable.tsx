@@ -276,8 +276,12 @@ export default function ClientesTable({
               return;
             }
 
-            await asignarVendedorMasivo(idsArray, bulkVendedor);
-            toast.success(`${idsArray.length} ${idsArray.length === 1 ? 'cliente asignado' : 'clientes asignados'} exitosamente`);
+            const esDesasignar = bulkVendedor === '__desasignar__';
+            await asignarVendedorMasivo(idsArray, esDesasignar ? null : bulkVendedor);
+            toast.success(esDesasignar
+              ? `Vendedor desasignado de ${idsArray.length} cliente${idsArray.length === 1 ? '' : 's'}`
+              : `${idsArray.length} ${idsArray.length === 1 ? 'cliente asignado' : 'clientes asignados'} exitosamente`
+            );
             setSelectedIds(new Set());
             setBulkVendedor('');
             router.refresh();
@@ -730,6 +734,7 @@ export default function ClientesTable({
                     <option value="">
                       {loadingVendedores ? 'Cargando...' : 'Seleccionar vendedor'}
                     </option>
+                    <option value="__desasignar__">Desasignar vendedor</option>
                     {vendedores.map((vendedor) => (
                       <option key={vendedor.id} value={vendedor.username}>
                         {vendedor.nombre_completo} (@{vendedor.username})

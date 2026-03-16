@@ -6,11 +6,13 @@ import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
  * Obtiene reporte de clientes con datos reales
  */
 export async function obtenerReporteClientes(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, endDate, days } = calcularFechas(periodo);
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     // Clientes nuevos del período
     const { data: clientesNuevos } = await supabase
@@ -128,11 +130,13 @@ export async function obtenerReporteClientes(
  * Obtiene reporte de gestión de clientes con estados de seguimiento
  */
 export async function obtenerReporteGestionClientes(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, days } = calcularFechas(periodo);
+    const { startDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: clientes } = await supabase
       .schema('crm')

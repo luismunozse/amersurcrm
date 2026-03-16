@@ -10,9 +10,11 @@ import toast from "react-hot-toast";
 
 interface ReporteVentasProps {
   periodo: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
-export default function ReporteVentas({ periodo }: ReporteVentasProps) {
+export default function ReporteVentas({ periodo, fechaInicio, fechaFin }: ReporteVentasProps) {
   const [data, setData] = useState<any>(null);
   const [metricas, setMetricas] = useState<any>(null);
   const [objetivos, setObjetivos] = useState<any>(null);
@@ -24,9 +26,9 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
     setError(null);
 
     const [resultVentas, resultMetricas, resultObjetivos] = await Promise.all([
-      obtenerReporteVentas(periodo),
-      obtenerMetricasRendimiento(periodo),
-      obtenerObjetivosVsRealidad(periodo)
+      obtenerReporteVentas(periodo, fechaInicio, fechaFin),
+      obtenerMetricasRendimiento(periodo, fechaInicio, fechaFin),
+      obtenerObjetivosVsRealidad(periodo, fechaInicio, fechaFin)
     ]);
 
     if (resultVentas.error) {
@@ -45,7 +47,7 @@ export default function ReporteVentas({ periodo }: ReporteVentasProps) {
     }
 
     setLoading(false);
-  }, [periodo]);
+  }, [periodo, fechaInicio, fechaFin]);
 
   useEffect(() => {
     cargarDatos();

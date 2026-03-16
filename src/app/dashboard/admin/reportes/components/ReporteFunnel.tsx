@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ReporteFunnelProps {
   periodo: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -56,7 +58,7 @@ const CONN_H  = 46;    // height of connector area between stages
 const LBL_X   = CX - MAX_W / 2 - 14; // fixed left label X
 const CNT_X   = CX + MAX_W / 2 + 14; // fixed right count X
 
-export default function ReporteFunnel({ periodo }: ReporteFunnelProps) {
+export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: ReporteFunnelProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export default function ReporteFunnel({ periodo }: ReporteFunnelProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await obtenerReporteFunnel(periodo);
+      const result = await obtenerReporteFunnel(periodo, fechaInicio, fechaFin);
       if (result.error) {
         setError(result.error);
         toast.error(result.error);
@@ -77,7 +79,7 @@ export default function ReporteFunnel({ periodo }: ReporteFunnelProps) {
     } finally {
       setLoading(false);
     }
-  }, [periodo]);
+  }, [periodo, fechaInicio, fechaFin]);
 
   useEffect(() => {
     cargarDatos();

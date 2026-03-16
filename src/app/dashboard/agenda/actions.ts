@@ -146,6 +146,96 @@ const RecordatorioSchema = z.object({
 type VistaCalendario = 'mes' | 'semana' | 'dia';
 
 // =====================================================
+// HELPER: SINCRONIZAR RECORDATORIO DE EVENTO
+// =====================================================
+
+/**
+ * Crea o actualiza el recordatorio automático asociado a un evento.
+ * - Si ya existe un recordatorio vinculado, lo actualiza con la nueva fecha.
+ * - Si no existe, crea uno nuevo.
+ * - Si recordar_antes_minutos es 0 o la fecha ya pasó, elimina el existente.
+ */
+async function sincronizarRecordatorioEvento(
+  supabase: Awaited<ReturnType<typeof createServerOnlyClient>>,
+  eventoId: string,
+  vendedorId: string,
+  createdBy: string,
+  datos: {
+    titulo: string;
+    fecha_inicio: string;
+    recordar_antes_minutos: number;
+    prioridad: string;
+    cliente_id?: string;
+    propiedad_id?: string;
+    notificar_email: boolean;
+  }
+): Promise<void> {
+  const fechaEvento = new Date(datos.fecha_inicio);
+  const fechaRecordatorio = new Date(fechaEvento.getTime() - datos.recordar_antes_minutos * 60 * 1000);
+  const ahora = new Date();
+
+  // Buscar recordatorio existente vinculado al evento
+  const { data: existente } = await supabase
+    .from('recordatorio')
+    .select('id, enviado')
+    .eq('evento_id', eventoId)
+    .eq('completado', false)
+    .maybeSingle();
+
+  // Si no hay minutos o la fecha ya pasó, eliminar recordatorio existente
+  if (datos.recordar_antes_minutos <= 0 || fechaRecordatorio <= ahora) {
+    if (existente) {
+      await supabase.from('recordatorio').delete().eq('id', existente.id);
+    }
+    return;
+  }
+
+  const labelMinutos = datos.recordar_antes_minutos >= 1440
+    ? `${Math.floor(datos.recordar_antes_minutos / 1440)} día(s)`
+    : datos.recordar_antes_minutos >= 60
+    ? `${Math.floor(datos.recordar_antes_minutos / 60)} hora(s)`
+    : `${datos.recordar_antes_minutos} minutos`;
+
+  const recordatorioPayload = {
+    titulo: `Recordatorio: ${datos.titulo}`,
+    descripcion: `Tu evento "${datos.titulo}" comienza en ${labelMinutos}.`,
+    tipo: 'personalizado' as const,
+    prioridad: datos.prioridad,
+    fecha_recordatorio: fechaRecordatorio.toISOString(),
+    vendedor_id: vendedorId,
+    cliente_id: datos.cliente_id ?? null,
+    propiedad_id: datos.propiedad_id ?? null,
+    evento_id: eventoId,
+    notificar_email: datos.notificar_email,
+    notificar_push: true,
+    data: {
+      evento_id: eventoId,
+      recordar_antes_minutos: datos.recordar_antes_minutos,
+    },
+  };
+
+  if (existente) {
+    // Actualizar recordatorio existente (reset enviado para que el cron lo procese de nuevo)
+    await supabase
+      .from('recordatorio')
+      .update({
+        ...recordatorioPayload,
+        enviado: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existente.id);
+  } else {
+    // Crear nuevo recordatorio
+    await supabase
+      .from('recordatorio')
+      .insert({
+        ...recordatorioPayload,
+        created_by: createdBy,
+      });
+  }
+}
+
+// =====================================================
 // AUTO-VENCIMIENTO DE EVENTOS
 // =====================================================
 
@@ -486,43 +576,18 @@ export async function crearEvento(formData: FormData) {
       }
 
       // Crear recordatorio basado en recordar_antes_minutos
-      if (datos.recordar_antes_minutos > 0) {
-        try {
-          const fechaEvento = new Date(datos.fecha_inicio);
-          const fechaRecordatorio = new Date(fechaEvento.getTime() - datos.recordar_antes_minutos * 60 * 1000);
-
-          // Solo crear si la fecha del recordatorio es en el futuro
-          if (fechaRecordatorio > new Date()) {
-            const labelMinutos = datos.recordar_antes_minutos >= 1440
-              ? `${Math.floor(datos.recordar_antes_minutos / 1440)} día(s)`
-              : datos.recordar_antes_minutos >= 60
-              ? `${Math.floor(datos.recordar_antes_minutos / 60)} hora(s)`
-              : `${datos.recordar_antes_minutos} minutos`;
-
-            await supabase
-              .from('recordatorio')
-              .insert({
-                titulo: `Recordatorio: ${datos.titulo}`,
-                descripcion: `Tu evento "${datos.titulo}" comienza en ${labelMinutos}.`,
-                tipo: 'personalizado',
-                prioridad: datos.prioridad,
-                fecha_recordatorio: fechaRecordatorio.toISOString(),
-                vendedor_id: vendedorId,
-                cliente_id: datos.cliente_id ?? null,
-                propiedad_id: datos.propiedad_id ?? null,
-                evento_id: evento.id,
-                notificar_email: datos.notificar_email,
-                notificar_push: true,
-                created_by: user.id,
-                data: {
-                  evento_id: evento.id,
-                  recordar_antes_minutos: datos.recordar_antes_minutos,
-                },
-              });
-          }
-        } catch (recordatorioError) {
-          console.warn("No se pudo crear recordatorio automático:", recordatorioError);
-        }
+      try {
+        await sincronizarRecordatorioEvento(supabase, evento.id, vendedorId, user.id, {
+          titulo: datos.titulo,
+          fecha_inicio: datos.fecha_inicio,
+          recordar_antes_minutos: datos.recordar_antes_minutos,
+          prioridad: datos.prioridad,
+          cliente_id: datos.cliente_id,
+          propiedad_id: datos.propiedad_id,
+          notificar_email: datos.notificar_email,
+        });
+      } catch (recordatorioError) {
+        console.warn("No se pudo crear recordatorio automático:", recordatorioError);
       }
     }
 
@@ -604,14 +669,29 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
       throw new Error(`Error actualizando evento: ${error.message}`);
     }
 
+    // Sincronizar recordatorio (actualizar fecha o crear/eliminar según corresponda)
+    try {
+      await sincronizarRecordatorioEvento(supabase, eventoId, eventoExistente.vendedor_id, user.id, {
+        titulo: datos.titulo,
+        fecha_inicio: datos.fecha_inicio,
+        recordar_antes_minutos: datos.recordar_antes_minutos,
+        prioridad: datos.prioridad,
+        cliente_id: datos.cliente_id,
+        propiedad_id: datos.propiedad_id,
+        notificar_email: datos.notificar_email,
+      });
+    } catch (recordatorioError) {
+      console.warn("No se pudo sincronizar recordatorio al editar evento:", recordatorioError);
+    }
+
     revalidatePath('/dashboard/agenda');
     return { success: true, message: "Evento actualizado exitosamente" };
 
   } catch (error) {
     console.error('Error actualizando evento:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : "Error desconocido" 
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Error desconocido"
     };
   }
 }
@@ -769,6 +849,23 @@ export async function completarEventoConResultado(
           .single();
 
         nuevoEventoId = nuevoEvento?.id ?? null;
+
+        // Crear recordatorio automático para el evento de seguimiento
+        if (nuevoEventoId) {
+          try {
+            await sincronizarRecordatorioEvento(supabase, nuevoEventoId, user.id, user.id, {
+              titulo: datos.proximaAccion.titulo,
+              fecha_inicio: datos.proximaAccion.fecha,
+              recordar_antes_minutos: 15,
+              prioridad: 'media',
+              cliente_id: evento.cliente_id ?? undefined,
+              propiedad_id: evento.propiedad_id ?? undefined,
+              notificar_email: true,
+            });
+          } catch (recordatorioError) {
+            console.warn("No se pudo crear recordatorio para seguimiento:", recordatorioError);
+          }
+        }
       } catch (err) {
         console.warn('Error creando próxima acción:', err);
       }
@@ -894,7 +991,7 @@ export async function reprogramarEvento(
     // Verificar que el evento pertenece al usuario
     const { data: eventoExistente } = await supabase
       .from('evento')
-      .select('vendedor_id, titulo')
+      .select('vendedor_id, titulo, recordar_antes_minutos, prioridad, cliente_id, propiedad_id, notificar_email')
       .eq('id', eventoId)
       .single();
 
@@ -919,6 +1016,21 @@ export async function reprogramarEvento(
 
     if (error) {
       throw new Error(`Error reprogramando evento: ${error.message}`);
+    }
+
+    // Recalcular recordatorio con la nueva fecha
+    try {
+      await sincronizarRecordatorioEvento(supabase, eventoId, eventoExistente.vendedor_id, user.id, {
+        titulo: eventoExistente.titulo,
+        fecha_inicio: nuevaFechaInicio,
+        recordar_antes_minutos: eventoExistente.recordar_antes_minutos ?? 15,
+        prioridad: eventoExistente.prioridad,
+        cliente_id: eventoExistente.cliente_id ?? undefined,
+        propiedad_id: eventoExistente.propiedad_id ?? undefined,
+        notificar_email: eventoExistente.notificar_email ?? true,
+      });
+    } catch (recordatorioError) {
+      console.warn("No se pudo sincronizar recordatorio al reprogramar:", recordatorioError);
     }
 
     revalidatePath('/dashboard/agenda');

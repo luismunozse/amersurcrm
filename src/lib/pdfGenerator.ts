@@ -277,6 +277,229 @@ export async function generarReportePDF(data: ReporteData): Promise<jsPDFType> {
   return doc;
 }
 
+// =====================================================
+// Exportación por bloques - PDF individual por sección
+// =====================================================
+
+export interface BloqueReporte {
+  titulo: string;
+  subtitulo?: string;
+  periodo?: { inicio: string; fin: string };
+  tablas: Array<{
+    titulo?: string;
+    encabezados: string[];
+    filas: string[][];
+  }>;
+}
+
+export async function generarBloquePDF(bloque: BloqueReporte): Promise<jsPDFType> {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+  const doc = new jsPDF();
+
+  const primaryColor: [number, number, number] = [0, 123, 255];
+  const secondaryColor: [number, number, number] = [108, 117, 125];
+
+  // Título
+  doc.setFontSize(18);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text(`AMERSUR CRM - ${bloque.titulo}`, 105, 20, { align: 'center' });
+
+  // Subtítulo
+  if (bloque.subtitulo) {
+    doc.setFontSize(11);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(bloque.subtitulo, 105, 28, { align: 'center' });
+  }
+
+  // Período
+  if (bloque.periodo) {
+    doc.setFontSize(10);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    const fi = new Date(bloque.periodo.inicio).toLocaleDateString('es-PE');
+    const ff = new Date(bloque.periodo.fin).toLocaleDateString('es-PE');
+    doc.text(`Período: ${fi} - ${ff}`, 105, bloque.subtitulo ? 34 : 28, { align: 'center' });
+  }
+
+  // Fecha generación
+  doc.setFontSize(9);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  const yFecha = bloque.periodo ? (bloque.subtitulo ? 40 : 34) : (bloque.subtitulo ? 34 : 28);
+  doc.text(`Generado el: ${new Date().toLocaleString('es-PE')}`, 105, yFecha, { align: 'center' });
+
+  let yPos = yFecha + 10;
+
+  // Tablas
+  bloque.tablas.forEach((tabla, index) => {
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    if (tabla.titulo) {
+      doc.setFontSize(13);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text(`${index + 1}. ${tabla.titulo}`, 14, yPos);
+      yPos += 8;
+    }
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [tabla.encabezados],
+      body: tabla.filas,
+      theme: 'striped',
+      headStyles: { fillColor: primaryColor },
+      margin: { left: 14, right: 14 },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  });
+
+  // Pie de página
+  const pageCount = doc.internal.pages.length - 1;
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(
+      `AMERSUR CRM - ${bloque.titulo} - Página ${i} de ${pageCount}`,
+      105,
+      doc.internal.pageSize.height - 10,
+      { align: 'center' }
+    );
+  }
+
+  return doc;
+}
+
+export async function exportarBloquePDF(bloque: BloqueReporte): Promise<void> {
+  const doc = await generarBloquePDF(bloque);
+  const pdfBlob = doc.output('blob');
+  const url = URL.createObjectURL(pdfBlob);
+  window.open(url, '_blank');
+}
+
+export async function descargarBloquePDF(bloque: BloqueReporte, nombreArchivo?: string): Promise<void> {
+  const doc = await generarBloquePDF(bloque);
+  const slug = bloque.titulo.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const fileName = nombreArchivo || `reporte-${slug}-${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(fileName);
+}
+
+// =====================================================
+// Exportación visual - captura gráficos del DOM
+// =====================================================
+
+export async function exportarSeccionVisualPDF(
+  elemento: HTMLElement,
+  titulo: string,
+  periodo?: { inicio: string; fin: string }
+): Promise<void> {
+  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+
+  const primaryColor: [number, number, number] = [0, 123, 255];
+  const secondaryColor: [number, number, number] = [108, 117, 125];
+
+  // Capturar el elemento completo como canvas
+  const canvas = await html2canvas(elemento, {
+    scale: 2, // Alta resolución
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    // Ignorar elementos interactivos (botones de filtro, paginación)
+    ignoreElements: (el) => {
+      return el.hasAttribute('data-pdf-ignore');
+    },
+  });
+
+  const imgData = canvas.toDataURL('image/png');
+  const imgWidth = canvas.width;
+  const imgHeight = canvas.height;
+
+  // Dimensiones del PDF (A4)
+  const pdfWidth = 210; // mm
+  const pdfHeight = 297; // mm
+  const margin = 14;
+  const headerHeight = periodo ? 48 : 38; // espacio para header
+  const footerHeight = 15;
+  const contentWidth = pdfWidth - margin * 2;
+  const contentHeightPerPage = pdfHeight - headerHeight - footerHeight;
+
+  // Escala: ancho de la imagen al ancho del contenido PDF
+  const scale = contentWidth / imgWidth;
+  const scaledImgHeight = imgHeight * scale;
+
+  // Calcular cuántas páginas necesitamos
+  const totalPages = Math.ceil(scaledImgHeight / contentHeightPerPage);
+
+  const doc = new jsPDF('p', 'mm', 'a4');
+
+  for (let page = 0; page < totalPages; page++) {
+    if (page > 0) doc.addPage();
+
+    // Header en cada página
+    doc.setFontSize(16);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(`AMERSUR CRM - ${titulo}`, pdfWidth / 2, 16, { align: 'center' });
+
+    if (periodo) {
+      doc.setFontSize(10);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      const fi = new Date(periodo.inicio).toLocaleDateString('es-PE');
+      const ff = new Date(periodo.fin).toLocaleDateString('es-PE');
+      doc.text(`Período: ${fi} - ${ff}`, pdfWidth / 2, 23, { align: 'center' });
+    }
+
+    doc.setFontSize(9);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    const yGen = periodo ? 29 : 23;
+    doc.text(`Generado el: ${new Date().toLocaleString('es-PE')}`, pdfWidth / 2, yGen, { align: 'center' });
+
+    // Recortar y posicionar la porción correspondiente de la imagen
+    // Usamos un canvas temporal para recortar cada "página" de la imagen
+    const sourceY = page * (contentHeightPerPage / scale);
+    const sourceHeight = Math.min(contentHeightPerPage / scale, imgHeight - sourceY);
+
+    const sliceCanvas = document.createElement('canvas');
+    sliceCanvas.width = imgWidth;
+    sliceCanvas.height = Math.ceil(sourceHeight);
+    const ctx = sliceCanvas.getContext('2d')!;
+    ctx.drawImage(
+      canvas,
+      0, Math.floor(sourceY),           // source x, y
+      imgWidth, Math.ceil(sourceHeight), // source w, h
+      0, 0,                              // dest x, y
+      imgWidth, Math.ceil(sourceHeight)  // dest w, h
+    );
+
+    const sliceData = sliceCanvas.toDataURL('image/png');
+    const sliceScaledHeight = sourceHeight * scale;
+
+    doc.addImage(sliceData, 'PNG', margin, headerHeight, contentWidth, sliceScaledHeight);
+  }
+
+  // Pie de página
+  const pageCount = doc.internal.pages.length - 1;
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(
+      `AMERSUR CRM - ${titulo} - Página ${i} de ${pageCount}`,
+      pdfWidth / 2,
+      pdfHeight - 8,
+      { align: 'center' }
+    );
+  }
+
+  const pdfBlob = doc.output('blob');
+  const url = URL.createObjectURL(pdfBlob);
+  window.open(url, '_blank');
+}
+
 export async function descargarReportePDF(data: ReporteData, nombreArchivo?: string): Promise<void> {
   const doc = await generarReportePDF(data);
   const fileName = nombreArchivo || `reporte-amersur-${new Date().toISOString().split('T')[0]}.pdf`;

@@ -15,9 +15,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ReporteGestionClientesProps {
   periodo: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
-export default function ReporteGestionClientes({ periodo }: ReporteGestionClientesProps) {
+export default function ReporteGestionClientes({ periodo, fechaInicio, fechaFin }: ReporteGestionClientesProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
     setLoading(true);
     setError(null);
 
-    const result = await obtenerReporteGestionClientes(periodo);
+    const result = await obtenerReporteGestionClientes(periodo, fechaInicio, fechaFin);
 
     if (result.error) {
       setError(result.error);
@@ -37,11 +39,11 @@ export default function ReporteGestionClientes({ periodo }: ReporteGestionClient
     }
 
     setLoading(false);
-  }, [periodo]);
+  }, [periodo, fechaInicio, fechaFin]);
 
   useEffect(() => {
     cargarDatos();
-  }, [periodo, cargarDatos]);
+  }, [cargarDatos]);
 
   if (loading) {
     return (

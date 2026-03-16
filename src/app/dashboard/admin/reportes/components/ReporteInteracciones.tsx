@@ -15,9 +15,11 @@ import PaginacionReporte from "@/components/reportes/PaginacionReporte";
 
 interface ReporteInteraccionesProps {
   periodo: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
-export default function ReporteInteracciones({ periodo }: ReporteInteraccionesProps) {
+export default function ReporteInteracciones({ periodo, fechaInicio, fechaFin }: ReporteInteraccionesProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
     setLoading(true);
     setError(null);
 
-    const result = await obtenerReporteInteracciones(periodo);
+    const result = await obtenerReporteInteracciones(periodo, fechaInicio, fechaFin);
 
     if (result.error) {
       setError(result.error);
@@ -38,7 +40,7 @@ export default function ReporteInteracciones({ periodo }: ReporteInteraccionesPr
     }
 
     setLoading(false);
-  }, [periodo]);
+  }, [periodo, fechaInicio, fechaFin]);
 
   useEffect(() => {
     cargarDatos();

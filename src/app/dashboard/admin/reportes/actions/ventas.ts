@@ -6,11 +6,13 @@ import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
  * Obtiene reporte de ventas con datos reales
  */
 export async function obtenerReporteVentas(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, endDate, days } = calcularFechas(periodo);
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: ventasData, error: ventasError } = await supabase
       .schema('crm')
@@ -126,11 +128,13 @@ export async function obtenerReporteVentas(
  * Obtiene métricas de rendimiento con datos reales
  */
 export async function obtenerMetricasRendimiento(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, endDate } = calcularFechas(periodo);
+    const { startDate, endDate } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: totalLeads } = await supabase
       .schema('crm')
@@ -194,11 +198,13 @@ export async function obtenerMetricasRendimiento(
  * Obtiene comparación de objetivos vs realidad
  */
 export async function obtenerObjetivosVsRealidad(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, endDate } = calcularFechas(periodo);
+    const { startDate, endDate } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: vendedores } = await supabase
       .schema('crm')

@@ -3,12 +3,14 @@
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
 
 export async function obtenerReporteFunnel(
-  periodo: string = '30'
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
 
-    const { startDate, endDate } = calcularFechas(periodo);
+    const { startDate, endDate } = calcularFechas(periodo, fechaInicio, fechaFin);
     const startISO = startDate.toISOString();
     const endISO = endDate.toISOString();
 
