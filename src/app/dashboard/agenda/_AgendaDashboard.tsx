@@ -754,9 +754,23 @@ export default function AgendaDashboard() {
 
           <div className="crm-card p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
-              <h2 className="text-xl sm:text-2xl font-bold text-crm-text-primary text-center sm:text-left">
-                {tituloVista.charAt(0).toUpperCase() + tituloVista.slice(1)}
-              </h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-bold text-crm-text-primary">
+                  {tituloVista.charAt(0).toUpperCase() + tituloVista.slice(1)}
+                </h2>
+                {vendedores.length > 0 && (
+                  <select
+                    value={vendedorFiltroId ?? ''}
+                    onChange={(e) => setVendedorFiltroId(e.target.value || null)}
+                    className="px-3 py-1.5 text-sm bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary"
+                  >
+                    <option value="">Todos los vendedores</option>
+                    {vendedores.map((v) => (
+                      <option key={v.id} value={v.id}>{v.nombre}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
               <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
                 <div className="flex bg-crm-border rounded-lg p-1 w-full sm:w-auto">
