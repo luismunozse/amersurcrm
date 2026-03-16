@@ -11,7 +11,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <Sidebar isOpen={open} onClose={() => setOpen(false)} />
       <div className="flex-1 flex flex-col">
         <Topbar onMenu={() => setOpen(true)} />
-        <main className="mx-auto max-w-6xl w-full p-6">{children}</main>
+        <main className="mx-auto max-w-6xl w-full p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

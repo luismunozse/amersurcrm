@@ -100,7 +100,7 @@ export default function SecondaryPanelDrawer({
             </button>
           </div>
 
-          <div className="flex h-[100dvh] flex-col overflow-y-auto px-5 pb-10">
+          <div className="flex flex-col overflow-y-auto px-4 sm:px-5 pb-6 sm:pb-10" style={{ maxHeight: 'calc(100dvh - 65px)' }}>
             <section className="py-6 space-y-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-crm-text-muted">
                 Estado del día

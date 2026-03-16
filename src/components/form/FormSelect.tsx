@@ -21,14 +21,14 @@ export function FormSelect({
 
   return (
     <div className="space-y-1">
-      <label className="block text-xs font-semibold text-crm-text-muted uppercase">
+      <label className="block text-xs sm:text-sm font-semibold text-crm-text-muted uppercase">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <select
         {...props}
         className={`
-          w-full px-3 py-2 rounded-lg border bg-crm-card text-crm-text
+          w-full px-3 py-2.5 sm:py-2 rounded-lg border bg-crm-card text-crm-text text-sm
           focus:outline-none focus:ring-2 transition-colors
           ${hasError
             ? 'border-red-500 focus:ring-red-500/40'

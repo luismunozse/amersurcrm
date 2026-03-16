@@ -429,7 +429,7 @@ async function DashboardContent() {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="group block min-w-[16rem] rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:min-w-0"
+                  className="group block min-w-[14rem] sm:min-w-[16rem] rounded-2xl border border-white/15 bg-white/10 p-3 sm:p-4 backdrop-blur-sm transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:min-w-0"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">

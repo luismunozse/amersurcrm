@@ -94,11 +94,11 @@ export async function SeguimientosHoy() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-crm-text-primary truncate">{cliente.nombre}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${estadoColors[cliente.estado_cliente] ?? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`}>
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${estadoColors[cliente.estado_cliente] ?? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`}>
                     {estadoLabels[cliente.estado_cliente] ?? cliente.estado_cliente}
                   </span>
                   {cliente.telefono && (
-                    <span className="text-[10px] text-crm-text-muted truncate">{cliente.telefono}</span>
+                    <span className="text-[11px] text-crm-text-muted truncate">{cliente.telefono}</span>
                   )}
                 </div>
               </div>

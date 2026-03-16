@@ -313,22 +313,22 @@ export default function RecordatoriosPanel() {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
-          <div className="text-sm text-crm-text-muted">Total (30 días)</div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className="crm-card p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-crm-text-primary">{estadisticas.total}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Total (30 días)</div>
         </div>
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{estadisticas.hoy}</div>
-          <div className="text-sm text-crm-text-muted">Hoy</div>
+        <div className="crm-card p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-blue-600">{estadisticas.hoy}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Hoy</div>
         </div>
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{estadisticas.inminentes}</div>
-          <div className="text-sm text-crm-text-muted">Inminentes</div>
+        <div className="crm-card p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-red-600">{estadisticas.inminentes}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Inminentes</div>
         </div>
-        <div className="crm-card p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{estadisticas.manana}</div>
-          <div className="text-sm text-crm-text-muted">Mañana</div>
+        <div className="crm-card p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-green-600">{estadisticas.manana}</div>
+          <div className="text-xs sm:text-sm text-crm-text-muted">Mañana</div>
         </div>
       </div>
 

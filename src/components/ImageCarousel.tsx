@@ -138,7 +138,7 @@ export default function ImageCarousel({
 
       {/* Main Image Container */}
       <div
-        className="relative max-w-7xl max-h-[90vh] mx-auto px-20"
+        className="relative max-w-7xl max-h-[90vh] mx-auto px-4 sm:px-8 lg:px-20"
         onClick={(e) => e.stopPropagation()}
       >
         {isLoading && (
@@ -218,9 +218,9 @@ export default function ImageCarousel({
         </div>
       )}
 
-      {/* Instructions */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white/60 text-xs">
-        <p>Usa ← → para navegar • ESC para cerrar</p>
+      {/* Instructions - hidden on mobile (touch gestures instead) */}
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white/60 text-xs hidden sm:block">
+        <p>Usa &larr; &rarr; para navegar &bull; ESC para cerrar</p>
       </div>
     </div>,
     document.body

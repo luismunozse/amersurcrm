@@ -154,7 +154,7 @@ export default function PhoneInput({
               type="button"
               onClick={() => setIsOpen(!isOpen)}
               disabled={disabled}
-              className="flex items-center space-x-1.5 px-2.5 py-2 border border-crm-border rounded-l-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all min-w-[100px]"
+              className="flex items-center space-x-1.5 px-2.5 py-2.5 border border-crm-border rounded-l-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all min-w-[90px] sm:min-w-[100px]"
             >
               <span className="text-sm">{selectedCountry.flag}</span>
               <span className="text-xs font-medium">{selectedCountry.dialCode}</span>
@@ -165,7 +165,7 @@ export default function PhoneInput({
 
             {/* Dropdown de países */}
             {isOpen && (
-              <div className="absolute top-full left-0 z-50 w-72 bg-crm-card border border-crm-border rounded-lg shadow-crm-xl mt-1 max-h-60 overflow-hidden">
+              <div className="absolute top-full left-0 z-50 w-[calc(100vw-3rem)] sm:w-72 bg-crm-card border border-crm-border rounded-lg shadow-crm-xl mt-1 max-h-60 overflow-hidden">
                 {/* Búsqueda */}
                 <div className="p-2 border-b border-crm-border">
                   <input
@@ -217,7 +217,7 @@ export default function PhoneInput({
             placeholder={placeholder}
             disabled={disabled}
             required={required}
-            className="flex-1 px-3 py-2 border border-crm-border rounded-r-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
+            className="flex-1 px-3 py-2.5 border border-crm-border rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
           />
 
           {/* Input oculto con el número completo para el formulario */}

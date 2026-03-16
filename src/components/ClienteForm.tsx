@@ -385,8 +385,8 @@ export default function ClienteForm({
 
               <div className="space-y-3">
                 {/* Calle y Número */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2 space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <label className="block text-xs font-medium text-crm-text-primary">Calle</label>
                     <input
                       name="direccion_calle"
@@ -554,12 +554,12 @@ export default function ClienteForm({
       </form>
 
       {/* Botones de Acción - Fijos en la parte inferior */}
-      <div className="flex justify-end space-x-3 pt-4 border-t border-crm-border bg-crm-card">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-crm-border bg-crm-card">
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="px-5 py-2 text-xs font-medium text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-all duration-200"
+            className="w-full sm:w-auto px-5 py-2.5 sm:py-2 text-xs font-medium text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-all duration-200"
             disabled={pending}
           >
             Cancelar
@@ -571,7 +571,7 @@ export default function ClienteForm({
             formRef.current?.requestSubmit();
           }}
           disabled={pending || loadingVendedores}
-          className="crm-button-primary px-6 py-2 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg"
+          className="w-full sm:w-auto crm-button-primary px-6 py-2.5 sm:py-2 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg"
         >
           {pending ? (
             <div className="flex items-center space-x-2">

@@ -26,13 +26,13 @@ export default function EstadoLotesChart({
   const porcentajeDisponibles = Math.round((disponibles / total) * 100);
 
   return (
-    <div className="h-64">
+    <div className="h-48 sm:h-64">
       <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-4 sm:gap-6">
           {/* Donut Chart Simplificado */}
-          <div className="relative w-40 h-40">
+          <div className="relative w-32 h-32 sm:w-40 sm:h-40">
             {/* SVG Donut */}
-            <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 120 120">
+            <svg className="w-32 h-32 sm:w-40 sm:h-40 transform -rotate-90" viewBox="0 0 120 120">
               <circle
                 cx="60"
                 cy="60"
@@ -90,28 +90,28 @@ export default function EstadoLotesChart({
 
             {/* Centro con total */}
             <div className="absolute inset-0 flex items-center justify-center flex-col">
-              <p className="text-3xl font-bold text-crm-text-primary">{total}</p>
-              <p className="text-xs text-crm-text-muted">Total</p>
+              <p className="text-2xl sm:text-3xl font-bold text-crm-text-primary">{total}</p>
+              <p className="text-[10px] sm:text-xs text-crm-text-muted">Total</p>
             </div>
           </div>
 
           {/* Leyenda */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 sm:flex-col sm:gap-2">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-sm text-crm-text-primary font-medium">
+              <span className="text-xs sm:text-sm text-crm-text-primary font-medium">
                 Vendidos: {vendidos} ({porcentajeVendidos}%)
               </span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span className="text-sm text-crm-text-primary font-medium">
+              <span className="text-xs sm:text-sm text-crm-text-primary font-medium">
                 Reservados: {reservados} ({porcentajeReservados}%)
               </span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-crm-primary"></div>
-              <span className="text-sm text-crm-text-primary font-medium">
+              <span className="text-xs sm:text-sm text-crm-text-primary font-medium">
                 Disponibles: {disponibles} ({porcentajeDisponibles}%)
               </span>
             </div>

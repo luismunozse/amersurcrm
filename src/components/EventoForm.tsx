@@ -99,16 +99,17 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-crm-text-primary">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-crm-text-primary">
               {eventoInicial ? 'Editar Evento' : 'Crear Nuevo Evento'}
             </h2>
             <button
               onClick={onCancel}
-              className="text-crm-text-muted hover:text-crm-text-primary transition-colors"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+              aria-label="Cerrar"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -166,7 +167,7 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
             </div>
 
             {/* Fechas y Hora */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Fecha de Inicio *
@@ -334,18 +335,18 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
             </div>
 
             {/* Botones */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-crm-border">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 sm:pt-6 border-t border-crm-border">
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-6 py-2 text-crm-text-muted hover:text-crm-text-primary transition-colors"
+                className="w-full sm:w-auto px-6 py-2.5 sm:py-2 text-sm text-crm-text-muted hover:text-crm-text-primary transition-colors rounded-lg hover:bg-crm-card-hover"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={cargando}
-                className="crm-button-primary px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto crm-button-primary px-6 py-2.5 sm:py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {cargando ? 'Creando...' : (eventoInicial ? 'Actualizar' : 'Crear Evento')}
               </button>

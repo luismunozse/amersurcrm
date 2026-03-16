@@ -114,7 +114,7 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
 
   return (
     <>
-      <div className="crm-card p-6 hover:shadow-lg transition-shadow">
+      <div className="crm-card p-4 sm:p-6 hover:shadow-lg transition-shadow">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
@@ -157,7 +157,7 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
         </div>
 
         {/* Información de gestión */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4">
           <div className="space-y-1">
             <p className="text-xs text-crm-text-muted">Proyecto</p>
             <p className="text-sm font-medium text-crm-text-primary">
@@ -238,13 +238,13 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => router.push(`/dashboard/propiedades/${propiedad.id}`)}
-              className="crm-button-secondary px-3 py-1 rounded text-xs font-medium"
+              className="crm-button-secondary px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[36px] sm:min-h-0"
             >
               Ver
             </button>
             <button
               onClick={() => router.push(`/dashboard/propiedades/${propiedad.id}/editar`)}
-              className="crm-button-primary px-3 py-1 rounded text-xs font-medium"
+              className="crm-button-primary px-3 py-2 sm:py-1 rounded text-xs font-medium min-h-[36px] sm:min-h-0"
             >
               Editar
             </button>
@@ -265,7 +265,7 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
             
             <button
               onClick={() => setShowDeleteDialog(true)}
-              className="text-crm-danger hover:text-crm-danger-hover p-1"
+              className="text-crm-danger hover:text-crm-danger-hover p-2 sm:p-1 min-h-[36px] min-w-[36px] inline-flex items-center justify-center"
               disabled={isPending}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

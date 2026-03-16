@@ -23,8 +23,8 @@ export default function VentasMensualesChart({ data }: { data: Record<string, nu
   }
 
   return (
-    <div className="h-64">
-      <div className="flex items-end justify-between h-full gap-2">
+    <div className="h-48 sm:h-64">
+      <div className="flex items-end justify-between h-full gap-1 sm:gap-2">
         {meses.map((mes, index) => {
           const valor = valores[index];
           const altura = maxValor > 0 ? (valor / maxValor) * 100 : 0;
@@ -56,7 +56,7 @@ export default function VentasMensualesChart({ data }: { data: Record<string, nu
               </div>
 
               {/* Label del mes */}
-              <p className="text-xs text-crm-text-muted text-center font-medium">
+              <p className="text-[10px] sm:text-xs text-crm-text-muted text-center font-medium">
                 {formatearMes(mes).split(' ')[0]}
               </p>
             </div>
