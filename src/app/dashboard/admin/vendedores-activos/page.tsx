@@ -79,7 +79,7 @@ export default function VendedoresActivosPage() {
 
   const cargarVendedoresDisponibles = async () => {
     try {
-      const response = await fetch("/api/admin/usuarios");
+      const response = await fetch("/api/admin/usuarios?limit=50&estado=activo");
       const data = await response.json();
 
       if (data.success) {
