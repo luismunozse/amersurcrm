@@ -183,6 +183,12 @@ export default function AgendaDashboard() {
     return "";
   }, []);
 
+  const obtenerTooltipCreador = useCallback((evento: Evento) => {
+    const creadorNombre = (evento as any).creador_nombre;
+    if (!creadorNombre) return undefined;
+    return `Creado por: ${creadorNombre}`;
+  }, []);
+
   const tituloVista = useMemo(() => {
     if (vista === "semana") {
       const inicio = startOfWeek(fechaActual, { weekStartsOn: 1 });
@@ -389,10 +395,9 @@ export default function AgendaDashboard() {
         return (
           <button
             type="button"
-            onClick={() => setFechaActual(dia)}
-            onDoubleClick={() => abrirModalNuevoEvento(dia)}
+            onClick={() => { setFechaActual(dia); setVista("dia"); }}
             key={dia.toISOString()}
-            title="Doble click para crear evento"
+            title="Click para ver eventos del día"
             className={`min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border border-crm-border rounded-lg transition-all duration-200 hover:shadow-md text-left ${
               esMesActual ? "bg-crm-card" : "bg-crm-border/30"
             } ${esHoy ? "ring-2 ring-crm-primary bg-crm-primary/5" : ""} ${
@@ -415,6 +420,7 @@ export default function AgendaDashboard() {
                     key={evento.id}
                     className={`text-xs p-1 rounded border cursor-pointer hover:shadow-sm transition-all duration-200 ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
                     style={obtenerColorEvento(evento.tipo, evento.estado)}
+                    title={obtenerTooltipCreador(evento)}
                     onClick={(e) => {
                       e.stopPropagation();
                       abrirModalEvento(evento);
@@ -470,6 +476,7 @@ export default function AgendaDashboard() {
                       key={evento.id}
                       className={`group relative p-2 border rounded-lg cursor-pointer transition-all ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
                       style={obtenerColorEvento(evento.tipo, evento.estado)}
+                      title={obtenerTooltipCreador(evento)}
                       onClick={() => abrirModalEvento(evento)}
                     >
                       <p className="text-xs font-semibold truncate pr-8">{evento.titulo}</p>
@@ -542,6 +549,7 @@ export default function AgendaDashboard() {
                 key={evento.id}
                 className={`group relative p-3 border rounded-lg hover:shadow transition-all cursor-pointer ${obtenerClasesEvento(evento.tipo, evento.estado)}`}
                 style={obtenerColorEvento(evento.tipo, evento.estado)}
+                title={obtenerTooltipCreador(evento)}
                 onClick={() => abrirModalEvento(evento)}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -816,6 +824,7 @@ export default function AgendaDashboard() {
                 <div
                   key={evento.id}
                   className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-crm-border/30 rounded-lg hover:bg-crm-border/50 transition-all duration-200 cursor-pointer"
+                  title={obtenerTooltipCreador(evento)}
                   onClick={() => abrirModalEvento(evento)}
                 >
                   <div
@@ -1054,6 +1063,7 @@ export default function AgendaDashboard() {
         onClose={handleCerrarModal}
         onSuccess={handleEventoGuardado}
         fechaPreseleccionada={fechaPreseleccionada ?? undefined}
+        vendedorId={vendedorFiltroId}
       />
 
       {/* Modal de resultado al completar */}

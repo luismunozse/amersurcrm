@@ -45,7 +45,7 @@ export async function marcarTodasLeidas() {
 
 export async function crearNotificacion(
   usuarioId: string,
-  tipo: 'cliente' | 'proyecto' | 'lote' | 'sistema',
+  tipo: 'cliente' | 'proyecto' | 'lote' | 'sistema' | 'evento' | 'recordatorio' | 'venta' | 'reserva' | 'lead_asignado',
   titulo: string,
   mensaje: string,
   data?: Record<string, unknown>

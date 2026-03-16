@@ -361,6 +361,21 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
       throw error;
     }
 
+    // Obtener nombres de creadores
+    const creadorIds = [...new Set((data ?? []).map(e => e.created_by).filter(Boolean))];
+    let creadorMap: Record<string, string> = {};
+    if (creadorIds.length > 0) {
+      const { data: perfiles } = await supabase
+        .from('usuario_perfil')
+        .select('id, nombre_completo, username')
+        .in('id', creadorIds);
+      if (perfiles) {
+        creadorMap = Object.fromEntries(
+          perfiles.map(p => [p.id, p.nombre_completo || p.username || p.id])
+        );
+      }
+    }
+
     return (data ?? []).map((item) => ({
       ...item,
       descripcion: item.descripcion ?? undefined,
@@ -376,6 +391,7 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
       patron_recurrencia: item.patron_recurrencia ?? undefined,
       notas: item.notas ?? undefined,
       etiquetas: item.etiquetas ?? [],
+      creador_nombre: item.created_by ? creadorMap[item.created_by] : undefined,
     })) as Evento[];
   } catch (error) {
     console.error('Error obteniendo eventos:', error);
@@ -387,7 +403,7 @@ export async function crearEvento(formData: FormData) {
   try {
     const supabase = await createServerOnlyClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       throw new Error("No autorizado");
     }
@@ -428,12 +444,17 @@ export async function crearEvento(formData: FormData) {
       snooze_hasta: formData.get("snooze_hasta") || undefined,
     });
 
+    // Si un admin/gerente asigna el evento a otro vendedor, usar ese ID
+    const vendedorAsignado = formData.get("vendedor_id") as string | null;
+    const vendedorId = vendedorAsignado || user.id;
+    const esAsignacionAOtro = vendedorAsignado && vendedorAsignado !== user.id;
+
     // Crear evento
     const { data: evento, error } = await supabase
       .from('evento')
       .insert({
         ...datos,
-        vendedor_id: user.id,
+        vendedor_id: vendedorId,
         created_by: user.id,
       })
       .select()
@@ -444,16 +465,64 @@ export async function crearEvento(formData: FormData) {
     }
 
     if (evento?.id) {
-      try {
-        await crearNotificacion(
-          user.id,
-          "sistema",
-          "Nuevo evento agendado",
-          `Has creado el evento "${datos.titulo}" para ${new Date(datos.fecha_inicio).toLocaleString("es-PE")}.`,
-          { evento_id: evento.id, prioridad: datos.prioridad, tipo: datos.tipo }
-        );
-      } catch (notifyError) {
-        console.warn("No se pudo crear notificación de evento:", notifyError);
+      // Notificar al vendedor asignado (solo si es otro usuario)
+      if (esAsignacionAOtro) {
+        try {
+          await crearNotificacion(
+            vendedorId,
+            "evento",
+            "Te han asignado un nuevo evento",
+            `Se te asignó "${datos.titulo}" para ${new Date(datos.fecha_inicio).toLocaleString("es-PE")}.`,
+            {
+              evento_id: evento.id,
+              prioridad: datos.prioridad,
+              tipo: datos.tipo,
+              url: "/dashboard/agenda",
+            }
+          );
+        } catch (notifyError) {
+          console.warn("No se pudo notificar al vendedor asignado:", notifyError);
+        }
+      }
+
+      // Crear recordatorio basado en recordar_antes_minutos
+      if (datos.recordar_antes_minutos > 0) {
+        try {
+          const fechaEvento = new Date(datos.fecha_inicio);
+          const fechaRecordatorio = new Date(fechaEvento.getTime() - datos.recordar_antes_minutos * 60 * 1000);
+
+          // Solo crear si la fecha del recordatorio es en el futuro
+          if (fechaRecordatorio > new Date()) {
+            const labelMinutos = datos.recordar_antes_minutos >= 1440
+              ? `${Math.floor(datos.recordar_antes_minutos / 1440)} día(s)`
+              : datos.recordar_antes_minutos >= 60
+              ? `${Math.floor(datos.recordar_antes_minutos / 60)} hora(s)`
+              : `${datos.recordar_antes_minutos} minutos`;
+
+            await supabase
+              .from('recordatorio')
+              .insert({
+                titulo: `Recordatorio: ${datos.titulo}`,
+                descripcion: `Tu evento "${datos.titulo}" comienza en ${labelMinutos}.`,
+                tipo: 'personalizado',
+                prioridad: datos.prioridad,
+                fecha_recordatorio: fechaRecordatorio.toISOString(),
+                vendedor_id: vendedorId,
+                cliente_id: datos.cliente_id ?? null,
+                propiedad_id: datos.propiedad_id ?? null,
+                evento_id: evento.id,
+                notificar_email: datos.notificar_email,
+                notificar_push: true,
+                created_by: user.id,
+                data: {
+                  evento_id: evento.id,
+                  recordar_antes_minutos: datos.recordar_antes_minutos,
+                },
+              });
+          }
+        } catch (recordatorioError) {
+          console.warn("No se pudo crear recordatorio automático:", recordatorioError);
+        }
       }
     }
 
@@ -533,20 +602,6 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
 
     if (error) {
       throw new Error(`Error actualizando evento: ${error.message}`);
-    }
-
-    if (datos.titulo) {
-      try {
-        await crearNotificacion(
-          user.id,
-          "sistema",
-          "Evento actualizado",
-          `Actualizaste el evento "${datos.titulo}".`,
-          { evento_id: eventoId }
-        );
-      } catch (notifyError) {
-        console.warn("No se pudo crear notificación de actualización de evento:", notifyError);
-      }
     }
 
     revalidatePath('/dashboard/agenda');
@@ -778,20 +833,7 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
     }
 
     if (nuevoEstado === 'completado') {
-      // 1. Crear notificación
-      try {
-        await crearNotificacion(
-          user.id,
-          "sistema",
-          "Evento completado",
-          `Has completado el evento "${eventoExistente.titulo}".`,
-          { evento_id: eventoId }
-        );
-      } catch (notifyError) {
-        console.warn("No se pudo crear notificación:", notifyError);
-      }
-
-      // 2. Registrar interacción en el cliente si el evento está vinculado a uno
+      // Registrar interacción en el cliente si el evento está vinculado a uno
       if (eventoExistente.cliente_id) {
         try {
           // Obtener username del vendedor para cliente_interaccion
@@ -879,19 +921,6 @@ export async function reprogramarEvento(
       throw new Error(`Error reprogramando evento: ${error.message}`);
     }
 
-    // Crear notificación
-    try {
-      await crearNotificacion(
-        user.id,
-        "sistema",
-        "Evento reprogramado",
-        `Has reprogramado el evento "${eventoExistente.titulo}" para ${new Date(nuevaFechaInicio).toLocaleString("es-PE")}.`,
-        { evento_id: eventoId }
-      );
-    } catch (notifyError) {
-      console.warn("No se pudo crear notificación:", notifyError);
-    }
-
     revalidatePath('/dashboard/agenda');
     return { success: true, message: "Evento reprogramado exitosamente" };
 
@@ -946,20 +975,6 @@ export async function crearRecordatorio(formData: FormData) {
 
     if (error) {
       throw new Error(`Error creando recordatorio: ${error.message}`);
-    }
-
-    if (recordatorio?.id) {
-      try {
-        await crearNotificacion(
-          user.id,
-          "sistema",
-          "Nuevo recordatorio creado",
-          `Has creado un recordatorio: "${datos.titulo}".`,
-          { recordatorio_id: recordatorio.id, prioridad: datos.prioridad, tipo: datos.tipo }
-        );
-      } catch (notifyError) {
-        console.warn("No se pudo crear notificación de recordatorio:", notifyError);
-      }
     }
 
     revalidatePath('/dashboard/agenda');

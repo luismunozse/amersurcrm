@@ -14,6 +14,8 @@ interface EventoModalProps {
   onSuccess: () => void;
   fechaPreseleccionada?: string;
   clienteInicial?: { id: string; nombre: string };
+  /** ID del vendedor al que se asigna el evento (cuando admin crea para otro) */
+  vendedorId?: string | null;
 }
 
 const TIPOS_EVENTO = [
@@ -282,7 +284,7 @@ function LoteSearch({
   );
 }
 
-export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaPreseleccionada, clienteInicial }: EventoModalProps) {
+export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaPreseleccionada, clienteInicial, vendedorId }: EventoModalProps) {
   const [formData, setFormData] = useState<FormValues>({
     titulo: "",
     tipo: "llamada",
@@ -390,6 +392,11 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
       }
       if (formData.proximo_paso_fecha) {
         payload.append("proximo_paso_fecha", formData.proximo_paso_fecha);
+      }
+
+      // Vendedor asignado (cuando admin crea para otro vendedor)
+      if (vendedorId) {
+        payload.append("vendedor_id", vendedorId);
       }
 
       // Valores por defecto para campos requeridos por el schema
