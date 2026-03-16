@@ -12,6 +12,7 @@ type SP = Promise<{
   tipo?: string | string[];
   vendedor?: string | string[];
   origen?: string | string[];
+  proyectoInteres?: string | string[];
   page?: string | string[];
   sortBy?: string | string[];
   sortOrder?: string | string[];
@@ -33,6 +34,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
   const tipo = (Array.isArray(sp.tipo) ? sp.tipo[0] : sp.tipo ?? "").trim();
   const vendedor = (Array.isArray(sp.vendedor) ? sp.vendedor[0] : sp.vendedor ?? "").trim();
   const origen = (Array.isArray(sp.origen) ? sp.origen[0] : sp.origen ?? "").trim();
+  const proyectoInteres = (Array.isArray(sp.proyectoInteres) ? sp.proyectoInteres[0] : sp.proyectoInteres ?? "").trim();
   const page = parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page ?? "1"), 10);
   const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "fecha_alta").trim();
   const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
@@ -57,6 +59,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
         tipo,
         vendedor,
         origen,
+        proyectoInteres,
         sortBy,
         sortOrder
       }).catch(e => {
@@ -84,6 +87,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
     tipo,
     vendedor,
     origen,
+    proyectoInteres,
     sortBy,
     sortOrder,
   };
@@ -138,6 +142,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
           tipo={tipo}
           vendedor={vendedor}
           origen={origen}
+          proyectoInteres={proyectoInteres}
           sortBy={sortBy}
           sortOrder={sortOrder}
         />

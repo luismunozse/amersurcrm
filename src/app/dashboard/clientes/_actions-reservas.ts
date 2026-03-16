@@ -31,6 +31,7 @@ export async function agregarPropiedadInteres(data: {
   clienteId: string;
   loteId?: string;
   propiedadId?: string;
+  proyectoId?: string;
   prioridad?: 1 | 2 | 3;
   notas?: string;
 }) {
@@ -48,8 +49,9 @@ export async function agregarPropiedadInteres(data: {
       .from('cliente_propiedad_interes')
       .insert({
         cliente_id: data.clienteId,
-        lote_id: data.loteId,
-        propiedad_id: data.propiedadId,
+        lote_id: data.loteId || null,
+        propiedad_id: data.propiedadId || null,
+        proyecto_id: data.proyectoId || null,
         prioridad: data.prioridad || 2,
         notas: data.notas,
         agregado_por: authResult.username,

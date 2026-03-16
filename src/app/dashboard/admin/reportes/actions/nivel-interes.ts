@@ -56,6 +56,7 @@ export async function obtenerReporteNivelInteres(
       .select(`
         cliente_id,
         prioridad,
+        proyecto_id,
         lote:lote_id (
           proyecto_id
         ),
@@ -66,25 +67,28 @@ export async function obtenerReporteNivelInteres(
 
     const { data: interesesProyecto } = await interesQuery;
 
+    // ID especial para consultas generales (sin proyecto específico)
+    const CONSULTA_GENERAL_ID = '__general__';
+
     // Mapear clientes con interés en proyectos específicos Y su mejor prioridad
     const clientesConProyecto = new Map<string, string[]>();
     const clientePrioridad = new Map<string, number>(); // Mejor prioridad del cliente (1=alta, menor es mejor)
 
     interesesProyecto?.forEach((interes: any) => {
-      const proyId = interes.lote?.proyecto_id || interes.propiedad?.proyecto_id;
-      if (proyId) {
-        const proyectos = clientesConProyecto.get(interes.cliente_id) || [];
-        if (!proyectos.includes(proyId)) {
-          proyectos.push(proyId);
-        }
-        clientesConProyecto.set(interes.cliente_id, proyectos);
+      // Prioridad: proyecto_id directo > lote.proyecto_id > propiedad.proyecto_id > consulta general
+      const proyId = interes.proyecto_id || interes.lote?.proyecto_id || interes.propiedad?.proyecto_id || CONSULTA_GENERAL_ID;
 
-        // Guardar la mejor prioridad (menor número = mayor prioridad)
-        const prioridadActual = clientePrioridad.get(interes.cliente_id) || 3;
-        const nuevaPrioridad = interes.prioridad || 2;
-        if (nuevaPrioridad < prioridadActual) {
-          clientePrioridad.set(interes.cliente_id, nuevaPrioridad);
-        }
+      const proyectos = clientesConProyecto.get(interes.cliente_id) || [];
+      if (!proyectos.includes(proyId)) {
+        proyectos.push(proyId);
+      }
+      clientesConProyecto.set(interes.cliente_id, proyectos);
+
+      // Guardar la mejor prioridad (menor número = mayor prioridad)
+      const prioridadActual = clientePrioridad.get(interes.cliente_id) || 3;
+      const nuevaPrioridad = interes.prioridad || 2;
+      if (nuevaPrioridad < prioridadActual) {
+        clientePrioridad.set(interes.cliente_id, nuevaPrioridad);
       }
     });
 
@@ -250,6 +254,7 @@ export async function obtenerReporteNivelInteres(
 
     // Formatear distribución por proyecto
     const proyectosMap = new Map(proyectos?.map(p => [p.id, p.nombre]) || []);
+    proyectosMap.set(CONSULTA_GENERAL_ID, 'Consulta General');
     const distribucionPorProyecto = Array.from(nivelesPorProyecto.entries())
       .map(([proyId, niveles]) => ({
         proyecto: proyectosMap.get(proyId) || 'Sin nombre',
@@ -289,8 +294,12 @@ export async function obtenerReporteNivelInteres(
       }
     });
 
-    // Formatear lista de clientes por proyecto
-    const clientesPorProyecto = (proyectos || [])
+    // Formatear lista de clientes por proyecto (incluir consultas generales)
+    const listaProyectos = [
+      ...(proyectos || []),
+      ...(clientesPorProyectoMap.has(CONSULTA_GENERAL_ID) ? [{ id: CONSULTA_GENERAL_ID, nombre: 'Consulta General' }] : []),
+    ];
+    const clientesPorProyecto = listaProyectos
       .map(p => ({
         proyectoId: p.id,
         proyecto: p.nombre,
@@ -327,6 +336,7 @@ export async function obtenerReporteNivelInteres(
     });
 
     const proyectosNombreMap = new Map(proyectos?.map(p => [p.id, p.nombre]) || []);
+    proyectosNombreMap.set(CONSULTA_GENERAL_ID, 'Consulta General');
     const distribucionPorVendedor = Array.from(vendedorProyectoMap.entries())
       .map(([vendedor, data]) => ({
         vendedor,

@@ -140,14 +140,12 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
   );
   const lotesDisponibles = selectedProyecto?.lotes ?? [];
 
+  const esConsultaGeneral = selectedProyectoId === "__general__";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProyectoId) {
-      toast.error("Selecciona un proyecto");
-      return;
-    }
-    if (!selectedLoteId) {
-      toast.error("Selecciona un lote");
+      toast.error("Selecciona un proyecto o Consulta General");
       return;
     }
 
@@ -155,7 +153,12 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
     try {
       const result = await agregarPropiedadInteres({
         clienteId,
-        loteId: selectedLoteId,
+        ...(esConsultaGeneral
+          ? {}
+          : {
+              proyectoId: selectedProyectoId,
+              ...(selectedLoteId ? { loteId: selectedLoteId } : {}),
+            }),
         prioridad,
         notas: notas.trim() ? notas.trim() : undefined,
       });
@@ -217,11 +220,17 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
               <div className="flex items-center gap-2">
                 <select
                   value={selectedProyectoId}
-                  onChange={(e) => setSelectedProyectoId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedProyectoId(e.target.value);
+                    if (e.target.value === "__general__") {
+                      setSelectedLoteId("");
+                    }
+                  }}
                   disabled={loadingOptions || submitting || proyectos.length === 0}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-50"
                 >
                   <option value="">Seleccionar proyecto</option>
+                  <option value="__general__">Consulta General (sin proyecto espec\u00edfico)</option>
                   {proyectos.map((proyecto) => (
                     <option key={proyecto.id} value={proyecto.id}>
                       {proyecto.nombre}
@@ -238,34 +247,43 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Lote *
-              </label>
-              <select
-                value={selectedLoteId}
-                onChange={(e) => setSelectedLoteId(e.target.value)}
-                disabled={
-                  submitting ||
-                  loadingOptions ||
-                  !selectedProyectoId ||
-                  lotesDisponibles.length === 0
-                }
-                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-50"
-              >
-                <option value="">Seleccionar lote</option>
-                {lotesDisponibles.map((lote) => (
-                  <option key={lote.id} value={lote.id}>
-                    {renderLoteLabel(lote)}
-                  </option>
-                ))}
-              </select>
-              {selectedProyectoId && !loadingOptions && lotesDisponibles.length === 0 && (
-                <p className="text-xs text-crm-text-muted mt-1">
-                  Este proyecto no tiene lotes disponibles para la lista de deseos.
+            {!esConsultaGeneral && selectedProyectoId && (
+              <div>
+                <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                  Lote <span className="text-crm-text-muted font-normal">(opcional)</span>
+                </label>
+                <select
+                  value={selectedLoteId}
+                  onChange={(e) => setSelectedLoteId(e.target.value)}
+                  disabled={
+                    submitting ||
+                    loadingOptions ||
+                    lotesDisponibles.length === 0
+                  }
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-50"
+                >
+                  <option value="">Sin lote espec\u00edfico (inter\u00e9s en el proyecto)</option>
+                  {lotesDisponibles.map((lote) => (
+                    <option key={lote.id} value={lote.id}>
+                      {renderLoteLabel(lote)}
+                    </option>
+                  ))}
+                </select>
+                {!loadingOptions && lotesDisponibles.length === 0 && (
+                  <p className="text-xs text-crm-text-muted mt-1">
+                    Este proyecto no tiene lotes disponibles. Se registrar\u00e1 inter\u00e9s a nivel proyecto.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {esConsultaGeneral && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Se registrar\u00e1 como consulta general. El cliente a\u00fan no tiene un proyecto espec\u00edfico de inter\u00e9s.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -316,7 +334,7 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
             </button>
             <button
               type="submit"
-              disabled={submitting || !selectedLoteId}
+              disabled={submitting || !selectedProyectoId}
               className="px-4 py-2 text-sm font-medium text-white bg-crm-primary rounded-lg hover:bg-crm-primary/90 transition-colors disabled:opacity-50"
             >
               {submitting ? "Agregando..." : "Agregar"}

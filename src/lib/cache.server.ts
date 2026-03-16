@@ -26,6 +26,7 @@ interface GetClientesParams {
   tipo?: string;
   vendedor?: string;
   origen?: string;  // Filtro por origen del lead
+  proyectoInteres?: string;  // Filtro por proyecto de interés (ID de proyecto o "__general__")
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   mode?: 'list' | 'dashboard';
@@ -83,6 +84,7 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     tipo = '',
     vendedor = '',
     origen = '',
+    proyectoInteres = '',
     sortBy = 'fecha_alta',
     sortOrder = 'desc',
     mode = 'list',
@@ -108,11 +110,43 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
   const usarVistaAccesible = !esAdmin && !esGerente && !vendedor && username;
   const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
 
+  // Pre-filtro: obtener IDs de clientes por proyecto de interés (si aplica)
+  let clienteIdsProyecto: string[] | null = null;
+  if (proyectoInteres && proyectoInteres.trim() !== '') {
+    let interesQuery = supabase.schema('crm')
+      .from('cliente_propiedad_interes')
+      .select('cliente_id');
+
+    if (proyectoInteres === '__general__') {
+      // Consulta general: sin proyecto_id, sin lote_id, sin propiedad_id
+      interesQuery = interesQuery
+        .is('proyecto_id', null)
+        .is('lote_id', null)
+        .is('propiedad_id', null);
+    } else {
+      // Proyecto específico: buscar por proyecto_id directo o por lote.proyecto_id
+      interesQuery = interesQuery.eq('proyecto_id', proyectoInteres);
+    }
+
+    const { data: interesData } = await interesQuery;
+    clienteIdsProyecto = [...new Set((interesData ?? []).map((r: any) => r.cliente_id as string))];
+
+    // Si no hay clientes con ese interés, retornar vacío
+    if (clienteIdsProyecto.length === 0) {
+      return { data: [], total: 0 };
+    }
+  }
+
   // buildBaseQuery ahora recibe las columnas a seleccionar y opciones
   // IMPORTANTE: .select() debe llamarse PRIMERO para que .or() esté disponible
   const buildBaseQuery = (selectColumns: string, options?: { count?: 'exact' | 'planned' | 'estimated', head?: boolean }) => {
     // Crear query con .select() primero para obtener PostgrestFilterBuilder (que tiene .or())
     let query = supabase.schema('crm').from(tablaClientes).select(selectColumns, options);
+
+    // Filtro por proyecto de interés (pre-computado)
+    if (clienteIdsProyecto) {
+      query = query.in('id', clienteIdsProyecto);
+    }
 
     // Filtros de permisos usando vista accesible (solo para vendedores, no admins)
     if (usarVistaAccesible) {

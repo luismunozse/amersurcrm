@@ -81,6 +81,7 @@ interface ClientesTableProps {
   tipo?: string;
   vendedor?: string;
   origen?: string;  // Filtro por origen del lead
+  proyectoInteres?: string;  // Filtro por proyecto de interés
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -97,6 +98,7 @@ export default function ClientesTable({
   tipo = '',
   vendedor = '',
   origen = '',
+  proyectoInteres = '',
   sortBy: initialSortBy = 'fecha_alta',
   sortOrder: initialSortOrder = 'desc'
 }: ClientesTableProps) {
@@ -130,6 +132,9 @@ export default function ClientesTable({
   const [vendedores, setVendedores] = useState<Array<{ id: string; username: string; nombre_completo: string; email: string }>>([]);
   const [loadingVendedores, setLoadingVendedores] = useState(false);
 
+  // Estado para lista de proyectos (filtro por proyecto de interés)
+  const [proyectos, setProyectos] = useState<Array<{ id: string; nombre: string }>>([]);
+
   // Estado local para búsqueda
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
   const [isSearching, setIsSearching] = useState(false);
@@ -140,18 +145,23 @@ export default function ClientesTable({
     setIsSearching(false); // Resetear spinner cuando llegan los resultados
   }, [searchQuery]);
 
-  // Cargar lista de vendedores disponibles (para filtros y acciones)
+  // Cargar lista de vendedores y proyectos disponibles (para filtros)
   useEffect(() => {
     let isMounted = true;
     setLoadingVendedores(true);
-    obtenerVendedores()
-      .then((data) => {
+
+    Promise.all([
+      obtenerVendedores(),
+      fetch("/api/reservas/opciones").then(r => r.json()).then(d => d.proyectos || []).catch(() => []),
+    ])
+      .then(([vendedoresData, proyectosData]) => {
         if (isMounted) {
-          setVendedores(data);
+          setVendedores(vendedoresData);
+          setProyectos(proyectosData.map((p: any) => ({ id: p.id, nombre: p.nombre })));
         }
       })
       .catch((error) => {
-        console.error('Error cargando vendedores:', error);
+        console.error('Error cargando datos para filtros:', error);
       })
       .finally(() => {
         if (isMounted) {
@@ -342,36 +352,13 @@ export default function ClientesTable({
 
   const handleSort = (column: keyof Cliente) => {
     const newSortOrder = sortBy === column ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
-
-    // Construir URL params manteniendo los filtros actuales
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (searchTelefono) params.set('telefono', searchTelefono);
-    if (searchDni) params.set('dni', searchDni);
-    if (estado) params.set('estado', estado);
-    if (tipo) params.set('tipo', tipo);
-    if (vendedor) params.set('vendedor', vendedor);
-    if (origen) params.set('origen', origen);
-    params.set('sortBy', column);
-    params.set('sortOrder', newSortOrder);
-    params.set('page', '1'); // Resetear a página 1 al ordenar
-
+    const params = buildFilterParams({ sortBy: column, sortOrder: newSortOrder });
     router.push(`/dashboard/clientes?${params.toString()}`);
   };
 
   const goToPage = (page: number) => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (searchTelefono) params.set('telefono', searchTelefono);
-    if (searchDni) params.set('dni', searchDni);
-    if (estado) params.set('estado', estado);
-    if (tipo) params.set('tipo', tipo);
-    if (vendedor) params.set('vendedor', vendedor);
-    if (origen) params.set('origen', origen);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
+    const params = buildFilterParams();
     params.set('page', page.toString());
-
     router.push(`/dashboard/clientes?${params.toString()}`);
   };
 
@@ -415,19 +402,7 @@ export default function ClientesTable({
 
   // Función para aplicar búsqueda
   const handleSearch = (value: string) => {
-    const params = new URLSearchParams();
-    if (value.trim()) params.set('q', value.trim());
-    if (searchTelefono) params.set('telefono', searchTelefono);
-    if (searchDni) params.set('dni', searchDni);
-    if (estado) params.set('estado', estado);
-    if (tipo) params.set('tipo', tipo);
-    if (vendedor) params.set('vendedor', vendedor);
-    if (origen) params.set('origen', origen);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
-    params.set('page', '1'); // Resetear a página 1 al buscar
-
-    router.push(`/dashboard/clientes?${params.toString()}`);
+    router.push(`/dashboard/clientes?${buildFilterParams({ q: value.trim() }).toString()}`);
   };
 
   // Limpiar búsqueda
@@ -436,20 +411,23 @@ export default function ClientesTable({
     handleSearch('');
   };
 
-  const handleVendedorFilterChange = (value: string) => {
+  // Helper para construir URL con todos los filtros activos
+  const buildFilterParams = (overrides: Record<string, string> = {}) => {
     const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (searchTelefono) params.set('telefono', searchTelefono);
-    if (searchDni) params.set('dni', searchDni);
-    if (estado) params.set('estado', estado);
-    if (tipo) params.set('tipo', tipo);
-    if (origen) params.set('origen', origen);
-    if (value) params.set('vendedor', value);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
+    const values: Record<string, string> = {
+      q: searchQuery, telefono: searchTelefono, dni: searchDni,
+      estado, tipo, vendedor, origen, proyectoInteres,
+      sortBy, sortOrder, ...overrides,
+    };
+    Object.entries(values).forEach(([key, val]) => {
+      if (val) params.set(key, val);
+    });
     params.set('page', '1');
+    return params;
+  };
 
-    router.push(`/dashboard/clientes?${params.toString()}`);
+  const handleVendedorFilterChange = (value: string) => {
+    router.push(`/dashboard/clientes?${buildFilterParams({ vendedor: value }).toString()}`);
   };
 
   const handleClearVendedorFilter = () => {
@@ -473,19 +451,7 @@ export default function ClientesTable({
   ];
 
   const handleOrigenFilterChange = (value: string) => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (searchTelefono) params.set('telefono', searchTelefono);
-    if (searchDni) params.set('dni', searchDni);
-    if (estado) params.set('estado', estado);
-    if (tipo) params.set('tipo', tipo);
-    if (vendedor) params.set('vendedor', vendedor);
-    if (value) params.set('origen', value);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
-    params.set('page', '1');
-
-    router.push(`/dashboard/clientes?${params.toString()}`);
+    router.push(`/dashboard/clientes?${buildFilterParams({ origen: value }).toString()}`);
   };
 
   const handleClearOrigenFilter = () => {
@@ -493,19 +459,11 @@ export default function ClientesTable({
   };
 
   const handleEstadoFilterChange = (value: string) => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (searchTelefono) params.set('telefono', searchTelefono);
-    if (searchDni) params.set('dni', searchDni);
-    if (tipo) params.set('tipo', tipo);
-    if (vendedor) params.set('vendedor', vendedor);
-    if (origen) params.set('origen', origen);
-    if (value) params.set('estado', value);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
-    params.set('page', '1');
+    router.push(`/dashboard/clientes?${buildFilterParams({ estado: value }).toString()}`);
+  };
 
-    router.push(`/dashboard/clientes?${params.toString()}`);
+  const handleProyectoInteresFilterChange = (value: string) => {
+    router.push(`/dashboard/clientes?${buildFilterParams({ proyectoInteres: value }).toString()}`);
   };
 
   // Manejar cambio de estado con modal de contacto
@@ -671,8 +629,29 @@ export default function ClientesTable({
             </select>
           </div>
 
+          {/* Filtro por proyecto de interés */}
+          <div className="flex-1">
+            <label htmlFor="filtro-proyecto" className="block text-sm font-medium text-crm-text-primary mb-1">
+              Proyecto de interés
+            </label>
+            <select
+              id="filtro-proyecto"
+              value={proyectoInteres || ''}
+              onChange={(e) => handleProyectoInteresFilterChange(e.target.value)}
+              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+            >
+              <option value="">Todos los proyectos</option>
+              <option value="__general__">Consulta General</option>
+              {proyectos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Botón limpiar filtros */}
-          {(vendedor || origen || estado) && (
+          {(vendedor || origen || estado || proyectoInteres) && (
             <div className="flex items-end">
               <button
                 type="button"
