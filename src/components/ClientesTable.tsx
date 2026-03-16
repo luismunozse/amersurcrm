@@ -22,8 +22,9 @@ import ClienteForm from "@/components/ClienteForm";
 import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
-import { Download } from "lucide-react";
+import { Download, FileType } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import DatePicker from "@/components/ui/DatePicker";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 import {
   getEstadoClienteLabel,
@@ -82,6 +83,8 @@ interface ClientesTableProps {
   vendedor?: string;
   origen?: string;  // Filtro por origen del lead
   proyectoInteres?: string;  // Filtro por proyecto de interés
+  fechaDesde?: string;
+  fechaHasta?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -99,6 +102,8 @@ export default function ClientesTable({
   vendedor = '',
   origen = '',
   proyectoInteres = '',
+  fechaDesde = '',
+  fechaHasta = '',
   sortBy: initialSortBy = 'fecha_alta',
   sortOrder: initialSortOrder = 'desc'
 }: ClientesTableProps) {
@@ -211,6 +216,8 @@ export default function ClientesTable({
     tipo: tipo || undefined,
     vendedor: vendedor || undefined,
     origen: origen || undefined,
+    fechaDesde: fechaDesde || undefined,
+    fechaHasta: fechaHasta || undefined,
     sortBy: initialSortBy,
     sortOrder: initialSortOrder,
   };
@@ -223,6 +230,7 @@ export default function ClientesTable({
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [exportingSelected, setExportingSelected] = useState(false);
   const [exportingAll, setExportingAll] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Ya no necesitamos filtrar ni ordenar localmente, el servidor lo hace
   // Los clientes vienen ya filtrados, ordenados y paginados del servidor
@@ -421,6 +429,7 @@ export default function ClientesTable({
     const values: Record<string, string> = {
       q: searchQuery, telefono: searchTelefono, dni: searchDni,
       estado, tipo, vendedor, origen, proyectoInteres,
+      fechaDesde, fechaHasta,
       sortBy, sortOrder, ...overrides,
     };
     Object.entries(values).forEach(([key, val]) => {
@@ -654,8 +663,32 @@ export default function ClientesTable({
             </select>
           </div>
 
+          {/* Filtro por fecha */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-crm-text-primary mb-1">
+              Fecha desde
+            </label>
+            <DatePicker
+              value={fechaDesde || ''}
+              onChange={(val) => router.push(`/dashboard/clientes?${buildFilterParams({ fechaDesde: val }).toString()}`)}
+              placeholder="Desde"
+              maxDate={fechaHasta ? new Date(fechaHasta + 'T23:59:59') : undefined}
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-crm-text-primary mb-1">
+              Fecha hasta
+            </label>
+            <DatePicker
+              value={fechaHasta || ''}
+              onChange={(val) => router.push(`/dashboard/clientes?${buildFilterParams({ fechaHasta: val }).toString()}`)}
+              placeholder="Hasta"
+              minDate={fechaDesde ? new Date(fechaDesde) : undefined}
+            />
+          </div>
+
           {/* Botón limpiar filtros */}
-          {(vendedor || origen || estado || proyectoInteres) && (
+          {(vendedor || origen || estado || proyectoInteres || fechaDesde || fechaHasta) && (
             <div className="flex items-end">
               <button
                 type="button"
@@ -832,6 +865,8 @@ export default function ClientesTable({
                       estado,
                       tipo,
                       vendedor,
+                      fechaDesde,
+                      fechaHasta,
                       sortBy: initialSortBy,
                       sortOrder: initialSortOrder,
                     });
@@ -854,6 +889,41 @@ export default function ClientesTable({
                 {exportingAll ? <Spinner size="sm" /> : <Download className="w-4 h-4" />}
                 {exportingAll ? 'Exportando todo...' : 'Exportar todos'}
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setExportingPdf(true);
+                    const full = await obtenerTodosLosClientes({
+                      searchTerm: searchQuery,
+                      searchTelefono,
+                      searchDni,
+                      estado,
+                      tipo,
+                      vendedor,
+                      fechaDesde,
+                      fechaHasta,
+                      sortBy: initialSortBy,
+                      sortOrder: initialSortOrder,
+                    });
+                    await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'pdf', {
+                      fileName: 'clientes',
+                      includeFiltersSheet: true,
+                      includeTimestamp: true,
+                    });
+                    toast.success(`PDF generado (${full.total} registros)`);
+                  } catch (error) {
+                    console.error(error);
+                    toast.error('Error generando PDF');
+                  } finally {
+                    setExportingPdf(false);
+                  }
+                }}
+                disabled={exportingPdf}
+                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {exportingPdf ? <Spinner size="sm" /> : <FileType className="w-4 h-4" />}
+                {exportingPdf ? 'Generando PDF...' : 'Exportar PDF'}
+              </button>
             </div>
           )}
         </div>
@@ -861,7 +931,24 @@ export default function ClientesTable({
         {/* Vista mobile */}
         <div className="sm:hidden px-4 py-4 space-y-4">
           {clientes.map((cliente, index) => {
-            const estadoLabel = getEstadoClienteLabel(cliente.estado_cliente as EstadoCliente);
+            const estadoActual = (cliente.estado_cliente || 'por_contactar') as EstadoCliente;
+            const getEstadoMobileClasses = (estado: EstadoCliente) => {
+              switch (estado) {
+                case 'por_contactar':
+                  return 'border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-200';
+                case 'contactado':
+                  return 'border-yellow-200 bg-yellow-50 text-yellow-700 focus:ring-yellow-200';
+                case 'transferido':
+                  return 'border-green-200 bg-green-50 text-green-700 focus:ring-green-200';
+                case 'intermedio':
+                  return 'border-cyan-200 bg-cyan-50 text-cyan-700 focus:ring-cyan-200';
+                case 'potencial':
+                  return 'border-purple-200 bg-purple-50 text-purple-700 focus:ring-purple-200';
+                case 'desestimado':
+                default:
+                  return 'border-gray-200 bg-gray-50 text-gray-700 focus:ring-gray-200';
+              }
+            };
             return (
               <div
                 key={`mobile-${index}-${cliente.id}`}
@@ -876,9 +963,18 @@ export default function ClientesTable({
                       Código: {cliente.codigo_cliente || '—'}
                     </p>
                   </div>
-                  <span className="rounded-full bg-crm-primary/10 px-3 py-1 text-xs font-semibold text-crm-primary">
-                    {estadoLabel}
-                  </span>
+                  <select
+                    value={estadoActual}
+                    onChange={(e) => handleEstadoChange(cliente, e.target.value as EstadoCliente)}
+                    disabled={isPending}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${getEstadoMobileClasses(estadoActual)}`}
+                  >
+                    {ESTADOS_CLIENTE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="mt-3 space-y-2 text-xs text-crm-text-secondary">
                   <p>

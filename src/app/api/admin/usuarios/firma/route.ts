@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/permissions/server";
+export const dynamic = 'force-dynamic';
 
 const BUCKET = "avatars";
 

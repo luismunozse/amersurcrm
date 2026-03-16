@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { normalizePhoneE164 } from "@/lib/utils/phone";
+export const dynamic = 'force-dynamic';
 
 const FALLBACK_BATCH_LIMIT = 100;
 

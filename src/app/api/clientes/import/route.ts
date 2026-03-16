@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { z } from "zod";
 import { normalizePhoneE164, isValidPhone } from "@/lib/utils/phone";
+export const dynamic = 'force-dynamic';
 
 const ClienteImportSchema = z.object({
   nombre: z.string().min(1, "Nombre requerido"),

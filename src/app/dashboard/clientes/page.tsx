@@ -13,6 +13,8 @@ type SP = Promise<{
   vendedor?: string | string[];
   origen?: string | string[];
   proyectoInteres?: string | string[];
+  fechaDesde?: string | string[];
+  fechaHasta?: string | string[];
   page?: string | string[];
   sortBy?: string | string[];
   sortOrder?: string | string[];
@@ -35,6 +37,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
   const vendedor = (Array.isArray(sp.vendedor) ? sp.vendedor[0] : sp.vendedor ?? "").trim();
   const origen = (Array.isArray(sp.origen) ? sp.origen[0] : sp.origen ?? "").trim();
   const proyectoInteres = (Array.isArray(sp.proyectoInteres) ? sp.proyectoInteres[0] : sp.proyectoInteres ?? "").trim();
+  const fechaDesde = (Array.isArray(sp.fechaDesde) ? sp.fechaDesde[0] : sp.fechaDesde ?? "").trim();
+  const fechaHasta = (Array.isArray(sp.fechaHasta) ? sp.fechaHasta[0] : sp.fechaHasta ?? "").trim();
   const page = parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page ?? "1"), 10);
   const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "fecha_alta").trim();
   const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
@@ -60,6 +64,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
         vendedor,
         origen,
         proyectoInteres,
+        fechaDesde,
+        fechaHasta,
         sortBy,
         sortOrder
       }).catch(e => {
@@ -88,6 +94,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
     vendedor,
     origen,
     proyectoInteres,
+    fechaDesde,
+    fechaHasta,
     sortBy,
     sortOrder,
   };
@@ -143,6 +151,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
           vendedor={vendedor}
           origen={origen}
           proyectoInteres={proyectoInteres}
+          fechaDesde={fechaDesde}
+          fechaHasta={fechaHasta}
           sortBy={sortBy}
           sortOrder={sortOrder}
         />

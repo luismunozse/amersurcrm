@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient, createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/permissions/server";
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {

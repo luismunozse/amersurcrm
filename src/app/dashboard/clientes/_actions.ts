@@ -465,6 +465,8 @@ export async function obtenerTodosLosClientes(params: {
   estado?: string;
   tipo?: string;
   vendedor?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }) {

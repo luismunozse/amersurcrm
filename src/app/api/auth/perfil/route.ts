@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+export const dynamic = 'force-dynamic';
 
 // GET - Obtener perfil del usuario autenticado
 export async function GET() {

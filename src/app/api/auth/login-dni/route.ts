@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 import { extractRequestMetadata } from "@/lib/api/requestContext";
 import { notifyAdminsOfSecurityEvent } from "@/lib/security/adminNotifications";
 import { logLoginAudit, resolveLoginAuditCount } from "@/lib/loginAudit";
+export const dynamic = 'force-dynamic';
 
 const DNI_REGEX = /^\d{6,12}$/;
 

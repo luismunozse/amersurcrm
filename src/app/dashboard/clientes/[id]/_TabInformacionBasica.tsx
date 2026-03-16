@@ -21,6 +21,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
   const router = useRouter();
   const { tienePermiso, esAdminOCoordinador } = usePermissions();
   const puedeEditar = esAdminOCoordinador() || tienePermiso(PERMISOS.CLIENTES.EDITAR_TODOS) || tienePermiso(PERMISOS.CLIENTES.EDITAR_ASIGNADOS);
+  const puedeReasignar = esAdminOCoordinador() || tienePermiso(PERMISOS.CLIENTES.REASIGNAR);
   const tipoDoc = TIPOS_DOCUMENTO_OPTIONS.find(t => t.value === cliente.tipo_documento)?.label;
   const estadoCivil = ESTADO_CIVIL_OPTIONS.find(e => e.value === cliente.estado_civil)?.label;
   const origenLead = ORIGENES_LEAD_OPTIONS.find(o => o.value === cliente.origen_lead)?.label;
@@ -80,21 +81,23 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
               Los asesores asignados pueden gestionar proformas y el seguimiento del cliente.
             </p>
           </div>
-          <div className="w-full sm:w-64">
-            <select
-              value={selectedVendedor}
-              onChange={(e) => handleAsignarVendedor(e.target.value)}
-              disabled={isAssigning}
-              className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Sin asignar</option>
-              {vendedores.map((vendedor) => (
-                <option key={vendedor.id} value={vendedor.username || ""}>
-                  {vendedor.nombre_completo || vendedor.username}
-                </option>
-              ))}
-            </select>
-          </div>
+          {puedeReasignar && (
+            <div className="w-full sm:w-64">
+              <select
+                value={selectedVendedor}
+                onChange={(e) => handleAsignarVendedor(e.target.value)}
+                disabled={isAssigning}
+                className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Sin asignar</option>
+                {vendedores.map((vendedor) => (
+                  <option key={vendedor.id} value={vendedor.username || ""}>
+                    {vendedor.nombre_completo || vendedor.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { enviarWhatsApp, enviarSMS } from "@/lib/services/twilio";
 import type { EstadoMensaje } from "@/types/whatsapp-marketing";
+export const dynamic = 'force-dynamic';
 
 /**
  * Normaliza un número de teléfono al formato internacional

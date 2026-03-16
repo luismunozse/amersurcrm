@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, verificarAdminOptimizado } from "@/lib/supabase.server";
+export const dynamic = 'force-dynamic';
 
 // Configuración de runtime para Vercel
 export const runtime = "nodejs";

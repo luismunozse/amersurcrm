@@ -18,7 +18,10 @@ export async function obtenerPermisosUsuario(): Promise<UsuarioConPermisos | nul
     // Usar función cacheada para evitar rate limits
     const { user } = await getCachedAuthUser();
 
-    if (!user) return null;
+    if (!user) {
+      console.warn('[permisos] No hay usuario autenticado (getCachedAuthUser retornó null)');
+      return null;
+    }
 
     // Obtener perfil y permisos
     const { data: perfil, error } = await supabase
@@ -38,6 +41,11 @@ export async function obtenerPermisosUsuario(): Promise<UsuarioConPermisos | nul
       .single();
 
     if (error || !perfil || !perfil.activo) {
+      console.warn(`[permisos] Fallo obteniendo perfil para ${user.id}:`, {
+        error: error?.message,
+        perfilExiste: !!perfil,
+        activo: perfil?.activo,
+      });
       return null;
     }
 

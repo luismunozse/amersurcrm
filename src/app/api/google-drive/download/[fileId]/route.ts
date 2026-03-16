@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
+export const dynamic = 'force-dynamic';
 
 type DownloadRouteContext = {
   params: Promise<{

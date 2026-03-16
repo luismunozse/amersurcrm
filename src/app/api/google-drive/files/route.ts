@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
+export const dynamic = 'force-dynamic';
 
 const DEFAULT_PAGE_SIZE = 100;
 type DataSource = "cache" | "drive";

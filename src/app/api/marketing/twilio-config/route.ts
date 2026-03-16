@@ -5,6 +5,7 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/permissions/server";
 import { z } from "zod";
 import { invalidateTwilioClientCache } from "@/lib/services/twilio";
+export const dynamic = 'force-dynamic';
 
 const normalizeOptionalPhone = z.preprocess((val) => {
   if (typeof val !== "string") return val;

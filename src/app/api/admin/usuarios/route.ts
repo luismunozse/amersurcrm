@@ -4,6 +4,7 @@ import { esAdmin } from "@/lib/permissions/server";
 import { generarUsername, generarUsernameConNumero, validarUsername } from "@/lib/utils/username-generator";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { registrarAuditoriaUsuario } from "@/lib/auditoria-usuarios";
+export const dynamic = 'force-dynamic';
 
 // GET - Obtener lista de usuarios con paginación server-side
 export async function GET(request: NextRequest) {

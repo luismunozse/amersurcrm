@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+export const dynamic = 'force-dynamic';
 
 // Interfaz para el resultado de la importación
 interface ImportResult {

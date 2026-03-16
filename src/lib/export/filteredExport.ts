@@ -72,6 +72,8 @@ export interface ClienteExportFilters {
   tipo?: string;
   vendedor?: string;
   origen?: string;  // Filtro por origen del lead
+  fechaDesde?: string;
+  fechaHasta?: string;
   sortBy?: string;
   sortOrder?: string;
 }
@@ -395,6 +397,8 @@ function buildFilterMetadata(filters: any): Array<{ filtro: string; valor: strin
     precio_max: 'Precio Máximo',
     area_min: 'Área Mínima',
     area_max: 'Área Máxima',
+    fechaDesde: 'Fecha Desde',
+    fechaHasta: 'Fecha Hasta',
     fecha_inicio_min: 'Fecha Inicio Desde',
     fecha_inicio_max: 'Fecha Inicio Hasta',
   };
@@ -485,8 +489,44 @@ async function exportToCSVWithFilters(
   URL.revokeObjectURL(link.href);
 }
 
+// ============================================================================
+// Paleta de colores CRM Amersur (misma que pdfGenerator.ts)
+// ============================================================================
+const CRM_COLORS = {
+  primary:      [134, 144, 31]  as [number, number, number],
+  primaryHover: [107, 115, 25]  as [number, number, number],
+  secondary:    [158, 166, 76]  as [number, number, number],
+  accent:       [176, 183, 109] as [number, number, number],
+  dark:         [15, 23, 42]    as [number, number, number],
+  textSecondary:[100, 116, 139] as [number, number, number],
+  textMuted:    [148, 163, 184] as [number, number, number],
+  border:       [226, 232, 240] as [number, number, number],
+  bgLight:      [248, 250, 252] as [number, number, number],
+  white:        [255, 255, 255] as [number, number, number],
+};
+
+let cachedLogoBase64: string | null = null;
+async function getLogoBase64(): Promise<string | null> {
+  if (cachedLogoBase64) return cachedLogoBase64;
+  try {
+    const response = await fetch('/logo-amersur-horizontal.png');
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        cachedLogoBase64 = reader.result as string;
+        resolve(cachedLogoBase64);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Exportar a PDF con filtros
+ * Exportar a PDF con estilo de reportes AMERSUR
  */
 async function exportToPDFWithFilters(
   data: any[],
@@ -496,113 +536,266 @@ async function exportToPDFWithFilters(
 ): Promise<void> {
   const JsPDF = await getJsPDF();
   const { default: autoTable } = await import('jspdf-autotable');
-  const doc = new JsPDF('landscape');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const marginX = 14;
-  const headerBg: [number, number, number] = [12, 25, 59];
-  const accentColor: [number, number, number] = [149, 193, 31];
-  const secondaryText: [number, number, number] = [71, 85, 105];
+  const logo = await getLogoBase64();
+  const doc = new JsPDF(); // Portrait, como los reportes
+  const PAGE_W = 210;
+  const PAGE_H = 297;
+  const MARGIN = 16;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
 
-  // Cabecera
-  const headerHeight = 24;
-  doc.setFillColor(...headerBg);
-  doc.roundedRect(marginX - 4, 10, pageWidth - (marginX - 4) * 2, headerHeight, 4, 4, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('AMERSUR CRM', marginX, 20);
-  doc.setFontSize(16);
-  doc.text('Reporte de Proyectos', marginX, 30);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  const generatedText = `Generado: ${new Date().toLocaleString('es-PE')}`;
-  doc.text(generatedText, pageWidth - marginX, 20, { align: 'right' });
-  const countText = `Registros exportados: ${data.length}`;
-  doc.text(countText, pageWidth - marginX, 27, { align: 'right' });
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFont('helvetica', 'normal');
-
-  // Resumen visual
-  const summaryStartY = 10 + headerHeight + 8;
-  const availableWidth = pageWidth - marginX * 2;
-  const cardWidth = (availableWidth - 8) / 2;
-  const cardHeight = 18;
-  const activeFiltersCount = filterMetadata.filter(
-    (meta) => meta.filtro !== 'Registros Exportados'
-  ).length;
-
-  const drawSummaryCard = (x: number, title: string, value: string) => {
-    doc.setDrawColor(229, 231, 235);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, summaryStartY, cardWidth, cardHeight, 3, 3, 'FD');
-    doc.setFontSize(9);
-    doc.setTextColor(...secondaryText);
-    doc.text(title, x + 6, summaryStartY + 7);
-    doc.setFontSize(13);
-    doc.setTextColor(...headerBg);
-    doc.text(value, x + 6, summaryStartY + 15);
+  // ── Helpers de diseño (mismos que pdfGenerator.ts) ──
+  const drawHeaderBand = () => {
+    doc.setFillColor(...CRM_COLORS.primary);
+    doc.rect(0, 0, PAGE_W, 3, 'F');
+    doc.setFillColor(...CRM_COLORS.accent);
+    doc.rect(0, 3, PAGE_W, 0.5, 'F');
+    if (logo) {
+      doc.addImage(logo, 'PNG', MARGIN, 7, 12, 9.6);
+    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...CRM_COLORS.primary);
+    doc.text('AMERSUR', logo ? MARGIN + 14 : MARGIN, 13);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...CRM_COLORS.textMuted);
+    doc.text('INMOBILIARIA', logo ? MARGIN + 14 : MARGIN, 16.5);
   };
 
-  drawSummaryCard(marginX, 'Registros filtrados', String(data.length));
-  drawSummaryCard(
-    marginX + cardWidth + 8,
-    'Filtros activos',
-    activeFiltersCount.toString()
-  );
+  const drawPageFooter = (pageNum: number, totalPages: number) => {
+    doc.setDrawColor(...CRM_COLORS.border);
+    doc.setLineWidth(0.3);
+    doc.line(MARGIN, PAGE_H - 14, PAGE_W - MARGIN, PAGE_H - 14);
+    doc.setFillColor(...CRM_COLORS.primary);
+    doc.rect(MARGIN, PAGE_H - 14, 20, 0.5, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...CRM_COLORS.textMuted);
+    doc.text(`AMERSUR CRM  |  Listado de Clientes`, MARGIN, PAGE_H - 9);
+    doc.text(`Página ${pageNum} de ${totalPages}`, PAGE_W - MARGIN, PAGE_H - 9, { align: 'right' });
+  };
 
-  let currentY = summaryStartY + cardHeight + 10;
+  // ── Portada ──
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 
-  // Tabla de filtros aplicada
-  const visibleFilters = filterMetadata.filter((meta) => meta.valor && meta.valor !== '0');
-  if (visibleFilters.length > 0) {
-    autoTable(doc, {
-      startY: currentY,
-      head: [['Filtro', 'Valor']],
-      body: visibleFilters.map((meta) => [meta.filtro, meta.valor]),
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2, textColor: [31, 41, 55] },
-      headStyles: { fillColor: accentColor, textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 247, 250] },
-      margin: { left: marginX, right: marginX },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: availableWidth - 50 },
-      },
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 10;
+  // Banda superior
+  doc.setFillColor(...CRM_COLORS.primary);
+  doc.rect(0, 0, PAGE_W, 60, 'F');
+  doc.setFillColor(...CRM_COLORS.primaryHover);
+  doc.rect(0, 55, PAGE_W, 5, 'F');
+
+  // Logo centrado
+  if (logo) {
+    doc.addImage(logo, 'PNG', PAGE_W / 2 - 15, 10, 30, 24);
   }
 
-  // Tabla principal de datos
-  const headers = columns.map((col) => col.label);
+  // Título empresa
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text('AMERSUR INMOBILIARIA', PAGE_W / 2, logo ? 42 : 28, { align: 'center' });
+
+  // Línea decorativa
+  doc.setDrawColor(...CRM_COLORS.accent);
+  doc.setLineWidth(0.5);
+  doc.line(PAGE_W / 2 - 30, 70, PAGE_W / 2 + 30, 70);
+
+  // Título del reporte
+  doc.setFontSize(26);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...CRM_COLORS.dark);
+  doc.text('Listado de Clientes', PAGE_W / 2, 85, { align: 'center' });
+
+  // Subtítulo con período si hay filtro de fecha
+  const fechaDesde = filterMetadata.find(m => m.filtro === 'Fecha Desde')?.valor;
+  const fechaHasta = filterMetadata.find(m => m.filtro === 'Fecha Hasta')?.valor;
+  let periodoTexto: string | null = null;
+  if (fechaDesde || fechaHasta) {
+    const desde = fechaDesde || 'Inicio';
+    const hasta = fechaHasta || 'Actualidad';
+    periodoTexto = `${desde}  —  ${hasta}`;
+  }
+
+  // Subtítulo
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...CRM_COLORS.textSecondary);
+  doc.text(`${data.length} clientes exportados`, PAGE_W / 2, 94, { align: 'center' });
+
+  // Box de información
+  const boxY = 110;
+  const boxW = 120;
+  const boxX = (PAGE_W - boxW) / 2;
+  doc.setFillColor(...CRM_COLORS.bgLight);
+  doc.roundedRect(boxX, boxY, boxW, 30, 3, 3, 'F');
+  doc.setDrawColor(...CRM_COLORS.border);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(boxX, boxY, boxW, 30, 3, 3, 'S');
+  doc.setFillColor(...CRM_COLORS.primary);
+  doc.rect(boxX, boxY, 3, 30, 'F');
+
+  if (periodoTexto) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...CRM_COLORS.primary);
+    doc.text('PERÍODO DEL REPORTE', PAGE_W / 2, boxY + 10, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...CRM_COLORS.dark);
+    doc.text(periodoTexto, PAGE_W / 2, boxY + 18, { align: 'center' });
+  } else {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...CRM_COLORS.primary);
+    doc.text('REGISTROS TOTALES', PAGE_W / 2, boxY + 10, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...CRM_COLORS.dark);
+    doc.text(`${data.length} clientes`, PAGE_W / 2, boxY + 18, { align: 'center' });
+  }
+
+  // Fecha de generación
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...CRM_COLORS.textMuted);
+  doc.text(`Generado: ${new Date().toLocaleString('es-PE')}`, PAGE_W / 2, boxY + 26, { align: 'center' });
+
+  // Línea decorativa inferior
+  doc.setDrawColor(...CRM_COLORS.accent);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN + 20, 155, PAGE_W - MARGIN - 20, 155);
+
+  // Footer portada
+  doc.setFillColor(...CRM_COLORS.primary);
+  doc.rect(0, PAGE_H - 8, PAGE_W, 8, 'F');
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(255, 255, 255);
+  doc.text('Documento generado automáticamente por AMERSUR CRM', PAGE_W / 2, PAGE_H - 3, { align: 'center' });
+
+  // ── Página 2: Filtros aplicados (si hay) ──
+  const visibleFilters = filterMetadata.filter(
+    (meta) => meta.valor && meta.valor !== '0' && meta.filtro !== 'Registros Exportados'
+  );
+
+  doc.addPage();
+  drawHeaderBand();
+  let yPos = 24;
+
+  // Título de sección - Filtros
+  if (visibleFilters.length > 0) {
+    doc.setFillColor(...CRM_COLORS.bgLight);
+    doc.roundedRect(MARGIN, yPos - 1, CONTENT_W, 9, 1.5, 1.5, 'F');
+    doc.setFillColor(...CRM_COLORS.primary);
+    doc.rect(MARGIN, yPos - 1, 2.5, 9, 'F');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...CRM_COLORS.dark);
+    doc.text('FILTROS APLICADOS', MARGIN + 6, yPos + 5.5);
+    yPos += 14;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Filtro', 'Valor']],
+      body: visibleFilters.map((meta) => [meta.filtro, meta.valor]),
+      headStyles: {
+        fillColor: CRM_COLORS.primary,
+        textColor: [255, 255, 255] as [number, number, number],
+        fontStyle: 'bold' as const,
+        fontSize: 9,
+        cellPadding: 4,
+      },
+      bodyStyles: {
+        fontSize: 9,
+        textColor: CRM_COLORS.dark,
+        cellPadding: 3.5,
+      },
+      alternateRowStyles: {
+        fillColor: [245, 247, 242] as [number, number, number],
+      },
+      styles: {
+        lineColor: CRM_COLORS.border,
+        lineWidth: 0.2,
+        font: 'helvetica',
+      },
+      margin: { left: MARGIN, right: MARGIN },
+      columnStyles: {
+        0: { cellWidth: 50 },
+      },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 12;
+  }
+
+  // ── Título de sección - Datos ──
+  doc.setFillColor(...CRM_COLORS.bgLight);
+  doc.roundedRect(MARGIN, yPos - 1, CONTENT_W, 9, 1.5, 1.5, 'F');
+  doc.setFillColor(...CRM_COLORS.primary);
+  doc.rect(MARGIN, yPos - 1, 2.5, 9, 'F');
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...CRM_COLORS.dark);
+  doc.text('LISTADO DE CLIENTES', MARGIN + 6, yPos + 5.5);
+  yPos += 14;
+
+  // Columnas reducidas para formato portrait (las más importantes)
+  const pdfColumns = columns.filter(col =>
+    ['nombre', 'codigo_cliente', 'estado_cliente', 'telefono', 'vendedor_asignado', 'fecha_alta', 'origen_lead'].includes(col.key)
+  );
+  // Si no hay columnas filtradas, usar todas
+  const finalColumns = pdfColumns.length > 0 ? pdfColumns : columns;
+
+  const headers = finalColumns.map((col) => col.label);
   const rows = data.map((row) =>
-    columns.map((col) => {
+    finalColumns.map((col) => {
       const value = row[col.label];
       if (value === null || value === undefined || value === '') return '-';
       return value;
     })
   );
 
+  // Tabla principal con estilo AMERSUR
   autoTable(doc, {
-    startY: currentY,
+    startY: yPos,
     head: [headers],
     body: rows,
-    theme: 'striped',
-    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
-    headStyles: { fillColor: headerBg, textColor: [255, 255, 255], fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [247, 249, 252] },
-    margin: { left: marginX, right: marginX, top: 20 },
-    columnStyles: columns.reduce(
-      (acc, col, idx) => {
-        acc[idx] = {
-          cellWidth: col.width ? col.width * 2 : 'auto',
-          halign: 'left',
-        };
-        return acc;
-      },
-      {} as Record<number, any>
-    ),
+    headStyles: {
+      fillColor: CRM_COLORS.primary,
+      textColor: [255, 255, 255] as [number, number, number],
+      fontStyle: 'bold' as const,
+      fontSize: 8,
+      cellPadding: 3,
+      halign: 'left' as const,
+    },
+    bodyStyles: {
+      fontSize: 8,
+      textColor: CRM_COLORS.dark,
+      cellPadding: 2.5,
+    },
+    alternateRowStyles: {
+      fillColor: [245, 247, 242] as [number, number, number],
+    },
+    styles: {
+      lineColor: CRM_COLORS.border,
+      lineWidth: 0.2,
+      font: 'helvetica',
+      overflow: 'linebreak' as const,
+    },
+    margin: { left: MARGIN, right: MARGIN, top: 24 },
+    didDrawPage: (hookData: any) => {
+      // Redibujar header en cada página nueva (excepto portada)
+      if (hookData.pageNumber > 1) {
+        drawHeaderBand();
+      }
+    },
   });
+
+  // ── Pie de página en todas las páginas (excepto portada) ──
+  const pageCount = doc.internal.pages.length - 1;
+  for (let i = 2; i <= pageCount; i++) {
+    doc.setPage(i);
+    drawPageFooter(i - 1, pageCount - 1);
+  }
 
   doc.save(fileName);
 }
@@ -637,6 +830,8 @@ export function formatFilterSummary(filters: Record<string, any>): string {
   if (filters.telefono) activeFilters.push(`Teléfono: ${filters.telefono}`);
   if (filters.dni) activeFilters.push(`Documento: ${filters.dni}`);
   if (filters.vendedor) activeFilters.push(`Vendedor: ${filters.vendedor}`);
+  if (filters.fechaDesde) activeFilters.push(`Desde: ${filters.fechaDesde}`);
+  if (filters.fechaHasta) activeFilters.push(`Hasta: ${filters.fechaHasta}`);
   if (filters.precio_min || filters.precio_max) {
     const range = [
       filters.precio_min ? `$${filters.precio_min}` : 'Min',

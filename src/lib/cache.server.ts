@@ -27,6 +27,8 @@ interface GetClientesParams {
   vendedor?: string;
   origen?: string;  // Filtro por origen del lead
   proyectoInteres?: string;  // Filtro por proyecto de interés (ID de proyecto o "__general__")
+  fechaDesde?: string;  // Filtro fecha_alta desde (YYYY-MM-DD)
+  fechaHasta?: string;  // Filtro fecha_alta hasta (YYYY-MM-DD)
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   mode?: 'list' | 'dashboard';
@@ -85,6 +87,8 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     vendedor = '',
     origen = '',
     proyectoInteres = '',
+    fechaDesde = '',
+    fechaHasta = '',
     sortBy = 'fecha_alta',
     sortOrder = 'desc',
     mode = 'list',
@@ -174,6 +178,12 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
         // Buscar en ambos campos de teléfono
         query = query.or(`telefono.ilike.%${cleanPhone}%,telefono_whatsapp.ilike.%${cleanPhone}%`);
       }
+      if (fechaDesde) {
+        query = query.gte('fecha_alta', `${fechaDesde}T00:00:00`);
+      }
+      if (fechaHasta) {
+        query = query.lte('fecha_alta', `${fechaHasta}T23:59:59`);
+      }
       return query;
     }
 
@@ -239,6 +249,14 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
 
     if (origen && origen.trim() !== '') {
       query = query.eq('origen_lead', origen);
+    }
+
+    if (fechaDesde && fechaDesde.trim() !== '') {
+      query = query.gte('fecha_alta', `${fechaDesde}T00:00:00`);
+    }
+
+    if (fechaHasta && fechaHasta.trim() !== '') {
+      query = query.lte('fecha_alta', `${fechaHasta}T23:59:59`);
     }
 
     return query;

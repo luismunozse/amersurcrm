@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+export const dynamic = 'force-dynamic';
 
 type LoteDisponible = {
   id: string;

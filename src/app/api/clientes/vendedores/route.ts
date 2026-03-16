@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+export const dynamic = 'force-dynamic';
 
 const ROLES_VENDEDORES = ["ROL_VENDEDOR", "ROL_COORDINADOR_VENTAS"];
 

@@ -111,6 +111,8 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const {
     loading: permisosLoading,
+    error: permisosError,
+    refetch: refetchPermisos,
     tieneAlgunoDePermisos,
     tieneAlgunoDeRoles,
     esAdmin,
@@ -427,6 +429,18 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           >
             {permisosLoading ? (
               <SkeletonNav count={collapsed ? 4 : 7} />
+            ) : permisosError ? (
+              <div className={cn("text-center", collapsed ? "px-1 py-4" : "px-4 py-6")}>
+                <p className={cn("text-crm-text-muted text-xs", collapsed && "hidden")}>
+                  Error cargando menú
+                </p>
+                <button
+                  onClick={() => refetchPermisos()}
+                  className="mt-2 text-xs text-crm-primary hover:text-crm-primary-hover transition-colors"
+                >
+                  {collapsed ? "↻" : "Reintentar"}
+                </button>
+              </div>
             ) : (
               renderNavItems(filteredNavigation)
             )}

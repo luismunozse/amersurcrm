@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/proyectos/search-by-name

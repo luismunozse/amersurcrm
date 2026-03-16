@@ -21,7 +21,7 @@ export function usePermissions() {
   const fetchPermissions = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/auth/permissions');
+      const response = await fetch('/api/auth/permissions', { cache: 'no-store' });
 
       if (!response.ok) {
         throw new Error('Error obteniendo permisos');

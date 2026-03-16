@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { getConfiguredGoogleDriveClient } from "@/lib/google-drive/helpers";
 import type { GoogleDriveFile } from "@/lib/google-drive/client";
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/google-drive/sync
