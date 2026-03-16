@@ -325,10 +325,15 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
     .eq("id", clienteId)
     .maybeSingle();
 
-  const payload = {
+  const payload: Record<string, string | null> = {
     vendedor_username: vendedorUsername || null,
     vendedor_asignado: vendedorUsername || null,
   };
+
+  // Al asignar vendedor, actualizar fecha_alta para que aparezca primero en la lista
+  if (vendedorUsername) {
+    payload.fecha_alta = new Date().toISOString();
+  }
 
   const { error } = await supabase
     .from("cliente")

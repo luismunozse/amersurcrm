@@ -194,7 +194,7 @@ export default function ReporteGestionClientes({ periodo, fechaInicio, fechaFin 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-pdf-ignore>
         <div>
           <h2 className="text-2xl font-bold text-crm-text-primary flex items-center gap-2">
             <Users className="w-6 h-6" />
@@ -207,7 +207,7 @@ export default function ReporteGestionClientes({ periodo, fechaInicio, fechaFin 
       </div>
 
       {/* Filtro por Vendedor */}
-      <Card>
+      <Card data-pdf-ignore>
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-end gap-4">
             <div className="flex-1">

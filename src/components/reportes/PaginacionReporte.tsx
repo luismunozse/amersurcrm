@@ -51,7 +51,7 @@ export default function PaginacionReporte({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-crm-border bg-crm-card-hover/50">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-crm-border bg-crm-card-hover/50" data-pdf-ignore>
       <div className="flex items-center gap-3 text-sm text-crm-text-secondary">
         <span>
           {inicio}-{fin} de {totalItems}

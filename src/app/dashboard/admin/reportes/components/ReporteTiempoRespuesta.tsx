@@ -144,7 +144,7 @@ export default function ReporteTiempoRespuesta({ periodo, fechaInicioDefault, fe
   return (
     <div className="space-y-6">
       {/* Filtros */}
-      <Card>
+      <Card data-pdf-ignore>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="w-5 h-5" />

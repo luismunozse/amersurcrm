@@ -90,10 +90,15 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
     .in("id", ids);
 
   // Actualizar ambos campos (null para desasignar)
-  const payload = {
+  const payload: Record<string, string | null> = {
     vendedor_username: vendedorUsername || null,
     vendedor_asignado: vendedorUsername || null,
   };
+
+  // Al asignar vendedor, actualizar fecha_alta para que aparezca primero en la lista
+  if (vendedorUsername) {
+    payload.fecha_alta = new Date().toISOString();
+  }
 
   const { error } = await supabaseAdmin
     .schema("crm")
