@@ -50,23 +50,31 @@ export const Pagination = memo(function Pagination({
   const visiblePages = getVisiblePages();
 
   return (
-    <nav className={`flex items-center justify-center space-x-2 ${className}`}>
+    <nav className={`flex items-center justify-center gap-1 sm:gap-2 ${className}`}>
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="px-4 py-2 text-sm border border-crm-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-crm-card-hover text-crm-text-primary transition-all duration-200"
+        className="min-h-[44px] min-w-[44px] px-2 sm:px-4 py-2 text-sm border border-crm-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-crm-card-hover text-crm-text-primary transition-all duration-200"
+        aria-label="Página anterior"
       >
-        Anterior
+        <span className="hidden sm:inline">Anterior</span>
+        <span className="sm:hidden">&larr;</span>
       </button>
 
+      {/* Mobile: solo muestra página actual / total */}
+      <span className="sm:hidden text-sm text-crm-text-secondary font-medium px-2">
+        {currentPage} / {totalPages}
+      </span>
+
+      {/* Desktop: muestra números de página */}
       {visiblePages.map((page, index) => (
         <React.Fragment key={index}>
           {page === '...' ? (
-            <span className="px-3 py-2 text-sm text-crm-text-muted">...</span>
+            <span className="hidden sm:inline px-2 py-2 text-sm text-crm-text-muted">...</span>
           ) : (
             <button
               onClick={() => onPageChange(page as number)}
-              className={`px-4 py-2 text-sm border rounded-lg transition-all duration-200 ${
+              className={`hidden sm:inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 py-2 text-sm border rounded-lg transition-all duration-200 ${
                 currentPage === page
                   ? 'bg-crm-primary text-white border-crm-primary hover:bg-crm-primary-hover font-medium'
                   : 'border-crm-border text-crm-text-primary hover:bg-crm-card-hover hover:border-crm-primary/30'
@@ -81,9 +89,11 @@ export const Pagination = memo(function Pagination({
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="px-4 py-2 text-sm border border-crm-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-crm-card-hover text-crm-text-primary transition-all duration-200"
+        className="min-h-[44px] min-w-[44px] px-2 sm:px-4 py-2 text-sm border border-crm-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-crm-card-hover text-crm-text-primary transition-all duration-200"
+        aria-label="Página siguiente"
       >
-        Siguiente
+        <span className="hidden sm:inline">Siguiente</span>
+        <span className="sm:hidden">&rarr;</span>
       </button>
     </nav>
   );

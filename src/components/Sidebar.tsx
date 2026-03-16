@@ -325,8 +325,8 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           "lg:fixed lg:top-0 lg:h-screen lg:z-40",
           // ancho desktop controlado por variable
           "lg:w-[var(--sidebar-w)]",
-          // ancho móvil (expandido)
-          "w-80 sm:w-72",
+          // ancho móvil (expandido) - 85vw para dejar espacio visible del overlay
+          "w-[85vw] max-w-80 sm:w-72",
           // Transiciones mejoradas con soporte para reduced motion
           prefersReducedMotion
             ? "transition-none" // Sin animaciones si el usuario lo prefiere

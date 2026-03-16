@@ -357,12 +357,12 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover rounded-lg transition-colors"
+        className="relative inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
         aria-label="Notificaciones"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] px-1 h-[18px] bg-crm-danger text-white rounded-full text-[10px] leading-[18px] font-semibold text-center">
+          <span className="absolute top-0.5 right-0.5 min-w-[18px] px-1 h-[18px] bg-crm-danger text-white rounded-full text-[10px] leading-[18px] font-semibold text-center">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -370,7 +370,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
       {isOpen && (
         <>
-          <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-crm-border z-50">
+          <div className="fixed inset-x-3 top-16 sm:inset-x-auto sm:top-auto sm:absolute sm:right-0 sm:mt-2 w-auto sm:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-crm-border z-50">
             <div className="p-4 border-b border-crm-border">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-crm-text-primary">Notificaciones</h3>

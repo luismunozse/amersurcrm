@@ -997,20 +997,20 @@ export default function ClientesTable({
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     onClick={() => handleShowDetail(cliente)}
-                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg bg-crm-primary px-3 py-2 text-xs font-semibold text-white"
+                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg bg-crm-primary px-3 py-2.5 text-xs font-semibold text-white min-h-[44px] active:scale-[0.97] transition-transform"
                   >
                     Ver detalle
                   </button>
                   <Link
                     href={`/dashboard/clientes/${cliente.id}`}
-                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg border border-crm-border px-3 py-2 text-xs font-semibold text-crm-text-primary"
+                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg border border-crm-border px-3 py-2.5 text-xs font-semibold text-crm-text-primary min-h-[44px] active:scale-[0.97] transition-transform"
                   >
                     Abrir ficha
                   </Link>
                   {puedeEliminarClientes && (
                     <button
                       onClick={() => askDelete(cliente)}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-crm-danger px-3 py-2 text-xs font-semibold text-crm-danger"
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-crm-danger px-3 py-2.5 text-xs font-semibold text-crm-danger min-h-[44px] active:scale-[0.97] transition-transform"
                     >
                       Eliminar
                     </button>

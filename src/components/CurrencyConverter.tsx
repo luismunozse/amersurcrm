@@ -48,7 +48,7 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="fixed sm:absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-16 sm:top-auto mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-72 rounded-2xl border border-crm-border/70 bg-crm-card/95 p-4 text-sm text-crm-text-primary shadow-xl backdrop-blur z-50">
+          <div className="fixed sm:absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-16 sm:top-auto mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-72 rounded-2xl border border-crm-border/70 bg-crm-card p-4 text-sm text-crm-text-primary shadow-xl backdrop-blur z-50">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-crm-text-primary">Conversor USD ⇄ PEN</h3>
             <button
@@ -80,11 +80,13 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
           <div className="mt-3 space-y-2">
             <label className="text-xs font-medium text-crm-text-muted">Monto</label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder={mode === 'usdToPen' ? 'Monto en USD' : 'Monto en PEN'}
-              className="w-full rounded-lg border border-crm-border bg-crm-card px-3 py-2 text-sm focus:border-crm-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
+              className="w-full rounded-lg border border-crm-border bg-crm-card px-3 py-2.5 text-sm focus:border-crm-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/20"
             />
           </div>
 

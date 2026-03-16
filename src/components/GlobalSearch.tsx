@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Spinner } from '@/components/ui/Spinner';
 import { useRouter } from "next/navigation";
 import { SearchResult, PropiedadSearchResult, EventoSearchResult } from "@/types/search";
@@ -8,18 +8,26 @@ import { globalSearch } from "@/app/dashboard/actions/search";
 
 interface GlobalSearchProps {
   className?: string;
+  autoFocus?: boolean;
+  onSelect?: () => void;
 }
 
-export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
+const GlobalSearch = forwardRef<HTMLInputElement, GlobalSearchProps>(function GlobalSearch(
+  { className = "", autoFocus = false, onSelect },
+  ref
+) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  
+
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Expose inputRef via forwarded ref
+  useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
 
   // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
@@ -66,13 +74,13 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < results.length - 1 ? prev + 1 : 0
         );
         break;
       case "ArrowUp":
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev > 0 ? prev - 1 : results.length - 1
         );
         break;
@@ -95,6 +103,7 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
     setQuery("");
     setResults([]);
     setSelectedIndex(-1);
+    onSelect?.();
     router.push(result.url);
   };
 
@@ -149,7 +158,8 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
               setIsOpen(true);
             }
           }}
-          className="w-64 pl-10 pr-4 py-2 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
+          autoFocus={autoFocus}
+          className="w-full lg:w-64 pl-10 pr-4 py-2.5 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent"
         />
         {isLoading && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -163,7 +173,7 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
         <div className="absolute top-full left-0 right-0 mt-1 bg-crm-card border border-crm-border rounded-lg shadow-crm-lg z-50 max-h-96 overflow-y-auto">
           {results.length === 0 && !isLoading ? (
             <div className="px-4 py-3 text-crm-text-muted text-sm">
-              No se encontraron resultados para "{query}"
+              No se encontraron resultados para &quot;{query}&quot;
             </div>
           ) : (
             results.map((result, index) => (
@@ -183,17 +193,17 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
                       <h4 className="text-sm font-medium text-crm-text-primary truncate">
                         {result.title}
                       </h4>
-                      <span className="ml-2 px-2 py-1 text-xs font-medium bg-crm-primary/10 text-crm-primary rounded-full">
+                      <span className="ml-2 px-2 py-1 text-xs font-medium bg-crm-primary/10 text-crm-primary rounded-full whitespace-nowrap">
                         {getResultTypeLabel(result)}
                       </span>
                     </div>
-                    
+
                     {result.subtitle && (
                       <p className="text-xs text-crm-text-secondary mt-1">
                         {result.subtitle}
                       </p>
                     )}
-                    
+
                     {result.description && (
                       <p className="text-xs text-crm-text-muted mt-1 truncate">
                         {result.description}
@@ -210,7 +220,7 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
                         )}
                         {(result as PropiedadSearchResult).proyecto_nombre && (
                           <span className="text-crm-text-muted">
-                            • {(result as PropiedadSearchResult).proyecto_nombre}
+                            &bull; {(result as PropiedadSearchResult).proyecto_nombre}
                           </span>
                         )}
                       </div>
@@ -223,12 +233,12 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
                         </span>
                         {(result as EventoSearchResult).cliente_nombre && (
                           <span className="text-crm-text-muted">
-                            • {(result as EventoSearchResult).cliente_nombre}
+                            &bull; {(result as EventoSearchResult).cliente_nombre}
                           </span>
                         )}
                         {(result as EventoSearchResult).propiedad_codigo && (
                           <span className="text-crm-text-muted">
-                            • {(result as EventoSearchResult).propiedad_codigo}
+                            &bull; {(result as EventoSearchResult).propiedad_codigo}
                           </span>
                         )}
                       </div>
@@ -242,4 +252,6 @@ export default function GlobalSearch({ className = "" }: GlobalSearchProps) {
       )}
     </div>
   );
-}
+});
+
+export default GlobalSearch;

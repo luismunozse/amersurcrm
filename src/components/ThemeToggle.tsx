@@ -30,7 +30,7 @@ export default function ThemeToggle({ compact = false }: Props) {
   return (
     <button
       onClick={toggle}
-      className="p-2 rounded-lg text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+      className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
       aria-label="Cambiar tema"
       title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
