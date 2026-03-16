@@ -205,11 +205,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
   }, [permisosLoading, canAccessNavItem]);
 
   const filteredAdminNavigation = useMemo(() => {
-    if (permisosLoading) return adminNavigation;
+    if (permisosLoading) return [];
     return adminNavigation.filter(canAccessNavItem);
   }, [permisosLoading, canAccessNavItem]);
 
-  const showAdminSection = filteredAdminNavigation.length > 0;
+  const showAdminSection = !permisosLoading && filteredAdminNavigation.length > 0;
 
   // Keyboard navigation handler
   const handleNavKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {

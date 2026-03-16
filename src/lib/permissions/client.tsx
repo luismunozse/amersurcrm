@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { PermisoCodigo, UsuarioConPermisos, RolNombre } from './types';
 
 /**
@@ -10,8 +10,11 @@ export function usePermissions() {
   const [usuario, setUsuario] = useState<UsuarioConPermisos | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const retryCount = useRef(0);
+  const MAX_RETRIES = 2;
 
   useEffect(() => {
+    retryCount.current = 0;
     fetchPermissions();
   }, []);
 
@@ -27,11 +30,21 @@ export function usePermissions() {
       const data = await response.json();
       setUsuario(data.usuario);
       setError(null);
+      retryCount.current = 0;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Error desconocido'));
       setUsuario(null);
+      // Reintento automático si falla (máximo MAX_RETRIES veces)
+      if (retryCount.current < MAX_RETRIES) {
+        retryCount.current += 1;
+        const delay = retryCount.current * 1500;
+        setTimeout(() => fetchPermissions(), delay);
+        return; // No setear loading=false, seguimos en estado de carga
+      }
     } finally {
-      setLoading(false);
+      if (retryCount.current === 0 || retryCount.current >= MAX_RETRIES) {
+        setLoading(false);
+      }
     }
   };
 
