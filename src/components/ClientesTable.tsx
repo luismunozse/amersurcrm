@@ -492,6 +492,22 @@ export default function ClientesTable({
     handleOrigenFilterChange('');
   };
 
+  const handleEstadoFilterChange = (value: string) => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (searchTelefono) params.set('telefono', searchTelefono);
+    if (searchDni) params.set('dni', searchDni);
+    if (tipo) params.set('tipo', tipo);
+    if (vendedor) params.set('vendedor', vendedor);
+    if (origen) params.set('origen', origen);
+    if (value) params.set('estado', value);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    params.set('page', '1');
+
+    router.push(`/dashboard/clientes?${params.toString()}`);
+  };
+
   // Manejar cambio de estado con modal de contacto
   const handleEstadoChange = async (cliente: Cliente, nuevoEstado: EstadoCliente) => {
     const estadoActual = (cliente.estado_cliente || 'por_contactar') as EstadoCliente;
@@ -615,6 +631,26 @@ export default function ClientesTable({
             </div>
           )}
 
+          {/* Filtro por estado del cliente */}
+          <div className="flex-1">
+            <label htmlFor="filtro-estado" className="block text-sm font-medium text-crm-text-primary mb-1">
+              Estado
+            </label>
+            <select
+              id="filtro-estado"
+              value={estado || ''}
+              onChange={(e) => handleEstadoFilterChange(e.target.value)}
+              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+            >
+              <option value="">Todos los estados</option>
+              {ESTADOS_CLIENTE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Filtro por origen del lead */}
           <div className="flex-1">
             <label htmlFor="filtro-origen" className="block text-sm font-medium text-crm-text-primary mb-1">
@@ -636,13 +672,19 @@ export default function ClientesTable({
           </div>
 
           {/* Botón limpiar filtros */}
-          {(vendedor || origen) && (
+          {(vendedor || origen || estado) && (
             <div className="flex items-end">
               <button
                 type="button"
                 onClick={() => {
-                  if (vendedor) handleClearVendedorFilter();
-                  if (origen) handleClearOrigenFilter();
+                  const params = new URLSearchParams();
+                  if (searchQuery) params.set('q', searchQuery);
+                  if (searchTelefono) params.set('telefono', searchTelefono);
+                  if (searchDni) params.set('dni', searchDni);
+                  if (sortBy) params.set('sortBy', sortBy);
+                  if (sortOrder) params.set('sortOrder', sortOrder);
+                  params.set('page', '1');
+                  router.push(`/dashboard/clientes?${params.toString()}`);
                 }}
                 className="px-3 py-2 text-sm font-medium text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover whitespace-nowrap"
               >
