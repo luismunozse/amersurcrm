@@ -238,6 +238,7 @@ export async function actualizarCliente(formData: FormData) {
     capacidad_compra_estimada: parsed.data.capacidad_compra_estimada || null,
     forma_pago_preferida: parsed.data.forma_pago_preferida || null,
     notas: parsed.data.notas || null,
+    updated_at: new Date().toISOString(),
   };
 
   const { error } = await supabase
@@ -328,12 +329,8 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
   const payload: Record<string, string | null> = {
     vendedor_username: vendedorUsername || null,
     vendedor_asignado: vendedorUsername || null,
+    updated_at: new Date().toISOString(),
   };
-
-  // Al asignar vendedor, actualizar fecha_alta para que aparezca primero en la lista
-  if (vendedorUsername) {
-    payload.fecha_alta = new Date().toISOString();
-  }
 
   const { error } = await supabase
     .from("cliente")
