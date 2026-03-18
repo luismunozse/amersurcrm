@@ -503,9 +503,15 @@ export default function ClienteForm({
                       ))}
                     </select>
                   ) : (
-                    <div className="w-full px-3 py-2 border border-dashed border-crm-border rounded-lg bg-crm-card-hover/40 text-xs text-crm-text-muted">
-                      No cuentas con permisos para reasignar vendedores. Contacta a tu coordinador si necesitas realizar cambios.
-                    </div>
+                    <>
+                      {/* Preservar el vendedor actual cuando el usuario no tiene permiso de reasignar */}
+                      {cliente?.vendedor_asignado && (
+                        <input type="hidden" name="vendedor_asignado" value={cliente.vendedor_asignado} />
+                      )}
+                      <div className="w-full px-3 py-2 border border-dashed border-crm-border rounded-lg bg-crm-card-hover/40 text-xs text-crm-text-muted">
+                        No cuentas con permisos para reasignar vendedores. Contacta a tu coordinador si necesitas realizar cambios.
+                      </div>
+                    </>
                   )}
                   {errorVendedores && puedeGestionarVendedor && (
                     <p className="text-xs text-yellow-600 flex items-center gap-1">
