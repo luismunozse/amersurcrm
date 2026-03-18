@@ -40,7 +40,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
   const fechaDesde = (Array.isArray(sp.fechaDesde) ? sp.fechaDesde[0] : sp.fechaDesde ?? "").trim();
   const fechaHasta = (Array.isArray(sp.fechaHasta) ? sp.fechaHasta[0] : sp.fechaHasta ?? "").trim();
   const page = parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page ?? "1"), 10);
-  const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "updated_at").trim();
+  const sortBy = (Array.isArray(sp.sortBy) ? sp.sortBy[0] : sp.sortBy ?? "fecha_alta").trim();
   const sortOrder = (Array.isArray(sp.sortOrder) ? sp.sortOrder[0] : sp.sortOrder ?? "desc").trim() as 'asc' | 'desc';
 
   let permisosUsuario;

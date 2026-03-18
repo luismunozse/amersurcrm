@@ -57,8 +57,7 @@ const CLIENTE_LIST_COLUMNS = `
       fecha_alta,
       ultimo_contacto,
       proxima_accion,
-      created_at,
-      updated_at
+      created_at
     `;
 
 const CLIENTE_DASHBOARD_COLUMNS = `
@@ -90,7 +89,7 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     proyectoInteres = '',
     fechaDesde = '',
     fechaHasta = '',
-    sortBy = 'updated_at',
+    sortBy = 'fecha_alta',
     sortOrder = 'desc',
     mode = 'list',
     withTotal = mode === 'list'
