@@ -485,7 +485,13 @@ export default function ClienteForm({
                     )}
                   </div>
                   {permisosLoading ? (
-                    <div className="h-10 rounded-lg bg-crm-border/60 animate-pulse" />
+                    <>
+                      {/* Preservar vendedor mientras cargan permisos */}
+                      {cliente?.vendedor_asignado && (
+                        <input type="hidden" name="vendedor_asignado" value={cliente.vendedor_asignado} />
+                      )}
+                      <div className="h-10 rounded-lg bg-crm-border/60 animate-pulse" />
+                    </>
                   ) : puedeGestionarVendedor ? (
                     <select
                       name="vendedor_asignado"
