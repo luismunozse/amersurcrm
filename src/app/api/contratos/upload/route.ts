@@ -20,6 +20,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Archivo, ID de contrato y tipo de documento requeridos' }, { status: 400 });
     }
 
+    const urlFieldByTipo: Record<string, string> = {
+      contrato: 'contrato_url',
+      escritura: 'escritura_url',
+      constancia_sunarp: 'constancia_sunarp_url',
+    };
+    if (!(tipoDocumento in urlFieldByTipo)) {
+      return NextResponse.json({ error: 'Tipo de documento inválido' }, { status: 400 });
+    }
+
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ error: 'Formato no válido. Use PDF, JPG, PNG o WEBP' }, { status: 400 });
@@ -47,10 +56,8 @@ export async function POST(request: NextRequest) {
       .from('imagenes')
       .getPublicUrl(filePath);
 
-    // Actualizar el contrato con la URL del documento
-    const urlField = tipoDocumento === 'contrato' ? 'contrato_url'
-      : tipoDocumento === 'escritura' ? 'escritura_url'
-      : 'constancia_sunarp_url';
+    // Actualizar el contrato con la URL del documento (tipo ya validado contra allowlist)
+    const urlField = urlFieldByTipo[tipoDocumento];
 
     const { error: updateError } = await supabase
       .from('contrato')

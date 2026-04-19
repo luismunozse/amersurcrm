@@ -12,6 +12,7 @@ import type { UsuarioConPermisos } from "@/lib/permissions/types";
 import { registerPushSubscription } from "@/lib/pushClient";
 import NotificationPermissionPrompt from "@/components/NotificationPermissionPrompt";
 import ChangelogModal, { useChangelog } from "@/components/ChangelogModal";
+import { CommandPalette } from "@/components/CommandPalette";
 
 export default function DashboardClient({
   children,
@@ -115,11 +116,12 @@ export default function DashboardClient({
       <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>
         <SidebarProvider>
           <SidebarShadcn />
-          <SidebarInset className="bg-crm-bg-primary">
+          <SidebarInset className="bg-crm-bg-primary min-w-0 overflow-x-hidden">
             <ShadcnHeaderBridge headerProps={headerProps} />
             <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
           </SidebarInset>
         </SidebarProvider>
+        <CommandPalette />
         <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />
         <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
       </UserProfileProvider>

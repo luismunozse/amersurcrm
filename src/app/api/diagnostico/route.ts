@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerOnlyClient } from "@/lib/supabase.server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const supabase = await createServerOnlyClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const userAgent = req.headers.get("user-agent") || "unknown";
   const isIOS = /iPhone|iPad|iPod/.test(userAgent);
   const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);

@@ -11,8 +11,20 @@ export async function POST() {
     {
       cookies: {
         get: (n) => cookieStore.get(n)?.value,
-        set: (n, v, o) => { try { cookieStore.set({ name: n, value: v, ...o }); } catch {} },
-        remove: (n, o) => { try { cookieStore.set({ name: n, value: "", ...o, maxAge: 0 }); } catch {} },
+        set: (n, v, o) => {
+          try {
+            cookieStore.set({ name: n, value: v, ...o });
+          } catch (err) {
+            console.error("[logout] fallo al escribir cookie", n, err);
+          }
+        },
+        remove: (n, o) => {
+          try {
+            cookieStore.set({ name: n, value: "", ...o, maxAge: 0 });
+          } catch (err) {
+            console.error("[logout] fallo al limpiar cookie", n, err);
+          }
+        },
       },
       db: { schema: "crm" },
     }

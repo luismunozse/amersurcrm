@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { esAdminOCoordinador } from "@/lib/permissions/server";
 export const dynamic = 'force-dynamic';
 
 const ROLES_VENDEDORES = ["ROL_VENDEDOR", "ROL_COORDINADOR_VENTAS"];
@@ -11,6 +12,10 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
+    if (!(await esAdminOCoordinador())) {
+      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
     const serviceSupabase = createServiceRoleClient();
@@ -27,7 +32,8 @@ export async function GET() {
 
     const { data, error } = await serviceSupabase
       .from("usuario_perfil")
-      .select("id, username, nombre_completo, telefono, email, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)");
+      .select("id, username, nombre_completo, telefono, email, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+      .eq("activo", true);
 
     if (error) {
       console.error("[ImportarClientes] Error obteniendo vendedores:", error);

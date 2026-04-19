@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { esAdminOCoordinador } from "@/lib/permissions/server";
 import { z } from "zod";
 import { normalizePhoneE164, isValidPhone } from "@/lib/utils/phone";
 export const dynamic = 'force-dynamic';
@@ -77,6 +78,10 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
+    if (!(await esAdminOCoordinador())) {
+      return NextResponse.json({ error: "No tienes permisos para importar clientes" }, { status: 403 });
     }
 
     // Validar y transformar datos

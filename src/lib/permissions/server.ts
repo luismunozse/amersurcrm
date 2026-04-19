@@ -1,4 +1,5 @@
 import 'server-only';
+import { headers } from 'next/headers';
 import { createServerOnlyClient, getCachedAuthUser } from '@/lib/supabase.server';
 import type {
   PermisoCodigo,
@@ -257,6 +258,19 @@ async function registrarAuditoriaPermiso(
   try {
     const supabase = await createServerOnlyClient();
 
+    let ipAddress: string | null = null;
+    let userAgent: string | null = null;
+    try {
+      const h = await headers();
+      ipAddress =
+        h.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        h.get('x-real-ip') ||
+        null;
+      userAgent = h.get('user-agent');
+    } catch {
+      // headers() puede fallar fuera del contexto de request
+    }
+
     await supabase
       .schema('crm')
       .from('auditoria_permiso')
@@ -267,8 +281,8 @@ async function registrarAuditoriaPermiso(
         recurso_tipo: permiso.split('.')[0] || 'unknown',
         resultado,
         metadata: metadata || {},
-        ip_address: null, // TODO: Obtener IP del request
-        user_agent: null, // TODO: Obtener user agent del request
+        ip_address: ipAddress,
+        user_agent: userAgent,
       });
   } catch (error) {
     // No lanzar error si falla la auditoría

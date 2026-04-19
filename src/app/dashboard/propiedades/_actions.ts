@@ -6,6 +6,7 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { esAdmin } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { dispararPropiedadDisponible } from "@/lib/services/marketing-automatizaciones";
+import { parseOptionalNumber } from "@/lib/utils/numeric";
 
 export async function crearPropiedad(formData: FormData) {
   const supabase = await createServerActionClient();
@@ -25,9 +26,9 @@ export async function crearPropiedad(formData: FormData) {
     const proyecto_id = formData.get("proyecto_id") ? String(formData.get("proyecto_id")) : null;
     const ubicacion_ciudad = String(formData.get("ubicacion_ciudad") || "").trim();
     const ubicacion_direccion = String(formData.get("ubicacion_direccion") || "").trim();
-    const superficie_total = formData.get("superficie_total") ? Number(formData.get("superficie_total")) : null;
-    const superficie_construida = formData.get("superficie_construida") ? Number(formData.get("superficie_construida")) : null;
-    const precio = formData.get("precio") ? Number(formData.get("precio")) : null;
+    const superficie_total = parseOptionalNumber(formData.get("superficie_total"));
+    const superficie_construida = parseOptionalNumber(formData.get("superficie_construida"));
+    const precio = parseOptionalNumber(formData.get("precio"));
     const moneda = String(formData.get("moneda") || "USD");
     const estado_comercial = String(formData.get("estado_comercial") || "disponible");
     const etiquetas = formData.getAll("etiquetas") as string[];

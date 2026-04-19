@@ -18,6 +18,7 @@ import { getCachedClientes } from "@/lib/cache.server";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
 import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
+import { parseOptionalNumber } from "@/lib/utils/numeric";
 import {
   TipoCliente,
   TipoDocumento,
@@ -70,8 +71,7 @@ export async function crearCliente(formData: FormData) {
     vendedor_asignado: formData.get("vendedor_asignado") ? String(formData.get("vendedor_asignado")) : undefined,
     proxima_accion: formData.get("proxima_accion") ? String(formData.get("proxima_accion")) : undefined,
     interes_principal: formData.get("interes_principal") ? String(formData.get("interes_principal")) : undefined,
-    capacidad_compra_estimada: formData.get("capacidad_compra_estimada") ?
-      Number(formData.get("capacidad_compra_estimada")) : undefined,
+    capacidad_compra_estimada: parseOptionalNumber(formData.get("capacidad_compra_estimada")) ?? undefined,
     forma_pago_preferida: formData.get("forma_pago_preferida") ? String(formData.get("forma_pago_preferida")) : undefined,
     notas: String(formData.get("notas") || ""),
   };
@@ -188,8 +188,7 @@ export async function actualizarCliente(formData: FormData) {
     vendedor_asignado: formData.get("vendedor_asignado") ? String(formData.get("vendedor_asignado")) : undefined,
     proxima_accion: formData.get("proxima_accion") ? String(formData.get("proxima_accion")) : undefined,
     interes_principal: formData.get("interes_principal") ? String(formData.get("interes_principal")) : undefined,
-    capacidad_compra_estimada: formData.get("capacidad_compra_estimada") ?
-      Number(formData.get("capacidad_compra_estimada")) : undefined,
+    capacidad_compra_estimada: parseOptionalNumber(formData.get("capacidad_compra_estimada")) ?? undefined,
     forma_pago_preferida: formData.get("forma_pago_preferida") ? String(formData.get("forma_pago_preferida")) : undefined,
     notas: String(formData.get("notas") || ""),
   };

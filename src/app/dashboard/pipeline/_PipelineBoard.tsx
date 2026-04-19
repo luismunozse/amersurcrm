@@ -134,7 +134,7 @@ export default function PipelineBoard({ clientesIniciales, puedeVerTodos }: Prop
   }, [clientesIniciales]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 15 } }),
     useSensor(KeyboardSensor),
   );
 

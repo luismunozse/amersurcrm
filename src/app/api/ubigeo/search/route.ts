@@ -4,7 +4,10 @@ import { supabaseServer } from "@/lib/supabaseServer";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") || "").trim();
-  const limit_rows = Number(searchParams.get("limit") || 20);
+  const requestedLimit = Number(searchParams.get("limit") || 20);
+  const limit_rows = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(100, requestedLimit))
+    : 20;
   if (!q) return NextResponse.json({ error: "q requerido" }, { status: 400 });
 
   const supabase = await supabaseServer();

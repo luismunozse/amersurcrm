@@ -449,47 +449,60 @@ export const getCachedPipelineClientes = cache(
     const puedeVerTodos = esAdmin || esGerente || esCoordinador;
     const username = perfil?.username;
 
-    let query = supabase
-      .schema('crm')
-      .from('cliente')
-      .select(`
-        id,
-        codigo_cliente,
-        nombre,
-        estado_cliente,
-        vendedor_username,
-        vendedor_asignado,
-        capacidad_compra_estimada,
-        ultimo_contacto,
-        proxima_accion,
-        origen_lead,
-        propiedades_reservadas
-      `)
-      .in('estado_cliente', [
-        'por_contactar',
-        'contactado',
-        'intermedio',
-        'potencial',
-        'desestimado',
-        'transferido',
-      ])
-      .limit(500);
+    const ESTADOS_PIPELINE = [
+      'por_contactar',
+      'contactado',
+      'intermedio',
+      'potencial',
+      'desestimado',
+      'transferido',
+    ] as const;
+    const PER_ESTADO_LIMIT = 300;
 
-    if (!puedeVerTodos && username) {
-      query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
-    } else if (puedeVerTodos && vendedor && vendedor.trim() !== '') {
-      query = query.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
+    const perEstadoQueries = ESTADOS_PIPELINE.map((estado) => {
+      let q = supabase
+        .schema('crm')
+        .from('cliente')
+        .select(`
+          id,
+          codigo_cliente,
+          nombre,
+          estado_cliente,
+          vendedor_username,
+          vendedor_asignado,
+          capacidad_compra_estimada,
+          ultimo_contacto,
+          proxima_accion,
+          origen_lead,
+          propiedades_reservadas,
+          fecha_alta
+        `)
+        .eq('estado_cliente', estado)
+        .order('fecha_alta', { ascending: false })
+        .limit(PER_ESTADO_LIMIT);
+
+      if (!puedeVerTodos && username) {
+        q = q.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+      } else if (puedeVerTodos && vendedor && vendedor.trim() !== '') {
+        q = q.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
+      }
+
+      return q;
+    });
+
+    const results = await Promise.all(perEstadoQueries);
+
+    const merged: any[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.error) {
+        console.error(`Error pipeline (${ESTADOS_PIPELINE[i]}):`, r.error.message);
+        continue;
+      }
+      if (r.data) merged.push(...(r.data as any[]));
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error en getCachedPipelineClientes:', error.message);
-      return [];
-    }
-
-    const arr = (data ?? []) as any[];
-    const unique = Array.from(new Map(arr.map(c => [c.id, c])).values()) as any[];
+    const unique = Array.from(new Map(merged.map((c) => [c.id, c])).values()) as any[];
     if (unique.length === 0) return [];
 
     const ids = unique.map((c) => c.id);

@@ -47,9 +47,15 @@ export async function POST(request: NextRequest) {
 
     console.log('📩 Webhook de Twilio recibido:', event);
 
-    // Validar firma de Twilio (opcional pero recomendado)
+    // Validar firma de Twilio — en producción es obligatorio
     const twilioSignature = request.headers.get('x-twilio-signature');
     const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const isProd = process.env.NODE_ENV === 'production';
+
+    if (isProd && (!twilioSignature || !authToken)) {
+      console.error('❌ Webhook rechazado: firma o TWILIO_AUTH_TOKEN ausentes en producción');
+      return NextResponse.json({ error: 'Signature required' }, { status: 403 });
+    }
 
     if (twilioSignature && authToken) {
       const url = request.url;
@@ -58,8 +64,6 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ Firma de Twilio inválida');
         return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
       }
-    } else if (twilioSignature && !authToken) {
-      console.warn('⚠️ Firma recibida pero falta TWILIO_AUTH_TOKEN. Se omite validación.');
     }
 
     const supabase = createServiceRoleClient();

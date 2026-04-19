@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
+import { esAdmin } from "@/lib/permissions/server";
 
 export const dynamic = "force-dynamic";
 
@@ -87,15 +88,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Verificar si es administrador
-    const { data: perfil } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .select('rol')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    const isAdmin = perfil?.rol === 'admin';
+    const isAdmin = await esAdmin();
 
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '50');

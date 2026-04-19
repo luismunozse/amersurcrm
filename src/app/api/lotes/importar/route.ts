@@ -132,6 +132,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const MAX_XLSX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_XLSX_SIZE) {
+      return NextResponse.json(
+        { error: "El archivo excede el tamaño máximo permitido (10MB)" },
+        { status: 413 }
+      );
+    }
+
     if (!proyecto_id) {
       return NextResponse.json(
         { error: "No se proporcionó el ID del proyecto" },
