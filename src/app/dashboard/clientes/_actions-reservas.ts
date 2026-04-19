@@ -221,6 +221,9 @@ export async function crearReserva(data: {
   metodoPago?: string;
   comprobanteUrl?: string;
   notas?: string;
+  tipoSeparacion?: 'separacion_simple' | 'arras_confirmatorias' | 'arras_retractacion';
+  porcentajeAplicado?: number;
+  precioReferencia?: number;
 }) {
   await requierePermiso(PERMISOS.RESERVAS.CREAR, {
     accion: 'crear_reserva',
@@ -300,6 +303,9 @@ export async function crearReserva(data: {
         comprobante_url: data.comprobanteUrl,
         notas: data.notas,
         estado: 'activa',
+        tipo_separacion: data.tipoSeparacion || 'separacion_simple',
+        porcentaje_aplicado: data.porcentajeAplicado,
+        precio_referencia: data.precioReferencia,
       })
       .select()
       .single();
@@ -330,8 +336,34 @@ export async function crearReserva(data: {
     if (eventoReserva) {
       revalidatePath('/dashboard/agenda');
     }
+
+    // Auto-crear proceso de adquisición
+    if (reserva && data.loteId) {
+      try {
+        // Obtener proyecto_id del lote
+        const { data: loteData } = await supabase
+          .from('lote')
+          .select('proyecto_id')
+          .eq('id', data.loteId)
+          .single();
+
+        if (loteData?.proyecto_id) {
+          await supabase.rpc('crear_proceso_desde_plantilla', {
+            p_cliente_id: data.clienteId,
+            p_lote_id: data.loteId,
+            p_reserva_id: reserva.id,
+            p_vendedor_username: authResult.username,
+            p_proyecto_id: loteData.proyecto_id,
+          });
+        }
+      } catch (procesoError) {
+        console.warn('No se pudo crear proceso de adquisición automáticamente:', procesoError);
+      }
+    }
+
     revalidarCliente(data.clienteId);
     revalidatePath('/dashboard/proyectos');
+    revalidatePath('/dashboard/adquisicion');
 
     return { success: true, data: reserva };
   } catch (error: any) {

@@ -78,12 +78,14 @@ export interface VisitaPropiedad {
 }
 
 // ============================================================
-// RESERVAS
+// RESERVAS / SEPARACIÓN
 // ============================================================
 
 export type EstadoReserva = 'activa' | 'vencida' | 'cancelada' | 'convertida_venta';
 
 export type Moneda = 'PEN' | 'USD' | 'EUR';
+
+export type TipoSeparacion = 'separacion_simple' | 'arras_confirmatorias' | 'arras_retractacion';
 
 export interface Reserva {
   id: string;
@@ -101,6 +103,10 @@ export interface Reserva {
   metodo_pago?: string;
   comprobante_url?: string;
   notas?: string;
+  // Campos de separación mejorada
+  tipo_separacion?: TipoSeparacion;
+  porcentaje_aplicado?: number;
+  precio_referencia?: number;
   created_at: string;
   updated_at: string;
 }
@@ -214,6 +220,12 @@ export const ESTADOS_RESERVA: { value: EstadoReserva; label: string; color: stri
   { value: 'vencida', label: 'Vencida', color: 'red' },
   { value: 'cancelada', label: 'Cancelada', color: 'gray' },
   { value: 'convertida_venta', label: 'Convertida en Venta', color: 'blue' },
+];
+
+export const TIPOS_SEPARACION: { value: TipoSeparacion; label: string; descripcion: string }[] = [
+  { value: 'separacion_simple', label: 'Separación Simple', descripcion: 'Monto reembolsable que reserva la unidad' },
+  { value: 'arras_confirmatorias', label: 'Arras Confirmatorias', descripcion: 'Art. 1477 CC Perú - Se imputan al precio, no reembolsable' },
+  { value: 'arras_retractacion', label: 'Arras de Retractación', descripcion: 'Art. 1480 CC Perú - Permiten retractarse con penalidad' },
 ];
 
 export const ESTADOS_VENTA: { value: EstadoVenta; label: string; color: string }[] = [

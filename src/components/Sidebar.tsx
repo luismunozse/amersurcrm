@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -177,8 +178,24 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
     }
   }, [collapsed]);
 
-  const isActive = (href: string) =>
-    href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
+  const isActive = (href: string) => {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    // Si el href tiene query params, hacer match exacto del path + query
+    if (href.includes('?')) {
+      const [path, query] = href.split('?');
+      return pathname === path && (typeof window !== 'undefined' ? window.location.search.includes(query) : false);
+    }
+    return pathname.startsWith(href);
+  };
+
+  // Para sub-items: solo marcar activo si la URL coincide exactamente (sin que hermanos se activen)
+  const isChildActive = (href: string) => {
+    if (href.includes('?')) {
+      const [path, query] = href.split('?');
+      return pathname === path && (typeof window !== 'undefined' ? window.location.search.includes(query) : false);
+    }
+    return pathname === href;
+  };
 
   const canAccessNavItem = useCallback(
     (item: NavItem) => {
@@ -236,38 +253,125 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
     }
   }, []);
 
+  // Estado para sub-menús expandidos
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  // Auto-expandir grupo si algún hijo está activo
+  useEffect(() => {
+    const newExpanded: Record<string, boolean> = {};
+    navigation.forEach(item => {
+      if (item.children?.some(child => isActive(child.href.split('?')[0]))) {
+        newExpanded[item.name] = true;
+      }
+    });
+    if (isActive('/dashboard/cobranza')) newExpanded['Control de Pagos'] = true;
+    setExpandedGroups(prev => ({ ...prev, ...newExpanded }));
+  }, [pathname]);
+
+  const toggleGroup = useCallback((name: string) => {
+    setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
+  }, []);
+
   const renderNavItems = (items: NavItem[]) =>
-    items.map((item, i) => (
-      <NavLink
-        key={item.name}
-        href={item.href}
-        active={isActive(item.href)}
-        onClick={onClose}
-        collapsed={collapsed}
-        label={item.name}
-        badge={item.badge}
-        style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
-      >
-        <span
-          className={cn(
-            "shrink-0 grid place-items-center transition-all",
-            collapsed ? "w-9 h-9" : "w-8 h-8"
-          )}
+    items.map((item, i) => {
+      // Item con sub-items (grupo expandible)
+      if (item.children && item.children.length > 0 && !collapsed) {
+        const isExpanded = expandedGroups[item.name] || false;
+        const anyChildActive = item.children.some(child => isActive(child.href.split('?')[0]));
+
+        return (
+          <Fragment key={item.name}>
+            <button
+              onClick={() => toggleGroup(item.name)}
+              className={cn(
+                "group flex items-center w-full rounded-xl text-sm font-medium transition-all duration-300 px-4 py-3",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary",
+                anyChildActive
+                  ? "text-white"
+                  : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
+              )}
+              style={{ transitionDelay: `${i * 25}ms` }}
+            >
+              <div className="flex items-center w-full justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 grid place-items-center w-8 h-8">
+                    {item.icon}
+                  </span>
+                  <span className="whitespace-nowrap truncate">{item.name}</span>
+                </div>
+                <ChevronDownIcon className={cn(
+                  "w-4 h-4 transition-transform duration-200",
+                  isExpanded ? "rotate-180" : ""
+                )} />
+              </div>
+            </button>
+
+            {/* Sub-items */}
+            <div className={cn(
+              "overflow-hidden transition-all duration-200",
+              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+            )}>
+              <div className="ml-6 pl-3 border-l border-crm-sidebar-hover/30 space-y-0.5 py-1">
+                {item.children.filter(canAccessNavItem).map((child) => {
+                  const childActive = isChildActive(child.href);
+                  return (
+                    <Link
+                      key={child.name}
+                      href={child.href}
+                      onClick={onClose}
+                      className={cn(
+                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+                        childActive
+                          ? "text-white bg-white/10 font-medium"
+                          : "text-crm-text-muted hover:text-white hover:bg-white/5"
+                      )}
+                    >
+                      <span className="shrink-0 w-5 h-5 grid place-items-center opacity-70">
+                        {child.icon}
+                      </span>
+                      <span className="truncate">{child.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </Fragment>
+        );
+      }
+
+      // Item simple (sin hijos)
+      return (
+        <NavLink
+          key={item.name}
+          href={item.href}
+          active={isActive(item.href)}
+          onClick={onClose}
+          collapsed={collapsed}
+          label={item.name}
+          badge={item.badge}
+          style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
         >
-          {item.icon}
-        </span>
-        <span
-          className={cn(
-            "transition-all duration-300 ease-out whitespace-nowrap",
-            collapsed
-              ? "max-w-0 opacity-0 translate-x-2 pointer-events-none"
-              : "max-w-[12rem] opacity-100 translate-x-0 truncate"
-          )}
-        >
-          {item.name}
-        </span>
-      </NavLink>
-    ));
+          <span
+            className={cn(
+              "shrink-0 grid place-items-center transition-all",
+              collapsed ? "w-9 h-9" : "w-8 h-8"
+            )}
+          >
+            {item.icon}
+          </span>
+          <span
+            className={cn(
+              "transition-all duration-300 ease-out whitespace-nowrap",
+              collapsed
+                ? "max-w-0 opacity-0 translate-x-2 pointer-events-none"
+                : "max-w-[12rem] opacity-100 translate-x-0 truncate"
+            )}
+          >
+            {item.name}
+          </span>
+        </NavLink>
+      );
+    });
 
   const SkeletonNav = ({ count }: { count: number }) => (
     <div className={cn("space-y-1.5", collapsed && "px-1")} role="status" aria-label="Cargando navegación">

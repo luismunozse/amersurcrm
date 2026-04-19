@@ -200,44 +200,79 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener el último orden
-    const { data: ultimoVendedor } = await supabase
+    // Si ya existe (activo o inactivo), reactivarlo en lugar de fallar
+    const { data: existente } = await supabase
       .schema("crm")
       .from("vendedor_activo")
-      .select("orden")
-      .order("orden", { ascending: false })
-      .limit(1)
+      .select("id, activo, orden")
+      .eq("vendedor_id", vendedor_id)
       .maybeSingle();
 
-    const nuevoOrden = (ultimoVendedor?.orden ?? 0) + 1;
+    let vendedorActivo;
 
-    // Insertar vendedor a la lista
-    const { data: vendedorActivo, error: insertError } = await supabase
-      .schema("crm")
-      .from("vendedor_activo")
-      .insert({
-        vendedor_id,
-        orden: nuevoOrden,
-        activo: true,
-      })
-      .select()
-      .single();
+    if (existente) {
+      const { data: actualizado, error: updateError } = await supabase
+        .schema("crm")
+        .from("vendedor_activo")
+        .update({ activo: true })
+        .eq("id", existente.id)
+        .select()
+        .single();
 
-    if (insertError) {
-      console.error("[VendedoresActivos] Error insertando:", insertError);
+      if (updateError) {
+        console.error("[VendedoresActivos] Error reactivando:", updateError);
+        return NextResponse.json(
+          { error: `Error al reactivar vendedor: ${updateError.message}` },
+          { status: 500 }
+        );
+      }
 
-      // Si ya existe, retornar error específico
-      if (insertError.code === "23505") {
+      if (existente.activo) {
         return NextResponse.json(
           { error: "El vendedor ya está en la lista" },
           { status: 400 }
         );
       }
 
-      return NextResponse.json(
-        { error: `Error al agregar vendedor: ${insertError.message}` },
-        { status: 500 }
-      );
+      vendedorActivo = actualizado;
+    } else {
+      // Obtener el último orden
+      const { data: ultimoVendedor } = await supabase
+        .schema("crm")
+        .from("vendedor_activo")
+        .select("orden")
+        .order("orden", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const nuevoOrden = (ultimoVendedor?.orden ?? 0) + 1;
+
+      const { data: insertado, error: insertError } = await supabase
+        .schema("crm")
+        .from("vendedor_activo")
+        .insert({
+          vendedor_id,
+          orden: nuevoOrden,
+          activo: true,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("[VendedoresActivos] Error insertando:", insertError);
+        if (insertError.code === "23505") {
+          return NextResponse.json(
+            { error: "El vendedor ya está en la lista" },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json(
+          { error: `Error al agregar vendedor: ${insertError.message}` },
+          { status: 500 }
+        );
+      }
+
+      vendedorActivo = insertado;
     }
 
     console.log(

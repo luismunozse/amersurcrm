@@ -31,6 +31,15 @@ const {
 
   const mockServiceClient = {
     schema: mockServiceSchema,
+    storage: {
+      from: vi.fn().mockReturnValue({
+        upload: vi.fn().mockResolvedValue({ data: { path: "firmas/user-1/firma-123.png" }, error: null }),
+        getPublicUrl: vi.fn().mockReturnValue({
+          data: { publicUrl: "https://storage.example.com/avatars/firmas/user-1/firma-123.png" },
+        }),
+        remove: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
+    },
     _chain: mockServiceChain,
     _from: mockServiceFrom,
   };
@@ -47,15 +56,9 @@ vi.mock("@/lib/permissions/server", () => ({
   esAdmin: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("@/lib/storage", () => ({
-  uploadFile: vi.fn().mockResolvedValue({ data: { path: "firmas/user-1/firma-123.png" }, error: null }),
-  deleteFile: vi.fn().mockResolvedValue({ data: [{ name: "firma.png" }], error: null }),
-  getPublicUrl: vi.fn().mockReturnValue("https://storage.example.com/avatars/firmas/user-1/firma-123.png"),
-}));
 
 import { POST, DELETE } from "@/app/api/admin/usuarios/firma/route";
 import { esAdmin } from "@/lib/permissions/server";
-import { uploadFile, getPublicUrl } from "@/lib/storage";
 
 // Helper: create a NextRequest with mocked formData to avoid jsdom File handling issues
 function createFormDataRequest(
@@ -197,8 +200,7 @@ describe("POST /api/admin/usuarios/firma", () => {
 
     expect(body.success).toBe(true);
     expect(body.firmaUrl).toBe("https://storage.example.com/avatars/firmas/user-1/firma-123.png");
-    expect(uploadFile).toHaveBeenCalled();
-    expect(getPublicUrl).toHaveBeenCalled();
+    expect(mockServiceClient.storage.from).toHaveBeenCalledWith("avatars");
   });
 });
 

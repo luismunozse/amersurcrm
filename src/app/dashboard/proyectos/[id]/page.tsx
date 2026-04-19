@@ -436,6 +436,8 @@ export default async function ProyLotesPage({
 
       {/* Tabs Navigation */}
       <ProjectTabs
+        proyectoId={proyecto.id}
+        isAdmin={isAdmin}
         lotesSection={
           <>
             {/* Filtros compactos */}

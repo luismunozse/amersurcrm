@@ -223,6 +223,51 @@ export const PERMISOS = {
   CALENDARIO: {
     EQUIPO: 'calendario.equipo' as const,
   },
+
+  // ========== CALIFICACIÓN BANCARIA ==========
+  CALIFICACION: {
+    VER: 'calificacion.ver' as const,
+    CREAR: 'calificacion.crear' as const,
+    EDITAR: 'calificacion.editar' as const,
+    APROBAR: 'calificacion.aprobar' as const,
+  },
+
+  // ========== CONTRATOS ==========
+  CONTRATO: {
+    VER: 'contrato.ver' as const,
+    CREAR: 'contrato.crear' as const,
+    EDITAR: 'contrato.editar' as const,
+  },
+
+  // ========== COBRANZA ==========
+  COBRANZA: {
+    VER: 'cobranza.ver' as const,
+    GESTIONAR: 'cobranza.gestionar' as const,
+    ENVIAR_ALERTAS: 'cobranza.enviar_alertas' as const,
+  },
+
+  // ========== ENTREGAS ==========
+  ENTREGAS: {
+    VER: 'entregas.ver' as const,
+    CREAR: 'entregas.crear' as const,
+    EDITAR: 'entregas.editar' as const,
+    COMPLETAR: 'entregas.completar' as const,
+  },
+
+  // ========== POST-VENTA ==========
+  POSTVENTA: {
+    VER: 'postventa.ver' as const,
+    CREAR: 'postventa.crear' as const,
+    ASIGNAR: 'postventa.asignar' as const,
+    RESOLVER: 'postventa.resolver' as const,
+  },
+
+  // ========== INDEPENDIZACIÓN ==========
+  INDEPENDIZACION: {
+    VER: 'independizacion.ver' as const,
+    CREAR: 'independizacion.crear' as const,
+    EDITAR: 'independizacion.editar' as const,
+  },
 } as const;
 
 /**

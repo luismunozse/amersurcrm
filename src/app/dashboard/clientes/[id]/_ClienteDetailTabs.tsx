@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Info, MessageSquare, Heart, FileText, DollarSign, Clock, FileSpreadsheet } from "lucide-react";
+import { Info, MessageSquare, Heart, DollarSign, Clock, ShoppingCart, Headphones } from "lucide-react";
 import TabInformacionBasica from "./_TabInformacionBasica";
 import TabInteracciones from "./_TabInteracciones";
 import TabPropiedadesInteres from "./_TabPropiedadesInteres";
@@ -9,6 +9,15 @@ import TabReservas from "./_TabReservas";
 import TabVentas from "./_TabVentas";
 import TabTimeline from "./_TabTimeline";
 import TabProformas from "./_TabProformas";
+import dynamic from "next/dynamic";
+
+const TabProcesosCliente = dynamic(() => import("./_TabProcesosCliente"), { ssr: false });
+const TabCalificacion = dynamic(() => import("./_TabCalificacion"), { ssr: false });
+const TabContrato = dynamic(() => import("./_TabContrato"), { ssr: false });
+const TabCronograma = dynamic(() => import("./_TabCronograma"), { ssr: false });
+const TabEntrega = dynamic(() => import("./_TabEntrega"), { ssr: false });
+const TabPostVenta = dynamic(() => import("./_TabPostVenta"), { ssr: false });
+const TabIndependizacion = dynamic(() => import("./_TabIndependizacion"), { ssr: false });
 import type { ClienteCompleto } from "@/lib/types/clientes";
 import type {
   InteraccionConVendedor,
@@ -40,7 +49,21 @@ export type ClienteTabType =
   | 'reservas'
   | 'ventas'
   | 'proformas'
-  | 'timeline';
+  | 'timeline'
+  | 'calificacion'
+  | 'contrato'
+  | 'cronograma'
+  | 'entrega'
+  | 'postventa'
+  | 'independizacion'
+  // Tabs agrupados
+  | 'adquisicion'
+  | 'postventa_hub';
+
+// Sub-tabs dentro de cada tab agrupado
+type AdquisicionSubTab = 'separaciones' | 'cotizaciones' | 'calificacion';
+type VentasSubTab = 'ventas' | 'cronograma' | 'contrato';
+type PostVentaSubTab = 'entregas' | 'solicitudes' | 'independizacion';
 
 export default function ClienteDetailTabs({
   cliente,
@@ -56,13 +79,15 @@ export default function ClienteDetailTabs({
   seguimientosVencidos = 0,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ClienteTabType>(defaultTab);
+  const [adquisicionSubTab, setAdquisicionSubTab] = useState<AdquisicionSubTab>('separaciones');
+  const [ventasSubTab, setVentasSubTab] = useState<VentasSubTab>('ventas');
+  const [postVentaSubTab, setPostVentaSubTab] = useState<PostVentaSubTab>('entregas');
   const [interaccionesCount, setInteraccionesCount] = useState(interacciones.length);
 
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
 
-  // Sync interacciones count when props change (e.g., after router.refresh)
   useEffect(() => {
     setInteraccionesCount(interacciones.length);
   }, [interacciones.length]);
@@ -72,49 +97,41 @@ export default function ClienteDetailTabs({
   }, []);
 
   const tabs = [
+    { id: 'info' as ClienteTabType, label: 'Información', icon: Info, count: null },
+    { id: 'timeline' as ClienteTabType, label: 'Historial', icon: Clock, count: null },
     {
-      id: 'info' as ClienteTabType,
-      label: 'Información',
-      icon: Info,
-      count: null,
+      id: 'interacciones' as ClienteTabType, label: 'Interacciones', icon: MessageSquare,
+      count: interaccionesCount, alert: seguimientosVencidos > 0,
     },
-    {
-      id: 'timeline' as ClienteTabType,
-      label: 'Historial',
-      icon: Clock,
-      count: null,
-    },
-    {
-      id: 'interacciones' as ClienteTabType,
-      label: 'Interacciones',
-      icon: MessageSquare,
-      count: interaccionesCount,
-    },
-    {
-      id: 'propiedades' as ClienteTabType,
-      label: 'Propiedades de Interés',
-      icon: Heart,
-      count: propiedadesInteres.length,
-    },
-    {
-      id: 'reservas' as ClienteTabType,
-      label: 'Reservas',
-      icon: FileText,
-      count: reservas.length,
-    },
-    {
-      id: 'ventas' as ClienteTabType,
-      label: 'Ventas',
-      icon: DollarSign,
-      count: ventas.length,
-    },
-    {
-      id: 'proformas' as ClienteTabType,
-      label: 'Cotizaciones',
-      icon: FileSpreadsheet,
-      count: proformas.length,
-    },
+    { id: 'propiedades' as ClienteTabType, label: 'Interés', icon: Heart, count: propiedadesInteres.length },
+    { id: 'adquisicion' as ClienteTabType, label: 'Adquisición', icon: ShoppingCart, count: reservas.length + proformas.length },
+    { id: 'ventas' as ClienteTabType, label: 'Ventas', icon: DollarSign, count: ventas.length },
+    { id: 'postventa_hub' as ClienteTabType, label: 'Post-Venta', icon: Headphones, count: null },
   ];
+
+  function SubTabBar({ items, active, onChange }: {
+    items: { id: string; label: string }[];
+    active: string;
+    onChange: (id: any) => void;
+  }) {
+    return (
+      <div className="flex gap-1 mb-4 bg-crm-background rounded-lg p-1">
+        {items.map(item => (
+          <button
+            key={item.id}
+            onClick={() => onChange(item.id)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              active === item.id
+                ? 'bg-crm-card text-crm-text shadow-sm'
+                : 'text-crm-text-muted hover:text-crm-text'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-crm-card border border-crm-border rounded-lg shadow-sm">
@@ -130,7 +147,7 @@ export default function ClienteDetailTabs({
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`
-                  flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap
+                  flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap
                   transition-colors border-b-2 -mb-px
                   ${isActive
                     ? 'border-crm-primary text-crm-primary'
@@ -151,7 +168,7 @@ export default function ClienteDetailTabs({
                     {tab.count}
                   </span>
                 )}
-                {tab.id === 'interacciones' && seguimientosVencidos > 0 && (
+                {'alert' in tab && tab.alert && (
                   <span className="relative flex h-2.5 w-2.5" title={`${seguimientosVencidos} seguimiento${seguimientosVencidos > 1 ? 's' : ''} vencido${seguimientosVencidos > 1 ? 's' : ''}`}>
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
@@ -168,7 +185,9 @@ export default function ClienteDetailTabs({
         {activeTab === 'info' && (
           <TabInformacionBasica cliente={cliente} vendedores={vendedores} />
         )}
+
         {activeTab === 'timeline' && <TabTimeline clienteId={cliente.id} />}
+
         {activeTab === 'interacciones' && (
           <TabInteracciones
             clienteId={cliente.id}
@@ -177,23 +196,79 @@ export default function ClienteDetailTabs({
             onCountChange={handleInteraccionesCountChange}
           />
         )}
+
         {activeTab === 'propiedades' && (
           <TabPropiedadesInteres
             propiedades={propiedadesInteres}
             clienteId={cliente.id}
           />
         )}
-        {activeTab === 'reservas' && <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} isAdmin={isAdmin} />}
-        {activeTab === 'ventas' && <TabVentas ventas={ventas} />}
-        {activeTab === 'proformas' && (
-          <TabProformas
-            cliente={cliente}
-            proformas={proformas}
-            reservas={reservas}
-            ventas={ventas}
-            asesorActual={asesorActual}
-            isAdmin={isAdmin}
-          />
+
+        {/* ========== ADQUISICIÓN (agrupado) ========== */}
+        {activeTab === 'adquisicion' && (
+          <>
+            <SubTabBar
+              items={[
+                { id: 'separaciones', label: 'Procesos' },
+                { id: 'cotizaciones', label: 'Separaciones' },
+                { id: 'calificacion', label: 'Cotizaciones' },
+              ]}
+              active={adquisicionSubTab}
+              onChange={setAdquisicionSubTab}
+            />
+            {adquisicionSubTab === 'separaciones' && (
+              <TabProcesosCliente clienteId={cliente.id} />
+            )}
+            {adquisicionSubTab === 'cotizaciones' && (
+              <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} isAdmin={isAdmin} />
+            )}
+            {adquisicionSubTab === 'calificacion' && (
+              <TabProformas
+                cliente={cliente}
+                proformas={proformas}
+                reservas={reservas}
+                ventas={ventas}
+                asesorActual={asesorActual}
+                isAdmin={isAdmin}
+              />
+            )}
+          </>
+        )}
+
+        {/* ========== VENTAS (agrupado) ========== */}
+        {activeTab === 'ventas' && (
+          <>
+            <SubTabBar
+              items={[
+                { id: 'ventas', label: 'Ventas' },
+                { id: 'cronograma', label: 'Cronograma de Pagos' },
+                { id: 'contrato', label: 'Contrato / Minuta' },
+              ]}
+              active={ventasSubTab}
+              onChange={setVentasSubTab}
+            />
+            {ventasSubTab === 'ventas' && <TabVentas ventas={ventas} />}
+            {ventasSubTab === 'cronograma' && <TabCronograma clienteId={cliente.id} ventas={ventas} />}
+            {ventasSubTab === 'contrato' && <TabContrato clienteId={cliente.id} clienteNombre={cliente.nombre} cliente={cliente} ventas={ventas} />}
+          </>
+        )}
+
+        {/* ========== POST-VENTA (agrupado) ========== */}
+        {activeTab === 'postventa_hub' && (
+          <>
+            <SubTabBar
+              items={[
+                { id: 'entregas', label: 'Entregas' },
+                { id: 'solicitudes', label: 'Solicitudes' },
+                { id: 'independizacion', label: 'Independización' },
+              ]}
+              active={postVentaSubTab}
+              onChange={setPostVentaSubTab}
+            />
+            {postVentaSubTab === 'entregas' && <TabEntrega clienteId={cliente.id} clienteNombre={cliente.nombre} ventas={ventas} />}
+            {postVentaSubTab === 'solicitudes' && <TabPostVenta clienteId={cliente.id} clienteNombre={cliente.nombre} ventas={ventas} />}
+            {postVentaSubTab === 'independizacion' && <TabIndependizacion clienteId={cliente.id} clienteNombre={cliente.nombre} ventas={ventas} />}
+          </>
         )}
       </div>
     </div>

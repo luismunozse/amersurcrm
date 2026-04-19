@@ -172,9 +172,24 @@ export async function convertirReservaEnVenta(data: {
       }
     }
 
+    // Generar cronograma de pagos automáticamente si es financiado/crédito
+    if (
+      venta &&
+      (data.formaPago === 'financiado' || data.formaPago === 'credito_bancario' || data.formaPago === 'mixto') &&
+      data.numeroCuotas &&
+      data.numeroCuotas > 0
+    ) {
+      try {
+        await supabase.rpc('generar_cronograma_pagos', { p_venta_id: venta.id });
+      } catch (cronogramaError) {
+        console.warn('No se pudo generar cronograma automático:', cronogramaError);
+      }
+    }
+
     revalidarCliente(reserva.cliente_id);
     revalidatePath('/dashboard/proyectos');
     revalidatePath('/dashboard/ventas');
+    revalidatePath('/dashboard/cobranza');
 
     return { success: true, data: venta };
   } catch (error: any) {

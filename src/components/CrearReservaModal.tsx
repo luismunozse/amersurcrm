@@ -258,9 +258,9 @@ export default function CrearReservaModal({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl p-6">
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between p-6 pb-4 shrink-0">
           <div>
             <h2 className="text-xl font-bold text-crm-text-primary">
               Crear Reserva
@@ -285,7 +285,7 @@ export default function CrearReservaModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto px-6 pb-6 flex-1 min-h-0">
           {/* Proyecto y Lote */}
           <div className="space-y-3">
             <div>
@@ -401,29 +401,21 @@ export default function CrearReservaModal({
             <label className="block text-sm font-medium text-crm-text-primary mb-2">
               Fecha de Vencimiento *
             </label>
-            <DateTimePicker
-              value={fechaVencimiento}
-              onChange={setFechaVencimiento}
+            <input
+              type="date"
+              value={fechaVencimiento ? fechaVencimiento.split('T')[0] : ''}
+              onChange={(e) => setFechaVencimiento(e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')}
               disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary disabled:opacity-60"
             />
-            <div className="flex gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => setFechaVencimiento(new Date().toISOString())}
-                className="text-xs text-crm-text-muted hover:text-crm-primary transition-colors disabled:opacity-50"
-                disabled={isSubmitting}
-              >
-                Usar fecha actual
-              </button>
-              <button
-                type="button"
-                onClick={() => setFechaVencimiento(calcularFechaVencimiento())}
-                className="text-xs text-crm-primary hover:underline disabled:opacity-50"
-                disabled={isSubmitting}
-              >
-                +30 días
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setFechaVencimiento(calcularFechaVencimiento())}
+              className="text-xs text-crm-primary hover:underline disabled:opacity-50 mt-1"
+              disabled={isSubmitting}
+            >
+              +30 días
+            </button>
           </div>
 
           {/* Método de Pago */}
