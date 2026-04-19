@@ -36,3 +36,7 @@ export { obtenerReporteTiempoRespuesta } from "./tiempo-respuesta";
 
 // Funnel de conversión
 export { obtenerReporteFunnel } from "./funnel";
+
+// Resumen KPIs (cards superiores del módulo)
+export { obtenerResumenKPIs } from "./resumen-kpis";
+export type { ResumenKPIs } from "./resumen-kpis";

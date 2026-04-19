@@ -17,6 +17,7 @@ import ReporteInteracciones from "./components/ReporteInteracciones";
 import ReporteNivelInteres from "./components/ReporteNivelInteres";
 import ReporteOrigenLead from "./components/ReporteOrigenLead";
 import ReporteTiempoRespuesta from "./components/ReporteTiempoRespuesta";
+import ResumenKPIs from "./components/ResumenKPIs";
 import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
 import DatePicker from "@/components/ui/DatePicker";
 import toast from "react-hot-toast";
@@ -292,6 +293,13 @@ export default function ReportesPage() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {/* Resumen de KPIs del período (Fase 1) */}
+      <ResumenKPIs
+        periodo={selectedPeriod}
+        fechaInicio={modoPersonalizado ? fechaInicio : undefined}
+        fechaFin={modoPersonalizado ? fechaFin : undefined}
+      />
 
       {/* Sección unificada de reportes */}
       <div className="bg-crm-card border border-crm-border rounded-xl p-6">

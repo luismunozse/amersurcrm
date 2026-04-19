@@ -370,12 +370,14 @@ export async function obtenerTimelineCliente(
     const limit = options?.limit ?? 50;
     const offset = options?.offset ?? 0;
 
-    // Obtener todas las entidades relacionadas al cliente con limite
+    // Obtener todas las entidades relacionadas al cliente con limite.
+    // Nota: no usamos embed PostgREST a usuario_perfil porque vendedor_username
+    // no tiene FK declarada (es VARCHAR libre). El username ya viene en la fila.
     const [interacciones, visitas, reservas, ventas, eventosAgenda] = await Promise.all([
       // Interacciones
       supabase
         .from('cliente_interaccion')
-        .select('*, vendedor:usuario_perfil!vendedor_username(username)')
+        .select('*')
         .eq('cliente_id', clienteId)
         .order('fecha_interaccion', { ascending: false })
         .limit(limit),
@@ -383,7 +385,7 @@ export async function obtenerTimelineCliente(
       // Visitas
       supabase
         .from('visita_propiedad')
-        .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username)')
+        .select('*, lote:lote!lote_id(numero_lote)')
         .eq('cliente_id', clienteId)
         .order('fecha_visita', { ascending: false })
         .limit(limit),
@@ -391,7 +393,7 @@ export async function obtenerTimelineCliente(
       // Reservas
       supabase
         .from('reserva')
-        .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username)')
+        .select('*, lote:lote!lote_id(numero_lote)')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false })
         .limit(limit),
@@ -399,7 +401,7 @@ export async function obtenerTimelineCliente(
       // Ventas con pagos
       supabase
         .from('venta')
-        .select('*, lote:lote!lote_id(numero_lote), vendedor:usuario_perfil!vendedor_username(username), pagos:pago(*)')
+        .select('*, lote:lote!lote_id(numero_lote), pagos:pago(*)')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false })
         .limit(limit),
@@ -442,7 +444,7 @@ export async function obtenerTimelineCliente(
           resultado: item.resultado,
           duracion_minutos: item.duracion_minutos,
           proxima_accion: item.proxima_accion,
-          vendedor_username: item.vendedor?.username,
+          vendedor_username: item.vendedor_username,
         },
       });
     });
@@ -459,7 +461,7 @@ export async function obtenerTimelineCliente(
           lote: item.lote?.numero_lote,
           nivel_interes: item.nivel_interes,
           duracion_minutos: item.duracion_minutos,
-          vendedor_username: item.vendedor?.username,
+          vendedor_username: item.vendedor_username,
         },
       });
     });
@@ -478,7 +480,7 @@ export async function obtenerTimelineCliente(
           moneda: item.moneda,
           lote: item.lote?.numero_lote,
           estado: item.estado,
-          vendedor_username: item.vendedor?.username,
+          vendedor_username: item.vendedor_username,
         },
       });
     });
@@ -497,7 +499,7 @@ export async function obtenerTimelineCliente(
           moneda: item.moneda,
           forma_pago: item.forma_pago,
           lote: item.lote?.numero_lote,
-          vendedor_username: item.vendedor?.username,
+          vendedor_username: item.vendedor_username,
         },
       });
 

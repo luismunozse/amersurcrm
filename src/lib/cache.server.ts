@@ -407,6 +407,94 @@ export const getCachedLeadsStatsByOrigen = cache(async (): Promise<{ origen: str
     .sort((a, b) => b.count - a.count);
 });
 
+/* ========= Pipeline Kanban ========= */
+export type PipelineCliente = {
+  id: string;
+  codigo_cliente: string;
+  nombre: string;
+  estado_cliente: string;
+  vendedor_username: string | null;
+  vendedor_asignado: string | null;
+  capacidad_compra_estimada: number | null;
+  ultimo_contacto: string | null;
+  proxima_accion: string | null;
+  fecha_proxima_accion: string | null;
+  origen_lead: string | null;
+  propiedades_reservadas: number;
+};
+
+interface GetPipelineParams {
+  vendedor?: string;
+}
+
+export const getCachedPipelineClientes = cache(
+  async (params?: GetPipelineParams): Promise<PipelineCliente[]> => {
+    const supabase = await createOptimizedServerClient();
+    const userId = await getUserIdOrNull(supabase);
+    if (!userId) return [];
+
+    const { vendedor = '' } = params || {};
+
+    const { data: perfil } = await supabase
+      .from('usuario_perfil')
+      .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+      .eq('id', userId)
+      .single();
+
+    const rolData = perfil?.rol as any;
+    const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+    const esAdmin = rolNombre === 'ROL_ADMIN';
+    const esGerente = rolNombre === 'ROL_GERENTE';
+    const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
+    const puedeVerTodos = esAdmin || esGerente || esCoordinador;
+    const username = perfil?.username;
+
+    let query = supabase
+      .schema('crm')
+      .from('cliente')
+      .select(`
+        id,
+        codigo_cliente,
+        nombre,
+        estado_cliente,
+        vendedor_username,
+        vendedor_asignado,
+        capacidad_compra_estimada,
+        ultimo_contacto,
+        proxima_accion,
+        fecha_proxima_accion,
+        origen_lead,
+        propiedades_reservadas
+      `)
+      .in('estado_cliente', [
+        'por_contactar',
+        'contactado',
+        'intermedio',
+        'potencial',
+        'desestimado',
+        'transferido',
+      ])
+      .limit(500);
+
+    if (!puedeVerTodos && username) {
+      query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+    } else if (puedeVerTodos && vendedor && vendedor.trim() !== '') {
+      query = query.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error en getCachedPipelineClientes:', error.message);
+      return [];
+    }
+
+    const arr = (data ?? []) as any[];
+    const unique = Array.from(new Map(arr.map(c => [c.id, c])).values());
+    return unique as PipelineCliente[];
+  }
+);
+
 /* ========= Proyectos ========= */
 export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
   const supabase = await createOptimizedServerClient();

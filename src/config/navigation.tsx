@@ -18,6 +18,7 @@ import {
   Target,
   Percent,
   ShoppingCart,
+  KanbanSquare,
 } from "lucide-react";
 import { PERMISOS } from "@/lib/permissions";
 import type { PermisoCodigo, RolNombre } from "@/lib/permissions";
@@ -35,6 +36,7 @@ export type NavItem = {
 export const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { name: "Clientes", href: "/dashboard/clientes", permisos: [PERMISOS.CLIENTES.VER_TODOS, PERMISOS.CLIENTES.VER_ASIGNADOS], icon: <Users className="w-5 h-5" /> },
+  { name: "Pipeline", href: "/dashboard/pipeline", permisos: [PERMISOS.CLIENTES.VER_TODOS, PERMISOS.CLIENTES.VER_ASIGNADOS], icon: <KanbanSquare className="w-5 h-5" /> },
   { name: "Proyectos", href: "/dashboard/proyectos", permisos: [PERMISOS.PROYECTOS.VER], icon: <Building2 className="w-5 h-5" /> },
   { name: "Propiedades", href: "/dashboard/propiedades", permisos: [PERMISOS.LOTES.VER], icon: <Home className="w-5 h-5" /> },
   {

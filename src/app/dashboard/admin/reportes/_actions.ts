@@ -25,3 +25,6 @@ export { obtenerReporteOrigenLead } from "./actions/origen-lead";
 export { obtenerReporteTiempoRespuesta } from "./actions/tiempo-respuesta";
 
 export { obtenerReporteFunnel } from "./actions/funnel";
+
+export { obtenerResumenKPIs } from "./actions/resumen-kpis";
+export type { ResumenKPIs } from "./actions/resumen-kpis";
