@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import React, { memo, useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { ChevronDown as ChevronDownIcon, Menu as Bars3Icon, X as XMarkIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { usePermissions } from "@/lib/permissions";
 import { navigation, adminNavigation, type NavItem } from "@/config/navigation";
@@ -18,7 +17,7 @@ interface SidebarProps {
   onCollapseChange?: (collapsed: boolean) => void;
 }
 
-function NavLink({
+const NavLink = memo(function NavLink({
   href, active, children, onClick, collapsed = false, label = "", style, badge,
 }: {
   href: string; active: boolean; children: React.ReactNode; onClick?: () => void; collapsed?: boolean; label?: string; style?: React.CSSProperties; badge?: string;
@@ -31,38 +30,22 @@ function NavLink({
       aria-current={active ? "page" : undefined}
       style={style}
       className={cn(
-        "group flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden",
+        "flex items-center rounded-xl text-sm font-medium transition-colors duration-150 relative",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
-        collapsed ? "lg:justify-center lg:px-2 lg:py-2 lg:mx-1.5" : "px-4 py-3",
+        collapsed ? "lg:justify-center lg:px-2 lg:py-2 lg:mx-1.5" : "px-4 py-2",
         active
-          ? "bg-gradient-to-r from-crm-primary to-crm-primary-hover text-white shadow-lg shadow-crm-primary/30 scale-[1.02]"
-          : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white hover:shadow-lg hover:shadow-crm-primary/10 hover:scale-[1.03]"
+          ? "bg-crm-primary text-white shadow-md shadow-crm-primary/20"
+          : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
       )}
     >
-      {/* Efecto de brillo en hover */}
-      {!active && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-      )}
-
-      {/* Indicador activo más visible */}
       {active && (
-        <>
-          <div className={cn(
-            "absolute top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-full",
-            collapsed ? "left-0 h-8" : "left-0 h-10"
-          )} />
-          {collapsed && (
-            <div className="absolute inset-0 bg-white/5 rounded-xl animate-pulse" />
-          )}
-        </>
+        <div className={cn(
+          "absolute top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-full",
+          collapsed ? "left-0 h-8" : "left-0 h-10"
+        )} />
       )}
 
-      {/* Glow effect en hover cuando está colapsado */}
-      {collapsed && !active && (
-        <div className="absolute inset-0 bg-crm-primary/0 group-hover:bg-crm-primary/10 rounded-xl transition-colors duration-300" />
-      )}
-
-      <div className={cn("relative z-10 flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3 justify-between")}
+      <div className={cn("relative flex items-center w-full", collapsed ? "lg:gap-0 lg:justify-center" : "lg:gap-3 justify-between")}
       >
         <div className="flex items-center gap-3">
           {children}
@@ -104,7 +87,7 @@ function NavLink({
   }
 
   return content;
-}
+});
 
 export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false, onCollapseChange }: SidebarProps) {
   const pathname = usePathname();
@@ -265,7 +248,14 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
       }
     });
     if (isActive('/dashboard/cobranza')) newExpanded['Control de Pagos'] = true;
-    setExpandedGroups(prev => ({ ...prev, ...newExpanded }));
+
+    const keys = Object.keys(newExpanded);
+    if (keys.length === 0) return;
+
+    setExpandedGroups(prev => {
+      if (keys.every(k => prev[k] === true)) return prev;
+      return { ...prev, ...newExpanded };
+    });
   }, [pathname]);
 
   const toggleGroup = useCallback((name: string) => {
@@ -284,13 +274,12 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
             <button
               onClick={() => toggleGroup(item.name)}
               className={cn(
-                "group flex items-center w-full rounded-xl text-sm font-medium transition-all duration-300 px-4 py-3",
+                "flex items-center w-full rounded-xl text-sm font-medium transition-colors duration-150 px-4 py-2",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary",
                 anyChildActive
                   ? "text-white"
                   : "text-crm-text-muted hover:bg-crm-sidebar-hover hover:text-white"
               )}
-              style={{ transitionDelay: `${i * 25}ms` }}
             >
               <div className="flex items-center w-full justify-between">
                 <div className="flex items-center gap-3">
@@ -349,11 +338,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           collapsed={collapsed}
           label={item.name}
           badge={item.badge}
-          style={!collapsed ? { transitionDelay: `${i * 25}ms` } : undefined}
         >
           <span
             className={cn(
-              "shrink-0 grid place-items-center transition-all",
+              "shrink-0 grid place-items-center",
               collapsed ? "w-9 h-9" : "w-8 h-8"
             )}
           >
@@ -361,10 +349,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           </span>
           <span
             className={cn(
-              "transition-all duration-300 ease-out whitespace-nowrap",
+              "whitespace-nowrap",
               collapsed
-                ? "max-w-0 opacity-0 translate-x-2 pointer-events-none"
-                : "max-w-[12rem] opacity-100 translate-x-0 truncate"
+                ? "hidden"
+                : "max-w-[12rem] truncate"
             )}
           >
             {item.name}
@@ -380,7 +368,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
           key={`sidebar-skeleton-${idx}`}
           className={cn(
             "flex items-center gap-3 rounded-xl overflow-hidden relative",
-            collapsed ? "lg:mx-1.5 lg:justify-center lg:px-2 lg:py-2" : "px-4 py-3"
+            collapsed ? "lg:mx-1.5 lg:justify-center lg:px-2 lg:py-2" : "px-4 py-2"
           )}
         >
           {/* Shimmer effect */}
@@ -405,11 +393,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
 
   return (
     <Tooltip.Provider delayDuration={200}>
-      {/* Overlay móvil mejorado con blur */}
+      {/* Overlay móvil */}
       {isOpen && (
         <button
           aria-label="Cerrar menú"
-          className="fixed inset-0 bg-gradient-to-r from-black/50 to-black/30 backdrop-blur-md z-40 lg:hidden animate-in fade-in-0 duration-300 cursor-default"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden animate-in fade-in-0 duration-150 cursor-default"
           onClick={onClose}
         />
       )}
@@ -449,10 +437,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className={cn(
-            "flex items-center h-20 px-6 border-b border-crm-sidebar-hover bg-gradient-to-r from-crm-sidebar to-crm-sidebar-hover/50",
+            "flex items-center h-16 px-5 border-b border-crm-sidebar-hover bg-gradient-to-r from-crm-sidebar to-crm-sidebar-hover/50",
             collapsed ? "lg:justify-center lg:px-3" : "justify-between"
           )}>
-            <div className={cn("flex items-center", collapsed ? "lg:space-x-0" : "space-x-4 w-full")}>
+            <div className={cn("flex items-center", collapsed ? "lg:space-x-0" : "space-x-3 w-full")}>
               {/* Logo o botón hamburguesa */}
               {collapsed ? (
                 <Tooltip.Root>
@@ -460,12 +448,10 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                     <button
                       type="button"
                       onClick={() => handleCollapseChange(false)}
-                      className="hidden lg:flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-crm-primary/30 to-crm-accent/30 backdrop-blur-sm border-2 border-crm-primary/40 text-white hover:border-crm-primary/60 hover:from-crm-primary/40 hover:to-crm-accent/40 transition-all duration-300 shadow-xl shadow-crm-primary/20 hover:shadow-2xl hover:shadow-crm-primary/30 hover:scale-110 active:scale-95 group relative overflow-hidden"
+                      className="hidden lg:flex items-center justify-center w-12 h-12 rounded-xl bg-crm-primary/25 border-2 border-crm-primary/40 text-white hover:border-crm-primary/60 hover:bg-crm-primary/35 transition-colors duration-150 shadow-md shadow-crm-primary/20"
                       aria-label="Expandir sidebar"
                     >
-                      {/* Efecto de brillo animado */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                      <Bars3Icon className="w-7 h-7 relative z-10 transition-transform group-hover:rotate-180 group-hover:scale-110" />
+                      <Bars3Icon className="w-6 h-6" />
                     </button>
                   </Tooltip.Trigger>
                   <Tooltip.Portal>
@@ -480,20 +466,15 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                   </Tooltip.Portal>
                 </Tooltip.Root>
               ) : (
-                <div className="relative flex-shrink-0">
-                  <div className="absolute inset-0 bg-gradient-to-br from-crm-primary/20 to-crm-accent/20 rounded-2xl blur-sm" />
-                  <div className="relative bg-white/10 backdrop-blur-sm rounded-2xl p-2 border border-white/20">
-                    <Image src="/amersur-logo-b.png" alt="AMERSUR" width={48} height={48} className="h-12 w-12 object-contain" priority />
-                  </div>
-                  <div className="absolute inset-0 bg-crm-primary/30 rounded-2xl blur-lg -z-10" />
+                <div className="relative flex-shrink-0 bg-white/10 rounded-xl p-1.5 border border-white/20">
+                  <Image src="/amersur-logo-b.png" alt="AMERSUR" width={36} height={36} className="h-9 w-9 object-contain" priority />
                 </div>
               )}
 
               {/* Títulos (ocultos al colapsar) */}
-              <div className={cn("flex-1 min-w-0 flex flex-col justify-center", collapsed && "hidden lg:hidden")}>
-                <span className="text-white font-bold text-xl block tracking-wide leading-tight">AMERSUR</span>
-                <span className="text-crm-primary font-semibold text-base block tracking-wider leading-tight">CRM</span>
-                <p className="text-xs text-crm-text-muted mt-0.5 hidden sm:block font-medium leading-tight">Tu Propiedad, sin fronteras</p>
+              <div className={cn("flex-1 min-w-0 flex items-baseline gap-2", collapsed && "hidden lg:hidden")}>
+                <span className="text-white font-bold text-lg tracking-wide leading-none">AMERSUR</span>
+                <span className="text-crm-primary font-semibold text-sm tracking-wider leading-none">CRM</span>
               </div>
             </div>
 
@@ -502,11 +483,11 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
               <button
                 type="button"
                 onClick={() => handleCollapseChange(true)}
-                className="hidden lg:flex items-center justify-center ml-3 w-10 h-10 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 group"
+                className="hidden lg:flex items-center justify-center ml-3 w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 transition-colors duration-150"
                 aria-label="Colapsar sidebar"
                 title="Colapsar menú"
               >
-                <Bars3Icon className="w-6 h-6 transition-transform group-hover:rotate-180" />
+                <Bars3Icon className="w-6 h-6" />
               </button>
             )}
 
@@ -527,8 +508,8 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
             aria-label="Navegación principal"
             onKeyDown={handleNavKeyDown}
             className={cn(
-              "flex-1 overflow-y-auto",
-              collapsed ? "px-2 py-3 space-y-0.5" : "px-4 sm:px-6 py-6 space-y-1.5"
+              "flex-1 overflow-y-auto scrollbar-auto-hide",
+              collapsed ? "px-2 py-3 space-y-0.5" : "px-4 sm:px-6 py-4 space-y-1"
             )}
           >
             {permisosLoading ? (
@@ -573,7 +554,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
                 {!collapsed && (
                   <div className="px-4 py-2 mb-2">
                     <h3 className="text-xs font-bold text-crm-primary uppercase tracking-widest flex items-center">
-                      <div className="w-2 h-2 bg-crm-primary rounded-full mr-2 animate-pulse" />
+                      <div className="w-2 h-2 bg-crm-primary rounded-full mr-2" />
                       Sistema
                     </h3>
                   </div>

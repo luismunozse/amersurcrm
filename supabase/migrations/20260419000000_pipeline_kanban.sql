@@ -66,6 +66,10 @@ BEGIN
   LEFT JOIN crm.rol r ON r.id = up.rol_id
   WHERE up.id = v_user_id;
 
+  IF v_username IS NULL OR length(v_username) = 0 THEN
+    RAISE EXCEPTION 'Usuario sin username configurado' USING ERRCODE = '42704';
+  END IF;
+
   v_es_privilegiado := v_rol_nombre IN ('ROL_ADMIN','ROL_GERENTE','ROL_COORDINADOR_VENTAS');
 
   SELECT estado_cliente, created_by, vendedor_username
@@ -114,11 +118,13 @@ BEGIN
    WHERE id = p_cliente_id;
 
   INSERT INTO crm.cliente_interaccion (
-    cliente_id, usuario_id, tipo, notas,
-    estado_anterior, estado_nuevo, created_at
+    cliente_id, vendedor_username, tipo, notas,
+    estado_anterior, estado_nuevo,
+    fecha_interaccion, created_at
   ) VALUES (
-    p_cliente_id, v_user_id, 'cambio_estado', p_motivo,
-    v_estado_actual, p_estado_nuevo, now()
+    p_cliente_id, v_username, 'cambio_estado', p_motivo,
+    v_estado_actual, p_estado_nuevo,
+    now(), now()
   )
   RETURNING id INTO v_interaccion_id;
 

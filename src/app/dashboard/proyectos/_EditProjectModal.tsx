@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from 'react';
-import { XMarkIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { X as XMarkIcon, ImageIcon as PhotoIcon, Trash2 as TrashIcon } from 'lucide-react';
 import { actualizarProyecto } from './_actions';
 import toast from 'react-hot-toast';
 import type { ProyectoMediaItem } from "@/types/proyectos";

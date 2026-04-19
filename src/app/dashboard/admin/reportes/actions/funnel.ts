@@ -68,11 +68,11 @@ export async function obtenerReporteFunnel(
     }, {});
 
     const etapas = [
-      { id: 'leads',       label: 'Leads captados',   descripcion: 'Total clientes registrados en el período',       cantidad: totalLeads,       porcentaje: 100,                                                                                    color: '#6366f1', icon: '👥' },
-      { id: 'contactados', label: 'Contactados',       descripcion: 'Leads con al menos una interacción registrada',  cantidad: totalContactados, porcentaje: totalLeads > 0 ? Math.round((totalContactados / totalLeads) * 100) : 0,       color: '#3b82f6', icon: '📞' },
-      { id: 'visita',      label: 'Visita realizada',  descripcion: 'Leads que visitaron al menos un proyecto',       cantidad: totalConVisita,   porcentaje: totalLeads > 0 ? Math.round((totalConVisita / totalLeads) * 100) : 0,          color: '#f59e0b', icon: '🏠' },
-      { id: 'reserva',     label: 'Reserva activa',    descripcion: 'Leads con reserva de lote generada',             cantidad: totalConReserva,  porcentaje: totalLeads > 0 ? Math.round((totalConReserva / totalLeads) * 100) : 0,         color: '#f97316', icon: '📋' },
-      { id: 'venta',       label: 'Venta cerrada',     descripcion: 'Leads que finalizaron en venta confirmada',      cantidad: totalVentas,      porcentaje: totalLeads > 0 ? Math.round((totalVentas / totalLeads) * 100) : 0,             color: '#22c55e', icon: '🎉' },
+      { id: 'leads',       label: 'Leads captados',   descripcion: 'Total clientes registrados en el período',       cantidad: totalLeads,       porcentaje: 100,                                                                                    color: '#6366f1' },
+      { id: 'contactados', label: 'Contactados',       descripcion: 'Leads con al menos una interacción registrada',  cantidad: totalContactados, porcentaje: totalLeads > 0 ? Math.round((totalContactados / totalLeads) * 100) : 0,       color: '#3b82f6' },
+      { id: 'visita',      label: 'Visita realizada',  descripcion: 'Leads que visitaron al menos un proyecto',       cantidad: totalConVisita,   porcentaje: totalLeads > 0 ? Math.round((totalConVisita / totalLeads) * 100) : 0,          color: '#f59e0b' },
+      { id: 'reserva',     label: 'Reserva activa',    descripcion: 'Leads con reserva de lote generada',             cantidad: totalConReserva,  porcentaje: totalLeads > 0 ? Math.round((totalConReserva / totalLeads) * 100) : 0,         color: '#f97316' },
+      { id: 'venta',       label: 'Venta cerrada',     descripcion: 'Leads que finalizaron en venta confirmada',      cantidad: totalVentas,      porcentaje: totalLeads > 0 ? Math.round((totalVentas / totalLeads) * 100) : 0,             color: '#22c55e' },
     ];
 
     const conversiones = [

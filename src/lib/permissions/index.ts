@@ -9,4 +9,5 @@ export {
   usePermissions,
   usePermiso,
   useRol,
+  PermissionsProvider,
 } from './client';

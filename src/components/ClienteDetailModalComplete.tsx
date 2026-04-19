@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import type { SVGProps } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, HomeModernIcon, DocumentTextIcon, ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { X as XMarkIcon, Phone as PhoneIcon, Mail as EnvelopeIcon, MapPin as MapPinIcon, User as UserIcon, Building2 as BuildingOfficeIcon, Calendar as CalendarIcon, Home as HomeModernIcon, FileText as DocumentTextIcon, ExternalLink as ArrowTopRightOnSquareIcon, Clipboard as ClipboardDocumentIcon, Check as CheckIcon, AlertTriangle as ExclamationTriangleIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { PageLoader } from '@/components/ui/PageLoader';

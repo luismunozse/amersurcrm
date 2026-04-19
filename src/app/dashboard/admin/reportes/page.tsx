@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Calendar, Download, BarChart3, UserCheck, UserCog, MessageSquare,
@@ -18,10 +19,10 @@ import ReporteNivelInteres from "./components/ReporteNivelInteres";
 import ReporteOrigenLead from "./components/ReporteOrigenLead";
 import ReporteTiempoRespuesta from "./components/ReporteTiempoRespuesta";
 import ResumenKPIs from "./components/ResumenKPIs";
+import SidebarSecciones from "./components/SidebarSecciones";
 import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
 import DatePicker from "@/components/ui/DatePicker";
 import toast from "react-hot-toast";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/PageLoader";
@@ -77,16 +78,41 @@ const ALL_TABS = [
   { id: "rendimiento",     title: "Rendimiento",      icon: UserCog },
 ];
 
-export default function ReportesPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("30");
-  const [activeTab, setActiveTab] = useState("analisis");
-  // Registra qué tabs ya se visitaron (carga lazy + caché sin re-fetch)
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
-    () => new Set(["analisis"])
-  );
+const SECCION_DEFAULT = "analisis";
+const SECCIONES_VALIDAS = new Set(ALL_TABS.map((t) => t.id));
 
-  // Ref al contenedor de tabs para captura visual PDF
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
+export default function ReportesPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ReportesPageContent />
+    </Suspense>
+  );
+}
+
+function ReportesPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [selectedPeriod, setSelectedPeriod] = useState("30");
+
+  // Fuente de verdad del tab activo: URL param ?seccion=<id>
+  const seccionUrl = searchParams.get("seccion");
+  const activeTab =
+    seccionUrl && SECCIONES_VALIDAS.has(seccionUrl) ? seccionUrl : SECCION_DEFAULT;
+
+  // Registra qué secciones ya se visitaron (lazy load + caché sin re-fetch)
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+    () => new Set([activeTab]),
+  );
+  useEffect(() => {
+    setVisitedTabs((prev) =>
+      prev.has(activeTab) ? prev : new Set([...prev, activeTab]),
+    );
+  }, [activeTab]);
+
+  // Ref al <main> con las secciones, para captura visual PDF
+  const mainContentRef = useRef<HTMLDivElement>(null);
 
   // Fechas personalizadas
   const fechasPreset = calcularFechasPeriodo(selectedPeriod);
@@ -131,8 +157,10 @@ export default function ReportesPage() {
   };
 
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    setVisitedTabs(prev => new Set([...prev, tab]));
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("seccion", tab);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setVisitedTabs((prev) => new Set([...prev, tab]));
   };
 
   const handleExportarCompleto = async () => {
@@ -155,12 +183,12 @@ export default function ReportesPage() {
     const tabActual = ALL_TABS.find(t => t.id === activeTab);
     if (!tabActual) return;
 
-    // Buscar el contenido visible del tab activo dentro del contenedor
-    const container = tabsContainerRef.current;
+    // Buscar el contenido visible de la sección activa
+    const container = mainContentRef.current;
     if (!container) return;
 
     const activeContent = container.querySelector<HTMLElement>(
-      `[data-state="active"][role="tabpanel"]`
+      `[data-seccion-activa="true"]`
     );
     if (!activeContent || activeContent.children.length === 0) {
       toast.error('No hay contenido visible para exportar', { id: 'export-bloque' });
@@ -301,153 +329,194 @@ export default function ReportesPage() {
         fechaFin={modoPersonalizado ? fechaFin : undefined}
       />
 
-      {/* Sección unificada de reportes */}
-      <div className="bg-crm-card border border-crm-border rounded-xl p-6">
-        <Tabs ref={tabsContainerRef} value={activeTab} onValueChange={handleTabChange} className="w-full">
+      {/* Sección unificada de reportes: sidebar de secciones + contenido */}
+      <div className="bg-crm-card border border-crm-border rounded-xl overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          <SidebarSecciones
+            secciones={ALL_TABS}
+            activeId={activeTab}
+            onChange={handleTabChange}
+          />
 
-          {/* Tab Navigation - scrolleable en móvil */}
-          <div className="flex items-center justify-between mb-6" data-pdf-ignore>
-            <div className="overflow-x-auto -mx-1 px-1 flex-1">
-              <TabsList className="flex flex-nowrap w-max min-w-full bg-transparent p-0 gap-1 h-auto">
-                {ALL_TABS.map((tab) => (
-                  <TabsTrigger
-                    key={tab.id}
-                    value={tab.id}
-                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors bg-crm-card-hover text-crm-text-primary hover:bg-crm-sidebar-hover data-[state=active]:bg-crm-primary data-[state=active]:text-white whitespace-nowrap"
-                  >
-                    <tab.icon className="w-4 h-4 flex-shrink-0" />
-                    <span>{tab.title}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          <main ref={mainContentRef} className="flex-1 min-w-0 p-4 md:p-6">
+            {/* Header de la sección activa con PDF Sección */}
+            <div className="flex items-center justify-between mb-6" data-pdf-ignore>
+              <h2 className="text-lg font-semibold text-crm-text-primary truncate">
+                {ALL_TABS.find((t) => t.id === activeTab)?.title}
+              </h2>
+              <button
+                onClick={handleExportarBloque}
+                title={`Exportar "${ALL_TABS.find((t) => t.id === activeTab)?.title}" como PDF con gráficos`}
+                className="flex-shrink-0 ml-3 flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors"
+              >
+                <FileDown className="w-4 h-4" />
+                <span className="hidden sm:inline">PDF Sección</span>
+              </button>
             </div>
 
-            {/* Botón exportar bloque actual */}
-            <button
-              onClick={handleExportarBloque}
-              title={`Exportar "${ALL_TABS.find(t => t.id === activeTab)?.title}" como PDF con gráficos`}
-              className="flex-shrink-0 ml-3 flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors"
+            {/* ── Secciones que usan datos de useReportes ── */}
+            <section
+              data-seccion="analisis"
+              data-seccion-activa={activeTab === "analisis" ? "true" : undefined}
+              className={activeTab === "analisis" ? "" : "hidden"}
             >
-              <FileDown className="w-4 h-4" />
-              <span className="hidden sm:inline">PDF Sección</span>
-            </button>
-          </div>
+              {visitedTabs.has("analisis") && renderOverviewContent(
+                () => <GraficosTendencias tendencias={data!.tendencias} metricas={data!.metricas} />
+              )}
+            </section>
 
-          {/* ── Tabs que usan datos de useReportes ── */}
-          <TabsContent value="analisis" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("analisis") && renderOverviewContent(
-              () => <GraficosTendencias tendencias={data!.tendencias} metricas={data!.metricas} />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="comparacion"
+              data-seccion-activa={activeTab === "comparacion" ? "true" : undefined}
+              className={activeTab === "comparacion" ? "" : "hidden"}
+            >
+              {visitedTabs.has("comparacion") && renderOverviewContent(
+                () => <ComparacionPeriodos periodoActual={selectedPeriod} datosActuales={data!} />
+              )}
+            </section>
 
-          <TabsContent value="comparacion" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("comparacion") && renderOverviewContent(
-              () => <ComparacionPeriodos periodoActual={selectedPeriod} datosActuales={data!} />
-            )}
-          </TabsContent>
+            {/* ── Secciones con sus propias server actions ── */}
+            <section
+              data-seccion="funnel"
+              data-seccion-activa={activeTab === "funnel" ? "true" : undefined}
+              className={activeTab === "funnel" ? "" : "hidden"}
+            >
+              {visitedTabs.has("funnel") && (
+                <ReporteFunnel
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          {/* ── Tabs con sus propias server actions ── */}
-          <TabsContent value="funnel" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("funnel") && (
-              <ReporteFunnel
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="nivel-interes"
+              data-seccion-activa={activeTab === "nivel-interes" ? "true" : undefined}
+              className={activeTab === "nivel-interes" ? "" : "hidden"}
+            >
+              {visitedTabs.has("nivel-interes") && (
+                <ReporteNivelInteres
+                  periodo={selectedPeriod}
+                  fechaInicioDefault={fechasEfectivas.fechaInicio}
+                  fechaFinDefault={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="nivel-interes" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("nivel-interes") && (
-              <ReporteNivelInteres
-                periodo={selectedPeriod}
-                fechaInicioDefault={fechasEfectivas.fechaInicio}
-                fechaFinDefault={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="origen-lead"
+              data-seccion-activa={activeTab === "origen-lead" ? "true" : undefined}
+              className={activeTab === "origen-lead" ? "" : "hidden"}
+            >
+              {visitedTabs.has("origen-lead") && (
+                <ReporteOrigenLead
+                  periodo={selectedPeriod}
+                  fechaInicioDefault={fechasEfectivas.fechaInicio}
+                  fechaFinDefault={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="origen-lead" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("origen-lead") && (
-              <ReporteOrigenLead
-                periodo={selectedPeriod}
-                fechaInicioDefault={fechasEfectivas.fechaInicio}
-                fechaFinDefault={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="tiempo-respuesta"
+              data-seccion-activa={activeTab === "tiempo-respuesta" ? "true" : undefined}
+              className={activeTab === "tiempo-respuesta" ? "" : "hidden"}
+            >
+              {visitedTabs.has("tiempo-respuesta") && (
+                <ReporteTiempoRespuesta
+                  periodo={selectedPeriod}
+                  fechaInicioDefault={fechasEfectivas.fechaInicio}
+                  fechaFinDefault={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="tiempo-respuesta" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("tiempo-respuesta") && (
-              <ReporteTiempoRespuesta
-                periodo={selectedPeriod}
-                fechaInicioDefault={fechasEfectivas.fechaInicio}
-                fechaFinDefault={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="gestion"
+              data-seccion-activa={activeTab === "gestion" ? "true" : undefined}
+              className={activeTab === "gestion" ? "" : "hidden"}
+            >
+              {visitedTabs.has("gestion") && (
+                <ReporteGestionClientes
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="gestion" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("gestion") && (
-              <ReporteGestionClientes
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="interacciones"
+              data-seccion-activa={activeTab === "interacciones" ? "true" : undefined}
+              className={activeTab === "interacciones" ? "" : "hidden"}
+            >
+              {visitedTabs.has("interacciones") && (
+                <ReporteInteracciones
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="interacciones" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("interacciones") && (
-              <ReporteInteracciones
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="propiedades"
+              data-seccion-activa={activeTab === "propiedades" ? "true" : undefined}
+              className={activeTab === "propiedades" ? "" : "hidden"}
+            >
+              {visitedTabs.has("propiedades") && (
+                <ReportePropiedades
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="propiedades" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("propiedades") && (
-              <ReportePropiedades
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="ventas"
+              data-seccion-activa={activeTab === "ventas" ? "true" : undefined}
+              className={activeTab === "ventas" ? "" : "hidden"}
+            >
+              {visitedTabs.has("ventas") && (
+                <ReporteVentas
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="ventas" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("ventas") && (
-              <ReporteVentas
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
+            <section
+              data-seccion="clientes"
+              data-seccion-activa={activeTab === "clientes" ? "true" : undefined}
+              className={activeTab === "clientes" ? "" : "hidden"}
+            >
+              {visitedTabs.has("clientes") && (
+                <ReporteClientes
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
 
-          <TabsContent value="clientes" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("clientes") && (
-              <ReporteClientes
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="rendimiento" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {visitedTabs.has("rendimiento") && (
-              <ReporteRendimientoVendedores
-                periodo={selectedPeriod}
-                fechaInicio={fechasEfectivas.fechaInicio}
-                fechaFin={fechasEfectivas.fechaFin}
-              />
-            )}
-          </TabsContent>
-
-        </Tabs>
+            <section
+              data-seccion="rendimiento"
+              data-seccion-activa={activeTab === "rendimiento" ? "true" : undefined}
+              className={activeTab === "rendimiento" ? "" : "hidden"}
+            >
+              {visitedTabs.has("rendimiento") && (
+                <ReporteRendimientoVendedores
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+          </main>
+        </div>
       </div>
     </div>
   );

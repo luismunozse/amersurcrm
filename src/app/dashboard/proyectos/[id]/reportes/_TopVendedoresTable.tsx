@@ -1,6 +1,6 @@
 "use client";
 
-import { TrophyIcon } from "@heroicons/react/24/solid";
+import { Trophy as TrophyIcon } from "lucide-react";
 
 export default function TopVendedoresTable({
   data,

@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
-import { Sidebar } from "@/components/Sidebar";
+import { SidebarShadcn } from "@/components/SidebarShadcn";
+import { SidebarProvider, SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import type { NotificacionNoLeida } from "@/types/crm";
 import type { ExchangeRate } from "@/lib/exchange";
 import { UserProfileProvider } from "./UserProfileContext";
+import { PermissionsProvider } from "@/lib/permissions";
+import type { UsuarioConPermisos } from "@/lib/permissions/types";
 import { registerPushSubscription } from "@/lib/pushClient";
 import NotificationPermissionPrompt from "@/components/NotificationPermissionPrompt";
 import ChangelogModal, { useChangelog } from "@/components/ChangelogModal";
@@ -23,6 +25,7 @@ export default function DashboardClient({
   notificationsCount = 0,
   exchangeRates = [],
   pushConfig,
+  initialUsuarioPermisos = null,
 }: {
   children: React.ReactNode;
   userEmail?: string;
@@ -38,9 +41,8 @@ export default function DashboardClient({
     enabled: boolean;
     vapidPublicKey: string | null;
   };
+  initialUsuarioPermisos?: UsuarioConPermisos | null;
 }) {
-  const [open, setOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userAvatarUrl ?? null);
   const hasRegisteredPush = useRef(false);
   const { isOpen: isChangelogOpen, hasNewVersion, openChangelog, closeChangelog } = useChangelog();
@@ -53,7 +55,6 @@ export default function DashboardClient({
     setAvatarUrl(url);
   };
 
-  // Función para registrar push subscription
   const tryRegisterPush = useCallback(() => {
     if (
       !pushConfig?.enabled ||
@@ -75,11 +76,8 @@ export default function DashboardClient({
     });
   }, [pushConfig?.enabled, pushConfig?.vapidPublicKey]);
 
-  // Intentar registrar push al montar (solo funcionará si ya tiene permiso)
   useEffect(() => {
     if (hasRegisteredPush.current) return;
-
-    // Safari iOS no soporta Web Push Notifications
     if (typeof Notification === "undefined") return;
 
     if (Notification.permission === "denied") {
@@ -87,61 +85,53 @@ export default function DashboardClient({
       return;
     }
 
-    // Solo registrar si ya tiene permiso (no solicitar aquí)
     if (Notification.permission === "granted") {
       hasRegisteredPush.current = true;
       tryRegisterPush();
     }
   }, [tryRegisterPush]);
 
-  // Callback cuando el usuario otorga permiso via el prompt
   const handlePermissionGranted = useCallback(() => {
     hasRegisteredPush.current = true;
     tryRegisterPush();
   }, [tryRegisterPush]);
 
+  const headerProps = {
+    userEmail,
+    userName,
+    userUsername,
+    userRole,
+    userAvatarUrl: avatarUrl || undefined,
+    lastSignInAt,
+    notifications,
+    notificationsCount,
+    exchangeRates,
+    onOpenChangelog: openChangelog,
+    hasNewChangelog: hasNewVersion,
+  };
+
   return (
-    <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>
-      <div className="relative min-h-dvh bg-crm-bg-primary">
-        {/* Sidebar flotante - ahora es fixed en lugar de flex item */}
-        <Sidebar
-          isOpen={open}
-          onClose={() => setOpen(false)}
-          collapsed={collapsed}
-          onCollapseChange={setCollapsed}
-        />
-
-        {/* Contenido principal con padding dinámico según estado del sidebar */}
-        <div
-          className={cn(
-            "min-h-dvh flex flex-col transition-all duration-300 ease-out",
-            // En desktop, agregar margen izquierdo según el ancho del sidebar
-            "lg:ml-[var(--sidebar-w)]"
-          )}
-        >
-          {/* Header */}
-          <Header
-            onSidebarToggle={() => setOpen(true)}
-            userEmail={userEmail}
-            userName={userName}
-            userUsername={userUsername}
-            userRole={userRole}
-            userAvatarUrl={avatarUrl || undefined}
-            lastSignInAt={lastSignInAt}
-            sidebarCollapsed={collapsed}
-            notifications={notifications}
-            notificationsCount={notificationsCount}
-            exchangeRates={exchangeRates}
-            onOpenChangelog={openChangelog}
-            hasNewChangelog={hasNewVersion}
-          />
-
-          {/* Main content */}
-          <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
-        </div>
-      </div>
-      <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />
-      <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
-    </UserProfileProvider>
+    <PermissionsProvider initialUsuario={initialUsuarioPermisos}>
+      <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>
+        <SidebarProvider>
+          <SidebarShadcn />
+          <SidebarInset className="bg-crm-bg-primary">
+            <ShadcnHeaderBridge headerProps={headerProps} />
+            <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
+          </SidebarInset>
+        </SidebarProvider>
+        <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />
+        <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
+      </UserProfileProvider>
+    </PermissionsProvider>
   );
+}
+
+function ShadcnHeaderBridge({
+  headerProps,
+}: {
+  headerProps: Omit<React.ComponentProps<typeof Header>, "sidebarCollapsed">;
+}) {
+  const { state } = useSidebar();
+  return <Header sidebarCollapsed={state === "collapsed"} {...headerProps} />;
 }

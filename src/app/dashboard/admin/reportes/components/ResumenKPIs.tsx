@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, TrendingUp, Clock, DollarSign, UserCheck } from "lucide-react";
+import { Users, TrendingUp, Clock, DollarSign, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import {
   obtenerResumenKPIs,
@@ -41,7 +41,11 @@ function construirItems(data: ResumenKPIsData | null): KPIItem[] {
   const horas = data?.tiempoRespuestaPromedio.totalHoras ?? 0;
   const etiquetaTiempo = data?.tiempoRespuestaPromedio.etiqueta ?? "—";
   const ventas = data?.ventasPeriodo ?? 0;
-  const activos = data?.clientesActivos ?? 0;
+  const cerradas = data?.ventasCerradas ?? 0;
+
+  // La tasa de conversión es "válida" si hay leads como base de cálculo,
+  // aunque el valor sea 0% (significa "hubo leads pero ninguno convirtió").
+  const convEsVacio = leads === 0;
 
   return [
     {
@@ -55,8 +59,8 @@ function construirItems(data: ResumenKPIsData | null): KPIItem[] {
       key: "tasaConversion",
       label: "Tasa de conversión",
       icon: TrendingUp,
-      valor: conv > 0 ? `${conv.toFixed(1)}%` : "—",
-      esVacio: conv === 0,
+      valor: convEsVacio ? "—" : `${conv.toFixed(1)}%`,
+      esVacio: convEsVacio,
     },
     {
       key: "tiempo",
@@ -73,11 +77,11 @@ function construirItems(data: ResumenKPIsData | null): KPIItem[] {
       esVacio: ventas === 0,
     },
     {
-      key: "clientesActivos",
-      label: "Clientes activos",
-      icon: UserCheck,
-      valor: activos > 0 ? formatearEntero(activos) : "—",
-      esVacio: activos === 0,
+      key: "ventasCerradas",
+      label: "Ventas cerradas",
+      icon: CheckCircle2,
+      valor: cerradas > 0 ? formatearEntero(cerradas) : "—",
+      esVacio: cerradas === 0,
     },
   ];
 }

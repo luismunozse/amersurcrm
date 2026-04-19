@@ -1,52 +1,110 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { PermisoCodigo, UsuarioConPermisos, RolNombre } from './types';
 
-/**
- * Hook para obtener los permisos del usuario actual
- */
-export function usePermissions() {
+type PermissionsState = {
+  usuario: UsuarioConPermisos | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+};
+
+const PermissionsContext = createContext<PermissionsState | undefined>(undefined);
+
+async function fetchPermisos(): Promise<UsuarioConPermisos | null> {
+  const response = await fetch('/api/auth/permissions', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Error obteniendo permisos');
+  const data = await response.json();
+  return data.usuario as UsuarioConPermisos | null;
+}
+
+export function PermissionsProvider({
+  initialUsuario,
+  children,
+}: {
+  initialUsuario: UsuarioConPermisos | null;
+  children: ReactNode;
+}) {
+  const [usuario, setUsuario] = useState<UsuarioConPermisos | null>(initialUsuario);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await fetchPermisos();
+      setUsuario(next);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Error desconocido'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return (
+    <PermissionsContext.Provider value={{ usuario, loading, error, refetch }}>
+      {children}
+    </PermissionsContext.Provider>
+  );
+}
+
+function useStandalonePermissions(enabled: boolean): PermissionsState {
   const [usuario, setUsuario] = useState<UsuarioConPermisos | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<Error | null>(null);
   const retryCount = useRef(0);
   const MAX_RETRIES = 2;
 
-  useEffect(() => {
-    retryCount.current = 0;
-    fetchPermissions();
-  }, []);
-
-  const fetchPermissions = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/auth/permissions', { cache: 'no-store' });
-
-      if (!response.ok) {
-        throw new Error('Error obteniendo permisos');
-      }
-
-      const data = await response.json();
-      setUsuario(data.usuario);
+      const next = await fetchPermisos();
+      setUsuario(next);
       setError(null);
       retryCount.current = 0;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Error desconocido'));
       setUsuario(null);
-      // Reintento automático si falla (máximo MAX_RETRIES veces)
       if (retryCount.current < MAX_RETRIES) {
         retryCount.current += 1;
         const delay = retryCount.current * 1500;
-        setTimeout(() => fetchPermissions(), delay);
-        return; // No setear loading=false, seguimos en estado de carga
+        setTimeout(() => load(), delay);
+        return;
       }
     } finally {
       if (retryCount.current === 0 || retryCount.current >= MAX_RETRIES) {
         setLoading(false);
       }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    retryCount.current = 0;
+    load();
+  }, [enabled, load]);
+
+  return { usuario, loading, error, refetch: load };
+}
+
+/**
+ * Hook para obtener los permisos del usuario actual.
+ * Prefiere el PermissionsContext del layout; si no existe, hace fetch standalone.
+ */
+export function usePermissions() {
+  const ctx = useContext(PermissionsContext);
+  const standalone = useStandalonePermissions(ctx === undefined);
+  const { usuario, loading, error, refetch } = ctx ?? standalone;
 
   const tienePermiso = useCallback(
     (permiso: PermisoCodigo): boolean => {
@@ -88,34 +146,24 @@ export function usePermissions() {
     [usuario]
   );
 
-  const esAdmin = useCallback((): boolean => {
-    return tieneRol('ROL_ADMIN');
-  }, [tieneRol]);
-
-  const esCoordinador = useCallback((): boolean => {
-    return tieneRol('ROL_COORDINADOR_VENTAS');
-  }, [tieneRol]);
-
-  const esVendedor = useCallback((): boolean => {
-    return tieneRol('ROL_VENDEDOR');
-  }, [tieneRol]);
-
-  const esAdminOCoordinador = useCallback((): boolean => {
-    return tieneAlgunoDeRoles(['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS']);
-  }, [tieneAlgunoDeRoles]);
+  const esAdmin = useCallback((): boolean => tieneRol('ROL_ADMIN'), [tieneRol]);
+  const esCoordinador = useCallback((): boolean => tieneRol('ROL_COORDINADOR_VENTAS'), [tieneRol]);
+  const esVendedor = useCallback((): boolean => tieneRol('ROL_VENDEDOR'), [tieneRol]);
+  const esAdminOCoordinador = useCallback(
+    (): boolean => tieneAlgunoDeRoles(['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS']),
+    [tieneAlgunoDeRoles]
+  );
 
   return {
     usuario,
     loading,
     error,
-    refetch: fetchPermissions,
-    // Métodos de verificación
+    refetch,
     tienePermiso,
     tieneAlgunoDePermisos,
     tieneTodosLosPermisos,
     tieneRol,
     tieneAlgunoDeRoles,
-    // Helpers de rol
     esAdmin,
     esCoordinador,
     esVendedor,

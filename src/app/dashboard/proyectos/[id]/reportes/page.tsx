@@ -1,6 +1,6 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
-import { ArrowLeftIcon, ChartBarIcon, ArrowTrendingUpIcon, UsersIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
+import { ArrowLeft as ArrowLeftIcon, BarChart3 as ChartBarIcon, TrendingUp as ArrowTrendingUpIcon, Users as UsersIcon, DollarSign as CurrencyDollarIcon } from "lucide-react";
 import Link from "next/link";
 import VentasMensualesChart from "./_VentasMensualesChart";
 import EstadoLotesChart from "./_EstadoLotesChart";

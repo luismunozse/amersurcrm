@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, MapPinIcon, UserIcon, BuildingOfficeIcon, CalendarIcon, CurrencyDollarIcon, ChatBubbleLeftRightIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { X as XMarkIcon, Phone as PhoneIcon, Mail as EnvelopeIcon, MapPin as MapPinIcon, User as UserIcon, Building2 as BuildingOfficeIcon, Calendar as CalendarIcon, DollarSign as CurrencyDollarIcon, MessagesSquare as ChatBubbleLeftRightIcon, FileText as DocumentTextIcon } from 'lucide-react';
 
 interface ClienteDetailModalProps {
   isOpen: boolean;

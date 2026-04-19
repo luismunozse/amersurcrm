@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Recordatorio, RecordatorioFormData, TIPOS_RECORDATORIO_OPTIONS, PRIORIDADES_OPTIONS } from "@/lib/types/agenda";
 import { crearRecordatorio } from "./actions";
 import toast from "react-hot-toast";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { X as XMarkIcon } from "lucide-react";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface RecordatorioModalProps {

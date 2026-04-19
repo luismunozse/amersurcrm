@@ -1,12 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { TrendingUp, AlertCircle, Users, DollarSign, Target } from "lucide-react";
+import {
+  TrendingUp,
+  AlertCircle,
+  Users,
+  DollarSign,
+  Target,
+  Phone,
+  Home,
+  ClipboardList,
+  PartyPopper,
+  type LucideIcon,
+} from "lucide-react";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { obtenerReporteFunnel } from "../_actions";
+import { obtenerReporteFunnel, type EtapaFunnel } from "../_actions";
 import toast from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import ModalClientesEtapaFunnel from "./ModalClientesEtapaFunnel";
 
 interface ReporteFunnelProps {
   periodo: string;
@@ -29,6 +42,14 @@ const ESTADO_LABELS: Record<string, string> = {
   desestimado:     'Desestimado',
   potencial:       'Potencial',
   sin_estado:      'Sin estado',
+};
+
+const ETAPA_ICONS: Record<string, LucideIcon> = {
+  leads:       Users,
+  contactados: Phone,
+  visita:      Home,
+  reserva:     ClipboardList,
+  venta:       PartyPopper,
 };
 
 const ESTADO_COLORS: Record<string, string> = {
@@ -62,6 +83,23 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [etapaActiva, setEtapaActiva] = useState<{
+    id: EtapaFunnel;
+    label: string;
+  } | null>(null);
+
+  const abrirModalEtapa = useCallback((id: string, label: string) => {
+    if (id === "leads" || id === "contactados" || id === "visita" || id === "reserva" || id === "venta") {
+      setEtapaActiva({ id, label });
+    }
+  }, []);
+
+  const buildClientesLink = (estado: string) => {
+    const params = new URLSearchParams({ estado });
+    if (fechaInicio) params.set("fechaDesde", fechaInicio);
+    if (fechaFin) params.set("fechaHasta", fechaFin);
+    return `/dashboard/clientes?${params.toString()}`;
+  };
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -185,6 +223,7 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                   const botW    = nextEt ? barW(nextEt.cantidad) : topW;
                   const yMid    = yBase + BAR_H / 2;
                   const connY   = yBase + BAR_H;
+                  const Icon    = ETAPA_ICONS[etapa.id];
 
                   // Trapezoid (wider at top, narrower at bottom)
                   const trap = [
@@ -202,7 +241,29 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                                   : '#9CA3AF';
 
                   return (
-                    <g key={etapa.id}>
+                    <g
+                      key={etapa.id}
+                      onClick={() => abrirModalEtapa(etapa.id, etapa.label)}
+                      style={{ cursor: "pointer" }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Ver clientes de la etapa ${etapa.label}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          abrirModalEtapa(etapa.id, etapa.label);
+                        }
+                      }}
+                    >
+
+                      {/* Hit area invisible sobre toda la fila de la etapa */}
+                      <rect
+                        x={0}
+                        y={yBase}
+                        width={W}
+                        height={BAR_H}
+                        fill="transparent"
+                      />
 
                       {/* ─ Trapezoid fill ─ */}
                       <polygon
@@ -235,19 +296,19 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                       )}
 
                       {/* ─ Left: icon + stage label (fixed column) ─ */}
+                      {Icon && (
+                        <Icon
+                          x={LBL_X - 16}
+                          y={yMid - 15}
+                          width={16}
+                          height={16}
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          fill="none"
+                        />
+                      )}
                       <text
-                        x={LBL_X}
-                        y={yMid - 8}
-                        textAnchor="end"
-                        dominantBaseline="middle"
-                        fontSize="13"
-                        fontWeight="600"
-                        fill="currentColor"
-                      >
-                        {etapa.icon}
-                      </text>
-                      <text
-                        x={LBL_X - 20}
+                        x={LBL_X - 22}
                         y={yMid - 8}
                         textAnchor="end"
                         dominantBaseline="middle"
@@ -258,7 +319,7 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                         {etapa.label}
                       </text>
                       <text
-                        x={LBL_X - 20}
+                        x={LBL_X - 22}
                         y={yMid + 11}
                         textAnchor="end"
                         dominantBaseline="middle"
@@ -295,7 +356,7 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
 
                       {/* ─ Connector between stages ─ */}
                       {idx < numStages - 1 && (
-                        <g>
+                        <g pointerEvents="none">
                           {/* Dashed vertical line */}
                           <line
                             x1={CX} y1={connY + 3}
@@ -432,7 +493,12 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                       .reduce((s: number, v) => s + (v as number), 0);
                     const pct = total > 0 ? Math.round(((count as number) / total) * 100) : 0;
                     return (
-                      <div key={estado} className="flex items-center gap-2">
+                      <Link
+                        key={estado}
+                        href={buildClientesLink(estado)}
+                        className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-crm-card-hover transition-colors group"
+                        title={`Ver clientes en estado "${ESTADO_LABELS[estado] || estado}"`}
+                      >
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
                           ESTADO_COLORS[estado] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
                         }`}>
@@ -440,14 +506,14 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                         </span>
                         <div className="flex-1 h-1.5 bg-crm-border rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-crm-primary/50 rounded-full transition-all duration-700"
+                            className="h-full bg-crm-primary/50 rounded-full transition-all duration-700 group-hover:bg-crm-primary"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
                         <span className="text-xs font-bold text-crm-text-primary tabular-nums w-6 text-right shrink-0">
                           {count as number}
                         </span>
-                      </div>
+                      </Link>
                     );
                   })}
               </div>
@@ -456,6 +522,16 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
 
         </div>
       </div>
+
+      <ModalClientesEtapaFunnel
+        open={etapaActiva !== null}
+        etapa={etapaActiva?.id ?? null}
+        etapaLabel={etapaActiva?.label ?? ""}
+        periodo={periodo}
+        fechaInicio={fechaInicio}
+        fechaFin={fechaFin}
+        onClose={() => setEtapaActiva(null)}
+      />
     </div>
   );
 }

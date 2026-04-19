@@ -462,7 +462,6 @@ export const getCachedPipelineClientes = cache(
         capacidad_compra_estimada,
         ultimo_contacto,
         proxima_accion,
-        fecha_proxima_accion,
         origen_lead,
         propiedades_reservadas
       `)
@@ -490,8 +489,31 @@ export const getCachedPipelineClientes = cache(
     }
 
     const arr = (data ?? []) as any[];
-    const unique = Array.from(new Map(arr.map(c => [c.id, c])).values());
-    return unique as PipelineCliente[];
+    const unique = Array.from(new Map(arr.map(c => [c.id, c])).values()) as any[];
+    if (unique.length === 0) return [];
+
+    const ids = unique.map((c) => c.id);
+    const { data: interacciones, error: interErr } = await supabase
+      .schema('crm')
+      .from('cliente_interaccion')
+      .select('cliente_id, fecha_proxima_accion')
+      .in('cliente_id', ids)
+      .not('fecha_proxima_accion', 'is', null);
+
+    const proximasPorCliente = new Map<string, string>();
+    if (!interErr && interacciones) {
+      for (const row of interacciones as { cliente_id: string; fecha_proxima_accion: string }[]) {
+        const actual = proximasPorCliente.get(row.cliente_id);
+        if (!actual || row.fecha_proxima_accion < actual) {
+          proximasPorCliente.set(row.cliente_id, row.fecha_proxima_accion);
+        }
+      }
+    }
+
+    return unique.map((c) => ({
+      ...c,
+      fecha_proxima_accion: proximasPorCliente.get(c.id) ?? null,
+    })) as PipelineCliente[];
   }
 );
 

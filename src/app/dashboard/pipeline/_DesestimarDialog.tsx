@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { XCircleIcon } from "@heroicons/react/24/outline";
+import { XCircle as XCircleIcon } from "lucide-react";
 
 const MOTIVOS_SUGERIDOS = [
   "Precio fuera de presupuesto",

@@ -40,3 +40,11 @@ export { obtenerReporteFunnel } from "./funnel";
 // Resumen KPIs (cards superiores del módulo)
 export { obtenerResumenKPIs } from "./resumen-kpis";
 export type { ResumenKPIs } from "./resumen-kpis";
+
+// Drill-down del funnel: clientes por etapa
+export { obtenerClientesPorEtapaFunnel } from "./clientes-etapa-funnel";
+export type {
+  EtapaFunnel,
+  ClienteEtapaFunnel,
+  ResultadoEtapaFunnel,
+} from "./clientes-etapa-funnel";

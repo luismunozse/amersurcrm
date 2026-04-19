@@ -5,13 +5,13 @@ import { Recordatorio } from "@/lib/types/agenda";
 import { marcarRecordatorioCompletado, marcarRecordatorioLeido, eliminarRecordatorio } from "./actions";
 import toast from "react-hot-toast";
 import {
-  CheckIcon,
-  ClockIcon,
-  CalendarIcon,
-  TrashIcon,
-  PencilIcon,
-  PlusIcon
-} from "@heroicons/react/24/outline";
+  Check as CheckIcon,
+  Clock as ClockIcon,
+  Calendar as CalendarIcon,
+  Trash2 as TrashIcon,
+  Pencil as PencilIcon,
+  Plus as PlusIcon,
+} from "lucide-react";
 
 interface ListaRecordatoriosProps {
   recordatoriosIniciales: Recordatorio[];

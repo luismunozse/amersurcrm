@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(
-      `✅ [VendedoresActivos] Vendedor ${vendedorData.username} agregado con orden ${nuevoOrden}`
+      `✅ [VendedoresActivos] Vendedor ${vendedorData.username} agregado con orden ${vendedorActivo?.orden}`
     );
 
     return NextResponse.json({

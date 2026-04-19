@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { X as XMarkIcon } from "lucide-react";
 import { cambiarEstadoPropiedad } from "./_actions";
 import { actualizarLote } from "../proyectos/[id]/_actions";
 import toast from "react-hot-toast";

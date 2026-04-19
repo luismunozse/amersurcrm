@@ -13,7 +13,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { Search as MagnifyingGlassIcon, Filter as FunnelIcon, X as XMarkIcon, SlidersHorizontal as AdjustmentsHorizontalIcon } from 'lucide-react';
 
 interface LotesSearchBarProps {
   proyectoId: string;

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { XMarkIcon, PhoneIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, UserGroupIcon, VideoCameraIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
+import { X as XMarkIcon, Phone as PhoneIcon, Mail as EnvelopeIcon, MessagesSquare as ChatBubbleLeftRightIcon, Users as UserGroupIcon, Video as VideoCameraIcon, MessageSquareText as ChatBubbleBottomCenterTextIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { registrarInteraccion } from '@/app/dashboard/clientes/_actions_crm';
 import DatePicker from "@/components/ui/DatePicker";

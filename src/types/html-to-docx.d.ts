@@ -9,5 +9,5 @@ declare module 'html-to-docx' {
     html: string,
     headerHtml: string | null,
     options?: Options
-  ): Promise<Blob>;
+  ): Promise<Blob | Buffer>;
 }

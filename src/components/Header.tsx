@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Bars3Icon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { Gift } from "lucide-react";
+import { Search as MagnifyingGlassIcon, X as XMarkIcon, Gift } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import ThemeToggle from "./ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
 import UserAvatarMenu from "./UserAvatarMenu";
@@ -15,7 +15,6 @@ import { useOptionalUserProfileContext } from "@/app/dashboard/UserProfileContex
 import CurrencyConverter from "./CurrencyConverter";
 
 type HeaderProps = {
-  onSidebarToggle?: () => void;
   userEmail?: string;
   userName?: string;
   userUsername?: string;
@@ -31,7 +30,6 @@ type HeaderProps = {
 };
 
 export default function Header({
-  onSidebarToggle = () => {},
   userEmail,
   userName,
   userUsername,
@@ -68,14 +66,10 @@ export default function Header({
           <div className="flex justify-between items-center h-14 sm:h-16 lg:h-20">
             {/* Left: menú + logo */}
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <button
-                type="button"
-                onClick={onSidebarToggle}
-                className="lg:hidden inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-all duration-200 active:scale-95"
-                aria-label="Abrir menú"
-              >
-                <Bars3Icon className="h-6 w-6" />
-              </button>
+              <SidebarTrigger
+                className="w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-all duration-200 active:scale-95 [&_svg]:size-6"
+                aria-label="Alternar menú"
+              />
 
               {/* Logo - Visible en mobile o cuando sidebar está colapsado */}
               <Link

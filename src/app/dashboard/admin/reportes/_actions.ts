@@ -28,3 +28,10 @@ export { obtenerReporteFunnel } from "./actions/funnel";
 
 export { obtenerResumenKPIs } from "./actions/resumen-kpis";
 export type { ResumenKPIs } from "./actions/resumen-kpis";
+
+export { obtenerClientesPorEtapaFunnel } from "./actions/clientes-etapa-funnel";
+export type {
+  EtapaFunnel,
+  ClienteEtapaFunnel,
+  ResultadoEtapaFunnel,
+} from "./actions/clientes-etapa-funnel";

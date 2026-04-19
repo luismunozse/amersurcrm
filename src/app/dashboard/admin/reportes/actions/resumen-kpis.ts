@@ -12,7 +12,7 @@ export interface ResumenKPIs {
     etiqueta: string;
   };
   ventasPeriodo: number;
-  clientesActivos: number;
+  ventasCerradas: number;
 }
 
 export async function obtenerResumenKPIs(
@@ -37,8 +37,10 @@ export async function obtenerResumenKPIs(
     const tiempo = tiempoRes.data;
 
     const leadsCaptados = metricas?.metricas.clientes.nuevos ?? 0;
-    const clientesActivos = metricas?.metricas.clientes.activos ?? 0;
-    const ventasPeriodo = metricas?.metricas.ventas.valorTotal ?? 0;
+    // Usar ventasRegistradasEnPeriodo (filtrado por fecha_venta) en lugar de valorTotal,
+    // que tiene fallback a acumulados cuando el período no tiene ventas registradas.
+    const ventasPeriodo = metricas?.metricas.ventas.ventasRegistradasEnPeriodo ?? 0;
+    const ventasCerradas = metricas?.metricas.ventas.cantidadVentasEnPeriodo ?? 0;
     const tasaConversion = funnel?.tasaConversionFinal ?? 0;
     const promedioHoras = tiempo?.resumen?.promedioGlobalHoras ?? 0;
 
@@ -51,7 +53,7 @@ export async function obtenerResumenKPIs(
           etiqueta: formatearDuracion(promedioHoras),
         },
         ventasPeriodo,
-        clientesActivos,
+        ventasCerradas,
       },
       error: null,
     };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { XMarkIcon, ViewColumnsIcon } from "@heroicons/react/24/outline";
+import { X as XMarkIcon, Columns3 as ViewColumnsIcon } from "lucide-react";
 
 type PulseItem = {
   label: string;

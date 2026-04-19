@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Evento } from "@/lib/types/agenda";
 import { crearEvento, actualizarEvento, buscarLotes } from "./actions";
 import toast from "react-hot-toast";
-import { XMarkIcon, UserIcon } from "@heroicons/react/24/outline";
+import { X as XMarkIcon, User as UserIcon } from "lucide-react";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface EventoModalProps {

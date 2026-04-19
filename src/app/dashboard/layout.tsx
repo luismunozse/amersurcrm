@@ -10,6 +10,7 @@ import { createServerOnlyClient, createServiceRoleClient, getCachedAuthUser } fr
 import DashboardClient from "./DashboardClient";
 import { getCachedNotificacionesNoLeidas, getCachedNotificacionesCount } from "@/lib/cache.server";
 import { getSunatExchangeRates } from "@/lib/exchange";
+import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const s = await createServerOnlyClient();
@@ -67,6 +68,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     notifications,
     notificationsCount,
     exchangeRates,
+    usuarioPermisos,
   ] = await Promise.all([
     // CRÍTICA: configuración del sistema (necesaria para push)
     s
@@ -78,6 +80,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getCachedNotificacionesNoLeidas().catch(() => []),
     getCachedNotificacionesCount().catch(() => 0),
     getSunatExchangeRates().catch(() => []),
+    obtenerPermisosUsuario().catch(() => null),
   ]);
 
   const configuracion = configuracionResult?.data ?? null;
@@ -112,6 +115,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       notificationsCount={notificationsCount}
       exchangeRates={exchangeRates}
       pushConfig={pushConfig}
+      initialUsuarioPermisos={usuarioPermisos}
     >
       {children}
     </DashboardClient>

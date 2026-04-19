@@ -3,14 +3,14 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  BuildingOffice2Icon,
-  MapPinIcon,
-  ArrowRightIcon,
-  PhotoIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+  Building2 as BuildingOffice2Icon,
+  MapPin as MapPinIcon,
+  ArrowRight as ArrowRightIcon,
+  ImageIcon as PhotoIcon,
+  Search as MagnifyingGlassIcon,
+  Filter as FunnelIcon,
+  X as XMarkIcon,
+} from 'lucide-react';
 import QuickActions from './QuickActions';
 import type { ProyectoMediaItem } from '@/types/proyectos';
 

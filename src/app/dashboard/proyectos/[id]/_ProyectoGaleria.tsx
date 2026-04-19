@@ -3,7 +3,7 @@
 import { useState } from "react";
 import ImageCarousel from "@/components/ImageCarousel";
 import type { ProyectoMediaItem } from "@/types/proyectos";
-import { BuildingOffice2Icon } from "@heroicons/react/24/outline";
+import { Building2 as BuildingOffice2Icon } from "lucide-react";
 
 interface ProyectoGaleriaProps {
   nombre: string;

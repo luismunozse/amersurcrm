@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { AlertTriangle as ExclamationTriangleIcon, Info as InformationCircleIcon, CheckCircle2 as CheckCircleIcon, XCircle as XCircleIcon } from "lucide-react";
 
 type Tone = "info" | "warning" | "danger" | "success";
 

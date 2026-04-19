@@ -5,15 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
-  PencilSquareIcon,
-  ArrowTopRightOnSquareIcon,
-  MapPinIcon,
-  ShareIcon,
-  ChartBarIcon,
-  BuildingOffice2Icon,
-  TrashIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
+  SquarePen as PencilSquareIcon,
+  ExternalLink as ArrowTopRightOnSquareIcon,
+  MapPin as MapPinIcon,
+  Share2 as ShareIcon,
+  BarChart3 as ChartBarIcon,
+  Building2 as BuildingOffice2Icon,
+  Trash2 as TrashIcon,
+  AlertTriangle as ExclamationTriangleIcon,
+} from "lucide-react";
 import { eliminarProyecto } from "./_actions";
 import EditProjectModal from "./_EditProjectModal";
 import type { ProyectoMediaItem } from "@/types/proyectos";

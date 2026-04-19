@@ -30,27 +30,29 @@ export default function ContratoViewer({ isOpen, onClose, variables, clienteEmai
 
   async function handleExportWord() {
     startTransition(async () => {
-      try {
-        // Dynamic import para no cargar la librería si no se necesita
-        const htmlToDocx = (await import('html-to-docx')).default;
+      const filename = `Contrato_${variables.contrato_codigo}_${variables.cliente_nombre.replace(/\s+/g, '_')}.docx`;
 
-        const docxBlob = await htmlToDocx(htmlContent, null, {
-          table: { row: { cantSplit: false } },
-          footer: false,
-          header: false,
-          pageNumber: false,
+      try {
+        const res = await fetch('/api/contratos/docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: htmlContent, filename }),
         });
 
-        const url = URL.createObjectURL(docxBlob as Blob);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const docxBlob = await res.blob();
+        const url = URL.createObjectURL(docxBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Contrato_${variables.contrato_codigo}_${variables.cliente_nombre.replace(/\s+/g, '_')}.docx`;
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
         toast.success('Documento Word descargado');
       } catch (error) {
         console.error('Error exportando a Word:', error);
-        // Fallback: descargar como HTML
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
