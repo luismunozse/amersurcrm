@@ -29,6 +29,21 @@ const authenticatedRoutes: RuntimeCaching[] = [
     },
     handler: new NetworkOnly(),
   },
+  // Imágenes cross-origin desde Supabase Storage: NetworkOnly sin cachear.
+  // iOS standalone falla al servir respuestas opacas cacheadas del SW
+  // (imágenes grises/rotas); dejarlas ir directo a red evita el bug.
+  {
+    matcher: ({ url, request }) => {
+      if (request.destination !== "image") return false;
+      const host = url.hostname;
+      return (
+        host.endsWith(".supabase.co") ||
+        host.endsWith(".supabase.in") ||
+        host.endsWith(".supabase.com")
+      );
+    },
+    handler: new NetworkOnly(),
+  },
 ];
 
 const serwist = new Serwist({
