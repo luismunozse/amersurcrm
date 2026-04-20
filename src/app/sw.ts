@@ -1,6 +1,6 @@
 import { defaultCache } from "@serwist/next/worker";
-import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
 
 // Extiende el tipo global para permitir acceso a __SW_MANIFEST (inyectado por Serwist al build).
 declare global {
@@ -11,18 +11,52 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Rutas autenticadas: NUNCA cachear HTML/RSC — siempre ir a red.
+// iOS standalone tiende a servir caches obsoletos del SW (datos viejos o
+// vistos sin sesión). Las APIs también deben ir a red para no servir
+// respuestas con auth desactualizado.
+const authenticatedRoutes: RuntimeCaching[] = [
+  {
+    matcher: ({ url, request, sameOrigin }) => {
+      if (!sameOrigin) return false;
+      const path = url.pathname;
+      if (path.startsWith("/dashboard") || path.startsWith("/api/")) return true;
+      // RSC payloads: `_rsc` query param o accept header con text/x-component
+      if (url.searchParams.has("_rsc")) return true;
+      const accept = request.headers.get("accept") ?? "";
+      if (accept.includes("text/x-component")) return true;
+      return false;
+    },
+    handler: new NetworkOnly(),
+  },
+];
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
-  // Página de fallback cuando no hay red y la ruta no está cacheada
+  // Orden importa: las reglas de autenticadas van ANTES del defaultCache.
+  runtimeCaching: [...authenticatedRoutes, ...defaultCache],
+  // Página de fallback cuando no hay red y la ruta no está cacheada.
+  // Solo aplica a navegaciones que no matchearon las reglas anteriores
+  // (por ejemplo, la home pública o /login).
   fallbacks: {
     entries: [
       {
         url: "/offline",
-        matcher: ({ request }) => request.destination === "document",
+        matcher: ({ request }) => {
+          if (request.destination !== "document") return false;
+          // No dar fallback offline a rutas autenticadas — ya van NetworkOnly.
+          // Si están sin red, el browser muestra su error nativo, lo cual
+          // es preferible a un offline engañoso con datos stale.
+          try {
+            const path = new URL(request.url).pathname;
+            return !path.startsWith("/dashboard");
+          } catch {
+            return true;
+          }
+        },
       },
     ],
   },

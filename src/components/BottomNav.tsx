@@ -57,7 +57,12 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-crm-card/95 backdrop-blur border-t border-crm-border shadow-[0_-4px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)]"
+      // Notas iOS PWA:
+      // - bg sólido (sin /95) + sin backdrop-blur: blur semi-transparente rompe render en standalone.
+      // - transform-gpu + isolate: fuerza capa de composición y stacking propio, evita que el nav
+      //   se "despegue" del viewport al scrollear en iOS.
+      // - touch-action: manipulation en los targets: elimina delay/fallo de taps.
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-crm-card border-t border-crm-border shadow-[0_-4px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] isolate transform-gpu"
     >
       <ul className="flex items-stretch justify-around px-1">
         {visibles.map((item) => {
@@ -67,7 +72,7 @@ export default function BottomNav() {
             <li key={item.href} className="flex-1">
               <Link
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-0.5 min-h-[56px] py-1.5 text-[10px] font-medium transition-colors ${
+                className={`flex flex-col items-center justify-center gap-0.5 min-h-[56px] py-1.5 text-[10px] font-medium transition-colors touch-manipulation ${
                   activo
                     ? "text-crm-primary"
                     : "text-crm-text-muted hover:text-crm-text-primary"
@@ -92,7 +97,7 @@ export default function BottomNav() {
           <button
             type="button"
             onClick={() => sidebar.setOpenMobile(true)}
-            className="w-full flex flex-col items-center justify-center gap-0.5 min-h-[56px] py-1.5 text-[10px] font-medium text-crm-text-muted hover:text-crm-text-primary transition-colors"
+            className="w-full flex flex-col items-center justify-center gap-0.5 min-h-[56px] py-1.5 text-[10px] font-medium text-crm-text-muted hover:text-crm-text-primary transition-colors touch-manipulation"
             aria-label="Abrir menú completo"
           >
             <span className="grid place-items-center w-10 h-7 rounded-full">
