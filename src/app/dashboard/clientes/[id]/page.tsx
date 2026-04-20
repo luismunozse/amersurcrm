@@ -4,6 +4,7 @@ import { obtenerPermisosUsuario } from "@/lib/permissions/server";
 import { redirect, notFound } from "next/navigation";
 import ClienteDetailTabs, { ClienteTabType } from "./_ClienteDetailTabs";
 import AgendarEventoButton from "./_AgendarEventoButton";
+import RegistrarSeparacionButton from "./_RegistrarSeparacionButton";
 import { ArrowLeft, User, Phone, Mail, MapPin, AlertTriangle } from "lucide-react";
 import { contarSeguimientosVencidos } from "@/lib/utils/seguimientos";
 import Link from "next/link";
@@ -230,6 +231,12 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
   const seguimientosVencidos = contarSeguimientosVencidos(interacciones || []);
   const estadoColor = getEstadoClienteColor(cliente.estado_cliente);
 
+  // Puede registrar separacion: admin/coordinador/gerente o vendedor asignado al cliente.
+  const esPrivilegiado = ['ROL_ADMIN', 'ROL_GERENTE', 'ROL_COORDINADOR_VENTAS'].includes(
+    usuarioActual.rol,
+  );
+  const puedeRegistrarSeparacion = esPrivilegiado || esClientePropio;
+
   return (
     <div className="min-h-screen bg-crm-background">
       {/* Header */}
@@ -251,7 +258,12 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
               </div>
               <p className="text-sm text-crm-text-muted mt-1">{cliente.codigo_cliente}</p>
             </div>
-            <AgendarEventoButton clienteId={cliente.id} clienteNombre={cliente.nombre} />
+            <div className="flex items-center gap-2">
+              {cliente.estado_cliente === 'potencial' && puedeRegistrarSeparacion && (
+                <RegistrarSeparacionButton clienteId={cliente.id} />
+              )}
+              <AgendarEventoButton clienteId={cliente.id} clienteNombre={cliente.nombre} />
+            </div>
           </div>
 
           {/* Información Rápida */}

@@ -74,8 +74,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("[Login] Intentando autenticar con email:", emailToUse);
-
     // Autenticar con Supabase
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: emailToUse,
@@ -114,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // SEGURIDAD: Verificar que el usuario esté activo
     if (perfil && !perfil.activo) {
-      console.warn(`[Login] Usuario desactivado intentó iniciar sesión: ${emailToUse} (${authData.user.id})`);
+      console.warn(`[Login] Usuario desactivado intentó iniciar sesión: ${authData.user.id}`);
       // Cerrar la sesión que se acaba de crear
       await supabase.auth.signOut();
       return NextResponse.json(
@@ -127,7 +125,7 @@ export async function POST(request: NextRequest) {
     const rolData = perfil?.rol as { id?: string; nombre?: string } | null;
     const rolNombre = rolData?.nombre || "ROL_VENDEDOR";
 
-    console.log(`[Login] Usuario autenticado: ${emailToUse} (${authData.user.id}) - Rol: ${rolNombre}`);
+    console.log(`[Login] Usuario autenticado: ${authData.user.id} - Rol: ${rolNombre}`);
 
     return NextResponse.json({
       success: true,

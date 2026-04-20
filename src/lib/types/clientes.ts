@@ -10,7 +10,8 @@ export type EstadoCliente =
   | 'transferido'
   | 'intermedio'
   | 'desestimado'
-  | 'potencial';
+  | 'potencial'
+  | 'en_proceso';
 
 export type OrigenLead =
   | 'web'
@@ -214,6 +215,7 @@ export function getEstadoClienteColor(estado: EstadoCliente): string {
     case 'transferido': return 'green';
     case 'intermedio': return 'cyan';
     case 'potencial': return 'purple';
+    case 'en_proceso': return 'orange';
     case 'desestimado': return 'gray';
     default: return 'gray';
   }
@@ -226,6 +228,7 @@ export function getEstadoClienteLabel(estado: EstadoCliente): string {
     case 'transferido': return 'Transferido';
     case 'intermedio': return 'Intermedio';
     case 'potencial': return 'Potencial';
+    case 'en_proceso': return 'En Proceso';
     case 'desestimado': return 'Desestimado';
     default: return estado;
   }

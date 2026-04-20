@@ -11,6 +11,13 @@ import {
   Trash2 as TrashIcon,
   Pencil as PencilIcon,
   Plus as PlusIcon,
+  Users,
+  Phone,
+  FileText,
+  Home,
+  Bell,
+  User,
+  type LucideIcon,
 } from "lucide-react";
 
 interface ListaRecordatoriosProps {
@@ -104,14 +111,14 @@ export default function ListaRecordatorios({
     }
   };
 
-  const getTipoIcon = (tipo: string) => {
+  const getTipoIcon = (tipo: string): LucideIcon => {
     switch (tipo) {
-      case 'seguimiento_cliente': return '👥';
-      case 'llamada_prospecto': return '📞';
-      case 'envio_documentos': return '📄';
-      case 'visita_propiedad': return '🏠';
-      case 'reunion_equipo': return '👥';
-      default: return '⏰';
+      case 'seguimiento_cliente': return Users;
+      case 'llamada_prospecto': return Phone;
+      case 'envio_documentos': return FileText;
+      case 'visita_propiedad': return Home;
+      case 'reunion_equipo': return Users;
+      default: return Bell;
     }
   };
 
@@ -182,7 +189,7 @@ export default function ListaRecordatorios({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-lg">{getTipoIcon(recordatorio.tipo)}</span>
+                    {(() => { const Ic = getTipoIcon(recordatorio.tipo); return <Ic className="w-5 h-5 text-crm-text-secondary" aria-hidden />; })()}
                     <h4 className={`font-medium ${recordatorio.completado ? 'line-through text-gray-500' : 'text-crm-text-primary'}`}>
                       {recordatorio.titulo}
                     </h4>
@@ -204,14 +211,14 @@ export default function ListaRecordatorios({
                     </div>
                     {recordatorio.cliente_id && (
                       <div className="flex items-center space-x-1">
-                        <span>👤</span>
+                        <User className="w-3.5 h-3.5" aria-hidden />
                         <span>Cliente asignado</span>
                       </div>
                     )}
                     {recordatorio.propiedad_id && (
                       <div className="flex items-center space-x-1">
-                        <span>🏠</span>
-                        <span>Propiedad asignada</span>
+                        <Home className="w-3.5 h-3.5" aria-hidden />
+                        <span>Proyecto / Lote asignado</span>
                       </div>
                     )}
                   </div>

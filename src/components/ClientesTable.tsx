@@ -19,7 +19,7 @@ import { getErrorMessage } from "@/lib/errors";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Pagination } from "@/components/Pagination";
 import ClienteForm from "@/components/ClienteForm";
-import ClienteDetailModalComplete from "@/components/ClienteDetailModalComplete";
+import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
 import { Download, FileType } from "lucide-react";
@@ -114,8 +114,8 @@ export default function ClientesTable({
     id: null,
   });
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [showContactoModal, setShowContactoModal] = useState(false);
+  const { open: openQuickView } = useClienteQuickView();
   const [pendingEstadoChange, setPendingEstadoChange] = useState<{
     clienteId: string;
     nuevoEstado: EstadoCliente;
@@ -352,13 +352,7 @@ export default function ClientesTable({
   };
 
   const handleShowDetail = (cliente: Cliente) => {
-    setSelectedCliente(cliente);
-    setShowDetailModal(true);
-  };
-
-  const handleCloseDetail = () => {
-    setShowDetailModal(false);
-    setSelectedCliente(null);
+    openQuickView(cliente.id);
   };
 
 
@@ -813,7 +807,7 @@ export default function ClientesTable({
 
       {/* Tabla */}
       <div className="crm-card overflow-hidden">
-        <div className="flex justify-between items-start px-4 py-3 border-b border-crm-border bg-crm-card-hover">
+        <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-start px-4 py-3 border-b border-crm-border bg-crm-card-hover">
           <div>
             <h3 className="text-sm font-semibold text-crm-text-primary">Listado de clientes</h3>
             <p className="text-xs text-crm-text-muted">
@@ -821,7 +815,7 @@ export default function ClientesTable({
             </p>
           </div>
           {puedeExportarClientes && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap [&>button]:justify-center [&>button]:w-full md:[&>button]:w-auto">
               <button
                 onClick={async () => {
                   if (selectedIds.size === 0) {
@@ -1144,12 +1138,6 @@ export default function ClientesTable({
         disabled={isPending}
       />
 
-      <ClienteDetailModalComplete
-        isOpen={showDetailModal}
-        onClose={handleCloseDetail}
-        cliente={selectedCliente}
-      />
-
       {/* Modal para registrar contacto al cambiar estado */}
       <RegistrarContactoModal
         isOpen={showContactoModal}
@@ -1311,9 +1299,10 @@ const ClienteRow = memo(function ClienteRow({
       )}
       {/* Cliente */}
       <td className="px-4 py-4">
-        <Link
-          href={`/dashboard/clientes/${cliente.id}`}
-          className="flex items-center group gap-3 text-crm-text-primary hover:text-crm-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40 rounded-md"
+        <button
+          type="button"
+          onClick={() => onShowDetail(cliente)}
+          className="flex items-center group gap-3 text-crm-text-primary hover:text-crm-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40 rounded-md text-left"
         >
           <div className="w-10 h-10 bg-crm-primary/10 rounded-full flex items-center justify-center">
             <svg className="w-5 h-5 text-crm-primary group-hover:scale-105 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1327,7 +1316,7 @@ const ClienteRow = memo(function ClienteRow({
                cliente.tipo_cliente === 'empresa' ? 'Empresa' : 'No especificado'}
             </div>
           </div>
-        </Link>
+        </button>
       </td>
 
       {/* Estado */}

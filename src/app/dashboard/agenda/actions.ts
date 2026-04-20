@@ -350,7 +350,32 @@ export async function buscarLotes(query: string): Promise<Array<{
   }
 }
 
-export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes', vendedorFiltroId?: string | null): Promise<Evento[]> {
+export async function obtenerProyectosAgenda(): Promise<Array<{ id: string; nombre: string }>> {
+  try {
+    const supabase = await createServerOnlyClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('proyecto')
+      .select('id, nombre')
+      .order('nombre', { ascending: true });
+
+    if (error || !data) return [];
+    return data.map((p) => ({ id: p.id, nombre: p.nombre }));
+  } catch (error) {
+    console.warn('Error obteniendo proyectos para agenda:', error);
+    return [];
+  }
+}
+
+export async function obtenerEventos(
+  fecha: Date,
+  vista: VistaCalendario = 'mes',
+  vendedorFiltroId?: string | null,
+  proyectoFiltroId?: string | null,
+  rangoPersonalizado?: { desde?: string | null; hasta?: string | null } | null,
+): Promise<Evento[]> {
   try {
     const supabase = await createServerOnlyClient();
     const {
@@ -369,20 +394,36 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
     let inicioRango: Date;
     let finRango: Date;
 
-    switch (vista) {
-      case 'semana':
-        inicioRango = startOfWeek(fecha, { weekStartsOn: 1 });
-        finRango = endOfWeek(fecha, { weekStartsOn: 1 });
-        break;
-      case 'dia':
-        inicioRango = startOfDay(fecha);
-        finRango = endOfDay(fecha);
-        break;
-      case 'mes':
-      default:
-        inicioRango = startOfMonth(fecha);
-        finRango = endOfMonth(fecha);
-        break;
+    if (rangoPersonalizado?.desde && rangoPersonalizado?.hasta) {
+      inicioRango = startOfDay(new Date(rangoPersonalizado.desde));
+      finRango = endOfDay(new Date(rangoPersonalizado.hasta));
+    } else {
+      switch (vista) {
+        case 'semana':
+          inicioRango = startOfWeek(fecha, { weekStartsOn: 1 });
+          finRango = endOfWeek(fecha, { weekStartsOn: 1 });
+          break;
+        case 'dia':
+          inicioRango = startOfDay(fecha);
+          finRango = endOfDay(fecha);
+          break;
+        case 'mes':
+        default:
+          inicioRango = startOfMonth(fecha);
+          finRango = endOfMonth(fecha);
+          break;
+      }
+    }
+
+    // Filtro por proyecto: derivar los lote.id que pertenecen al proyecto y filtrar por propiedad_id
+    let lotesPermitidos: string[] | null = null;
+    if (proyectoFiltroId) {
+      const { data: lotesProyecto } = await supabase
+        .from('lote')
+        .select('id')
+        .eq('proyecto_id', proyectoFiltroId);
+      lotesPermitidos = (lotesProyecto ?? []).map((l) => l.id);
+      if (lotesPermitidos.length === 0) return [];
     }
 
     let query = supabase
@@ -443,6 +484,10 @@ export async function obtenerEventos(fecha: Date, vista: VistaCalendario = 'mes'
       if (!esAdminOGerente) {
         query = query.eq('vendedor_id', user.id);
       }
+    }
+
+    if (lotesPermitidos) {
+      query = query.in('propiedad_id', lotesPermitidos);
     }
 
     const { data, error } = await query;

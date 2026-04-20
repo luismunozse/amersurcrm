@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { User, Phone, Clock } from "lucide-react";
 import { formatCapacidadCompra } from "@/lib/types/clientes";
 import type { PipelineCliente } from "@/lib/cache.server";
+import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 
 const PROXIMA_ACCION_LABEL: Record<string, string> = {
   llamar: "Llamar",
@@ -59,6 +59,7 @@ interface Props {
 }
 
 export default function PipelineCard({ cliente, urgencia, asLink = true }: Props) {
+  const { open } = useClienteQuickView();
   const u = urgencia ?? getUrgencia(cliente.fecha_proxima_accion);
   const styles = URGENCIA_STYLES[u];
   const ultimoContacto = cliente.ultimo_contacto
@@ -121,8 +122,12 @@ export default function PipelineCard({ cliente, urgencia, asLink = true }: Props
   if (!asLink) return inner;
 
   return (
-    <Link href={`/dashboard/clientes/${cliente.id}`} className="block">
+    <button
+      type="button"
+      onClick={() => open(cliente.id)}
+      className="block w-full text-left"
+    >
       {inner}
-    </Link>
+    </button>
   );
 }

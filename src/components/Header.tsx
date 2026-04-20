@@ -134,12 +134,12 @@ export default function Header({
 
               <CurrencyConverter exchangeRates={exchangeRates} />
 
-              {/* Botón de Novedades/Changelog */}
+              {/* Botón de Novedades/Changelog — oculto en mobile para dar aire */}
               {onOpenChangelog && (
                 <button
                   type="button"
                   onClick={onOpenChangelog}
-                  className="relative inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                  className="hidden sm:inline-flex relative items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
                   aria-label="Ver novedades"
                   title="Ver novedades del sistema"
                 >

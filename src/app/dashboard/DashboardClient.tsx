@@ -13,6 +13,8 @@ import { registerPushSubscription } from "@/lib/pushClient";
 import NotificationPermissionPrompt from "@/components/NotificationPermissionPrompt";
 import ChangelogModal, { useChangelog } from "@/components/ChangelogModal";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ClienteQuickViewProvider } from "@/components/ClienteQuickViewSheet";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 
 export default function DashboardClient({
   children,
@@ -114,16 +116,19 @@ export default function DashboardClient({
   return (
     <PermissionsProvider initialUsuario={initialUsuarioPermisos}>
       <UserProfileProvider value={{ avatarUrl, setAvatarUrl: handleAvatarUpdate }}>
-        <SidebarProvider>
-          <SidebarShadcn />
-          <SidebarInset className="bg-crm-bg-primary min-w-0 overflow-x-hidden">
-            <ShadcnHeaderBridge headerProps={headerProps} />
-            <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
-          </SidebarInset>
-        </SidebarProvider>
-        <CommandPalette />
-        <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />
-        <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
+        <ClienteQuickViewProvider>
+          <SidebarProvider>
+            <SidebarShadcn />
+            <SidebarInset className="bg-crm-bg-primary min-w-0 overflow-x-hidden">
+              <MaintenanceBanner />
+              <ShadcnHeaderBridge headerProps={headerProps} />
+              <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
+            </SidebarInset>
+          </SidebarProvider>
+          <CommandPalette />
+          <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />
+          <ChangelogModal isOpen={isChangelogOpen} onClose={closeChangelog} />
+        </ClienteQuickViewProvider>
       </UserProfileProvider>
     </PermissionsProvider>
   );

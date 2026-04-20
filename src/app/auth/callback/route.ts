@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@/lib/supabase.server';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { getErrorCode } from '@/lib/utils/error';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('❌ Error al confirmar el cambio de email:', error);
-      console.error('Error code:', (error as any).code);
+      console.error('Error code:', getErrorCode(error));
       console.error('Error message:', error.message);
       return NextResponse.redirect(
         new URL('/dashboard/perfil?error=confirmation_failed', requestUrl.origin)

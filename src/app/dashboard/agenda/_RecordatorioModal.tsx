@@ -4,7 +4,25 @@ import { useState, useEffect } from "react";
 import { Recordatorio, RecordatorioFormData, TIPOS_RECORDATORIO_OPTIONS, PRIORIDADES_OPTIONS } from "@/lib/types/agenda";
 import { crearRecordatorio } from "./actions";
 import toast from "react-hot-toast";
-import { X as XMarkIcon } from "lucide-react";
+import {
+  X as XMarkIcon,
+  Home,
+  User,
+  Phone,
+  FileText,
+  Users,
+  Pencil,
+  type LucideIcon,
+} from "lucide-react";
+
+const TIPO_RECORDATORIO_ICON: Record<string, LucideIcon> = {
+  seguimiento_cliente: User,
+  llamada_prospecto: Phone,
+  envio_documentos: FileText,
+  visita_propiedad: Home,
+  reunion_equipo: Users,
+  personalizado: Pencil,
+};
 import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface RecordatorioModalProps {
@@ -153,18 +171,27 @@ export default function RecordatorioModal({
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
                   Tipo *
                 </label>
-                <select
-                  value={formData.tipo}
-                  onChange={(e) => handleInputChange("tipo", e.target.value)}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
-                  required
-                >
-                  {TIPOS_RECORDATORIO_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.icon} {option.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {TIPOS_RECORDATORIO_OPTIONS.map((option) => {
+                    const Ic = TIPO_RECORDATORIO_ICON[option.value] ?? Pencil;
+                    const activo = formData.tipo === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleInputChange("tipo", option.value)}
+                        className={`p-2.5 rounded-lg border-2 transition-all text-center flex flex-col items-center gap-1 ${
+                          activo
+                            ? "border-crm-primary bg-crm-primary/10 text-crm-primary"
+                            : "border-crm-border hover:border-crm-primary/50 text-crm-text-secondary"
+                        }`}
+                      >
+                        <Ic className="w-5 h-5" aria-hidden />
+                        <span className="text-xs leading-tight">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -211,7 +238,7 @@ export default function RecordatorioModal({
               </div>
             </div>
 
-            {/* Cliente y Propiedad */}
+            {/* Cliente y Proyecto/Lote */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-crm-text-primary mb-2">
@@ -231,15 +258,16 @@ export default function RecordatorioModal({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Propiedad
+                <label className="block text-sm font-medium text-crm-text-primary mb-2 inline-flex items-center gap-1.5">
+                  <Home className="w-4 h-4" aria-hidden />
+                  <span>Proyecto / Lote</span>
                 </label>
                 <select
                   value={formData.propiedad_id}
                   onChange={(e) => handleInputChange("propiedad_id", e.target.value)}
                   className="w-full px-3 py-2 border border-crm-border rounded-lg focus:ring-crm-primary focus:border-crm-primary bg-crm-card text-crm-text-primary"
                 >
-                  <option value="">Seleccionar propiedad</option>
+                  <option value="">Seleccionar proyecto / lote</option>
                   {propiedades.map(propiedad => (
                     <option key={propiedad.id} value={propiedad.id}>
                       {propiedad.identificacion_interna} - {propiedad.tipo}

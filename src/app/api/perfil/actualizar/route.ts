@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { getErrorCode } from "@/lib/utils/error";
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
 
         if (adminError) {
           console.error("Error al actualizar email con service role:", adminError);
-          const errorCode = (adminError as any).code;
+          const errorCode = getErrorCode(adminError);
           const errorMsg = adminError.message?.toLowerCase() || "";
 
           let errorMessage = "Error al actualizar el email.";
@@ -135,14 +136,14 @@ export async function POST(request: Request) {
         });
 
         if (emailError) {
+          const errorCode = getErrorCode(emailError);
           console.error("Error al actualizar email:", emailError);
-          console.error("Error code:", (emailError as any).code);
+          console.error("Error code:", errorCode);
           console.error("Error message:", emailError.message);
 
           // Mensajes de error más específicos basados en el código de error
           let errorMessage = "Error al actualizar el email.";
 
-          const errorCode = (emailError as any).code;
           const errorMsg = emailError.message?.toLowerCase() || "";
 
           if (errorCode === "email_address_invalid" || errorMsg.includes("invalid")) {

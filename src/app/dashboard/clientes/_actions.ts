@@ -523,3 +523,81 @@ export async function obtenerVendedores() {
 
   return vendedoresFiltrados;
 }
+
+export type ClienteQuickView = {
+  id: string;
+  codigo_cliente: string | null;
+  nombre: string;
+  estado_cliente: string | null;
+  tipo_cliente: string | null;
+  telefono: string | null;
+  telefono_whatsapp: string | null;
+  email: string | null;
+  direccion: Record<string, unknown> | null;
+  origen_lead: string | null;
+  interes_principal: string | null;
+  capacidad_compra_estimada: number | null;
+  vendedor_username: string | null;
+  vendedor_nombre: string | null;
+  ultimo_contacto: string | null;
+  proxima_accion: string | null;
+  fecha_proxima_accion: string | null;
+  notas: string | null;
+};
+
+export async function obtenerClienteParaQuickView(id: string): Promise<ClienteQuickView | null> {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [clienteRes, interaccionRes] = await Promise.all([
+    supabase
+      .from('cliente')
+      .select('id, codigo_cliente, nombre, estado_cliente, tipo_cliente, telefono, telefono_whatsapp, email, direccion, origen_lead, interes_principal, capacidad_compra_estimada, vendedor_username, ultimo_contacto, notas')
+      .eq('id', id)
+      .maybeSingle(),
+    supabase
+      .from('cliente_interaccion')
+      .select('proxima_accion, fecha_proxima_accion')
+      .eq('cliente_id', id)
+      .not('fecha_proxima_accion', 'is', null)
+      .order('fecha_proxima_accion', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const cliente = clienteRes.data;
+  if (!cliente) return null;
+
+  let vendedorNombre: string | null = null;
+  if (cliente.vendedor_username) {
+    const { data: vendedor } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('nombre_completo')
+      .eq('username', cliente.vendedor_username)
+      .maybeSingle();
+    vendedorNombre = vendedor?.nombre_completo ?? null;
+  }
+
+  return {
+    id: cliente.id,
+    codigo_cliente: cliente.codigo_cliente,
+    nombre: cliente.nombre,
+    estado_cliente: cliente.estado_cliente,
+    tipo_cliente: cliente.tipo_cliente,
+    telefono: cliente.telefono,
+    telefono_whatsapp: cliente.telefono_whatsapp,
+    email: cliente.email,
+    direccion: cliente.direccion as Record<string, unknown> | null,
+    origen_lead: cliente.origen_lead,
+    interes_principal: cliente.interes_principal,
+    capacidad_compra_estimada: cliente.capacidad_compra_estimada,
+    vendedor_username: cliente.vendedor_username,
+    vendedor_nombre: vendedorNombre,
+    ultimo_contacto: cliente.ultimo_contacto,
+    proxima_accion: interaccionRes.data?.proxima_accion ?? null,
+    fecha_proxima_accion: interaccionRes.data?.fecha_proxima_accion ?? null,
+    notas: cliente.notas,
+  };
+}

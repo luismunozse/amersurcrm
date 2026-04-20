@@ -33,8 +33,6 @@ export async function GET(request: NextRequest) {
 
       const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
 
-      console.log('[API /proyectos/list] User (token):', authUser?.id, 'Error:', authError);
-
       if (authError || !authUser) {
         return NextResponse.json(
           { error: "No autorizado" },
@@ -48,8 +46,6 @@ export async function GET(request: NextRequest) {
       // Token desde cookies (sesión web normal)
       supabase = await createClient();
       const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
-
-      console.log('[API /proyectos/list] User (session):', sessionUser?.id, 'Error:', authError);
 
       if (authError || !sessionUser) {
         return NextResponse.json(

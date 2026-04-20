@@ -78,8 +78,6 @@ export async function GET(request: NextRequest) {
     const esAdmin = rolNombre === "admin" || rolNombre === "ROL_ADMIN";
     const vendedorUsername = perfil?.username;
 
-    console.log(`[ClienteSearch] Usuario: ${vendedorUsername}, Rol: ${rolNombre}, EsAdmin: ${esAdmin}`);
-
     // Obtener parámetro de búsqueda
     const searchParams = request.nextUrl.searchParams;
     const phone = searchParams.get("phone");
@@ -94,8 +92,6 @@ export async function GET(request: NextRequest) {
     // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
     const cleanPhone = phone.replace(/[^\d]/g, "");
     const cleanPhoneWithPlus = `+${cleanPhone}`;
-
-    console.log(`[ClienteSearch] Buscando cliente con teléfono: ${cleanPhone} o ${cleanPhoneWithPlus}`);
 
     // Campos base del cliente
     const camposCliente = `
@@ -140,7 +136,6 @@ export async function GET(request: NextRequest) {
       usedJoin = true;
     } else if (errorJoin?.message?.includes("relationship") || errorJoin?.code === "PGRST200") {
       // FK no existe, hacer query sin JOIN
-      console.log("[ClienteSearch] FK no existe, usando query sin JOIN");
       let queryBasic = supabase
         .schema("crm")
         .from("cliente")
@@ -184,7 +179,6 @@ export async function GET(request: NextRequest) {
           .maybeSingle();
 
         if (clienteExiste) {
-          console.log(`[ClienteSearch] Cliente existe pero está asignado a: ${clienteExiste.vendedor_asignado}`);
           return NextResponse.json({
             cliente: null,
             asignadoAOtro: true,
@@ -193,11 +187,8 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      console.log(`[ClienteSearch] Cliente no encontrado`);
       return NextResponse.json({ cliente: null }, { headers: corsHeaders });
     }
-
-    console.log(`[ClienteSearch] Cliente encontrado: ${cliente.id}, vendedor: ${cliente.vendedor_asignado}, usedJoin: ${usedJoin}`);
 
     // Obtener nombre del vendedor
     let vendedorNombre: string | null = cliente.vendedor_asignado as string | null;

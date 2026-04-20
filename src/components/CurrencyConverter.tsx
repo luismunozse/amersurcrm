@@ -34,10 +34,12 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="inline-flex items-center gap-1 rounded-full border border-crm-border bg-crm-card px-3 py-1 text-xs font-medium text-crm-text-primary shadow-sm hover:bg-crm-card-hover"
+        aria-label="Conversor de divisas"
+        title="Conversor USD ⇄ PEN"
+        className="inline-flex items-center justify-center gap-1 rounded-full border border-crm-border bg-crm-card text-xs font-medium text-crm-text-primary shadow-sm hover:bg-crm-card-hover sm:px-3 sm:py-1 w-9 h-9 sm:w-auto sm:h-auto"
       >
-        <Calculator className="h-4 w-4" />
-        <span>Conversor</span>
+        <Calculator className="h-4 w-4 shrink-0" />
+        <span className="hidden sm:inline">Conversor</span>
       </button>
 
       {isOpen && (

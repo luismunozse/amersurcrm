@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -141,9 +141,13 @@ export function useCanAccess() {
 function NavGroupCollapsible({ item }: { item: NavItem }) {
   const isActive = useIsActive();
   const isChildActive = useIsChildActive();
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const { canAccessNavItem } = useCanAccess();
+
+  const handleChildClick = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const visibleChildren = React.useMemo(
     () => (item.children ?? []).filter(canAccessNavItem),
@@ -164,8 +168,13 @@ function NavGroupCollapsible({ item }: { item: NavItem }) {
   if (collapsed) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={anyChildActive} tooltip={item.name}>
-          <Link href={item.href}>
+        <SidebarMenuButton
+          asChild
+          isActive={anyChildActive}
+          tooltip={item.name}
+          className="min-h-11 md:min-h-8"
+        >
+          <Link href={item.href} onClick={handleChildClick}>
             {item.icon}
             <span>{item.name}</span>
           </Link>
@@ -178,7 +187,10 @@ function NavGroupCollapsible({ item }: { item: NavItem }) {
     <Collapsible.Root open={open} onOpenChange={setOpen} asChild>
       <SidebarMenuItem>
         <Collapsible.Trigger asChild>
-          <SidebarMenuButton isActive={anyChildActive}>
+          <SidebarMenuButton
+            isActive={anyChildActive}
+            className="min-h-11 md:min-h-8"
+          >
             {item.icon}
             <span>{item.name}</span>
             <ChevronDown
@@ -192,8 +204,12 @@ function NavGroupCollapsible({ item }: { item: NavItem }) {
           <SidebarMenuSub>
             {visibleChildren.map((child) => (
               <SidebarMenuSubItem key={child.name}>
-                <SidebarMenuSubButton asChild isActive={isChildActive(child.href)}>
-                  <Link href={child.href}>
+                <SidebarMenuSubButton
+                  asChild
+                  isActive={isChildActive(child.href)}
+                  className="min-h-10 md:min-h-7"
+                >
+                  <Link href={child.href} onClick={handleChildClick}>
                     {child.icon}
                     <span>{child.name}</span>
                   </Link>
@@ -209,12 +225,17 @@ function NavGroupCollapsible({ item }: { item: NavItem }) {
 
 function NavLeaf({ item, dynamicBadge }: { item: NavItem; dynamicBadge?: number }) {
   const isActive = useIsActive();
+  const { isMobile, setOpenMobile } = useSidebar();
   const hasDynamic = typeof dynamicBadge === "number" && dynamicBadge > 0;
   const badgeContent = hasDynamic
     ? dynamicBadge > 99
       ? "99+"
       : String(dynamicBadge)
     : item.badge;
+
+  const handleClick = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <SidebarMenuItem>
@@ -225,8 +246,9 @@ function NavLeaf({ item, dynamicBadge }: { item: NavItem; dynamicBadge?: number 
           hasDynamic ? `${item.name} (${badgeContent})` : item.name
         }
         size="sm"
+        className="min-h-11 md:min-h-8 text-sm md:text-xs"
       >
-        <Link href={item.href}>
+        <Link href={item.href} onClick={handleClick}>
           {item.icon}
           <span>{item.name}</span>
         </Link>
@@ -306,9 +328,9 @@ function CollapsibleNavGroup({
     <Collapsible.Root open={effectiveOpen} onOpenChange={onOpenChange}>
       <SidebarGroup className="py-1.5">
         <Collapsible.Trigger asChild>
-          <SidebarGroupLabel className="group/label cursor-pointer hover:text-sidebar-foreground transition-colors">
+          <SidebarGroupLabel className="group/label cursor-pointer hover:text-sidebar-foreground transition-colors h-10 md:h-8">
             <ChevronRight
-              className={`mr-1 h-3 w-3 shrink-0 transition-transform duration-200 ${
+              className={`mr-1 h-3.5 w-3.5 md:h-3 md:w-3 shrink-0 transition-transform duration-200 ${
                 isOpen ? "rotate-90" : ""
               }`}
             />
@@ -337,6 +359,26 @@ function useAutoScrollActive(deps: unknown[]) {
   return contentRef;
 }
 
+function SidebarMobileHeaderControls() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  if (!isMobile) return null;
+  return (
+    <>
+      <div className="flex justify-center pt-1 pb-2 md:hidden">
+        <span className="h-1 w-10 rounded-full bg-sidebar-foreground/20" />
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpenMobile(false)}
+        className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded-full text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
+        aria-label="Cerrar menú"
+      >
+        <X className="h-5 w-5" />
+      </button>
+    </>
+  );
+}
+
 export function SidebarShadcn() {
   const { loading, error, refetch } = usePermissions();
   const { canAccessNavItem } = useCanAccess();
@@ -360,6 +402,8 @@ export function SidebarShadcn() {
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
+        <SidebarMobileHeaderControls />
+
         <div className="flex items-center gap-2 px-1 py-1">
           <div className="relative group-data-[collapsible=icon]:hidden">
             <div className="absolute inset-0 bg-crm-primary/25 rounded-lg blur-sm" />
@@ -390,11 +434,11 @@ export function SidebarShadcn() {
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent("command-palette:open"))}
-          className="mx-1 mt-1 flex items-center gap-2 rounded-md border border-sidebar-border/60 bg-sidebar-accent/40 px-2 py-1.5 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+          className="mx-1 mt-1 flex items-center gap-2 rounded-md border border-sidebar-border/60 bg-sidebar-accent/40 px-3 py-2.5 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-1.5 md:text-xs md:py-1.5"
           aria-label="Buscar"
           title="Buscar (Ctrl/Cmd+K)"
         >
-          <Search className="h-3.5 w-3.5 shrink-0" />
+          <Search className="h-4 w-4 shrink-0 md:h-3.5 md:w-3.5" />
           <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">Buscar…</span>
           <kbd className="ml-auto hidden lg:inline-flex items-center gap-0.5 rounded bg-sidebar/50 px-1.5 py-0.5 font-mono text-[10px] text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
             ⌘K

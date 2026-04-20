@@ -41,8 +41,6 @@ export async function GET(
 
       const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
 
-      console.log('[API /proyectos/[id]/lotes] User (token):', authUser?.id, 'Error:', authError);
-
       if (authError || !authUser) {
         return NextResponse.json(
           { error: "No autorizado" },
@@ -56,8 +54,6 @@ export async function GET(
       // Token desde cookies (sesión web normal)
       supabase = await createClient();
       const { data: { user: sessionUser }, error: authError } = await supabase.auth.getUser();
-
-      console.log('[API /proyectos/[id]/lotes] User (session):', sessionUser?.id, 'Error:', authError);
 
       if (authError || !sessionUser) {
         return NextResponse.json(

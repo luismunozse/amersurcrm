@@ -224,21 +224,14 @@ export async function POST(request: NextRequest) {
     };
 
     // Normalizar las columnas de cada fila
-    const normalizedData = rawData.map((row: any, index: number) => {
-      const normalized: any = {};
-
-      Object.keys(row).forEach(key => {
+    type ImportRow = Record<string, unknown>;
+    const normalizedData: ImportRow[] = (rawData as ImportRow[]).map((row) => {
+      const normalized: ImportRow = {};
+      for (const key of Object.keys(row)) {
         const normalizedKey = normalizeColumnName(key);
         const standardKey = columnMapping[normalizedKey] || normalizedKey;
         normalized[standardKey] = row[key];
-      });
-
-      // Log para debugging (solo la primera fila)
-      if (index === 0) {
-        console.log("🔍 Columnas detectadas en Excel:", Object.keys(row));
-        console.log("🔄 Columnas normalizadas:", Object.keys(normalized));
       }
-
       return normalized;
     });
 
@@ -293,7 +286,7 @@ export async function POST(request: NextRequest) {
         const tipo_unidad = row.tipo_unidad ? String(row.tipo_unidad).trim() : null;
 
         // Construir objeto data con campos adicionales
-        const dataFields: Record<string, any> = {};
+        const dataFields: Record<string, string | number> = {};
         if (precio_m2 !== null) dataFields.precio_m2 = precio_m2;
         if (tipo_unidad) dataFields.tipo_unidad = tipo_unidad;
 
@@ -330,7 +323,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         result.errors.push({
           row: rowNumber,
-          codigo: row.codigo || "",
+          codigo: String(row.codigo ?? ""),
           error: error instanceof Error ? error.message : "Error desconocido",
         });
       }

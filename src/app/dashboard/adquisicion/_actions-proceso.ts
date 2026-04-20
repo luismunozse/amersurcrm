@@ -223,9 +223,16 @@ export async function avanzarEtapa(procesoId: string) {
       })
       .eq('id', etapaActual.id);
 
-    // Si hay siguiente etapa, avanzar
-    if (etapaActualIdx < etapas.length - 1) {
-      const siguienteEtapa = etapas[etapaActualIdx + 1];
+    // Buscar la siguiente etapa que no este omitida.
+    // Las etapas con estado 'omitida' (p.ej. calificacion bancaria en pago contado)
+    // se saltan sin tocar su estado ni su fecha_completada.
+    let siguienteIdx = etapaActualIdx + 1;
+    while (siguienteIdx < etapas.length && etapas[siguienteIdx].estado === 'omitida') {
+      siguienteIdx++;
+    }
+
+    if (siguienteIdx < etapas.length) {
+      const siguienteEtapa = etapas[siguienteIdx];
 
       await supabase
         .from('proceso_etapa')
@@ -247,7 +254,8 @@ export async function avanzarEtapa(procesoId: string) {
         })
         .eq('id', procesoId);
     } else {
-      // Última etapa completada → proceso completado
+      // No hay mas etapas pendientes (o todas las restantes estan omitidas)
+      // -> proceso completado.
       await supabase
         .from('proceso_adquisicion')
         .update({

@@ -9,6 +9,7 @@ import CrearReservaModal from "@/components/CrearReservaModal";
 import CancelarReservaModal from "@/components/CancelarReservaModal";
 import EliminarReservaModal from "@/components/EliminarReservaModal";
 import DetalleReservaModal from "@/components/DetalleReservaModal";
+import AdminSeparacionActions from "./_AdminSeparacionActions";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
 
 interface Props {
@@ -204,6 +205,15 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
                       >
                         <Ban className="h-4 w-4" />
                       </button>
+                    )}
+
+                    {/* Acciones admin: extender vencimiento / anular separacion */}
+                    {isAdmin && reserva.estado === 'activa' && (
+                      <AdminSeparacionActions
+                        reservaId={reserva.id}
+                        reservaCodigo={reserva.codigo_reserva}
+                        fechaVencimiento={reserva.fecha_vencimiento}
+                      />
                     )}
 
                     {/* Boton Eliminar - solo para admin */}

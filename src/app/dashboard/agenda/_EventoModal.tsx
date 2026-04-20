@@ -4,7 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { Evento } from "@/lib/types/agenda";
 import { crearEvento, actualizarEvento, buscarLotes } from "./actions";
 import toast from "react-hot-toast";
-import { X as XMarkIcon, User as UserIcon } from "lucide-react";
+import {
+  X as XMarkIcon,
+  User as UserIcon,
+  Phone,
+  Home,
+  CalendarDays,
+  Users,
+  CheckSquare,
+  MapPin,
+  ArrowRight,
+  type LucideIcon,
+} from "lucide-react";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface EventoModalProps {
@@ -18,12 +29,12 @@ interface EventoModalProps {
   vendedorId?: string | null;
 }
 
-const TIPOS_EVENTO = [
-  { value: "llamada", label: "Llamada", icon: "📞" },
-  { value: "visita", label: "Visita", icon: "🏠" },
-  { value: "cita", label: "Cita", icon: "📅" },
-  { value: "seguimiento", label: "Seguimiento", icon: "👥" },
-  { value: "tarea", label: "Tarea", icon: "✅" },
+const TIPOS_EVENTO: Array<{ value: string; label: string; Icon: LucideIcon }> = [
+  { value: "llamada", label: "Llamada", Icon: Phone },
+  { value: "visita", label: "Visita", Icon: Home },
+  { value: "cita", label: "Cita", Icon: CalendarDays },
+  { value: "seguimiento", label: "Seguimiento", Icon: Users },
+  { value: "tarea", label: "Tarea", Icon: CheckSquare },
 ];
 
 const PRIORIDADES = [
@@ -49,6 +60,7 @@ interface FormValues {
   cliente_nombre: string;
   propiedad_id: string;
   propiedad_label: string;
+  ubicacion: string;
   fecha_inicio: string;
   duracion_minutos: number;
   recordar_antes_minutos: number;
@@ -236,7 +248,10 @@ function LoteSearch({
     <div className="relative">
       {loteSeleccionado ? (
         <div className="flex items-center gap-2 px-3 py-2.5 border border-crm-border rounded-lg bg-crm-bg-secondary">
-          <span className="text-sm text-crm-text-primary flex-1 truncate">🏠 {loteSeleccionado.label}</span>
+          <span className="text-sm text-crm-text-primary flex-1 truncate inline-flex items-center gap-1.5">
+            <Home className="w-4 h-4 shrink-0" aria-hidden />
+            <span className="truncate">{loteSeleccionado.label}</span>
+          </span>
           <button type="button" onClick={limpiar} className="text-crm-text-muted hover:text-crm-text-primary text-xs">✕</button>
         </div>
       ) : (
@@ -293,6 +308,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
     cliente_nombre: "",
     propiedad_id: "",
     propiedad_label: "",
+    ubicacion: "",
     fecha_inicio: "",
     duracion_minutos: 30,
     recordar_antes_minutos: 15,
@@ -317,6 +333,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
         cliente_nombre: clienteNombre,
         propiedad_id: evento.propiedad_id || "",
         propiedad_label: evento.propiedad_id ? `Lote ${evento.propiedad_id.slice(0, 8)}...` : "",
+        ubicacion: (evento as any).ubicacion || "",
         fecha_inicio: evento.fecha_inicio?.slice(0, 16) || "",
         duracion_minutos: evento.duracion_minutos || 30,
         recordar_antes_minutos: evento.recordar_antes_minutos || 15,
@@ -343,6 +360,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
         cliente_nombre: clienteInicial?.nombre || "",
         propiedad_id: "",
         propiedad_label: "",
+        ubicacion: "",
         fecha_inicio: fechaDefault,
         duracion_minutos: 30,
         recordar_antes_minutos: 15,
@@ -382,6 +400,9 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
       payload.append("cliente_id", formData.cliente_id);
       if (formData.propiedad_id) {
         payload.append("propiedad_id", formData.propiedad_id);
+      }
+      if (formData.ubicacion.trim()) {
+        payload.append("ubicacion", formData.ubicacion.trim());
       }
       payload.append("fecha_inicio", formData.fecha_inicio);
       payload.append("duracion_minutos", String(formData.duracion_minutos));
@@ -447,27 +468,47 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
         {/* Contenido scrolleable */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="p-5 space-y-5 overflow-y-auto flex-1">
+            {/* Próximo paso actual (solo al editar y si está cargado) */}
+            {evento && (evento as any).proximo_paso_objetivo && (
+              <div className="border-l-4 border-crm-primary bg-crm-primary/5 rounded-r-lg p-3">
+                <p className="text-xs font-semibold text-crm-primary uppercase tracking-wide flex items-center gap-1.5">
+                  <ArrowRight className="w-3.5 h-3.5" aria-hidden /> Próximo paso actual
+                </p>
+                <p className="text-sm text-crm-text-primary mt-1">
+                  {(evento as any).proximo_paso_objetivo}
+                </p>
+                {(evento as any).proximo_paso_fecha && (
+                  <p className="text-xs text-crm-text-muted mt-0.5">
+                    Para el {new Date((evento as any).proximo_paso_fecha).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Tipo de evento */}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
                 Tipo de evento
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {TIPOS_EVENTO.map((tipo) => (
-                  <button
-                    key={tipo.value}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, tipo: tipo.value }))}
-                    className={`p-3 rounded-lg border-2 transition-all text-center ${
-                      formData.tipo === tipo.value
-                        ? "border-crm-primary bg-crm-primary/10"
-                        : "border-crm-border hover:border-crm-primary/50"
-                    }`}
-                  >
-                    <span className="text-xl block">{tipo.icon}</span>
-                    <span className="text-xs text-crm-text-secondary">{tipo.label}</span>
-                  </button>
-                ))}
+                {TIPOS_EVENTO.map((tipo) => {
+                  const Ic = tipo.Icon;
+                  return (
+                    <button
+                      key={tipo.value}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, tipo: tipo.value }))}
+                      className={`p-3 rounded-lg border-2 transition-all text-center flex flex-col items-center gap-1 ${
+                        formData.tipo === tipo.value
+                          ? "border-crm-primary bg-crm-primary/10 text-crm-primary"
+                          : "border-crm-border hover:border-crm-primary/50 text-crm-text-secondary"
+                      }`}
+                    >
+                      <Ic className="w-5 h-5" aria-hidden />
+                      <span className="text-xs">{tipo.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -490,25 +531,39 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
               />
             </div>
 
-            {/* Lote/Proyecto — solo para visitas */}
-            {(formData.tipo === 'visita' || formData.tipo === 'cita') && (
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  🏠 Lote / Propiedad <span className="text-crm-text-muted font-normal">(opcional)</span>
-                </label>
-                <LoteSearch
-                  value={formData.propiedad_id}
-                  onChange={(id, label) =>
-                    setFormData(prev => ({ ...prev, propiedad_id: id, propiedad_label: label }))
-                  }
-                  loteInicial={
-                    formData.propiedad_id && formData.propiedad_label
-                      ? { id: formData.propiedad_id, label: formData.propiedad_label }
-                      : undefined
-                  }
-                />
-              </div>
-            )}
+            {/* Proyecto/Lote — disponible para todos los tipos de evento */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                <Home className="w-4 h-4 inline mr-1" aria-hidden />
+                Proyecto / Lote <span className="text-crm-text-muted font-normal">(opcional)</span>
+              </label>
+              <LoteSearch
+                value={formData.propiedad_id}
+                onChange={(id, label) =>
+                  setFormData(prev => ({ ...prev, propiedad_id: id, propiedad_label: label }))
+                }
+                loteInicial={
+                  formData.propiedad_id && formData.propiedad_label
+                    ? { id: formData.propiedad_id, label: formData.propiedad_label }
+                    : undefined
+                }
+              />
+            </div>
+
+            {/* Lugar (dirección o referencia) */}
+            <div>
+              <label className="block text-sm font-medium text-crm-text-primary mb-2">
+                <MapPin className="w-4 h-4 inline mr-1" aria-hidden />
+                Lugar <span className="text-crm-text-muted font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.ubicacion}
+                onChange={(e) => setFormData(prev => ({ ...prev, ubicacion: e.target.value }))}
+                placeholder="Ej: Obra Av. Brasil, oficina central, caseta de ventas..."
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 text-crm-text-primary border border-crm-border rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-crm-primary text-sm"
+              />
+            </div>
 
             {/* Título */}
             <div>
@@ -605,7 +660,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
             {/* Próximo paso */}
             <div className="border border-crm-border rounded-lg p-4 space-y-3 bg-crm-bg-secondary/50">
               <p className="text-sm font-semibold text-crm-text-primary flex items-center gap-2">
-                <span>➡️</span> Próximo paso
+                <ArrowRight className="w-4 h-4" aria-hidden /> Próximo paso
               </p>
               <div>
                 <label className="block text-xs font-medium text-crm-text-muted mb-1.5">

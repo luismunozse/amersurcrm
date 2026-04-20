@@ -60,7 +60,7 @@ export default function VendedoresActivosPage() {
   const cargarVendedores = async () => {
     try {
       setCargando(true);
-      const response = await fetch("/api/admin/vendedores-activos");
+      const response = await fetch("/api/admin/vendedores-activos", { cache: "no-store" });
       const data = await response.json();
 
       if (data.success) {
@@ -79,7 +79,7 @@ export default function VendedoresActivosPage() {
 
   const cargarVendedoresDisponibles = async () => {
     try {
-      const response = await fetch("/api/admin/usuarios?limit=50&estado=activo");
+      const response = await fetch("/api/admin/usuarios?limit=50&estado=activo", { cache: "no-store" });
       const data = await response.json();
 
       if (data.success) {
@@ -319,7 +319,7 @@ export default function VendedoresActivosPage() {
       if (errores.length === 0) {
         toast.success(`${vendedoresDisponiblesSeleccionados.size} vendedor(es) agregado(s) exitosamente`);
         setVendedoresDisponiblesSeleccionados(new Set());
-        await cargarVendedores();
+        await Promise.all([cargarVendedores(), cargarVendedoresDisponibles()]);
         setMostrarAgregar(false);
       } else {
         toast.error(`Error al agregar ${errores.length} vendedor(es)`);

@@ -425,15 +425,21 @@ export type PipelineCliente = {
 
 interface GetPipelineParams {
   vendedor?: string;
+  origen?: string;
 }
 
+export type PipelineResult = {
+  clientes: PipelineCliente[];
+  totalesPorEstado: Record<string, number>;
+};
+
 export const getCachedPipelineClientes = cache(
-  async (params?: GetPipelineParams): Promise<PipelineCliente[]> => {
+  async (params?: GetPipelineParams): Promise<PipelineResult> => {
     const supabase = await createOptimizedServerClient();
     const userId = await getUserIdOrNull(supabase);
-    if (!userId) return [];
+    if (!userId) return { clientes: [], totalesPorEstado: {} };
 
-    const { vendedor = '' } = params || {};
+    const { vendedor = '', origen = '' } = params || {};
 
     const { data: perfil } = await supabase
       .from('usuario_perfil')
@@ -454,56 +460,80 @@ export const getCachedPipelineClientes = cache(
       'contactado',
       'intermedio',
       'potencial',
+      'en_proceso',
       'desestimado',
       'transferido',
     ] as const;
     const PER_ESTADO_LIMIT = 300;
 
-    const perEstadoQueries = ESTADOS_PIPELINE.map((estado) => {
-      let q = supabase
-        .schema('crm')
-        .from('cliente')
-        .select(`
-          id,
-          codigo_cliente,
-          nombre,
-          estado_cliente,
-          vendedor_username,
-          vendedor_asignado,
-          capacidad_compra_estimada,
-          ultimo_contacto,
-          proxima_accion,
-          origen_lead,
-          propiedades_reservadas,
-          fecha_alta
-        `)
-        .eq('estado_cliente', estado)
-        .order('fecha_alta', { ascending: false })
-        .limit(PER_ESTADO_LIMIT);
-
+    const aplicarFiltros = (q: any) => {
+      if (origen && origen.trim() !== '') {
+        q = q.eq('origen_lead', origen);
+      }
       if (!puedeVerTodos && username) {
         q = q.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
       } else if (puedeVerTodos && vendedor && vendedor.trim() !== '') {
         q = q.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
       }
-
       return q;
-    });
+    };
 
-    const results = await Promise.all(perEstadoQueries);
+    const perEstadoQueries = ESTADOS_PIPELINE.map((estado) =>
+      aplicarFiltros(
+        supabase
+          .schema('crm')
+          .from('cliente')
+          .select(`
+            id,
+            codigo_cliente,
+            nombre,
+            estado_cliente,
+            vendedor_username,
+            vendedor_asignado,
+            capacidad_compra_estimada,
+            ultimo_contacto,
+            proxima_accion,
+            origen_lead,
+            propiedades_reservadas,
+            fecha_alta
+          `)
+          .eq('estado_cliente', estado)
+          .order('fecha_alta', { ascending: false })
+          .limit(PER_ESTADO_LIMIT),
+      ),
+    );
 
+    const perEstadoCountQueries = ESTADOS_PIPELINE.map((estado) =>
+      aplicarFiltros(
+        supabase
+          .schema('crm')
+          .from('cliente')
+          .select('id', { count: 'exact', head: true })
+          .eq('estado_cliente', estado),
+      ),
+    );
+
+    const [dataResults, countResults] = await Promise.all([
+      Promise.all(perEstadoQueries),
+      Promise.all(perEstadoCountQueries),
+    ]);
+
+    const totalesPorEstado: Record<string, number> = {};
     const merged: any[] = [];
-    for (let i = 0; i < results.length; i++) {
-      const r = results[i];
+    for (let i = 0; i < dataResults.length; i++) {
+      const r = dataResults[i];
+      const estadoKey = ESTADOS_PIPELINE[i];
+      const countRes = countResults[i];
+      totalesPorEstado[estadoKey] = countRes.count ?? 0;
       if (r.error) {
-        console.error(`Error pipeline (${ESTADOS_PIPELINE[i]}):`, r.error.message);
+        console.error(`Error pipeline (${estadoKey}):`, r.error.message);
         continue;
       }
       if (r.data) merged.push(...(r.data as any[]));
     }
 
     const unique = Array.from(new Map(merged.map((c) => [c.id, c])).values()) as any[];
-    if (unique.length === 0) return [];
+    if (unique.length === 0) return { clientes: [], totalesPorEstado };
 
     const ids = unique.map((c) => c.id);
     const { data: interacciones, error: interErr } = await supabase
@@ -523,10 +553,12 @@ export const getCachedPipelineClientes = cache(
       }
     }
 
-    return unique.map((c) => ({
+    const clientes = unique.map((c) => ({
       ...c,
       fecha_proxima_accion: proximasPorCliente.get(c.id) ?? null,
     })) as PipelineCliente[];
+
+    return { clientes, totalesPorEstado };
   }
 );
 

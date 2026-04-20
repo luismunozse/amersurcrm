@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       const message = String(error.message ?? "");
       if (message.includes("duplicate key value")) {
-        console.info(`[WhatsAppLead] Lead duplicado ignorado (${body.telefono})`);
+        console.info(`[WhatsAppLead] Lead duplicado ignorado`);
         return NextResponse.json({
           success: false,
           message: "Lead duplicado",

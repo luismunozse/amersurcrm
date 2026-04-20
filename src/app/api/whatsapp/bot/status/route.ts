@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       previousState.error !== error;
 
     if (stateChanged) {
-      console.log(`[WhatsAppBotStatus] Estado actualizado: connected=${connected}, hasQR=${!!qr}, phone=${phoneNumber}`);
+      console.log(`[WhatsAppBotStatus] Estado actualizado: connected=${connected}, hasQR=${!!qr}`);
     }
 
     return NextResponse.json({
