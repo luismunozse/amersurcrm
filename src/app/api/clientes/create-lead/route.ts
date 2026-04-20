@@ -148,7 +148,16 @@ export async function POST(request: NextRequest) {
         }, { headers: corsHeaders });
       }
 
-      throw insertError;
+      return NextResponse.json(
+        {
+          error: "Error creando lead en base de datos",
+          message: insertError.message || "Error desconocido en RPC",
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+        },
+        { status: 500, headers: corsHeaders }
+      );
     }
 
     if (!nuevoCliente) {
@@ -212,8 +221,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("[CreateLead] Error completo:", error);
-    
-    // Log detallado del error
+
     if (error instanceof Error) {
       console.error("[CreateLead] Error message:", error.message);
       console.error("[CreateLead] Error stack:", error.stack);
@@ -221,13 +229,21 @@ export async function POST(request: NextRequest) {
       console.error("[CreateLead] Error object:", JSON.stringify(error, null, 2));
     }
 
+    const err = error as { message?: string; code?: string; details?: string; hint?: string; stack?: string } | null;
+    const resolvedMessage =
+      (error instanceof Error && error.message) ||
+      err?.message ||
+      (typeof error === "string" ? error : null) ||
+      "Error desconocido";
+
     return NextResponse.json(
       {
         error: "Error interno del servidor",
-        message: error instanceof Error ? error.message : "Unknown error",
-        details: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.stack : String(error))
-          : undefined,
+        message: resolvedMessage,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint,
+        stack: process.env.NODE_ENV === "development" ? err?.stack : undefined,
       },
       { status: 500, headers: corsHeaders }
     );
