@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import toast from "react-hot-toast";
+import { CheckCircle2, User, ClipboardList, Lock, Eye, EyeOff, AlertTriangle, ArrowRight, X } from "lucide-react";
 
 type LoginType = "admin" | "vendedor";
 
@@ -401,9 +402,7 @@ export default function LoginForm() {
                 aria-pressed={loginType === "admin"}
               >
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
+                  <CheckCircle2 className="w-4 h-4" />
                   Administrador
                 </span>
               </button>
@@ -418,9 +417,7 @@ export default function LoginForm() {
                 aria-pressed={loginType === "vendedor"}
               >
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                  <User className="w-4 h-4" />
                   Vendedor
                 </span>
               </button>
@@ -435,13 +432,9 @@ export default function LoginForm() {
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   {loginType === "admin" ? (
-                    <svg className="h-5 w-5 text-crm-text-muted group-focus-within:text-crm-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+                    <User className="h-5 w-5 text-crm-text-muted group-focus-within:text-crm-primary transition-colors" />
                   ) : (
-                    <svg className="h-5 w-5 text-crm-text-muted group-focus-within:text-crm-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                    </svg>
+                    <ClipboardList className="h-5 w-5 text-crm-text-muted group-focus-within:text-crm-primary transition-colors" />
                   )}
                 </div>
                 <input
@@ -476,9 +469,7 @@ export default function LoginForm() {
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-crm-text-muted group-focus-within:text-crm-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+                  <Lock className="h-5 w-5 text-crm-text-muted group-focus-within:text-crm-primary transition-colors" />
                 </div>
                 <input
                   type={showPassword ? "text" : "password"}
@@ -497,14 +488,9 @@ export default function LoginForm() {
                   aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                    </svg>
+                    <EyeOff className="h-5 w-5" />
                   ) : (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
+                    <Eye className="h-5 w-5" />
                   )}
                 </button>
               </div>
@@ -519,9 +505,7 @@ export default function LoginForm() {
                 onClick={handleOpenResetModal}
                 className="inline-flex items-center gap-2 rounded-lg border border-crm-primary/40 px-3 py-1.5 text-xs font-semibold text-crm-primary hover:bg-crm-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crm-primary transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11v6m0-10v.01M5.07 19H18.93A1.07 1.07 0 0020 17.93L12.54 4.4a1.07 1.07 0 00-1.88 0L4 17.93A1.07 1.07 0 005.07 19z" />
-                </svg>
+                <AlertTriangle className="w-4 h-4" />
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
@@ -539,9 +523,7 @@ export default function LoginForm() {
               ) : (
                 <span className="flex items-center justify-center gap-2">
                   {remainingLockSeconds > 0 ? `Bloqueado (${remainingLockSeconds}s)` : "Iniciar Sesión"}
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
+                  <ArrowRight className="w-5 h-5" aria-hidden />
                 </span>
               )}
             </button>
@@ -549,9 +531,7 @@ export default function LoginForm() {
 
           <div className="mt-8 text-center space-y-2 text-xs text-crm-text-muted">
             <div className="flex items-center justify-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+              <Lock className="w-4 h-4" />
               Conexión segura
             </div>
             <p>© 2025 AMERSUR CRM · Tu Propiedad, sin fronteras</p>
@@ -568,7 +548,7 @@ export default function LoginForm() {
 
     {showResetModal && (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4 animate-in fade-in duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="reset-dialog-title"
@@ -579,9 +559,12 @@ export default function LoginForm() {
         }}
       >
         <div
-          className="w-full max-w-md rounded-2xl border border-crm-border bg-crm-card p-6 shadow-2xl"
+          className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-t sm:border border-crm-border bg-crm-card p-5 sm:p-6 shadow-2xl pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200"
           onMouseDown={(event) => event.stopPropagation()}
         >
+          <div className="sm:hidden flex justify-center -mt-1 mb-3">
+            <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+          </div>
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="reset-dialog-title" className="text-xl font-semibold text-crm-text-primary">
@@ -597,9 +580,7 @@ export default function LoginForm() {
               className="rounded-lg p-1.5 text-crm-text-muted hover:text-crm-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crm-primary transition-colors"
               aria-label="Cerrar"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-5 h-5" />
             </button>
           </div>
 

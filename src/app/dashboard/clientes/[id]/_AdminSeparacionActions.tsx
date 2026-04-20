@@ -81,13 +81,16 @@ export default function AdminSeparacionActions({
 
       {openAction && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
           onClick={() => !isPending && setOpenAction(null)}
         >
           <div
-            className="bg-crm-card rounded-xl shadow-2xl w-full max-w-md"
+            className="bg-crm-card rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+              <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+            </div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-crm-border">
               <h3 className="font-semibold text-crm-text-primary">
                 {openAction === "anular" ? "Anular separación" : "Extender vencimiento"}

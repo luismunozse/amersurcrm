@@ -169,9 +169,19 @@ export default function TabCalificacion({ clienteId, clienteNombre, ventas, rese
       )}
 
       {calificaciones.length === 0 ? (
-        <div className="text-center py-8 text-crm-text-muted">
-          <Landmark className="h-12 w-12 mx-auto mb-2 opacity-30" />
-          <p>No hay calificaciones bancarias registradas</p>
+        <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
+          <Landmark className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay calificaciones bancarias</p>
+          <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
+            Si el cliente evalúa financiamiento bancario, carga aquí la calificación para hacer seguimiento.
+          </p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium text-sm"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Crear primera calificación
+          </button>
         </div>
       ) : (
         <div className="space-y-3">

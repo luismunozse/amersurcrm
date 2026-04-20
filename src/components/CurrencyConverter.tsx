@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ExchangeRate } from "@/lib/exchange";
-import { Calculator } from "lucide-react";
+import { Calculator, X } from "lucide-react";
 
 interface CurrencyConverterProps {
   exchangeRates: ExchangeRate[];
@@ -56,9 +56,10 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
             <button
               type="button"
               onClick={() => setIsOpen(false)}
+              aria-label="Cerrar"
               className="text-crm-text-muted hover:text-crm-text-primary"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           </div>
 
@@ -99,9 +100,19 @@ export default function CurrencyConverter({ exchangeRates }: CurrencyConverterPr
             </p>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-xs text-crm-text-muted">
-            <span>Tipo de cambio {mode === 'usdToPen' ? 'venta' : 'compra'}:</span>
-            <span className="font-medium text-crm-text-primary">{rateValue ? rateValue.toFixed(3) : '--'}</span>
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-crm-card-hover p-2 text-xs">
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] uppercase tracking-wide text-crm-text-muted">Compra</span>
+              <span className="font-semibold text-crm-text-primary">
+                {usdRate.buy ? usdRate.buy.toFixed(3) : '--'}
+              </span>
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] uppercase tracking-wide text-crm-text-muted">Venta</span>
+              <span className="font-semibold text-crm-text-primary">
+                {usdRate.sell ? usdRate.sell.toFixed(3) : '--'}
+              </span>
+            </div>
           </div>
 
           {usdRate.date && (

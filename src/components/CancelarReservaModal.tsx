@@ -83,17 +83,17 @@ export default function CancelarReservaModal({
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex min-h-full items-end sm:items-center justify-center sm:p-4">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
+              enterFrom="opacity-0 translate-y-4 sm:scale-95 sm:translate-y-0"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
               leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:scale-95 sm:translate-y-0"
             >
-              <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-crm-card border border-crm-border shadow-2xl transition-all">
+              <Dialog.Panel className="w-full sm:max-w-lg transform overflow-hidden rounded-t-2xl sm:rounded-2xl bg-crm-card border-t sm:border border-crm-border shadow-2xl transition-all pb-[env(safe-area-inset-bottom)] sm:pb-0">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-crm-border bg-crm-background">
                   <div>

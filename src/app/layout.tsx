@@ -6,6 +6,7 @@ import AppToaster from "@/components/Toaster";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import DevErrorFilter from "@/components/DevErrorFilter";
+import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
 const inter = localFont({
   src: [
@@ -97,6 +98,7 @@ export default function RootLayout({
             {children}
             <AppToaster />
             <SpeedInsights />
+            <ServiceWorkerRegistration />
           </ErrorBoundary>
         </ThemeProvider>
       </body>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { X, Clock, ArrowRight } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 
 type CambioEntry = {
@@ -121,9 +122,7 @@ export default function HistorialCambiosUsuario({ open, userId, userName, onClos
             onClick={onClose}
             className="text-crm-text-muted hover:text-crm-text-primary transition-colors p-1"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -139,9 +138,7 @@ export default function HistorialCambiosUsuario({ open, userId, userName, onClos
             </div>
           ) : cambios.length === 0 ? (
             <div className="text-center py-12">
-              <svg className="w-12 h-12 text-crm-text-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <Clock className="w-12 h-12 text-crm-text-muted mx-auto mb-3" strokeWidth={1.5} />
               <p className="text-sm text-crm-text-muted">No hay cambios registrados</p>
               <p className="text-xs text-crm-text-muted mt-1">Los cambios futuros aparecerán aquí</p>
             </div>
@@ -174,9 +171,7 @@ export default function HistorialCambiosUsuario({ open, userId, userName, onClos
                             <span className="text-red-500 line-through">
                               {formatValue(entry.campo, entry.valor_anterior)}
                             </span>
-                            <svg className="w-3 h-3 text-crm-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
+                            <ArrowRight className="w-3 h-3 text-crm-text-muted flex-shrink-0" />
                             <span className="text-green-600 font-medium">
                               {formatValue(entry.campo, entry.valor_nuevo)}
                             </span>

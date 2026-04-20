@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useId } from "react";
+import { Building2, MapPin, Home, ChevronDown, Check } from "lucide-react";
 
 interface Departamento { code: string; name: string }
 interface Provincia { code: string; name: string; departamento_code: string }
@@ -298,9 +299,7 @@ export default function UbicacionSelector({
       {/* Departamento */}
       <div className="space-y-1.5" ref={depRef}>
         <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary dark:text-gray-200">
-          <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
+          <Building2 className="w-3 h-3 text-crm-primary" />
           Departamento
         </label>
         <div className="relative">
@@ -332,14 +331,9 @@ export default function UbicacionSelector({
             aria-expanded={departamentoAbierto}
             aria-controls={`${idBase}-departamentos`}
           />
-          <svg
+          <ChevronDown
             className={`w-3 h-3 text-crm-text-muted absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${departamentoAbierto ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          />
 
           {departamentoAbierto && (
             <div className={listClass} role="listbox" id={`${idBase}-departamentos`}>
@@ -357,9 +351,7 @@ export default function UbicacionSelector({
                       <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
                     </div>
                     {d.code === departamentoSeleccionado && (
-                      <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <Check className="w-4 h-4 text-crm-primary" />
                     )}
                   </div>
                 ))
@@ -374,10 +366,7 @@ export default function UbicacionSelector({
       {/* Provincia */}
       <div className="space-y-1.5" ref={provRef}>
         <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary dark:text-gray-200">
-          <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+          <MapPin className="w-3 h-3 text-crm-primary" />
           Provincia
         </label>
         <div className="relative">
@@ -409,14 +398,9 @@ export default function UbicacionSelector({
             aria-expanded={provinciaAbierta}
             aria-controls={`${idBase}-provincias`}
           />
-          <svg
+          <ChevronDown
             className={`w-3 h-3 text-crm-text-muted dark:text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${provinciaAbierta ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          />
 
           {provinciaAbierta && (
             <div className={listClass} role="listbox" id={`${idBase}-provincias`}>
@@ -434,9 +418,7 @@ export default function UbicacionSelector({
                       <span className="ubigeo-item-text">{p.name || '(sin nombre)'}</span>
                     </div>
                     {p.code === provinciaSeleccionada && (
-                      <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <Check className="w-4 h-4 text-crm-primary" />
                     )}
                   </div>
                 ))
@@ -451,10 +433,7 @@ export default function UbicacionSelector({
       {/* Distrito */}
       <div className="space-y-1.5" ref={distRef}>
         <label className="flex items-center gap-1.5 text-xs font-medium text-crm-text-primary dark:text-gray-200">
-          <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-          </svg>
+          <Home className="w-3 h-3 text-crm-primary" />
           Distrito
         </label>
         <div className="relative">
@@ -486,14 +465,9 @@ export default function UbicacionSelector({
             aria-expanded={distritoAbierto}
             aria-controls={`${idBase}-distritos`}
           />
-          <svg
+          <ChevronDown
             className={`w-3 h-3 text-crm-text-muted dark:text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${distritoAbierto ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          />
 
           {distritoAbierto && (
             <div className={listClass} role="listbox" id={`${idBase}-distritos`}>
@@ -511,9 +485,7 @@ export default function UbicacionSelector({
                       <span className="ubigeo-item-text">{d.name || '(sin nombre)'}</span>
                     </div>
                     {d.code === distritoSeleccionado && (
-                      <svg className="w-4 h-4 text-crm-primary" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <Check className="w-4 h-4 text-crm-primary" />
                     )}
                   </div>
                 ))

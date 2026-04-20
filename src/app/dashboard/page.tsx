@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { format, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { Users, Calendar, Package, Plus, Clock, BarChart3, Menu, Bell, ChevronRight, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { LazyDashboardStats } from "@/components/LazyDashboardStats";
 import { RecentActivities } from "@/components/RecentActivities";
@@ -163,9 +164,7 @@ function buildHeroHighlights(metrics: DashboardMetrics) {
       description: `${metrics.totalClientes.toLocaleString()} totales • ${metrics.clientesSinSeguimiento} sin seguimiento`,
       href: "/dashboard/clientes",
       icon: (
-        <svg className="w-5 h-5" role="img" aria-label="Ir a clientes" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />
-        </svg>
+        <Users className="w-5 h-5" role="img" aria-label="Ir a clientes" focusable="false" />
       ),
     },
     {
@@ -173,9 +172,7 @@ function buildHeroHighlights(metrics: DashboardMetrics) {
       description: `${metrics.eventosPendientes} eventos pendientes • ${metrics.eventosHoy} para hoy`,
       href: "/dashboard/agenda",
       icon: (
-        <svg className="w-5 h-5" role="img" aria-label="Ir a agenda" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
-        </svg>
+        <Calendar className="w-5 h-5" role="img" aria-label="Ir a agenda" focusable="false" />
       ),
     },
     {
@@ -183,9 +180,7 @@ function buildHeroHighlights(metrics: DashboardMetrics) {
       description: `${metrics.proyectosActivos} activos • ${metrics.proyectosSinPlanos} sin planos`,
       href: "/dashboard/proyectos",
       icon: (
-        <svg className="w-5 h-5" role="img" aria-label="Ir a proyectos" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4" />
-        </svg>
+        <Package className="w-5 h-5" role="img" aria-label="Ir a proyectos" focusable="false" />
       ),
     },
   ];
@@ -199,9 +194,7 @@ function buildQuickActions(metrics: DashboardMetrics) {
       href: "/dashboard/clientes",
       color: "primary" as const,
       icon: (
-        <svg className="w-6 h-6" role="img" aria-label="Registrar cliente" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
+        <Plus className="w-6 h-6" role="img" aria-label="Registrar cliente" focusable="false" />
       ),
     },
     {
@@ -210,10 +203,7 @@ function buildQuickActions(metrics: DashboardMetrics) {
       href: "/dashboard/agenda",
       color: "info" as const,
       icon: (
-        <svg className="w-6 h-6" role="img" aria-label="Planificar agenda" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <Clock className="w-6 h-6" role="img" aria-label="Planificar agenda" focusable="false" />
       ),
     },
     {
@@ -222,9 +212,7 @@ function buildQuickActions(metrics: DashboardMetrics) {
       href: metrics.esAdminOGerente ? "/dashboard/admin/reportes" : "/dashboard/vendedor/reportes",
       color: "warning" as const,
       icon: (
-        <svg className="w-6 h-6" role="img" aria-label="Analizar reportes" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9h4l3 8 4-16 3 8h4" />
-        </svg>
+        <BarChart3 className="w-6 h-6" role="img" aria-label="Analizar reportes" focusable="false" />
       ),
     },
   ];
@@ -236,9 +224,7 @@ function buildQuickActions(metrics: DashboardMetrics) {
       href: "/dashboard/proyectos",
       color: "info" as const,
       icon: (
-        <svg className="w-6 h-6" role="img" aria-label="Publicar proyecto" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h7" />
-        </svg>
+        <Menu className="w-6 h-6" role="img" aria-label="Publicar proyecto" focusable="false" />
       ),
     });
   }
@@ -348,10 +334,7 @@ async function DashboardContent() {
       value: `${metrics.clientesFueraDeRango} clientes requieren contacto esta semana`,
       tone: "primary" as const,
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 8a6 6 0 11-12 0 6 6 0 0112 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.73 21a2 2 0 01-3.46 0" />
-        </svg>
+        <Bell className="w-5 h-5" aria-hidden="true" />
       ),
     },
     {
@@ -359,9 +342,7 @@ async function DashboardContent() {
       value: `${metrics.eventosSemana} eventos en los próximos 7 días`,
       tone: "success" as const,
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18M16 3v4M8 3v4M5 9h14l-1 11H6L5 9z" />
-        </svg>
+        <Calendar className="w-5 h-5" aria-hidden="true" />
       ),
     },
     {
@@ -369,9 +350,7 @@ async function DashboardContent() {
       value: `${metrics.notificacionesPendientes} alertas por revisar`,
       tone: "info" as const,
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6M9 5l7 7-7 7" />
-        </svg>
+        <BarChart3 className="w-5 h-5" aria-hidden="true" />
       ),
     },
   ];
@@ -388,9 +367,7 @@ async function DashboardContent() {
       {metrics.hasError && (
         <div className="rounded-2xl border border-yellow-400/40 bg-yellow-50 dark:bg-yellow-900/20 px-5 py-4">
           <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
+            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
                 Error al cargar métricas del dashboard
@@ -449,19 +426,14 @@ async function DashboardContent() {
                 href="/dashboard/clientes"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-medium text-crm-primary shadow-crm transition hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                <Plus className="w-4 h-4" aria-hidden="true" />
                 Registrar cliente ahora
               </Link>
               <Link
                 href="/dashboard/agenda"
                 className="inline-flex items-center gap-2 rounded-full border border-white/30 px-5 py-2 text-sm font-medium text-white transition hover:border-white/60 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <Clock className="w-4 h-4" aria-hidden="true" />
                 Revisar agenda
               </Link>
             </div>
@@ -542,9 +514,7 @@ async function DashboardContent() {
                   </div>
                   <span className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-crm-primary/90 transition group-hover:text-crm-primary">
                     Ir ahora
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <ChevronRight className="w-4 h-4" aria-hidden="true" />
                   </span>
                 </div>
               </Link>

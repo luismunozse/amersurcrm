@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import {
@@ -94,26 +94,30 @@ export const byHref = (href: string): NavItem | undefined =>
 
 function useIsActive() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchString = searchParams?.toString() ?? "";
   return React.useCallback(
     (href: string) => {
       const [path, query] = href.split("?");
       if (path === "/dashboard") return pathname === "/dashboard";
-      if (query && typeof window !== "undefined") {
-        return pathname === path && window.location.search.includes(query);
+      if (query) {
+        return pathname === path && searchString.includes(query);
       }
       return pathname.startsWith(path);
     },
-    [pathname]
+    [pathname, searchString]
   );
 }
 
 function useIsChildActive() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchString = searchParams?.toString() ?? "";
   return React.useCallback(
     (href: string) => {
       const [path, query] = href.split("?");
-      if (query && typeof window !== "undefined") {
-        return pathname === path && window.location.search.includes(query);
+      if (query) {
+        return pathname === path && searchString.includes(query);
       }
       return pathname === href;
     },
@@ -386,6 +390,12 @@ export function SidebarShadcn() {
   const pathname = usePathname();
   const { isOpen: isGroupOpen, setOpen: setGroupOpen } = useGroupOpenState();
   const scrollRef = useAutoScrollActive([pathname, loading]);
+  // Evita hydration mismatch en Radix Collapsible dentro del sidebar:
+  // renderiza skeleton hasta que el cliente monte, así server y primer client render coinciden.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Resolver cada grupo: mapear hrefs → NavItem → filtrar por permisos.
   // Descartar grupos sin ítems visibles.
@@ -450,7 +460,7 @@ export function SidebarShadcn() {
         ref={scrollRef}
         className="scrollbar-auto-hide group-data-[collapsible=icon]:!overflow-y-auto"
       >
-        {loading ? (
+        {!mounted || loading ? (
           <SidebarGroup className="py-1.5">
             <SidebarGroupContent>
               <SkeletonList count={8} />

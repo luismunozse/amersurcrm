@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 
 interface SimpleModalProps {
   isOpen: boolean;
@@ -44,15 +45,18 @@ export default function SimpleModal({ isOpen, onClose, cliente }: SimpleModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50"
         onClick={onClose}
       />
-      
-      {/* Modal */}
-      <div role="dialog" aria-modal="true" aria-labelledby="simple-modal-title" className="relative bg-white rounded-lg p-6 max-w-md w-full mx-4">
+
+      {/* Modal — bottom sheet en mobile */}
+      <div role="dialog" aria-modal="true" aria-labelledby="simple-modal-title" className="relative bg-white dark:bg-slate-800 rounded-t-lg sm:rounded-lg p-5 sm:p-6 w-full sm:max-w-md pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex justify-between items-center mb-4">
           <h2 id="simple-modal-title" className="text-xl font-bold">Detalles del Cliente</h2>
           <button
@@ -60,7 +64,7 @@ export default function SimpleModal({ isOpen, onClose, cliente }: SimpleModalPro
             aria-label="Cerrar"
             className="text-gray-500 hover:text-gray-700"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
         

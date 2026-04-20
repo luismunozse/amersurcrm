@@ -241,24 +241,41 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     <div className="min-h-screen bg-crm-background">
       {/* Header */}
       <div className="bg-crm-card border-b border-crm-border sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center gap-3 sm:gap-4 mb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-4">
+          <div className="flex items-start gap-2 sm:gap-4 mb-2 sm:mb-4">
             <Link
               href="/dashboard/clientes"
-              className="p-2 hover:bg-crm-card-hover rounded-lg transition-colors"
+              className="shrink-0 p-2 -ml-2 hover:bg-crm-card-hover rounded-lg transition-colors"
+              aria-label="Volver a clientes"
             >
               <ArrowLeft className="h-5 w-5 text-crm-text-muted" />
             </Link>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-crm-text-primary">{cliente.nombre}</h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-2xl font-bold text-crm-text-primary leading-tight">
+                  {cliente.nombre}
+                </h1>
                 <span className={getStatusBadgeClasses(estadoColor)}>
                   {getEstadoClienteLabel(cliente.estado_cliente)}
                 </span>
               </div>
-              <p className="text-sm text-crm-text-muted mt-1">{cliente.codigo_cliente}</p>
+              <p className="text-xs sm:text-sm text-crm-text-muted mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="font-mono">{cliente.codigo_cliente}</span>
+                {cliente.telefono && (
+                  <>
+                    <span className="hidden sm:inline opacity-50">·</span>
+                    <a
+                      href={`tel:${cliente.telefono}`}
+                      className="text-crm-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <Phone className="h-3 w-3 sm:hidden" aria-hidden />
+                      {cliente.telefono}
+                    </a>
+                  </>
+                )}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {cliente.estado_cliente === 'potencial' && puedeRegistrarSeparacion && (
                 <RegistrarSeparacionButton clienteId={cliente.id} />
               )}
@@ -266,8 +283,8 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
             </div>
           </div>
 
-          {/* Información Rápida */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          {/* Información Rápida - oculta en mobile (datos ya visibles arriba o en tab Información) */}
+          <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {cliente.telefono && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-crm-text-muted" />

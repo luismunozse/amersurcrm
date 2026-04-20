@@ -33,7 +33,7 @@ interface RegisterOptions {
 
 export async function registerPushSubscription({
   vapidPublicKey,
-  serviceWorkerPath = "/notifications-sw.js",
+  serviceWorkerPath = "/sw.js",
   onSubscribed,
   onPermissionDenied,
 }: RegisterOptions) {
@@ -54,6 +54,8 @@ export async function registerPushSubscription({
     return;
   }
 
+  // El SW de Serwist ya se registra globalmente en ServiceWorkerRegistration.tsx.
+  // Acá reutilizamos la registración existente o esperamos a que esté lista.
   let swRegistration = await navigator.serviceWorker.getRegistration(serviceWorkerPath);
   if (!swRegistration) {
     swRegistration = await navigator.serviceWorker.register(serviceWorkerPath, { scope: "/" });

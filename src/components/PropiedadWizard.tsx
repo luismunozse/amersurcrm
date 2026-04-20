@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { X, ChevronLeft, ChevronRight, Plus, Building2, DollarSign, FileText, CheckCircle2 } from "lucide-react";
 import { crearPropiedad } from "@/app/dashboard/propiedades/_actions";
 import { crearLote } from "@/app/dashboard/proyectos/[id]/_actions";
 import toast from "react-hot-toast";
@@ -180,10 +181,13 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="crm-card rounded-2xl shadow-crm-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+      <div className="crm-card rounded-t-2xl sm:rounded-2xl shadow-crm-xl sm:max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-white/30" aria-hidden />
+        </div>
         {/* Header */}
-        <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 text-white px-6 py-4 rounded-t-2xl">
+        <div className="bg-gradient-to-r from-crm-primary to-crm-primary/80 text-white px-5 sm:px-6 py-4 sm:rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold">Nueva Propiedad</h2>
@@ -193,9 +197,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
               onClick={onClose}
               className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-6 h-6" />
             </button>
           </div>
           
@@ -227,9 +229,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
               disabled={currentStep === 1}
               className="px-6 py-3 bg-crm-border text-crm-text-primary rounded-lg hover:bg-crm-border/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft className="w-4 h-4" />
               Anterior
             </button>
             
@@ -246,9 +246,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
                   className="px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors flex items-center gap-2"
                 >
                   Siguiente
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
                 <button
@@ -263,9 +261,7 @@ export default function PropiedadWizard({ proyectos, onClose }: PropiedadWizardP
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
+                      <Plus className="w-4 h-4" />
                       Crear Propiedad
                     </>
                   )}
@@ -285,9 +281,7 @@ function Paso1Tipo({ data, updateData }: { data: PropiedadWizardData; updateData
     <div className="space-y-8">
       <div className="text-center">
         <div className="w-16 h-16 bg-crm-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-          </svg>
+          <Building2 className="w-8 h-8 text-crm-primary" />
         </div>
         <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Tipo de Propiedad</h3>
         <p className="text-crm-text-muted">Selecciona el tipo de propiedad que deseas crear</p>
@@ -296,9 +290,7 @@ function Paso1Tipo({ data, updateData }: { data: PropiedadWizardData; updateData
         {/* Tipo de Propiedad */}
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center">
-          <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-          </svg>
+          <Building2 className="w-5 h-5 mr-2 text-crm-primary" />
           Tipo de Propiedad
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -330,9 +322,7 @@ function Paso1Tipo({ data, updateData }: { data: PropiedadWizardData; updateData
       {/* Tipo de Operación */}
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-4 flex items-center">
-          <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-          </svg>
+          <DollarSign className="w-5 h-5 mr-2 text-crm-primary" />
           Tipo de Operación
         </h4>
         <div className="grid grid-cols-3 gap-4">
@@ -374,9 +364,7 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
       <div className="space-y-8">
       <div className="text-center">
           <div className="w-16 h-16 bg-crm-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-            </svg>
+            <Building2 className="w-8 h-8 text-crm-primary" />
           </div>
           <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Datos del Lote</h3>
           <p className="text-crm-text-muted">Información básica del lote</p>
@@ -384,9 +372,7 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
 
         <div className="crm-card p-6">
           <h4 className="text-lg font-semibold text-crm-text-primary mb-6 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <FileText className="w-5 h-5 mr-2 text-crm-primary" />
             Información del Lote
           </h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -461,9 +447,7 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
     <div className="space-y-8">
           <div className="text-center">
         <div className="w-16 h-16 bg-crm-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+          <FileText className="w-8 h-8 text-crm-primary" />
             </div>
         <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Datos Generales</h3>
         <p className="text-crm-text-muted">Información básica de la propiedad</p>
@@ -471,9 +455,7 @@ function Paso2DatosGenerales({ data, updateData, proyectos }: {
 
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-6 flex items-center">
-          <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-          </svg>
+          <Building2 className="w-5 h-5 mr-2 text-crm-primary" />
           Información de la Propiedad
         </h4>
     <div className="space-y-6">
@@ -619,9 +601,7 @@ function Paso4Precios({ data, updateData, proyectos }: {
     <div className="space-y-8">
       <div className="text-center">
         <div className="w-16 h-16 bg-crm-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <CheckCircle2 className="w-8 h-8 text-crm-primary" />
                 </div>
         <h3 className="text-2xl font-bold text-crm-text-primary mb-2">Precios y Confirmación</h3>
         <p className="text-crm-text-muted">Información comercial y confirmación final</p>
@@ -630,9 +610,7 @@ function Paso4Precios({ data, updateData, proyectos }: {
       {/* Precios */}
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-6 flex items-center">
-          <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-          </svg>
+          <DollarSign className="w-5 h-5 mr-2 text-crm-primary" />
           Información Comercial
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -669,9 +647,7 @@ function Paso4Precios({ data, updateData, proyectos }: {
       {/* Resumen de la Propiedad */}
       <div className="crm-card p-6">
         <h4 className="text-lg font-semibold text-crm-text-primary mb-6 flex items-center">
-          <svg className="w-5 h-5 mr-2 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+          <FileText className="w-5 h-5 mr-2 text-crm-primary" />
           Resumen de la Propiedad
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

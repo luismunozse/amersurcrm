@@ -1,3 +1,4 @@
+import { ChevronUp, ChevronDown, Users, Building2, Package, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { getCachedDashboardStats } from '@/lib/cache.server';
 
@@ -28,14 +29,10 @@ function StatCard({ title, value, change, changeType = 'neutral', icon, color = 
 
   const changeIcons = {
     positive: (
-      <svg className="w-3 h-3 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-      </svg>
+      <ChevronUp className="w-3 h-3 inline mr-0.5" strokeWidth={2.5} aria-hidden="true" />
     ),
     negative: (
-      <svg className="w-3 h-3 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-      </svg>
+      <ChevronDown className="w-3 h-3 inline mr-0.5" strokeWidth={2.5} aria-hidden="true" />
     ),
     neutral: null,
   };
@@ -94,9 +91,7 @@ export async function DashboardStats() {
       change: clientesDelta.text,
       changeType: clientesDelta.type,
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-        </svg>
+        <Users className="w-4 h-4" />
       ),
       color: "primary" as const,
     },
@@ -106,9 +101,7 @@ export async function DashboardStats() {
       change: "En tiempo real",
       changeType: "neutral" as const,
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
+        <Building2 className="w-4 h-4" />
       ),
       color: "success" as const,
     },
@@ -119,9 +112,7 @@ export async function DashboardStats() {
       change: `${stats.lotesVendidos} vendidos / ${stats.lotesReservados} reservados`,
       changeType: "neutral" as const,
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-        </svg>
+        <Package className="w-4 h-4" />
       ),
       color: "info" as const,
     },
@@ -131,9 +122,7 @@ export async function DashboardStats() {
       change: ventasDelta.text,
       changeType: ventasDelta.type,
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <DollarSign className="w-4 h-4" />
       ),
       color: stats.ventasMesActual > 0 ? "success" as const : "warning" as const,
     },

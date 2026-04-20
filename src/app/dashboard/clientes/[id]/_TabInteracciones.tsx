@@ -159,23 +159,24 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
       )}
 
       {/* Botón para nueva interacción */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-crm-text">Historial de Interacciones</h3>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <h3 className="text-base sm:text-lg font-semibold text-crm-text">Historial de Interacciones</h3>
         <div className="flex gap-2">
           <button
             onClick={cargarInteracciones}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 text-crm-text-secondary hover:text-crm-text-primary border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center w-10 h-10 text-crm-text-secondary hover:text-crm-text-primary border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors disabled:opacity-50"
             title="Recargar interacciones"
+            aria-label="Recargar interacciones"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden />
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium"
           >
-            <Plus className="h-4 w-4" />
-            Registrar Interacción
+            <Plus className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="text-sm">Registrar Interacción</span>
           </button>
         </div>
       </div>
@@ -192,13 +193,17 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
       {loading && interacciones.length === 0 ? (
         <PageLoader size="sm" />
       ) : !interacciones || interacciones.length === 0 ? (
-        <div className="text-center py-12 bg-crm-background rounded-lg">
-          <MessageSquare className="h-12 w-12 mx-auto mb-3 text-crm-text-muted opacity-50" />
-          <p className="text-crm-text-muted mb-4">No hay interacciones registradas</p>
+        <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
+          <MessageSquare className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay interacciones registradas</p>
+          <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
+            Cuando registres una llamada, visita o seguimiento, quedará visible aquí con su resultado.
+          </p>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="text-crm-primary hover:underline"
+            className="inline-flex items-center gap-2 px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium text-sm"
           >
+            <Plus className="h-4 w-4" aria-hidden />
             Registrar primera interacción
           </button>
         </div>

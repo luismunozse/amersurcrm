@@ -108,7 +108,9 @@
       "WebFetch(domain:skills.sh)",
       "Bash(npx next build:*)",
       "Bash(test:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(tasklist)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq npx*\")"
     ],
     "deny": [],
     "ask": []

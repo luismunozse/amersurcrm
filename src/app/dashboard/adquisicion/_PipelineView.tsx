@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition, useMemo } from "react";
-import { ChevronRight, User, MapPin, Clock, CheckCircle2, Circle, AlertCircle, Search, Download, Filter, X } from "lucide-react";
+import { ChevronRight, User, MapPin, Clock, CheckCircle2, Circle, AlertCircle, Search, Download, Filter, X, LayoutGrid } from "lucide-react";
 import { obtenerProcesos, obtenerResumenPipeline, toggleChecklistItem, avanzarEtapa } from "./_actions-proceso";
 import { ETAPAS_PROCESO, calcularProgresoEtapa, puedeAvanzarEtapa } from "@/lib/types/proceso-adquisicion";
 import type { ProcesoConRelaciones } from "@/lib/types/proceso-adquisicion";
@@ -224,7 +224,7 @@ export default function PipelineView() {
       {/* Lista de procesos */}
       {procesosFiltrados.length === 0 ? (
         <div className="text-center py-12 text-crm-text-muted">
-          <LayoutGridIcon className="h-12 w-12 mx-auto mb-2 opacity-30" />
+          <LayoutGrid className="h-12 w-12 mx-auto mb-2 opacity-30" />
           <p>No hay procesos de adquisición</p>
           <p className="text-xs mt-1">Los procesos se crean automáticamente al registrar una separación</p>
         </div>
@@ -399,11 +399,3 @@ export default function PipelineView() {
   );
 }
 
-function LayoutGridIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" />
-      <rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" />
-    </svg>
-  );
-}

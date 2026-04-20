@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import { crearReserva } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, type Moneda } from "@/lib/types/crm-flujo";
@@ -251,16 +252,19 @@ export default function CrearReservaModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl flex flex-col">
+      <div className="relative z-10 w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] bg-crm-card border-t-2 sm:border-2 border-crm-border rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         {/* Header */}
-        <div className="flex items-start justify-between p-6 pb-4 shrink-0">
+        <div className="flex items-start justify-between p-5 sm:p-6 pt-3 sm:pt-6 pb-4 shrink-0">
           <div>
             <h2 className="text-xl font-bold text-crm-text-primary">
               Crear Reserva
@@ -278,9 +282,7 @@ export default function CrearReservaModal({
             onClick={onClose}
             className="text-crm-text-muted hover:text-crm-text-primary transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
         </div>
 

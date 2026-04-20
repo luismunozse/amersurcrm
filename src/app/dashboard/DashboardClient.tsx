@@ -15,6 +15,8 @@ import ChangelogModal, { useChangelog } from "@/components/ChangelogModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ClienteQuickViewProvider } from "@/components/ClienteQuickViewSheet";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+import BottomNav from "@/components/BottomNav";
 
 export default function DashboardClient({
   children,
@@ -122,8 +124,10 @@ export default function DashboardClient({
             <SidebarInset className="bg-crm-bg-primary min-w-0 overflow-x-hidden">
               <MaintenanceBanner />
               <ShadcnHeaderBridge headerProps={headerProps} />
-              <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
+              <main className="flex-1 p-4 sm:p-6 safe-left safe-right pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-[max(env(safe-area-inset-bottom),1rem)]">{children}</main>
             </SidebarInset>
+            <BottomNav />
+            <PWAInstallPrompt />
           </SidebarProvider>
           <CommandPalette />
           <NotificationPermissionPrompt onPermissionGranted={handlePermissionGranted} />

@@ -17,12 +17,12 @@ export default function AgendarEventoButton({ clienteId, clienteNombre }: Props)
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary-hover rounded-lg transition-colors shadow-sm"
+        className="inline-flex items-center justify-center gap-2 px-2.5 sm:px-4 h-10 sm:h-10 rounded-lg text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary-hover transition-colors shadow-sm"
         title="Agendar actividad con este cliente"
+        aria-label="Agendar actividad con este cliente"
       >
-        <CalendarPlus className="h-4 w-4" />
+        <CalendarPlus className="h-4 w-4 shrink-0" aria-hidden />
         <span className="hidden sm:inline">Agendar actividad</span>
-        <span className="sm:hidden">Agendar</span>
       </button>
 
       <EventoModal

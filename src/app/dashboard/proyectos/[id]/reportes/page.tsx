@@ -1,6 +1,6 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
-import { ArrowLeft as ArrowLeftIcon, BarChart3 as ChartBarIcon, TrendingUp as ArrowTrendingUpIcon, Users as UsersIcon, DollarSign as CurrencyDollarIcon } from "lucide-react";
+import { ArrowLeft as ArrowLeftIcon, BarChart3 as ChartBarIcon, TrendingUp as ArrowTrendingUpIcon, Users as UsersIcon, DollarSign as CurrencyDollarIcon, Circle as CircleIcon } from "lucide-react";
 import Link from "next/link";
 import VentasMensualesChart from "./_VentasMensualesChart";
 import EstadoLotesChart from "./_EstadoLotesChart";
@@ -111,14 +111,15 @@ export default async function ReportesProyectoPage({ params }: { params: Promise
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
             proyecto.estado === 'activo'
               ? 'bg-green-100 text-green-700 border border-green-200'
               : proyecto.estado === 'pausado'
               ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
               : 'bg-red-100 text-red-700 border border-red-200'
           }`}>
-            {proyecto.estado === 'activo' ? '● Activo' : proyecto.estado === 'pausado' ? '● Pausado' : '● Cerrado'}
+            <CircleIcon className="w-2 h-2 fill-current" />
+            {proyecto.estado === 'activo' ? 'Activo' : proyecto.estado === 'pausado' ? 'Pausado' : 'Cerrado'}
           </span>
         </div>
       </div>

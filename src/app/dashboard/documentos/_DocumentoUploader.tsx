@@ -74,8 +74,11 @@ export default function DocumentoUploader({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-crm-border">
           <h2 className="text-xl font-semibold text-crm-text-primary">

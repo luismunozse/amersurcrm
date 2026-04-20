@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Download, FileSpreadsheet, FileText, FileType } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, FileType, ChevronDown } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import {
   exportFilteredProyectos,
@@ -185,14 +185,9 @@ export default function ExportButton({
         )}
         {isExporting ? 'Exportando...' : label}
         {!isExporting && (
-          <svg
+          <ChevronDown
             className={`${iconSizes[size]} transition-transform ${showDropdown ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          />
         )}
       </button>
 

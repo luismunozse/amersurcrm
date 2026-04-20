@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 
 type Props = {
@@ -66,7 +67,7 @@ export default function EstadoUsuarioModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
       aria-modal="true"
       role="dialog"
       aria-labelledby="estado-title"
@@ -78,7 +79,10 @@ export default function EstadoUsuarioModal({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
 
       {/* Dialog */}
-      <div className="relative z-10 w-full max-w-md bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+      <div className="relative z-10 w-full sm:max-w-md bg-crm-card border-t-2 sm:border-2 border-crm-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         {/* Icono de advertencia */}
         <div className="flex items-start gap-4 mb-4">
           <div className={`flex-shrink-0 w-12 h-12 rounded-full ${
@@ -87,13 +91,9 @@ export default function EstadoUsuarioModal({
               : 'bg-red-100 dark:bg-red-900/30'
           } flex items-center justify-center`}>
             {newState ? (
-              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
+              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
             ) : (
-              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-              </svg>
+              <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
             )}
           </div>
 

@@ -56,12 +56,15 @@ export default function DesestimarDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm sm:p-4 animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-labelledby="desestimar-title"
     >
-      <div className="w-full max-w-lg rounded-2xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20 shadow-xl">
+      <div className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border-t sm:border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20 shadow-xl pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-red-300 dark:bg-red-700" aria-hidden />
+        </div>
         <div className="flex items-start gap-3 p-6">
           <XCircleIcon className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0" aria-hidden="true" />
           <div className="flex-1">

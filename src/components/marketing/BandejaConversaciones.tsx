@@ -161,8 +161,11 @@ function ModalOptOut({
   const [motivo, setMotivo] = useState("");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-crm-card border border-crm-border rounded-2xl p-6 w-full max-w-sm shadow-crm-lg">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-crm-card border-t sm:border border-crm-border rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 w-full sm:max-w-sm shadow-crm-lg pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <h3 className="text-base font-semibold text-crm-text-primary mb-2">
           {activar ? "Activar opt-out" : "Desactivar opt-out"}
         </h3>
@@ -219,8 +222,11 @@ function ModalConversion({
   const [nota, setNota] = useState("");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-crm-card border border-crm-border rounded-2xl p-6 w-full max-w-sm shadow-crm-lg">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-crm-card border-t sm:border border-crm-border rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 w-full sm:max-w-sm shadow-crm-lg pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <h3 className="text-base font-semibold text-crm-text-primary mb-2 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-crm-success" />
           Registrar conversión

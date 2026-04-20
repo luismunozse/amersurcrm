@@ -31,9 +31,12 @@ function ModalConfirmarEliminar({
   onCancelar: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150">
       <div className="fixed inset-0 bg-black/50" onClick={onCancelar} />
-      <div className="relative bg-crm-card border border-crm-border rounded-xl shadow-xl p-6 w-full max-w-sm">
+      <div className="relative bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-xl p-5 sm:p-6 w-full sm:max-w-sm pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 bg-crm-error/10 rounded-lg flex items-center justify-center flex-shrink-0">
             <AlertTriangle className="w-5 h-5 text-crm-error" />
@@ -96,9 +99,12 @@ function ModalDetallePlantilla({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150">
       <div className="fixed inset-0 bg-black/50" onClick={onCerrar} />
-      <div className="relative bg-crm-card border border-crm-border rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+      <div className="relative bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-xl w-full sm:max-w-lg max-h-[92vh] sm:max-h-[85vh] flex flex-col pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-crm-border">
           <div>

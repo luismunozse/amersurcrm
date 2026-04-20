@@ -3,7 +3,7 @@
 import { useState } from "react";
 import ImageCarousel from "@/components/ImageCarousel";
 import type { ProyectoMediaItem } from "@/types/proyectos";
-import { Building2 as BuildingOffice2Icon } from "lucide-react";
+import { Building2 as BuildingOffice2Icon, ZoomIn } from "lucide-react";
 
 interface ProyectoGaleriaProps {
   nombre: string;
@@ -61,19 +61,7 @@ export default function ProyectoGaleria({
                 {/* Hover Overlay */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 p-3 rounded-full">
-                    <svg
-                      className="w-6 h-6 text-gray-800"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-                      />
-                    </svg>
+                    <ZoomIn className="w-6 h-6 text-gray-800" />
                   </div>
                 </div>
               </button>
@@ -133,19 +121,7 @@ export default function ProyectoGaleria({
                       {/* Hover Icon */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <svg
-                            className="w-5 h-5 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-                            />
-                          </svg>
+                          <ZoomIn className="w-5 h-5 text-white" />
                         </div>
                       </div>
                     </button>

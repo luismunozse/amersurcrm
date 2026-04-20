@@ -252,7 +252,9 @@ function LoteSearch({
             <Home className="w-4 h-4 shrink-0" aria-hidden />
             <span className="truncate">{loteSeleccionado.label}</span>
           </span>
-          <button type="button" onClick={limpiar} className="text-crm-text-muted hover:text-crm-text-primary text-xs">✕</button>
+          <button type="button" onClick={limpiar} aria-label="Limpiar selección" className="text-crm-text-muted hover:text-crm-text-primary">
+            <XMarkIcon className="w-4 h-4" />
+          </button>
         </div>
       ) : (
         <input
@@ -450,16 +452,22 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200 pb-[env(safe-area-inset-bottom)] sm:pb-0">
+        {/* Handle visual mobile */}
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         {/* Header fijo */}
-        <div className="flex items-center justify-between p-5 pb-4 border-b border-crm-border flex-shrink-0">
-          <h2 className="text-xl font-bold text-crm-text-primary">
+        <div className="flex items-center justify-between px-5 pt-3 sm:pt-5 pb-4 border-b border-crm-border flex-shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold text-crm-text-primary">
             {evento ? "Editar evento" : "Nuevo evento"}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-crm-border rounded-lg transition-colors"
+            className="shrink-0 grid place-items-center w-9 h-9 hover:bg-crm-border rounded-lg transition-colors"
+            aria-label="Cerrar"
+            title="Cerrar"
           >
             <XMarkIcon className="w-5 h-5 text-crm-text-muted" />
           </button>
@@ -688,7 +696,7 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
           </div>
 
           {/* Footer fijo con botones */}
-          <div className="flex justify-end space-x-3 p-5 pt-4 border-t border-crm-border flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
+          <div className="flex justify-end space-x-3 p-5 pt-4 border-t border-crm-border flex-shrink-0 bg-white dark:bg-slate-800 sm:rounded-b-2xl">
             <button
               type="button"
               onClick={onClose}

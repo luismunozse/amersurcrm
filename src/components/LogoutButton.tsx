@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LogOut } from "lucide-react";
 import { signOut } from "@/app/_actionsAuth";
 import ConfirmDialog from "./ConfirmDialog";
 
@@ -24,9 +25,7 @@ export default function LogoutButton() {
         title="Cerrar sesión"
         aria-label="Cerrar sesión"
       >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-        </svg>
+        <LogOut className="h-5 w-5" aria-hidden="true" />
       </button>
 
       <ConfirmDialog

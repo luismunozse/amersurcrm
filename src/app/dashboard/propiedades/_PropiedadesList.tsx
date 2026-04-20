@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
 import VerPropiedadModal from "./_VerPropiedadModal";
 import EditarPropiedadModal from "./_EditarPropiedadModal";
+import { LayoutGrid, Home, Building2, Briefcase, FileText, Zap, ChevronDown, Eye, Pencil, Trash2 } from "lucide-react";
 
 type Propiedad = {
   id: string;
@@ -119,49 +120,37 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
       case 'lote':
         return (
           <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
-            </svg>
+            <LayoutGrid className="w-5 h-5 text-orange-600" />
           </div>
         );
       case 'casa':
         return (
           <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+            <Home className="w-5 h-5 text-blue-600" />
           </div>
         );
       case 'departamento':
         return (
           <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+            <Building2 className="w-5 h-5 text-purple-600" />
           </div>
         );
       case 'oficina':
         return (
           <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
+            <Briefcase className="w-5 h-5 text-green-600" />
           </div>
         );
       case 'otro':
         return (
           <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+            <FileText className="w-5 h-5 text-gray-600" />
           </div>
         );
       default:
         return (
           <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+            <Home className="w-5 h-5 text-blue-600" />
           </div>
         );
     }
@@ -222,9 +211,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-            </svg>
+            <Building2 className="w-4 h-4 text-crm-primary" />
           </div>
         </div>
       </div>
@@ -232,9 +219,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
       {propiedades.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-20 h-20 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-            </svg>
+            <Building2 className="w-10 h-10 text-crm-text-muted" />
           </div>
           <h4 className="text-xl font-medium text-crm-text-primary mb-3">No hay propiedades registradas</h4>
           <p className="text-crm-text-muted mb-6 max-w-md mx-auto">
@@ -272,17 +257,13 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
                       {!propiedad.proyecto_id ? (
                         <div className="flex items-center space-x-1">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-crm-primary text-white">
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
+                            <Zap className="w-3 h-3 mr-1" />
                             Independiente
                           </span>
                         </div>
                       ) : (
                         <div className="flex items-center space-x-1">
-                          <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
+                          <Building2 className="w-3 h-3 text-crm-primary" />
                           <span className="text-sm font-medium text-crm-text-primary">
                             {propiedad.proyecto?.nombre || 'Proyecto'}
                           </span>
@@ -323,9 +304,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
                         <option value="bloqueado">Bloqueado</option>
                       </select>
                       <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <ChevronDown className="w-3 h-3 text-white" />
                       </div>
                     </div>
                   </td>
@@ -336,28 +315,21 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
                         className="inline-flex items-center justify-center w-8 h-8 text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors"
                         title="Ver detalles"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
+                        <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleEditar(propiedad)}
                         className="inline-flex items-center justify-center w-8 h-8 text-crm-primary bg-crm-primary/10 hover:bg-crm-primary/20 rounded-lg transition-colors"
                         title="Editar propiedad"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
+                        <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleEliminar(propiedad)}
                         className="inline-flex items-center justify-center w-8 h-8 text-crm-danger bg-crm-danger/10 hover:bg-crm-danger/20 rounded-lg transition-colors"
                         title="Eliminar propiedad"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>

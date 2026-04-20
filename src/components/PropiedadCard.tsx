@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { DollarSign, Trash2 } from "lucide-react";
 import { eliminarPropiedad, cambiarEstadoPropiedad } from "@/app/dashboard/propiedades/_actions";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -136,9 +137,7 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
-                </svg>
+                <DollarSign className="w-4 h-4 text-crm-primary" />
               </div>
               <div>
                 <p className="text-sm font-medium text-crm-text-primary">
@@ -268,9 +267,7 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
               className="text-crm-danger hover:text-crm-danger-hover p-2 sm:p-1 min-h-[36px] min-w-[36px] inline-flex items-center justify-center"
               disabled={isPending}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-              </svg>
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>

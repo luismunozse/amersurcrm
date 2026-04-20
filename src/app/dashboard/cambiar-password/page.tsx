@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Check, X, Eye, EyeOff } from "lucide-react";
+import { Check, X, Eye, EyeOff, Key } from "lucide-react";
 
 export default function CambiarPasswordPage() {
   const router = useRouter();
@@ -107,9 +107,7 @@ export default function CambiarPasswordPage() {
           <div className="bg-gradient-to-r from-crm-primary to-crm-accent p-6">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
+                <Key className="w-7 h-7 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">Cambiar Contraseña</h1>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { crearEvento } from "@/app/dashboard/agenda/actions";
 import { EventoFormState } from "@/lib/types/agenda";
 import DateTimePicker from "@/components/ui/DateTimePicker";
@@ -99,9 +100,12 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-4 sm:p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
+        <div className="p-4 sm:p-6 pt-3 sm:pt-6">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-crm-text-primary">
               {eventoInicial ? 'Editar Evento' : 'Crear Nuevo Evento'}
@@ -111,9 +115,7 @@ export default function EventoForm({ onSuccess, onCancel, eventoInicial }: Event
               className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-muted hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
               aria-label="Cerrar"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-6 h-6" />
             </button>
           </div>
 

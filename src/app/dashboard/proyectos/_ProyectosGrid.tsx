@@ -10,6 +10,8 @@ import {
   Search as MagnifyingGlassIcon,
   Filter as FunnelIcon,
   X as XMarkIcon,
+  Circle as CircleIcon,
+  Pause as PauseIcon,
 } from 'lucide-react';
 import QuickActions from './QuickActions';
 import type { ProyectoMediaItem } from '@/types/proyectos';
@@ -269,11 +271,18 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
                         : 'bg-red-500/90 text-white border-red-400'
                     }`}
                   >
-                    <span className="md:hidden">
-                      {p.estado === 'activo' ? '●' : p.estado === 'pausado' ? '⏸' : '✕'}
+                    <span className="md:hidden inline-flex items-center">
+                      {p.estado === 'activo' ? (
+                        <CircleIcon className="w-2.5 h-2.5 fill-current" />
+                      ) : p.estado === 'pausado' ? (
+                        <PauseIcon className="w-3 h-3 fill-current" />
+                      ) : (
+                        <XMarkIcon className="w-3 h-3" />
+                      )}
                     </span>
-                    <span className="hidden md:inline">
-                      {p.estado === 'activo' ? '● Activo' : p.estado === 'pausado' ? '● Pausado' : '● Cerrado'}
+                    <span className="hidden md:inline-flex items-center gap-1.5">
+                      <CircleIcon className="w-2 h-2 fill-current" />
+                      {p.estado === 'activo' ? 'Activo' : p.estado === 'pausado' ? 'Pausado' : 'Cerrado'}
                     </span>
                   </span>
                 </div>

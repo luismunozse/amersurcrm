@@ -155,7 +155,11 @@ export default function UserAvatarMenu({
   return (
     <Menu as="div" className="relative">
       {/* Avatar Button */}
-      <Menu.Button className="flex items-center gap-3 focus:outline-none">
+      <Menu.Button
+        className="flex items-center gap-3 focus:outline-none"
+        aria-label="Menú de usuario"
+        title={displayName ? `Menú de ${displayName}` : 'Menú de usuario'}
+      >
         {/* User info - desktop */}
         <div className="hidden lg:block text-right">
           <p className="text-sm font-medium text-crm-text-primary">

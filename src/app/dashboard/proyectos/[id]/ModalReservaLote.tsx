@@ -325,12 +325,15 @@ export default function ModalReservaLote({
     <>
       {/* Modal de reserva */}
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4 animate-in fade-in duration-150"
         role="dialog"
         aria-modal="true"
         style={{ display: mostrarFormCliente ? 'none' : 'flex' }}
       >
-        <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-crm-card border border-crm-border shadow-2xl">
+        <div className="w-full sm:max-w-3xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl bg-crm-card border-t sm:border border-crm-border shadow-2xl pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+          <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+            <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+          </div>
           {/* Header */}
           <div className="sticky top-0 bg-crm-card border-b border-crm-border px-6 py-4 flex items-center justify-between z-10">
             <div>
@@ -565,9 +568,12 @@ export default function ModalReservaLote({
 
       {/* Modal de crear cliente (superpuesto) */}
       {mostrarFormCliente && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-4xl my-8">
-            <div className="bg-crm-card rounded-xl border border-crm-border shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="w-full sm:max-w-4xl sm:my-8">
+            <div className="bg-crm-card rounded-t-xl sm:rounded-xl border-t sm:border border-crm-border shadow-2xl pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+              <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+                <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+              </div>
               {/* Header del modal de cliente */}
               <div className="sticky top-0 bg-crm-card border-b border-crm-border px-6 py-4 flex items-center justify-between z-10 rounded-t-xl">
                 <div>

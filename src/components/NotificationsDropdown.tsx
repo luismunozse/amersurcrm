@@ -2,7 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import {
+  Bell,
+  User,
+  Building2,
+  Home,
+  Settings,
+  Calendar,
+  Clock,
+  DollarSign,
+  Lock,
+  Sprout,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { marcarNotificacionLeida, marcarTodasLeidas } from "@/app/_actionsNotifications";
@@ -16,16 +28,16 @@ type NotificacionRow = NotificacionNoLeida & {
   data?: Record<string, unknown> | null;
 };
 
-const tipoIcons: Record<string, string> = {
-  cliente: "👤",
-  proyecto: "🏢",
-  lote: "🏠",
-  sistema: "⚙️",
-  evento: "📅",
-  recordatorio: "⏰",
-  venta: "💰",
-  reserva: "🔒",
-  lead_asignado: "🌱",
+const tipoIcons: Record<string, LucideIcon> = {
+  cliente: User,
+  proyecto: Building2,
+  lote: Home,
+  sistema: Settings,
+  evento: Calendar,
+  recordatorio: Clock,
+  venta: DollarSign,
+  reserva: Lock,
+  lead_asignado: Sprout,
 };
 
 const tipoColors: Record<string, string> = {
@@ -138,8 +150,9 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
       setUnreadCount((prev) => prev + 1);
     }
 
+    const ToastIcon = tipoIcons[normalized.tipo] ?? Bell;
     toast.success(normalized.titulo, {
-      icon: tipoIcons[normalized.tipo] ?? "🔔",
+      icon: <ToastIcon className="w-5 h-5 text-crm-primary" aria-hidden />,
       duration: 4000,
     });
 
@@ -359,6 +372,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
         onClick={() => setIsOpen(!isOpen)}
         className="relative inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
         aria-label="Notificaciones"
+        title={unreadCount > 0 ? `${unreadCount} notificación${unreadCount === 1 ? '' : 'es'} sin leer` : 'Notificaciones'}
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount > 0 && (
@@ -385,14 +399,18 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
             <div className="max-h-96 overflow-y-auto">
               {items.length > 0 ? (
                 <div className="divide-y divide-crm-border">
-                  {items.map((notificacion) => (
+                  {items.map((notificacion) => {
+                    const TipoIcon = tipoIcons[notificacion.tipo] ?? Bell;
+                    return (
                     <div
                       key={notificacion.id}
                       className="p-4 hover:bg-crm-card-hover transition-colors cursor-pointer"
                       onClick={() => handleNotificationClick(notificacion)}
                     >
                       <div className="flex items-start space-x-3">
-                        <span className="text-2xl">{tipoIcons[notificacion.tipo] ?? "🔔"}</span>
+                        <span className={`flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full bg-crm-card-hover ${tipoColors[notificacion.tipo] ?? "text-crm-text-primary"}`}>
+                          <TipoIcon className="w-5 h-5" aria-hidden />
+                        </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <p className={`text-sm font-medium ${tipoColors[notificacion.tipo] ?? "text-crm-text-primary"}`}>
@@ -404,11 +422,12 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-8 text-center">
-                  <div className="text-4xl mb-2">🔔</div>
+                  <Bell className="w-12 h-12 mx-auto mb-2 text-crm-text-muted opacity-50" aria-hidden />
                   <p className="text-crm-text-muted">No hay notificaciones</p>
                   <p className="text-xs text-crm-text-muted mt-1">Te notificaremos cuando haya novedades</p>
                 </div>

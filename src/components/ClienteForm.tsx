@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, useRef, useEffect, useCallback } from "react";
+import { User, MapPin, BarChart3, AlertTriangle } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 import { crearCliente, actualizarCliente, obtenerVendedores } from "@/app/dashboard/clientes/_actions";
 import { detectarDuplicados } from "@/app/dashboard/clientes/_actions-duplicates";
@@ -180,9 +181,7 @@ export default function ClienteForm({
       {/* Header */}
       <div className="flex items-center space-x-3 mb-4">
         <div className="w-8 h-8 bg-gradient-to-br from-crm-primary to-crm-primary/80 rounded-lg flex items-center justify-center">
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-          </svg>
+          <User className="w-4 h-4 text-white" />
         </div>
         <div>
           <h2 className="text-lg font-bold text-crm-text-primary">
@@ -201,9 +200,7 @@ export default function ClienteForm({
           <div className="space-y-4">
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-5 h-5 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                </svg>
+                <User className="w-3 h-3 text-crm-primary" />
               </div>
               <h3 className="text-sm font-semibold text-crm-text-primary">Información Básica</h3>
             </div>
@@ -375,10 +372,7 @@ export default function ClienteForm({
             <div className="space-y-3">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-5 h-5 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
+                  <MapPin className="w-3 h-3 text-crm-primary" />
                 </div>
                 <h3 className="text-sm font-semibold text-crm-text-primary">Dirección</h3>
               </div>
@@ -432,9 +426,7 @@ export default function ClienteForm({
             <div className="space-y-3 pt-3 border-t border-crm-border">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-5 h-5 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                  </svg>
+                  <BarChart3 className="w-3 h-3 text-crm-primary" />
                 </div>
                 <h3 className="text-sm font-semibold text-crm-text-primary">Información Comercial</h3>
               </div>
@@ -521,9 +513,7 @@ export default function ClienteForm({
                   )}
                   {errorVendedores && puedeGestionarVendedor && (
                     <p className="text-xs text-yellow-600 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                      </svg>
+                      <AlertTriangle className="w-3 h-3" />
                       No se pudieron cargar los vendedores
                     </p>
                   )}

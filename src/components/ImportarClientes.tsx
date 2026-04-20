@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Upload, X, Download, Play } from "lucide-react";
 import toast from "react-hot-toast";
 // xlsx y papaparse se cargan dinámicamente al procesar archivo (~700KB ahorrados)
 import type * as XLSXType from "xlsx";
@@ -683,16 +684,17 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-crm-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-crm-card rounded-t-lg sm:rounded-lg shadow-xl sm:max-w-4xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
+        <div className="p-5 sm:p-6 pt-3 sm:pt-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-crm-primary rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
-                </svg>
+                <Upload className="w-4 h-4 text-white" />
               </div>
               <h2 className="text-xl font-semibold text-crm-text-primary">Importar Clientes</h2>
             </div>
@@ -700,9 +702,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
               onClick={onClose}
               className="text-crm-text-muted hover:text-crm-text-primary transition-colors"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-              </svg>
+              <X className="w-6 h-6" />
             </button>
           </div>
 
@@ -776,18 +776,14 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                     onClick={downloadTemplate}
                     className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors flex items-center space-x-1"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
+                    <Download className="w-4 h-4" />
                     <span>Descargar plantilla con instrucciones</span>
                   </button>
                   <button
                     onClick={exportVendedoresCatalog}
                     className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors flex items-center space-x-1"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v10l9-5-9-5z" />
-                    </svg>
+                    <Play className="w-4 h-4" />
                     <span>Descargar catálogo de vendedores (username)</span>
                   </button>
                   <p className="text-xs text-crm-text-muted">
@@ -892,9 +888,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                       onClick={exportErrors}
                       className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors flex items-center space-x-1"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                      </svg>
+                      <Download className="w-4 h-4" />
                       <span>Exportar errores a CSV</span>
                     </button>
                   </div>
@@ -1005,9 +999,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
                       onClick={exportErrors}
                       className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors flex items-center space-x-1"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                      </svg>
+                      <Download className="w-4 h-4" />
                       <span>Exportar errores a CSV</span>
                     </button>
                   </div>

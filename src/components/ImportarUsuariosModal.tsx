@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { X, Upload, Check, AlertTriangle } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 
 type Rol = { id: string; nombre: string };
@@ -203,14 +204,17 @@ export default function ImportarUsuariosModal({ open, roles, onClose, onImportCo
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !isLoading) onClose();
       }}
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
 
-      <div className="relative z-10 w-full max-w-2xl max-h-[85vh] bg-crm-card border border-crm-border rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="relative z-10 w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-crm-border flex-shrink-0">
           <h3 className="text-lg font-semibold text-crm-text-primary">
@@ -223,9 +227,7 @@ export default function ImportarUsuariosModal({ open, roles, onClose, onImportCo
             disabled={isLoading}
             className="text-crm-text-muted hover:text-crm-text-primary disabled:opacity-50"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -234,9 +236,7 @@ export default function ImportarUsuariosModal({ open, roles, onClose, onImportCo
           {step === "upload" && (
             <div className="text-center py-8">
               <div className="mx-auto w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
+                <Upload className="w-8 h-8 text-crm-text-muted" strokeWidth={1.5} />
               </div>
               <p className="text-sm text-crm-text-primary mb-2 font-medium">
                 Selecciona un archivo CSV
@@ -336,13 +336,9 @@ María López,mlopez@email.com,87654321,987654322,Vendedor,60000,3`}
                 importResult.errores.length === 0 ? "bg-green-100 dark:bg-green-900/30" : "bg-amber-100 dark:bg-amber-900/30"
               }`}>
                 {importResult.errores.length === 0 ? (
-                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="w-8 h-8 text-green-600" />
                 ) : (
-                  <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
-                  </svg>
+                  <AlertTriangle className="w-8 h-8 text-amber-600" />
                 )}
               </div>
 

@@ -71,14 +71,17 @@ export function InfoDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm sm:p-4 animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-labelledby="info-dialog-title"
     >
       <div
-        className={`w-full max-w-md rounded-2xl border ${config.border} ${config.bg} shadow-xl transition`}
+        className={`w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-t sm:border ${config.border} ${config.bg} shadow-xl pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200`}
       >
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-start gap-4 p-6">
           <span aria-hidden="true">{config.icon}</span>
           <div className="flex-1">

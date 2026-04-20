@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useRouter } from "next/navigation";
 import UbicacionSelector from "@/components/UbicacionSelector";
 import { compressImage, compressImages, formatFileSize } from "@/lib/imageCompression";
+import { Plus, Minus, ChevronDown } from "lucide-react";
 
 export default function NewProyectoForm() {
   const [pending, start] = useTransition();
@@ -60,13 +61,11 @@ export default function NewProyectoForm() {
       >
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-br from-crm-primary to-crm-accent rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-all">
-            <svg className="w-5 h-5 text-white transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isExpanded ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/>
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-              )}
-            </svg>
+            {isExpanded ? (
+              <Minus className="w-5 h-5 text-white transition-transform duration-200" />
+            ) : (
+              <Plus className="w-5 h-5 text-white transition-transform duration-200" />
+            )}
           </div>
           <div className="text-left">
             <h2 className="text-base md:text-lg font-semibold text-crm-text-primary">
@@ -77,14 +76,9 @@ export default function NewProyectoForm() {
             </p>
           </div>
         </div>
-        <svg
+        <ChevronDown
           className={`w-5 h-5 text-crm-text-muted group-hover:text-crm-primary transition-all duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        />
       </button>
 
       {isExpanded && (
@@ -358,9 +352,7 @@ export default function NewProyectoForm() {
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                  </svg>
+                  <Plus className="w-4 h-4" />
                   <span>Agregar Proyecto</span>
                 </>
               )}

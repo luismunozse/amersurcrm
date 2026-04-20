@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -63,7 +64,7 @@ export default function EditarPropiedadInteresModal({ isOpen, onClose, propiedad
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
       onClick={(event) => {
         if (event.target === event.currentTarget && !submitting) {
           onClose();
@@ -71,7 +72,10 @@ export default function EditarPropiedadInteresModal({ isOpen, onClose, propiedad
       }}
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-md bg-crm-card border border-crm-border rounded-2xl shadow-xl p-6">
+      <div className="relative z-10 w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-crm-card border-t sm:border border-crm-border rounded-t-2xl sm:rounded-2xl shadow-xl p-5 sm:p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-start justify-between mb-5">
           <div>
             <h2 className="text-lg font-semibold text-crm-text">Editar propiedad</h2>
@@ -83,9 +87,7 @@ export default function EditarPropiedadInteresModal({ isOpen, onClose, propiedad
             onClick={() => !submitting && onClose()}
             className="text-crm-text-muted hover:text-crm-text transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" />
           </button>
         </div>
 

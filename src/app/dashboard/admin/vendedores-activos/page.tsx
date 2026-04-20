@@ -7,6 +7,7 @@ import { PageLoader } from "@/components/ui/PageLoader";
 import EliminarVendedorActivoModal from "@/components/EliminarVendedorActivoModal";
 import CambiarEstadoVendedorActivoModal from "@/components/CambiarEstadoVendedorActivoModal";
 import EliminarVendedoresMultipleModal from "@/components/EliminarVendedoresMultipleModal";
+import { Plus, Trash2, Check, X, ChevronUp, ChevronDown } from "lucide-react";
 
 interface VendedorActivo {
   id: string;
@@ -391,9 +392,7 @@ export default function VendedoresActivosPage() {
           onClick={() => setMostrarAgregar(!mostrarAgregar)}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus className="w-5 h-5" />
           Agregar Vendedor
         </button>
       </div>
@@ -493,9 +492,7 @@ export default function VendedoresActivosPage() {
               onClick={abrirModalEliminarMultiple}
               className="flex items-center gap-2 text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+              <Trash2 className="w-4 h-4" />
               Eliminar {vendedoresSeleccionados.size}
             </button>
           )}
@@ -535,16 +532,12 @@ export default function VendedoresActivosPage() {
                   <div>
                     {vendedor.activo ? (
                       <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                        <Check className="w-3 h-3" />
                         Activo
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="w-3 h-3" />
                         Inactivo
                       </span>
                     )}
@@ -559,9 +552,7 @@ export default function VendedoresActivosPage() {
                     className="p-2 text-gray-600 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Mover arriba"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
+                    <ChevronUp className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => moverVendedor(index, "abajo")}
@@ -569,9 +560,7 @@ export default function VendedoresActivosPage() {
                     className="p-2 text-gray-600 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Mover abajo"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown className="w-5 h-5" />
                   </button>
 
                   {/* Toggle activo */}
@@ -592,9 +581,7 @@ export default function VendedoresActivosPage() {
                     className="p-2 text-red-600 hover:bg-red-50 rounded"
                     title="Eliminar"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>

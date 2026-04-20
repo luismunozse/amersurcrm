@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Filter, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { getCachedFunnelClientes } from "@/lib/cache.server";
 
@@ -20,9 +21,7 @@ export async function MiniFunnelVentas() {
       <Card variant="elevated" className="h-full">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-crm-text-primary">
-            <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-            </svg>
+            <Filter className="w-5 h-5 text-crm-primary" aria-hidden="true" />
             Pipeline de ventas
           </CardTitle>
         </CardHeader>
@@ -43,9 +42,7 @@ export async function MiniFunnelVentas() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-crm-text-primary">
-            <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-            </svg>
+            <Filter className="w-5 h-5 text-crm-primary" aria-hidden="true" />
             Pipeline de ventas
           </CardTitle>
           <span className="text-xs font-medium text-crm-text-muted">
@@ -102,9 +99,7 @@ export async function MiniFunnelVentas() {
           className="flex items-center justify-center gap-1 pt-1 text-xs font-semibold text-crm-primary hover:text-crm-primary/80 transition"
         >
           Gestionar pipeline
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+          <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
         </Link>
       </CardContent>
     </Card>

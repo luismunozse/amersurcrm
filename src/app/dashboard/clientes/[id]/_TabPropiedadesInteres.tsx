@@ -81,9 +81,19 @@ export default function TabPropiedadesInteres({ propiedades, clienteId }: Props)
       </div>
 
       {listaVacia ? (
-        <div className="text-center py-12 bg-crm-background rounded-lg">
-          <Heart className="h-12 w-12 mx-auto mb-3 text-crm-text-muted opacity-50" />
-          <p className="text-crm-text-muted">No hay propiedades de interés registradas</p>
+        <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
+          <Heart className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay propiedades de interés</p>
+          <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
+            Agregá los lotes o proyectos que le interesan al cliente para hacer seguimiento de sus preferencias.
+          </p>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium text-sm"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Agregar primera propiedad
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

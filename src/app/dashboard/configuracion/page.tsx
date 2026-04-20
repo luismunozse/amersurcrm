@@ -2,6 +2,7 @@ import { createServerOnlyClient } from "@/lib/supabase.server";
 import { redirect } from "next/navigation";
 import { PERMISOS } from "@/lib/permissions";
 import { protegerRuta } from "@/lib/permissions/middleware";
+import { Bell, SquarePen, Check, Lock, Info } from "lucide-react";
 
 export default async function ConfiguracionPage() {
   const supabase = await createServerOnlyClient();
@@ -33,9 +34,7 @@ export default async function ConfiguracionPage() {
       <div className="bg-crm-card rounded-xl shadow-crm-lg border border-crm-border overflow-hidden mb-6">
         <div className="bg-gradient-to-r from-crm-primary/10 to-crm-accent/10 px-6 py-4 border-b border-crm-border">
           <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-3">
-            <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
+            <Bell className="w-6 h-6 text-crm-primary" />
             Notificaciones
           </h2>
         </div>
@@ -79,9 +78,7 @@ export default async function ConfiguracionPage() {
       <div className="bg-crm-card rounded-xl shadow-crm-lg border border-crm-border overflow-hidden mb-6">
         <div className="bg-gradient-to-r from-crm-primary/10 to-crm-accent/10 px-6 py-4 border-b border-crm-border">
           <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-3">
-            <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-            </svg>
+            <SquarePen className="w-6 h-6 text-crm-primary" />
             Interfaz
           </h2>
         </div>
@@ -95,9 +92,7 @@ export default async function ConfiguracionPage() {
                 <p className="text-sm font-medium text-crm-text-primary">Tema de la aplicación</p>
                 <p className="text-xs text-crm-text-muted mt-1">Puedes cambiar el tema desde el menú de usuario en el header</p>
               </div>
-              <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="w-5 h-5 text-crm-primary" />
             </div>
             <div className="flex items-center justify-between p-4 bg-crm-background rounded-lg border border-crm-border">
               <div className="flex-1">
@@ -116,9 +111,7 @@ export default async function ConfiguracionPage() {
       <div className="bg-crm-card rounded-xl shadow-crm-lg border border-crm-border overflow-hidden mb-6">
         <div className="bg-gradient-to-r from-crm-primary/10 to-crm-accent/10 px-6 py-4 border-b border-crm-border">
           <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-3">
-            <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
+            <Lock className="w-6 h-6 text-crm-primary" />
             Privacidad y Seguridad
           </h2>
         </div>
@@ -165,9 +158,7 @@ export default async function ConfiguracionPage() {
       <div className="bg-crm-card rounded-xl shadow-crm-lg border border-crm-border overflow-hidden">
         <div className="bg-gradient-to-r from-crm-primary/10 to-crm-accent/10 px-6 py-4 border-b border-crm-border">
           <h2 className="text-xl font-semibold text-crm-text-primary flex items-center gap-3">
-            <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Info className="w-6 h-6 text-crm-primary" />
             Información de la Cuenta
           </h2>
         </div>

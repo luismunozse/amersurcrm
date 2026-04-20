@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { X as XMarkIcon } from "lucide-react";
+import { X as XMarkIcon, Building2 } from "lucide-react";
 import { cambiarEstadoPropiedad } from "./_actions";
 import { actualizarLote } from "../proyectos/[id]/_actions";
 import toast from "react-hot-toast";
@@ -294,9 +294,7 @@ export default function EditarPropiedadModal({ propiedad, isOpen, onClose, onSuc
               <div className="bg-crm-card-hover rounded-lg p-4">
                 <h3 className="text-sm font-medium text-crm-text-muted mb-2">Proyecto Asociado</h3>
                 <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
+                  <Building2 className="w-4 h-4 text-crm-primary" />
                   <span className="text-crm-text-primary font-medium">{propiedad.proyecto.nombre}</span>
                 </div>
               </div>

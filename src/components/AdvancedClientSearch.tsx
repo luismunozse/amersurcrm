@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { Search, X, Phone, CreditCard } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 import { useRouter } from "next/navigation";
 
@@ -159,9 +160,7 @@ export default function AdvancedClientSearch({ clientes, onFiltersChange }: Adva
                   {isSearching ? (
                     <Spinner size="md" color="primary" />
                   ) : (
-                    <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
+                    <Search className="h-5 w-5 text-crm-text-muted" />
                   )}
                 </div>
                 <input
@@ -181,9 +180,7 @@ export default function AdvancedClientSearch({ clientes, onFiltersChange }: Adva
                 className="px-4 py-3 text-sm font-medium text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-xl transition-colors flex items-center gap-2"
                 title="Limpiar búsqueda"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+                <X className="w-4 h-4" />
                 Limpiar
               </button>
             )}
@@ -194,9 +191,7 @@ export default function AdvancedClientSearch({ clientes, onFiltersChange }: Adva
             {/* Búsqueda por teléfono */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                </svg>
+                <Phone className="h-5 w-5 text-crm-text-muted" />
               </div>
               <input
                 type="text"
@@ -210,9 +205,7 @@ export default function AdvancedClientSearch({ clientes, onFiltersChange }: Adva
             {/* Búsqueda por DNI */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
-                </svg>
+                <CreditCard className="h-5 w-5 text-crm-text-muted" />
               </div>
               <input
                 type="text"

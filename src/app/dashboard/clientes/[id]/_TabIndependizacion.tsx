@@ -116,9 +116,19 @@ export default function TabIndependizacion({ clienteId, clienteNombre, ventas }:
       )}
 
       {independizaciones.length === 0 ? (
-        <div className="text-center py-8 text-crm-text-muted">
-          <Building className="h-12 w-12 mx-auto mb-2 opacity-30" />
-          <p>No hay independizaciones registradas</p>
+        <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
+          <Building className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay independizaciones registradas</p>
+          <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
+            Una vez iniciado el trámite de independización del lote, su avance quedará registrado acá.
+          </p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium text-sm"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Crear primera independización
+          </button>
         </div>
       ) : (
         <div className="space-y-3">

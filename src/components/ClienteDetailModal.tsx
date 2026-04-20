@@ -114,17 +114,17 @@ export default function ClienteDetailModal({ isOpen, onClose, cliente }: Cliente
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
+          <div className="flex min-h-full items-end sm:items-center justify-center sm:p-4 text-center">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95 translate-y-4"
-              enterTo="opacity-100 scale-100 translate-y-0"
+              enterFrom="opacity-0 translate-y-4 sm:scale-95 sm:translate-y-0"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
               leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100 translate-y-0"
-              leaveTo="opacity-0 scale-95 translate-y-4"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:scale-95 sm:translate-y-0"
             >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all">
+              <Dialog.Panel className="w-full sm:max-w-4xl transform overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-800 text-left align-middle shadow-2xl transition-all pb-[env(safe-area-inset-bottom)] sm:pb-0">
                 {/* Header */}
                 <div className="bg-crm-primary px-6 py-6">
                   <div className="flex items-start justify-between">

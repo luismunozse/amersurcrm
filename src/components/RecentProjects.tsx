@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Building2, MapPin, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { getCachedProyectos } from "@/lib/cache.server";
 import type { ProyectoCached } from "@/types/crm";
@@ -28,9 +29,7 @@ export async function RecentProjects({ proyectos: proyectosProp }: RecentProject
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+            <Building2 className="w-5 h-5 text-crm-primary" aria-hidden="true" />
             <span>Proyectos Recientes</span>
           </div>
           <Link href="/dashboard/proyectos" className="text-sm text-crm-primary hover:text-crm-primary/80 transition-colors">
@@ -68,30 +67,13 @@ export async function RecentProjects({ proyectos: proyectosProp }: RecentProject
                       <span className="text-xs text-crm-text-muted">Estado: {proyecto.estado}</span>
                       {proyecto.ubicacion && (
                         <span className="inline-flex items-center gap-1 text-xs text-crm-text-muted">
-                          <svg
-                            className="h-3.5 w-3.5"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                            aria-hidden="true"
-                          >
-                            <path
-                              d="M10 18s6-4.35 6-10a6 6 0 1 0-12 0c0 5.65 6 10 6 10z"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <circle cx="10" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5" />
-                          </svg>
+                          <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden="true" />
                           {proyecto.ubicacion}
                         </span>
                       )}
                     </div>
                   </div>
-                  <svg className="w-4 h-4 text-crm-text-muted ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight className="w-4 h-4 text-crm-text-muted ml-2 flex-shrink-0" aria-hidden="true" />
                 </div>
               </Link>
             ))

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
+import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Lock, Building2, Info, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { actualizarLote, eliminarLote, duplicarLote, eliminarTodosLosLotes } from "./_actions";
 import LoteEditModal from "./LoteEditModal";
@@ -334,9 +334,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle className="flex items-center gap-2 flex-wrap">
               <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                </svg>
+                <Lock className="w-4 h-4 text-crm-primary" />
               </div>
               Lotes del Proyecto
               <span className="text-sm font-normal text-crm-text-muted">
@@ -363,18 +361,14 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
           {lotesAMostrar.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-20 h-20 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-10 h-10 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                </svg>
+                <Building2 className="w-10 h-10 text-crm-text-muted" />
               </div>
               <h4 className="text-xl font-medium text-crm-text-primary mb-3">No hay lotes registrados</h4>
               <p className="text-crm-text-muted mb-6 max-w-md mx-auto">
                 Comienza agregando tu primer lote usando el asistente paso a paso de arriba.
               </p>
               <div className="inline-flex items-center space-x-2 px-4 py-2 bg-crm-primary/10 text-crm-primary rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+                <Info className="w-5 h-5" />
                 <span className="text-sm font-medium">Usa el botón &quot;Crear Lote&quot; para comenzar</span>
               </div>
             </div>
@@ -550,7 +544,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                                     title="Duplicar lote"
                                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
                                   >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
+                                    <Copy className="w-4 h-4" />
                                     Duplicar lote
                                   </button>
                                 )}
@@ -672,7 +666,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                                       }}
                                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover transition-colors"
                                     >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2M8 7V5a2 2 0 012-2h6a2 2 0 012 2v6M8 7h6a2 2 0 012 2v6"/></svg>
+                                      <Copy className="w-4 h-4" />
                                       Duplicar lote
                                     </button>
                                   )}

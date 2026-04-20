@@ -11,6 +11,7 @@ import ProjectTabs from "./_ProjectTabs";
 import ProyectoGaleria from "./_ProyectoGaleria";
 import type { ProyectoMediaItem } from "@/types/proyectos";
 import type { OverlayLayerConfig } from "@/types/overlay-layers";
+import { ChevronLeft, MapPin, Search, Circle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -372,9 +373,7 @@ export default async function ProyLotesPage({
               className="flex-shrink-0 flex items-center justify-center w-10 h-10 text-crm-text-secondary bg-crm-card-hover hover:bg-crm-border rounded-lg transition-colors"
               title="Volver a proyectos"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-              </svg>
+              <ChevronLeft className="w-5 h-5" />
             </Link>
 
             <div className="flex-1 space-y-3">
@@ -383,14 +382,15 @@ export default async function ProyLotesPage({
 
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                     proyecto.estado === 'activo'
                       ? 'bg-green-100 text-green-700 border border-green-300'
                       : proyecto.estado === 'pausado'
                       ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
                       : 'bg-red-100 text-red-700 border border-red-300'
                   }`}>
-                    {proyecto.estado === 'activo' ? '● Activo' : proyecto.estado === 'pausado' ? '● Pausado' : '● Cerrado'}
+                    <Circle className="w-2 h-2 fill-current" />
+                    {proyecto.estado === 'activo' ? 'Activo' : proyecto.estado === 'pausado' ? 'Pausado' : 'Cerrado'}
                   </span>
 
                   {proyecto.tipo && (
@@ -407,10 +407,7 @@ export default async function ProyLotesPage({
 
               {proyecto.ubicacion && (
                 <div className="flex items-center gap-2 text-sm text-crm-text-secondary flex-wrap">
-                  <svg className="w-4 h-4 text-crm-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
+                  <MapPin className="w-4 h-4 text-crm-accent flex-shrink-0" />
                   <span>{proyecto.ubicacion}</span>
                 </div>
               )}
@@ -446,9 +443,7 @@ export default async function ProyLotesPage({
                 <div className="flex-1 min-w-0">
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-4 w-4 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                      </svg>
+                      <Search className="h-4 w-4 text-crm-text-muted" />
                     </div>
                     <input
                       name="q"

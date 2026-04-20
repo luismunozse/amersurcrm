@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 
 type Rol = {
@@ -112,15 +113,20 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-150">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50" onClick={isLoading ? undefined : onClose} />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-crm-card border border-crm-border rounded-xl shadow-crm-lg">
+      {/* Modal — bottom sheet en mobile */}
+      <div className="relative w-full sm:max-w-lg sm:mx-4 bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-crm-lg max-h-[92vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-center justify-between px-6 py-4 border-b border-crm-border">
           <h3 className="text-lg font-semibold text-crm-text-primary">Editar Usuario</h3>
-          <button onClick={onClose} disabled={isLoading} className="text-crm-text-muted hover:text-crm-text-primary disabled:opacity-50">✕</button>
+          <button onClick={onClose} disabled={isLoading} aria-label="Cerrar" className="text-crm-text-muted hover:text-crm-text-primary disabled:opacity-50">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <form onSubmit={onSubmit} className="p-6 space-y-4">

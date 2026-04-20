@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ChevronDown, Check } from "lucide-react";
 
 interface Country {
   code: string;
@@ -158,9 +159,7 @@ export default function PhoneInput({
             >
               <span className="text-sm">{selectedCountry.flag}</span>
               <span className="text-xs font-medium">{selectedCountry.dialCode}</span>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDown className="w-3 h-3" />
             </button>
 
             {/* Dropdown de países */}
@@ -196,9 +195,7 @@ export default function PhoneInput({
                         </div>
                       </div>
                       {selectedCountry.code === country.code && (
-                        <svg className="w-3 h-3 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                        <Check className="w-3 h-3 text-crm-primary" />
                       )}
                     </button>
                   ))}

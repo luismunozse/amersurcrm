@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle, X } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 
 interface DeleteUserModalProps {
@@ -53,20 +54,24 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-150">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50" onClick={handleClose} />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-crm-card border border-crm-border rounded-xl shadow-crm-lg">
+      {/* Modal — bottom sheet en mobile */}
+      <div className="relative w-full sm:max-w-md sm:mx-4 bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-crm-lg pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-center justify-between px-6 py-4 border-b border-crm-border">
           <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">⚠️ Eliminar Usuario</h3>
-          <button 
-            onClick={handleClose} 
+          <button
+            onClick={handleClose}
             disabled={isLoading}
+            aria-label="Cerrar"
             className="text-crm-text-muted hover:text-crm-text-primary disabled:opacity-50"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -75,9 +80,7 @@ export default function DeleteUserModal({ open, onClose, user, onConfirm }: Dele
             <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-400/50 rounded-lg p-4 mb-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
+                  <AlertTriangle className="h-5 w-5 text-red-400 dark:text-red-300" />
                 </div>
                 <div className="ml-3">
                   <h4 className="text-sm font-medium text-red-800 dark:text-red-200">

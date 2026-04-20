@@ -56,9 +56,12 @@ export default function TabVentas({ ventas }: Props) {
       </div>
 
       {!ventas || ventas.length === 0 ? (
-        <div className="text-center py-12 bg-crm-background rounded-lg">
-          <DollarSign className="h-12 w-12 mx-auto mb-3 text-crm-text-muted opacity-50" />
-          <p className="text-crm-text-muted">No hay ventas registradas</p>
+        <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
+          <DollarSign className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay ventas registradas</p>
+          <p className="text-xs sm:text-sm text-crm-text-muted max-w-sm mx-auto">
+            Cuando se concrete una venta a este cliente, aparecerá aquí con el detalle del lote, pagos y saldos.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">

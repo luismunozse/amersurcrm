@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Info, MessageSquare, Heart, DollarSign, Clock, ShoppingCart, Headphones } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Info, MessageSquare, Heart, DollarSign, Clock, ShoppingCart, Headphones, ChevronDown } from "lucide-react";
 import TabInformacionBasica from "./_TabInformacionBasica";
 import TabInteracciones from "./_TabInteracciones";
 import TabPropiedadesInteres from "./_TabPropiedadesInteres";
@@ -84,6 +84,38 @@ export default function ClienteDetailTabs({
   const [postVentaSubTab, setPostVentaSubTab] = useState<PostVentaSubTab>('entregas');
   const [interaccionesCount, setInteraccionesCount] = useState(interacciones.length);
 
+  // Scroll horizontal de tabs superior: mostrar fades según posición
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  const [scrollEstado, setScrollEstado] = useState<{ izquierda: boolean; derecha: boolean }>({ izquierda: false, derecha: false });
+
+  const actualizarScrollEstado = useCallback(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setScrollEstado({
+      izquierda: el.scrollLeft > 4,
+      derecha: el.scrollLeft < maxScroll - 4,
+    });
+  }, []);
+
+  useEffect(() => {
+    actualizarScrollEstado();
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', actualizarScrollEstado, { passive: true });
+    window.addEventListener('resize', actualizarScrollEstado);
+    return () => {
+      el.removeEventListener('scroll', actualizarScrollEstado);
+      window.removeEventListener('resize', actualizarScrollEstado);
+    };
+  }, [actualizarScrollEstado]);
+
+  useEffect(() => {
+    // Auto-scroll para que el tab activo quede visible
+    activeTabRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [activeTab]);
+
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
@@ -114,21 +146,49 @@ export default function ClienteDetailTabs({
     active: string;
     onChange: (id: any) => void;
   }) {
+    const activeItem = items.find((i) => i.id === active) ?? items[0];
     return (
-      <div className="flex gap-1 mb-4 bg-crm-background rounded-lg p-1">
-        {items.map(item => (
-          <button
-            key={item.id}
-            onClick={() => onChange(item.id)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              active === item.id
-                ? 'bg-crm-card text-crm-text shadow-sm'
-                : 'text-crm-text-muted hover:text-crm-text'
-            }`}
+      <div className="mb-4">
+        {/* Mobile: select nativo */}
+        <div className="relative sm:hidden">
+          <select
+            value={active}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full appearance-none px-4 pr-10 py-2.5 text-sm font-medium bg-crm-background border border-crm-border rounded-lg text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary/30"
+            aria-label="Seleccionar sección"
           >
-            {item.label}
-          </button>
-        ))}
+            {items.map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-crm-text-muted" aria-hidden />
+          <p className="sr-only">Actualmente: {activeItem.label}</p>
+        </div>
+
+        {/* Desktop: tabs pill con indicador claro */}
+        <div className="hidden sm:flex gap-1 bg-crm-background rounded-lg p-1">
+          {items.map((item) => {
+            const esActivo = active === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onChange(item.id)}
+                className={`relative px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  esActivo
+                    ? 'bg-crm-card text-crm-primary shadow-sm ring-1 ring-crm-primary/20'
+                    : 'text-crm-text-muted hover:text-crm-text hover:bg-crm-card/50'
+                }`}
+                aria-current={esActivo ? 'page' : undefined}
+              >
+                {item.label}
+                {esActivo && (
+                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 w-8 bg-crm-primary rounded-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -136,48 +196,62 @@ export default function ClienteDetailTabs({
   return (
     <div className="bg-crm-card border border-crm-border rounded-lg shadow-sm">
       {/* Tab Headers */}
-      <div className="border-b border-crm-border overflow-x-auto">
-        <div className="flex">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+      <div className="relative border-b border-crm-border">
+        <div ref={tabsScrollRef} className="overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+          <div className="flex">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
 
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap
-                  transition-colors border-b-2 -mb-px
-                  ${isActive
-                    ? 'border-crm-primary text-crm-primary'
-                    : 'border-transparent text-crm-text-muted hover:text-crm-text hover:border-crm-border'
-                  }
-                `}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{tab.label}</span>
-                {tab.count !== null && tab.count > 0 && (
-                  <span className={`
-                    px-2 py-0.5 text-xs font-semibold rounded-full
+              return (
+                <button
+                  key={tab.id}
+                  ref={isActive ? activeTabRef : undefined}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-2 px-4 sm:px-5 py-3 sm:py-4 text-sm font-medium whitespace-nowrap
+                    transition-colors border-b-2 -mb-px
                     ${isActive
-                      ? 'bg-crm-primary text-white'
-                      : 'bg-crm-background text-crm-text-muted'
+                      ? 'border-crm-primary text-crm-primary'
+                      : 'border-transparent text-crm-text-muted hover:text-crm-text hover:border-crm-border'
                     }
-                  `}>
-                    {tab.count}
-                  </span>
-                )}
-                {'alert' in tab && tab.alert && (
-                  <span className="relative flex h-2.5 w-2.5" title={`${seguimientosVencidos} seguimiento${seguimientosVencidos > 1 ? 's' : ''} vencido${seguimientosVencidos > 1 ? 's' : ''}`}>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                  `}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  <span>{tab.label}</span>
+                  {tab.count !== null && tab.count > 0 && (
+                    <span className={`
+                      px-2 py-0.5 text-xs font-semibold rounded-full
+                      ${isActive
+                        ? 'bg-crm-primary text-white'
+                        : 'bg-crm-background text-crm-text-muted'
+                      }
+                    `}>
+                      {tab.count}
+                    </span>
+                  )}
+                  {'alert' in tab && tab.alert && (
+                    <span className="relative flex h-2.5 w-2.5" title={`${seguimientosVencidos} seguimiento${seguimientosVencidos > 1 ? 's' : ''} vencido${seguimientosVencidos > 1 ? 's' : ''}`}>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Fades laterales para señalar que hay más scroll */}
+        <div
+          className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-crm-card to-transparent transition-opacity duration-150 ${scrollEstado.izquierda ? 'opacity-100' : 'opacity-0'}`}
+          aria-hidden
+        />
+        <div
+          className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-crm-card to-transparent transition-opacity duration-150 ${scrollEstado.derecha ? 'opacity-100' : 'opacity-0'}`}
+          aria-hidden
+        />
       </div>
 
       {/* Tab Content */}

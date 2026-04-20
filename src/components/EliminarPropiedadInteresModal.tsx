@@ -24,7 +24,7 @@ export default function EliminarPropiedadInteresModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
       onClick={(event) => {
         if (event.target === event.currentTarget && !loading) {
           onCancel();
@@ -32,7 +32,10 @@ export default function EliminarPropiedadInteresModal({
       }}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-md bg-crm-card border border-crm-border rounded-2xl shadow-2xl p-6">
+      <div className="relative z-10 w-full sm:max-w-md bg-crm-card border-t sm:border border-crm-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-full bg-red-500/10 text-red-500">
             <AlertTriangle className="h-5 w-5" />

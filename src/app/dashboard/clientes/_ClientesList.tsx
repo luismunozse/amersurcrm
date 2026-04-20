@@ -13,6 +13,7 @@ import ClienteForm from "@/components/ClienteForm";
 import SimpleModal from "@/components/SimpleModal";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 import { getEstadoClienteLabel, type EstadoCliente } from "@/lib/types/clientes";
+import { Users, User, Mail, Phone, MessageCircle, IdCard, Clock } from "lucide-react";
 
 type Cliente = { 
   id: string; 
@@ -177,9 +178,7 @@ export default function ClientesList({ clientes }: { clientes: Cliente[] }) {
         {clientes.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-              </svg>
+              <Users className="w-8 h-8 text-crm-text-muted" />
             </div>
             <h4 className="text-lg font-medium text-crm-text-primary mb-2">No hay clientes registrados</h4>
             <p className="text-crm-text-muted">Comienza agregando tu primer cliente usando el formulario de arriba.</p>
@@ -377,9 +376,7 @@ const ClienteItem = memo(function ClienteItem({
             onClick={() => onShowDetail(cliente)}
           >
             <div className="w-12 h-12 bg-crm-primary/10 rounded-full flex items-center justify-center group-hover:bg-crm-primary/20 transition-colors">
-              <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-              </svg>
+              <User className="w-6 h-6 text-crm-primary" />
             </div>
             <div>
               <div className="font-semibold text-crm-text-primary text-lg group-hover:text-crm-primary transition-colors">{cliente.nombre}</div>
@@ -432,33 +429,25 @@ const ClienteItem = memo(function ClienteItem({
             <div className="space-y-1">
               {cliente.email && (
                 <div className="flex items-center gap-2 text-sm text-crm-text-muted group-hover:text-crm-text-primary transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                  </svg>
+                  <Mail className="w-4 h-4" />
                   {cliente.email}
                 </div>
               )}
               {cliente.telefono && (
                 <div className="flex items-center gap-2 text-sm text-crm-text-muted group-hover:text-crm-text-primary transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                  </svg>
+                  <Phone className="w-4 h-4" />
                   {cliente.telefono}
                 </div>
               )}
               {cliente.telefono_whatsapp && (
                 <div className="flex items-center gap-2 text-sm text-crm-text-muted group-hover:text-crm-text-primary transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                  </svg>
+                  <MessageCircle className="w-4 h-4" />
                   WhatsApp: {cliente.telefono_whatsapp}
                 </div>
               )}
               {cliente.documento_identidad && (
                 <div className="flex items-center gap-2 text-sm text-crm-text-muted group-hover:text-crm-text-primary transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
-                  </svg>
+                  <IdCard className="w-4 h-4" />
                   DNI: {cliente.documento_identidad}
                 </div>
               )}
@@ -517,9 +506,7 @@ const ClienteItem = memo(function ClienteItem({
             className="flex items-center gap-2 p-3 bg-crm-primary/5 rounded-lg cursor-pointer hover:bg-crm-primary/10 transition-colors group"
             onClick={() => onShowDetail(cliente)}
           >
-            <svg className="w-4 h-4 text-crm-primary group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <Clock className="w-4 h-4 text-crm-primary group-hover:scale-110 transition-transform" />
             <span className="text-sm text-crm-text-primary group-hover:text-crm-primary transition-colors">
               <span className="font-medium">Próxima acción:</span> {cliente.proxima_accion}
             </span>
@@ -628,9 +615,12 @@ function RegistrarContactoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4 sm:py-6 animate-in fade-in duration-150">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl border border-crm-border overflow-hidden">
+      <div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl border-t sm:border border-crm-border overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[95vh] animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="px-6 py-4 border-b border-crm-border flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-crm-text-primary">Registrar contacto</h3>

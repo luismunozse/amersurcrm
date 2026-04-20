@@ -54,9 +54,10 @@ export default function MaintenanceBanner() {
         type="button"
         onClick={cerrar}
         aria-label="Cerrar aviso"
-        className="shrink-0 rounded p-0.5 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition"
+        title="Cerrar aviso"
+        className="shrink-0 -mr-1 grid place-items-center h-11 w-11 sm:h-8 sm:w-8 rounded text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition"
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5" />
       </button>
     </div>
   );

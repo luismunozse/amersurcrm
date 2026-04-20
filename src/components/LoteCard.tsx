@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil, Home, Image as ImageIcon, Box, ExternalLink } from "lucide-react";
 import { actualizarLote, eliminarLote } from "@/app/dashboard/proyectos/[id]/_actions";
 import toast from "react-hot-toast";
 import { getErrorMessage } from "@/lib/errors";
@@ -110,9 +111,7 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
       <div className="crm-card p-6">
         <div className="flex items-center space-x-2 mb-4">
           <div className="w-8 h-8 bg-crm-warning/10 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-crm-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-            </svg>
+            <Pencil className="w-4 h-4 text-crm-warning" />
           </div>
           <h4 className="text-lg font-semibold text-crm-text-primary">Editando Lote: {lote.codigo}</h4>
         </div>
@@ -204,10 +203,7 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <div className="w-12 h-12 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"/>
-                </svg>
+                <Home className="w-6 h-6 text-crm-primary" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-crm-text-primary">{lote.codigo}</h3>
@@ -233,17 +229,13 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
                 alt={`Lote ${lote.codigo}`}
                 className="w-full h-full"
                 fallbackIcon={
-                  <svg className="w-16 h-16 text-crm-text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
+                  <ImageIcon className="w-16 h-16 text-crm-text-muted mx-auto mb-2" />
                 }
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
-                  <svg className="w-16 h-16 text-crm-text-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
+                  <ImageIcon className="w-16 h-16 text-crm-text-muted mx-auto mb-2" />
                   <p className="text-sm text-crm-text-muted">Sin imagen</p>
                 </div>
               </div>
@@ -304,25 +296,19 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
           <div className="flex items-center space-x-4">
             {lote.data?.fotos && lote.data.fotos.length > 0 && (
               <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
+                <ImageIcon className="w-4 h-4" />
                 <span>{lote.data.fotos.length} foto(s)</span>
               </div>
             )}
             {lote.data?.renders && lote.data.renders.length > 0 && (
               <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                </svg>
+                <Box className="w-4 h-4" />
                 <span>{lote.data.renders.length} render(s)</span>
               </div>
             )}
             {lote.data?.links3D && lote.data.links3D.length > 0 && (
               <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                </svg>
+                <ExternalLink className="w-4 h-4" />
                 <span>{lote.data.links3D.length} enlace(s) 3D</span>
               </div>
             )}
@@ -330,9 +316,7 @@ export default function LoteCard({ lote, proyectoId }: LoteCardProps) {
              (!lote.data?.renders || lote.data.renders.length === 0) && 
              (!lote.data?.links3D || lote.data.links3D.length === 0) && (
               <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
+                <ImageIcon className="w-4 h-4" />
                 <span>Sin multimedia</span>
               </div>
             )}

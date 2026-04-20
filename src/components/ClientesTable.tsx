@@ -22,7 +22,7 @@ import ClienteForm from "@/components/ClienteForm";
 import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
-import { Download, FileType } from "lucide-react";
+import { Download, FileType, MoreVertical, Eye, Trash2, FileText, ChevronDown, Search, X, CheckCircle2, User, Users, Mail, Phone, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import DatePicker from "@/components/ui/DatePicker";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
@@ -87,6 +87,141 @@ interface ClientesTableProps {
   fechaHasta?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+}
+
+function ExportMenu({
+  exportando,
+  exportingSelected,
+  exportingAll,
+  exportingPdf,
+  hayAlgunaSeleccion,
+  seleccionCount,
+  onExportSeleccionados,
+  onExportTodos,
+  onExportPdf,
+}: {
+  exportando: boolean;
+  exportingSelected: boolean;
+  exportingAll: boolean;
+  exportingPdf: boolean;
+  hayAlgunaSeleccion: boolean;
+  seleccionCount: number;
+  onExportSeleccionados: () => void;
+  onExportTodos: () => void;
+  onExportPdf: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => setOpen(false);
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [open]);
+
+  return (
+    <div className="relative w-full md:w-auto" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={exportando}
+        className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
+      >
+        {exportando ? <Spinner size="sm" /> : <Download className="w-4 h-4" aria-hidden />}
+        <span>{exportando ? 'Exportando…' : 'Exportar'}</span>
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-64 rounded-lg border border-crm-border bg-crm-card shadow-lg z-20 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onExportSeleccionados(); }}
+            disabled={!hayAlgunaSeleccion || exportingSelected}
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50 disabled:cursor-not-allowed text-left"
+          >
+            <Download className="w-4 h-4 shrink-0" aria-hidden />
+            <span className="flex-1">
+              Exportar seleccionados
+              {hayAlgunaSeleccion && <span className="ml-1 text-crm-text-muted">({seleccionCount})</span>}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onExportTodos(); }}
+            disabled={exportingAll}
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50 text-left border-t border-crm-border"
+          >
+            <Download className="w-4 h-4 shrink-0" aria-hidden />
+            Exportar todos (Excel)
+          </button>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onExportPdf(); }}
+            disabled={exportingPdf}
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50 text-left border-t border-crm-border"
+          >
+            <FileText className="w-4 h-4 shrink-0" aria-hidden />
+            Exportar PDF
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClienteCardMenu({
+  onQuickView,
+  onEliminar,
+  puedeEliminar,
+}: {
+  onQuickView: () => void;
+  onEliminar?: () => void;
+  puedeEliminar: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => setOpen(false);
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center justify-center w-11 h-11 rounded-lg border border-crm-border text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+        aria-label="Más acciones"
+        title="Más acciones"
+      >
+        <MoreVertical className="w-4 h-4" aria-hidden />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-crm-border bg-crm-card shadow-lg z-20 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onQuickView(); }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-crm-text-primary hover:bg-crm-card-hover text-left"
+          >
+            <Eye className="w-4 h-4 shrink-0" aria-hidden />
+            Vista rápida
+          </button>
+          {puedeEliminar && onEliminar && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onEliminar(); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-crm-danger hover:bg-red-50 dark:hover:bg-red-900/20 text-left border-t border-crm-border"
+            >
+              <Trash2 className="w-4 h-4 shrink-0" aria-hidden />
+              Eliminar cliente
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ClientesTable({
@@ -534,14 +669,7 @@ export default function ClientesTable({
             }}
             className="w-full px-4 py-2 pl-10 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
           />
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-crm-text-muted"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-crm-text-muted" />
           {/* Barra de progreso de búsqueda */}
           {isSearching && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-crm-border rounded-b-lg overflow-hidden">
@@ -554,9 +682,7 @@ export default function ClientesTable({
               className="absolute right-3 top-1/2 -translate-y-1/2 text-crm-text-muted hover:text-crm-text-primary"
               title="Limpiar búsqueda"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -741,9 +867,7 @@ export default function ClientesTable({
                     disabled={isPending}
                     className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                    <CheckCircle2 className="w-4 h-4" />
                     Cambiar Estado
                   </button>
                 </div>
@@ -773,9 +897,7 @@ export default function ClientesTable({
                     disabled={isPending || !bulkVendedor || loadingVendedores}
                     className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-primary hover:bg-crm-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                    </svg>
+                    <User className="w-4 h-4" />
                     Asignar Vendedor
                   </button>
                 </div>
@@ -788,9 +910,7 @@ export default function ClientesTable({
                   disabled={isPending}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-crm-danger hover:bg-crm-danger/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                  </svg>
+                  <Trash2 className="w-4 h-4" />
                   Eliminar
                 </button>
               )}
@@ -814,112 +934,104 @@ export default function ClientesTable({
               Mostrando {clientes.length} de {total} cliente{total === 1 ? '' : 's'}
             </p>
           </div>
-          {puedeExportarClientes && (
-            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap [&>button]:justify-center [&>button]:w-full md:[&>button]:w-auto">
-              <button
-                onClick={async () => {
-                  if (selectedIds.size === 0) {
-                    toast.error('Selecciona al menos un cliente');
-                    return;
-                  }
-                  try {
-                    setExportingSelected(true);
-                    const selectedData = clientes.filter((c) => selectedIds.has(c.id));
-                    await exportFilteredClientes(selectedData, addCountToFilters(baseFilters, selectedData.length), 'excel', {
-                      fileName: 'clientes-seleccionados',
-                      includeFiltersSheet: true,
-                      includeTimestamp: true,
-                    });
-                    toast.success('Exportación de seleccionados completada');
-                  } catch (error) {
-                    console.error(error);
-                    toast.error('Error exportando seleccionados');
-                  } finally {
-                    setExportingSelected(false);
-                  }
-                }}
-                disabled={exportingSelected || selectedIds.size === 0}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-crm-border text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-50"
-              >
-                {exportingSelected ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                {exportingSelected ? 'Exportando...' : 'Exportar seleccionados'}
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    setExportingAll(true);
-                    const full = await obtenerTodosLosClientes({
-                      searchTerm: searchQuery,
-                      searchTelefono,
-                      searchDni,
-                      estado,
-                      tipo,
-                      vendedor,
-                      fechaDesde,
-                      fechaHasta,
-                      sortBy: initialSortBy,
-                      sortOrder: initialSortOrder,
-                    });
-                    await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'excel', {
-                      fileName: 'clientes',
-                      includeFiltersSheet: true,
-                      includeTimestamp: true,
-                    });
-                    toast.success(`Exportación completada (${full.total} registros)`);
-                  } catch (error) {
-                    console.error(error);
-                    toast.error('Error exportando clientes');
-                  } finally {
-                    setExportingAll(false);
-                  }
-                }}
-                disabled={exportingAll}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
-              >
-                {exportingAll ? <Spinner size="sm" /> : <Download className="w-4 h-4" />}
-                {exportingAll ? 'Exportando todo...' : 'Exportar todos'}
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    setExportingPdf(true);
-                    const full = await obtenerTodosLosClientes({
-                      searchTerm: searchQuery,
-                      searchTelefono,
-                      searchDni,
-                      estado,
-                      tipo,
-                      vendedor,
-                      fechaDesde,
-                      fechaHasta,
-                      sortBy: initialSortBy,
-                      sortOrder: initialSortOrder,
-                    });
-                    await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'pdf', {
-                      fileName: 'clientes',
-                      includeFiltersSheet: true,
-                      includeTimestamp: true,
-                    });
-                    toast.success(`PDF generado (${full.total} registros)`);
-                  } catch (error) {
-                    console.error(error);
-                    toast.error('Error generando PDF');
-                  } finally {
-                    setExportingPdf(false);
-                  }
-                }}
-                disabled={exportingPdf}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {exportingPdf ? <Spinner size="sm" /> : <FileType className="w-4 h-4" />}
-                {exportingPdf ? 'Generando PDF...' : 'Exportar PDF'}
-              </button>
-            </div>
-          )}
+          {puedeExportarClientes && (() => {
+            const exportando = exportingSelected || exportingAll || exportingPdf;
+            const hayAlgunaSeleccion = selectedIds.size > 0;
+
+            const handleExportSeleccionados = async () => {
+              if (selectedIds.size === 0) {
+                toast.error('Selecciona al menos un cliente');
+                return;
+              }
+              try {
+                setExportingSelected(true);
+                const selectedData = clientes.filter((c) => selectedIds.has(c.id));
+                await exportFilteredClientes(selectedData, addCountToFilters(baseFilters, selectedData.length), 'excel', {
+                  fileName: 'clientes-seleccionados',
+                  includeFiltersSheet: true,
+                  includeTimestamp: true,
+                });
+                toast.success('Exportación de seleccionados completada');
+              } catch (error) {
+                console.error(error);
+                toast.error('Error exportando seleccionados');
+              } finally {
+                setExportingSelected(false);
+              }
+            };
+
+            const handleExportTodos = async () => {
+              try {
+                setExportingAll(true);
+                const full = await obtenerTodosLosClientes({
+                  searchTerm: searchQuery,
+                  searchTelefono,
+                  searchDni,
+                  estado,
+                  tipo,
+                  vendedor,
+                  fechaDesde,
+                  fechaHasta,
+                  sortBy: initialSortBy,
+                  sortOrder: initialSortOrder,
+                });
+                await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'excel', {
+                  fileName: 'clientes',
+                  includeFiltersSheet: true,
+                  includeTimestamp: true,
+                });
+                toast.success(`Exportación completada (${full.total} registros)`);
+              } catch (error) {
+                console.error(error);
+                toast.error('Error exportando clientes');
+              } finally {
+                setExportingAll(false);
+              }
+            };
+
+            const handleExportPdf = async () => {
+              try {
+                setExportingPdf(true);
+                const full = await obtenerTodosLosClientes({
+                  searchTerm: searchQuery,
+                  searchTelefono,
+                  searchDni,
+                  estado,
+                  tipo,
+                  vendedor,
+                  fechaDesde,
+                  fechaHasta,
+                  sortBy: initialSortBy,
+                  sortOrder: initialSortOrder,
+                });
+                await exportFilteredClientes(full.data, addCountToFilters(baseFilters, full.total), 'pdf', {
+                  fileName: 'clientes',
+                  includeFiltersSheet: true,
+                  includeTimestamp: true,
+                });
+                toast.success(`PDF generado (${full.total} registros)`);
+              } catch (error) {
+                console.error(error);
+                toast.error('Error generando PDF');
+              } finally {
+                setExportingPdf(false);
+              }
+            };
+
+            return (
+              <ExportMenu
+                exportando={exportando}
+                exportingSelected={exportingSelected}
+                exportingAll={exportingAll}
+                exportingPdf={exportingPdf}
+                hayAlgunaSeleccion={hayAlgunaSeleccion}
+                seleccionCount={selectedIds.size}
+                onExportSeleccionados={handleExportSeleccionados}
+                onExportTodos={handleExportTodos}
+                onExportPdf={handleExportPdf}
+              />
+            );
+          })()}
         </div>
 
         {/* Vista mobile */}
@@ -988,27 +1100,18 @@ export default function ClientesTable({
                     </p>
                   )}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleShowDetail(cliente)}
-                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg bg-crm-primary px-3 py-2.5 text-xs font-semibold text-white min-h-[44px] active:scale-[0.97] transition-transform"
-                  >
-                    Ver detalle
-                  </button>
+                <div className="mt-4 flex items-center gap-2">
                   <Link
                     href={`/dashboard/clientes/${cliente.id}`}
-                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-2 rounded-lg border border-crm-border px-3 py-2.5 text-xs font-semibold text-crm-text-primary min-h-[44px] active:scale-[0.97] transition-transform"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-crm-primary px-3 py-2.5 text-xs font-semibold text-white min-h-[44px] active:scale-[0.97] transition-transform"
                   >
-                    Abrir ficha
+                    Ver cliente
                   </Link>
-                  {puedeEliminarClientes && (
-                    <button
-                      onClick={() => askDelete(cliente)}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-crm-danger px-3 py-2.5 text-xs font-semibold text-crm-danger min-h-[44px] active:scale-[0.97] transition-transform"
-                    >
-                      Eliminar
-                    </button>
-                  )}
+                  <ClienteCardMenu
+                    onQuickView={() => handleShowDetail(cliente)}
+                    onEliminar={() => askDelete(cliente)}
+                    puedeEliminar={puedeEliminarClientes}
+                  />
                 </div>
               </div>
             );
@@ -1102,9 +1205,7 @@ export default function ClientesTable({
         {clientes.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-              </svg>
+              <Users className="w-8 h-8 text-crm-text-muted" />
             </div>
             <h4 className="text-lg font-medium text-crm-text-primary mb-2">No hay clientes</h4>
             <p className="text-crm-text-muted">
@@ -1305,9 +1406,7 @@ const ClienteRow = memo(function ClienteRow({
           className="flex items-center group gap-3 text-crm-text-primary hover:text-crm-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40 rounded-md text-left"
         >
           <div className="w-10 h-10 bg-crm-primary/10 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-crm-primary group-hover:scale-105 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-            </svg>
+            <User className="w-5 h-5 text-crm-primary group-hover:scale-105 transition-transform" />
           </div>
           <div>
             <span className="text-sm font-medium group-hover:text-crm-primary transition-colors">{cliente.nombre}</span>
@@ -1329,17 +1428,13 @@ const ClienteRow = memo(function ClienteRow({
         <div className="space-y-1">
           {cliente.email && (
             <div className="text-sm text-crm-text-primary flex items-center">
-              <svg className="w-3 h-3 mr-1 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-              </svg>
+              <Mail className="w-3 h-3 mr-1 text-crm-text-muted" />
               {cliente.email}
             </div>
           )}
           {cliente.telefono && (
             <div className="text-sm text-crm-text-muted flex items-center">
-              <svg className="w-3 h-3 mr-1 text-crm-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-              </svg>
+              <Phone className="w-3 h-3 mr-1 text-crm-text-muted" />
               {cliente.telefono}
             </div>
           )}
@@ -1373,10 +1468,7 @@ const ClienteRow = memo(function ClienteRow({
             className="text-green-600 hover:text-green-700 transition-colors"
             title="Ver Detalles"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
+            <Eye className="w-4 h-4" />
           </button>
           {puedeEditarClientes && (
             <button
@@ -1384,9 +1476,7 @@ const ClienteRow = memo(function ClienteRow({
               className="text-crm-primary hover:text-crm-primary/80 transition-colors"
               title="Editar"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-              </svg>
+              <Pencil className="w-4 h-4" />
             </button>
           )}
           {cliente.telefono && (
@@ -1395,9 +1485,7 @@ const ClienteRow = memo(function ClienteRow({
               className="text-crm-success hover:text-crm-success/80 transition-colors"
               title="Llamar"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-              </svg>
+              <Phone className="w-4 h-4" />
             </a>
           )}
           {/* WhatsApp - Mostrar siempre para facilitar el acceso */}
@@ -1418,9 +1506,7 @@ const ClienteRow = memo(function ClienteRow({
             disabled={isPending}
             title="Eliminar"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </td>

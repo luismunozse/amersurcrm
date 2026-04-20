@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeftRight } from "lucide-react";
 import { actualizarEstadoCliente } from "@/app/dashboard/clientes/_actions";
 import toast from "react-hot-toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -85,9 +86,7 @@ export default function EstadoClienteButton({
       ) : (
         <>
           <span>{getEstadoLabel(estadoActual)}</span>
-          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-          </svg>
+          <ArrowLeftRight className="h-3 w-3" />
         </>
       )}
     </button>

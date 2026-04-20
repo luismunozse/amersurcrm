@@ -24,6 +24,7 @@ import { FormInput } from "@/components/form/FormInput";
 import { FormTextarea } from "@/components/form/FormTextarea";
 import { LoadingButton } from "@/components/form/LoadingButton";
 import { useProformaValidation } from "./proformas/useProformaValidation";
+import { X, User, Briefcase, Plus, Trash2, Download, Maximize2, AlertCircle, FileText } from "lucide-react";
 
 interface CrearProformaModalProps {
   isOpen: boolean;
@@ -470,7 +471,7 @@ export default function CrearProformaModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -479,7 +480,10 @@ export default function CrearProformaModal({
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
-      <div className="relative z-10 w-full max-w-7xl max-h-[90vh] overflow-y-auto bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl">
+      <div className="relative z-10 w-full sm:max-w-7xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto bg-crm-card border-t-2 sm:border-2 border-crm-border rounded-t-2xl sm:rounded-2xl shadow-2xl pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden sticky top-0 z-20 flex justify-center pt-2.5 pb-1 shrink-0 bg-crm-card">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-crm-border bg-crm-card/80 backdrop-blur">
           <div>
             <h2 className="text-xl font-semibold text-crm-text-primary">
@@ -493,9 +497,7 @@ export default function CrearProformaModal({
             onClick={onClose}
             className="p-2 text-crm-text-muted hover:text-crm-text transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -610,9 +612,7 @@ export default function CrearProformaModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-800">
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+                <User className="w-4 h-4 text-blue-600" />
                 <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 uppercase tracking-wider">
                   Datos del cliente
                 </h3>
@@ -657,9 +657,7 @@ export default function CrearProformaModal({
 
             <div className="space-y-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-xl border border-green-200 dark:border-green-800">
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
+                <Briefcase className="w-4 h-4 text-green-600" />
                 <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 uppercase tracking-wider">
                   Atendido por
                 </h3>
@@ -963,9 +961,7 @@ export default function CrearProformaModal({
                   className="p-1.5 text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
                   title="Agregar cuenta"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
+                  <Plus className="w-4 h-4" />
                 </button>
               </div>
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
@@ -991,9 +987,7 @@ export default function CrearProformaModal({
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Eliminar cuenta"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 ))}
@@ -1051,9 +1045,7 @@ export default function CrearProformaModal({
                           className="p-1.5 text-crm-text-muted hover:text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
                           title="Descargar PDF"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
+                          <Download className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -1066,9 +1058,7 @@ export default function CrearProformaModal({
                           className="p-1.5 text-crm-text-muted hover:text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
                           title="Ver en pantalla completa"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                          </svg>
+                          <Maximize2 className="w-4 h-4" />
                         </button>
                       </>
                     )}
@@ -1077,9 +1067,7 @@ export default function CrearProformaModal({
                 <div className="relative w-full h-[700px] bg-white border border-crm-border rounded-lg overflow-hidden flex items-center justify-center">
                   {previewError ? (
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
-                      <svg className="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
+                      <AlertCircle className="w-12 h-12 text-red-400" />
                       <p className="text-sm text-red-600 font-medium">{previewError}</p>
                       <button
                         type="button"
@@ -1097,9 +1085,7 @@ export default function CrearProformaModal({
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-3 px-4 text-center">
-                      <svg className="w-16 h-16 text-crm-text-muted opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      <FileText className="w-16 h-16 text-crm-text-muted opacity-50" />
                       <p className="text-sm text-crm-text-muted">
                         Completa los datos para ver la cotización en tiempo real
                       </p>
@@ -1175,9 +1161,7 @@ export default function CrearProformaModal({
                   }}
                   className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
+                  <Download className="w-4 h-4" />
                   Descargar
                 </button>
               )}
@@ -1191,9 +1175,7 @@ export default function CrearProformaModal({
                 }}
                 className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-6 h-6" />
               </button>
             </div>
           </div>

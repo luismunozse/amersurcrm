@@ -71,8 +71,8 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
         </h3>
         <div className="p-4 bg-crm-background rounded-lg border border-crm-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <p className="text-xs font-medium text-crm-text-muted mb-1">Vendedor asignado</p>
-            <p className="text-sm text-crm-text font-medium">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Vendedor asignado</p>
+            <p className="text-sm sm:text-base text-crm-text-primary font-semibold">
               {selectedVendedor
                 ? vendedores.find((v) => v.username === selectedVendedor)?.nombre_completo || selectedVendedor
                 : "Sin asignar"}
@@ -109,29 +109,31 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-crm-background rounded-lg">
-            <p className="text-xs font-medium text-crm-text-muted mb-1">Tipo de Cliente</p>
-            <p className="text-sm text-crm-text font-medium capitalize">{cliente.tipo_cliente}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Tipo de Cliente</p>
+            <p className="text-sm sm:text-base text-crm-text-primary font-semibold capitalize">{cliente.tipo_cliente}</p>
           </div>
 
-          {cliente.tipo_documento && (
-            <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">Documento</p>
-              <p className="text-sm text-crm-text font-medium">
-                {tipoDoc}: {cliente.documento_identidad}
-              </p>
-            </div>
-          )}
+          <div className="p-4 bg-crm-background rounded-lg">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Documento</p>
+            <p className="text-sm sm:text-base text-crm-text-primary font-semibold">
+              {cliente.tipo_documento && cliente.documento_identidad
+                ? `${tipoDoc}: ${cliente.documento_identidad}`
+                : cliente.documento_identidad
+                ? cliente.documento_identidad
+                : <span className="text-crm-text-muted">—</span>}
+            </p>
+          </div>
 
           {cliente.estado_civil && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">Estado Civil</p>
-              <p className="text-sm text-crm-text font-medium">{estadoCivil}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Estado Civil</p>
+              <p className="text-sm sm:text-base text-crm-text-primary font-semibold">{estadoCivil}</p>
             </div>
           )}
 
           <div className="p-4 bg-crm-background rounded-lg">
-            <p className="text-xs font-medium text-crm-text-muted mb-1">Fecha de Alta</p>
-            <p className="text-sm text-crm-text font-medium">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Fecha de Alta</p>
+            <p className="text-sm sm:text-base text-crm-text-primary font-semibold">
               {(() => {
                 const date = new Date(cliente.fecha_alta);
                 const fechaParte = date.toLocaleDateString('es-PE', {
@@ -159,7 +161,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {cliente.email && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1 flex items-center gap-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5 flex items-center gap-1">
                 <Mail className="h-3 w-3" /> Email
               </p>
               <a href={`mailto:${cliente.email}`} className="text-sm text-crm-primary hover:underline">
@@ -170,7 +172,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
 
           {cliente.telefono && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1 flex items-center gap-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5 flex items-center gap-1">
                 <Phone className="h-3 w-3" /> Teléfono
               </p>
               <a href={`tel:${cliente.telefono}`} className="text-sm text-crm-primary hover:underline">
@@ -181,7 +183,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
 
           {cliente.telefono_whatsapp && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">WhatsApp</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">WhatsApp</p>
               <a
                 href={`https://wa.me/${cliente.telefono_whatsapp.replace(/[^0-9]/g, '')}`}
                 target="_blank"
@@ -242,22 +244,22 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {cliente.origen_lead && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">Origen del Lead</p>
-              <p className="text-sm text-crm-text font-medium">{origenLead}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Origen del Lead</p>
+              <p className="text-sm sm:text-base text-crm-text-primary font-semibold">{origenLead}</p>
             </div>
           )}
 
           {cliente.interes_principal && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">Interés Principal</p>
-              <p className="text-sm text-crm-text font-medium">{interesPrincipal}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Interés Principal</p>
+              <p className="text-sm sm:text-base text-crm-text-primary font-semibold">{interesPrincipal}</p>
             </div>
           )}
 
           {cliente.capacidad_compra_estimada && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">Capacidad de Compra</p>
-              <p className="text-sm text-crm-text font-medium">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Capacidad de Compra</p>
+              <p className="text-sm sm:text-base text-crm-text-primary font-semibold">
                 {formatCapacidadCompra(cliente.capacidad_compra_estimada)}
               </p>
             </div>
@@ -265,8 +267,8 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
 
           {cliente.forma_pago_preferida && (
             <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-xs font-medium text-crm-text-muted mb-1">Forma de Pago Preferida</p>
-              <p className="text-sm text-crm-text font-medium">{formaPago}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Forma de Pago Preferida</p>
+              <p className="text-sm sm:text-base text-crm-text-primary font-semibold">{formaPago}</p>
             </div>
           )}
         </div>

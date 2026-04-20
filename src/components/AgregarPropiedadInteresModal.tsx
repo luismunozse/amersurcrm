@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import toast from "react-hot-toast";
 import { agregarPropiedadInteres } from "@/app/dashboard/clientes/_actions_crm";
@@ -182,7 +182,7 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
       onClick={(event) => {
         if (event.target === event.currentTarget && !submitting) {
           onClose();
@@ -190,7 +190,10 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
       }}
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-lg bg-crm-card border-2 border-crm-border rounded-2xl shadow-2xl p-6">
+      <div className="relative z-10 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-crm-card border-t-2 sm:border-2 border-crm-border rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center -mt-1 mb-3">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-crm-text-primary flex items-center gap-2">
@@ -205,9 +208,7 @@ export default function AgregarPropiedadInteresModal({ isOpen, onClose, clienteI
             onClick={() => !submitting && onClose()}
             className="text-crm-text-muted hover:text-crm-text-primary transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
         </div>
 

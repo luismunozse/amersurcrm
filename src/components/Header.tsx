@@ -61,8 +61,8 @@ export default function Header({
 
   return (
     <>
-      <header className="bg-crm-card shadow-crm-lg border-b border-crm-border sticky top-0 z-30">
-        <div className="w-full px-3 sm:px-4 lg:px-6">
+      <header className="bg-crm-card shadow-crm-lg border-b border-crm-border sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
+        <div className="w-full px-3 sm:px-4 lg:px-6 safe-left safe-right">
           <div className="flex justify-between items-center h-14 sm:h-16 lg:h-20">
             {/* Left: menú + logo */}
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -106,31 +106,10 @@ export default function Header({
                 onClick={() => setMobileSearchOpen(true)}
                 className="lg:hidden inline-flex items-center justify-center w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-colors"
                 aria-label="Buscar"
+                title="Buscar"
               >
                 <MagnifyingGlassIcon className="h-5 w-5" />
               </button>
-
-              {exchangeRates.length > 0 && (
-                <div className="hidden xl:flex items-center gap-2 rounded-2xl border border-crm-border/60 bg-crm-card-hover px-3 py-1.5 text-xs text-crm-text-muted">
-                  {exchangeRates.map((rate) => (
-                    <div key={rate.currency} className="flex items-center gap-2 px-2">
-                      <span className="font-semibold text-crm-text-primary">{rate.currency}/PEN</span>
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-[10px] uppercase tracking-wide">Compra</span>
-                        <span className="font-semibold text-crm-text-primary">
-                          {rate.buy ? rate.buy.toFixed(3) : '--'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-[10px] uppercase tracking-wide">Venta</span>
-                        <span className="font-semibold text-crm-text-primary">
-                          {rate.sell ? rate.sell.toFixed(3) : '--'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               <CurrencyConverter exchangeRates={exchangeRates} />
 
@@ -170,8 +149,8 @@ export default function Header({
 
       {/* Mobile search overlay - fullscreen */}
       {mobileSearchOpen && (
-        <div className="fixed inset-0 z-50 bg-crm-card lg:hidden animate-in fade-in duration-200">
-          <div className="flex items-center gap-2 px-3 h-14 border-b border-crm-border">
+        <div className="fixed inset-0 z-50 bg-crm-card lg:hidden animate-in fade-in duration-200 pt-[env(safe-area-inset-top)]">
+          <div className="flex items-center gap-2 px-3 h-14 border-b border-crm-border safe-left safe-right">
             <button
               type="button"
               onClick={() => setMobileSearchOpen(false)}

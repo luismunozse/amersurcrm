@@ -1,3 +1,4 @@
+import { Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { getCachedClientes, getCachedProyectos } from "@/lib/cache.server";
 import type { ClienteCached, ProyectoCached } from "@/types/crm";
@@ -75,9 +76,7 @@ export async function RecentActivities({ clientes: clientesProp, proyectos: proy
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <svg className="w-5 h-5 text-crm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <Clock className="w-5 h-5 text-crm-primary" aria-hidden="true" />
           <span>Actividad Reciente</span>
         </CardTitle>
       </CardHeader>

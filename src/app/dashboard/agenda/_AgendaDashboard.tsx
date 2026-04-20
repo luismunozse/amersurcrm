@@ -1382,9 +1382,12 @@ export default function AgendaDashboard() {
 
       {/* Modal de Reprogramar */}
       {mostrarModalReprogramar && eventoReprogramar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="p-6 space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1">
+              <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+            </div>
+            <div className="p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-crm-text-primary">Reprogramar Evento</h2>
                 <button
@@ -1985,8 +1988,11 @@ function ModalResultadoEvento({
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-end sm:items-center justify-center z-50 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] sm:max-h-[90vh] flex flex-col pb-[env(safe-area-inset-bottom)] sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
+        </div>
         <div className="p-5 border-b border-crm-border flex-shrink-0">
           <h2 className="text-lg font-bold text-crm-text-primary">Resultado de la gestión</h2>
           <p className="text-sm text-crm-text-muted mt-0.5 truncate">{evento.titulo}</p>
@@ -2106,7 +2112,7 @@ function ModalResultadoEvento({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 p-5 pt-4 border-t border-crm-border flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
+          <div className="flex justify-end gap-3 p-5 pt-4 border-t border-crm-border flex-shrink-0 bg-white dark:bg-slate-800 sm:rounded-b-2xl">
             <button
               type="button"
               onClick={onCancelar}

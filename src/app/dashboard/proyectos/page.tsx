@@ -5,6 +5,7 @@ import NewProyectoForm from "./_NewProyectoForm";
 import ProyectosGrid from "./_ProyectosGrid";
 import ExportButton from "@/components/export/ExportButton";
 import type { ProyectoMediaItem } from "@/types/proyectos";
+import { Plus, AlertTriangle } from "lucide-react";
 
 type LoteRow = {
   proyecto_id: string;
@@ -116,9 +117,7 @@ export default async function ProyectosPage() {
           <summary className="flex items-center justify-between px-3 py-2.5 md:px-4 md:py-3 text-sm font-semibold text-crm-text-primary cursor-pointer select-none">
             <span className="flex items-center gap-2">
               <span className="w-6 h-6 bg-gradient-to-br from-crm-primary to-crm-accent rounded-md flex items-center justify-center">
-                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                </svg>
+                <Plus className="w-3.5 h-3.5 text-white" />
               </span>
               Nuevo proyecto
             </span>
@@ -143,9 +142,7 @@ export default async function ProyectosPage() {
         <div className="crm-card p-6 border-l-4 border-crm-danger">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-crm-danger/20 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-crm-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-              </svg>
+              <AlertTriangle className="w-4 h-4 text-crm-danger" />
             </div>
             <div>
               <h3 className="text-sm font-medium text-crm-text-primary">Error cargando proyectos</h3>

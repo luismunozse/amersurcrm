@@ -417,4 +417,48 @@
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .safe-left { padding-left: env(safe-area-inset-left); }
   .safe-right { padding-right: env(safe-area-inset-right); }
+  .mt-safe { margin-top: env(safe-area-inset-top); }
+  .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+  .pt-safe-offset { padding-top: calc(env(safe-area-inset-top) + 0.5rem); }
+  .pb-safe-offset { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
+  .top-safe { top: env(safe-area-inset-top); }
+  .bottom-safe { bottom: env(safe-area-inset-bottom); }
+}
+
+/* ============================================================
+   PWA / Mobile polish global
+   ============================================================ */
+
+/* Evitar flash gris al tocar en iOS/Android */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safety net para evitar scroll horizontal accidental en mobile.
+   Nota: solo en body (no html) y sin overscroll contain, porque combinados
+   con scrollers anidados causan freeze/bounce en iOS. */
+body {
+  overflow-x: hidden;
+}
+
+/* Respetar motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus visible consistente para usuarios de teclado/accesibilidad */
+:focus-visible {
+  outline: 2px solid rgb(134 144 31 / 0.6);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban, Eye } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban, Eye, Plus } from "lucide-react";
 import Link from "next/link";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import type { ReservaConRelaciones } from "@/lib/types/cliente-detail";
@@ -75,13 +75,17 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
       </div>
 
       {!reservas || reservas.length === 0 ? (
-        <div className="text-center py-12 bg-crm-background rounded-lg">
-          <FileText className="h-12 w-12 mx-auto mb-3 text-crm-text-muted opacity-50" />
-          <p className="text-crm-text-muted mb-4">No hay reservas registradas</p>
+        <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
+          <FileText className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay reservas registradas</p>
+          <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
+            Cuando registres una separación con seña, aparecerá acá con su estado y acciones disponibles.
+          </p>
           <button
             onClick={() => setIsCrearModalOpen(true)}
-            className="text-crm-primary hover:underline"
+            className="inline-flex items-center gap-2 px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium text-sm"
           >
+            <Plus className="h-4 w-4" aria-hidden />
             Crear primera reserva
           </button>
         </div>
