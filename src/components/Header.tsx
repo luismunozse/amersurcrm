@@ -67,7 +67,7 @@ export default function Header({
             {/* Left: menú + logo */}
             <div className="flex items-center space-x-2 sm:space-x-4">
               <SidebarTrigger
-                className="w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-all duration-200 active:scale-95 [&_svg]:size-6"
+                className="hidden lg:inline-flex w-11 h-11 rounded-xl text-crm-text-secondary hover:text-crm-text-primary hover:bg-crm-card-hover transition-all duration-200 active:scale-95 [&_svg]:size-6"
                 aria-label="Alternar menú"
               />
 
