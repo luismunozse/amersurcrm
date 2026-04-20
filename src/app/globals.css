@@ -435,10 +435,11 @@
 }
 
 /* Safety net para evitar scroll horizontal accidental en mobile.
-   Nota: solo en body (no html) y sin overscroll contain, porque combinados
-   con scrollers anidados causan freeze/bounce en iOS. */
+   Usamos overflow-x: clip (no hidden): hidden crea un scroll container y
+   fuerza repaint de elementos fixed en cada scroll (flicker del BottomNav
+   en iOS PWA). clip solo recorta, no crea container. */
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Respetar motion preferences */

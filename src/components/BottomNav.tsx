@@ -59,10 +59,11 @@ export default function BottomNav() {
       aria-label="Navegación principal"
       // Notas iOS PWA:
       // - bg sólido (sin /95) + sin backdrop-blur: blur semi-transparente rompe render en standalone.
-      // - transform-gpu + isolate: fuerza capa de composición y stacking propio, evita que el nav
-      //   se "despegue" del viewport al scrollear en iOS.
+      // - transform-gpu / backface-visibility / will-change: fuerza capa de composición estable;
+      //   sin esto, iOS repinta el nav después de cada scroll → flicker.
+      // - isolate: stacking context propio para que no compita con otros fixed.
       // - touch-action: manipulation en los targets: elimina delay/fallo de taps.
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-crm-card border-t border-crm-border shadow-[0_-4px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] isolate transform-gpu"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-crm-card border-t border-crm-border shadow-[0_-4px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] isolate transform-gpu [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [will-change:transform]"
     >
       <ul className="flex items-stretch justify-around px-1">
         {visibles.map((item) => {
