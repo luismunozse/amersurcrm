@@ -8,27 +8,18 @@ import { useEffect } from "react";
  * - Solo se ejecuta en browsers que soportan SW y en protocolos seguros
  *   (https o localhost). En `http://` (excepto localhost) no aplica.
  * - Se deshabilita durante dev para evitar conflicto con HMR.
- * - Detecta nuevas versiones y recarga automáticamente la app cuando
- *   el SW nuevo toma control (evita que PWA siga sirviendo assets viejos
- *   tras un deploy; típico en iOS/Android con stale-while-revalidate).
+ *
+ * NOTA importante: NO hacemos `window.location.reload()` en `controllerchange`.
+ * Con `skipWaiting + clientsClaim` configurados en el SW, cualquier reinstalación
+ * (normal tras un deploy, o por inestabilidad en iOS standalone) dispara
+ * `controllerchange` y generaría un loop de reload. El browser toma el SW nuevo
+ * en la próxima navegación; no hace falta reload forzado.
  */
 export default function ServiceWorkerRegistration() {
   useEffect(() => {
     if (process.env.NODE_ENV === "development") return;
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
-
-    // Guard para evitar bucles de reload: solo recargamos una vez por sesión.
-    let reloading = false;
-    const onControllerChange = () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
-    };
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-
-    let registration: ServiceWorkerRegistration | null = null;
-    let visibilityHandler: (() => void) | null = null;
 
     const register = async () => {
       try {
@@ -43,35 +34,24 @@ export default function ServiceWorkerRegistration() {
           }
         }
 
-        registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-
-        // Chequear actualizaciones cuando la pestaña/PWA vuelve a primer plano.
-        // Esto es lo que permite que un deploy se vea sin matar la app.
-        visibilityHandler = () => {
-          if (document.visibilityState === "visible") {
-            registration?.update().catch(() => {
-              // silencioso: offline u otros errores no bloqueantes
-            });
-          }
-        };
-        document.addEventListener("visibilitychange", visibilityHandler);
+        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       } catch (error) {
         console.warn("No se pudo registrar el service worker:", error);
       }
     };
 
     // Esperar al evento load para no competir con el render inicial
+    let cleanup: (() => void) | null = null;
     if (document.readyState === "complete") {
       void register();
     } else {
-      window.addEventListener("load", register, { once: true });
+      const handler = () => void register();
+      window.addEventListener("load", handler, { once: true });
+      cleanup = () => window.removeEventListener("load", handler);
     }
 
     return () => {
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      if (visibilityHandler) {
-        document.removeEventListener("visibilitychange", visibilityHandler);
-      }
+      cleanup?.();
     };
   }, []);
 
