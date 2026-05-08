@@ -64,7 +64,8 @@ export async function protegerRuta(opciones: ProtegerRutaOpciones = {}): Promise
 
   // Verificar permisos alternativos (OR)
   if (permisos && permisos.length > 0) {
-    const tieneAlguno = permisos.some(p => usuario.permisos.includes(p));
+    const esAdmin = usuario.rol === 'ROL_ADMIN';
+    const tieneAlguno = esAdmin || permisos.some(p => usuario.permisos.includes(p));
     if (!tieneAlguno) {
       console.warn(`Acceso denegado: usuario ${usuario.id} no tiene ninguno de ${permisos.join(', ')}`);
       redirect(redirectTo);

@@ -105,10 +105,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
     // Interacciones
     supabase
       .from('cliente_interaccion')
-      .select(`
-        *,
-        vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
-      `)
+      .select('*')
       .eq('cliente_id', id)
       .order('fecha_interaccion', { ascending: false }),
 
@@ -158,7 +155,6 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           codigo,
           proyecto:proyecto!proyecto_id(nombre)
         ),
-        vendedor:usuario_perfil!vendedor_username(username, nombre_completo),
         pagos:pago(*)
       `)
       .eq('cliente_id', id)

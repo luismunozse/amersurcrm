@@ -24,7 +24,7 @@ import { FormInput } from "@/components/form/FormInput";
 import { FormTextarea } from "@/components/form/FormTextarea";
 import { LoadingButton } from "@/components/form/LoadingButton";
 import { useProformaValidation } from "./proformas/useProformaValidation";
-import { X, User, Briefcase, Plus, Trash2, Download, Maximize2, AlertCircle, FileText } from "lucide-react";
+import { X, User, Briefcase, Download, Maximize2, AlertCircle, FileText } from "lucide-react";
 
 interface CrearProformaModalProps {
   isOpen: boolean;
@@ -948,55 +948,8 @@ export default function CrearProformaModal({
             </div>
           </div>
 
-          {/* Cuentas y comentarios */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-semibold text-crm-text-secondary uppercase tracking-wider">
-                  Cuentas de la empresa
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setCuentasEmpresa([...cuentasEmpresa, ""])}
-                  className="p-1.5 text-crm-primary hover:bg-crm-primary/10 rounded-lg transition-colors"
-                  title="Agregar cuenta"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {cuentasEmpresa.map((cuenta, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={cuenta}
-                      onChange={(e) => {
-                        const nuevasCuentas = [...cuentasEmpresa];
-                        nuevasCuentas[index] = e.target.value;
-                        setCuentasEmpresa(nuevasCuentas);
-                      }}
-                      placeholder="Ej: BCP Soles: 123-456-789"
-                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-crm-border bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nuevasCuentas = cuentasEmpresa.filter((_, i) => i !== index);
-                        setCuentasEmpresa(nuevasCuentas.length > 0 ? nuevasCuentas : [""]);
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Eliminar cuenta"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-crm-text-muted mt-2">
-                Las cuentas aparecerán en el PDF de la cotización
-              </p>
-            </div>
-
+          {/* Comentarios */}
+          <div className="grid grid-cols-1 gap-4">
             <div className="p-4 bg-crm-background rounded-xl border border-crm-border">
               <h3 className="text-sm font-semibold text-crm-text-secondary uppercase tracking-wider mb-3">
                 Comentarios adicionales

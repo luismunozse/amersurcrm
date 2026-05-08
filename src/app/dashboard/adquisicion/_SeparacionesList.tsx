@@ -10,13 +10,20 @@ export default function SeparacionesList() {
   const [items, setItems] = useState<any[]>([]);
   const [filtro, setFiltro] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, [filtro]);
 
   async function loadData() {
     setLoading(true);
+    setError(null);
     const result = await obtenerSeparaciones({ estado: filtro || undefined });
-    if (result.success) setItems(result.data || []);
+    if (result.success) {
+      setItems(result.data || []);
+    } else {
+      setError(result.error || 'Error desconocido cargando separaciones');
+      console.error('[SeparacionesList] error:', result);
+    }
     setLoading(false);
   }
 
@@ -55,6 +62,13 @@ export default function SeparacionesList() {
 
       {loading ? (
         <div className="text-center py-8 text-crm-text-muted">Cargando separaciones...</div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <div className="inline-block px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 max-w-2xl">
+            <strong>Error cargando separaciones:</strong>
+            <pre className="mt-2 text-xs whitespace-pre-wrap break-all">{error}</pre>
+          </div>
+        </div>
       ) : items.length === 0 ? (
         <div className="text-center py-8 text-crm-text-muted">
           <Receipt className="h-12 w-12 mx-auto mb-2 opacity-30" />

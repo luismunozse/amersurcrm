@@ -109,6 +109,8 @@ export function usePermissions() {
   const tienePermiso = useCallback(
     (permiso: PermisoCodigo): boolean => {
       if (!usuario) return false;
+      // ROL_ADMIN tiene acceso total al sistema por definición.
+      if (usuario.rol === 'ROL_ADMIN') return true;
       return usuario.permisos.includes(permiso);
     },
     [usuario]
@@ -117,6 +119,7 @@ export function usePermissions() {
   const tieneAlgunoDePermisos = useCallback(
     (permisos: PermisoCodigo[]): boolean => {
       if (!usuario) return false;
+      if (usuario.rol === 'ROL_ADMIN') return true;
       return permisos.some(permiso => usuario.permisos.includes(permiso));
     },
     [usuario]
@@ -125,6 +128,7 @@ export function usePermissions() {
   const tieneTodosLosPermisos = useCallback(
     (permisos: PermisoCodigo[]): boolean => {
       if (!usuario) return false;
+      if (usuario.rol === 'ROL_ADMIN') return true;
       return permisos.every(permiso => usuario.permisos.includes(permiso));
     },
     [usuario]

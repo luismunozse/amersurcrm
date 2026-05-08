@@ -102,6 +102,12 @@ export async function verificarPermiso(
       };
     }
 
+    // ROL_ADMIN tiene acceso total al sistema por definición.
+    // No depende de la matriz de permisos: si el rol es admin, pasa siempre.
+    if (usuario.rol === 'ROL_ADMIN') {
+      return { permitido: true };
+    }
+
     // Verificar si tiene el permiso
     const tienePermiso = usuario.permisos.includes(permiso);
 

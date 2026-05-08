@@ -14,8 +14,9 @@ export default function PipelineView() {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Filtros
-  const [filtroEstado, setFiltroEstado] = useState('activos');
+  // Filtros — default a "Todos" para que admin vea procesos en cualquier
+  // estado (activo, completado, etc) sin necesidad de cambiar el filtro.
+  const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroEtapa, setFiltroEtapa] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [showFiltros, setShowFiltros] = useState(false);

@@ -1,8 +1,14 @@
 import { getCachedClientes } from "@/lib/cache.server";
 import NewClienteForm from "./_NewClienteForm";
 import ClientesTable from "@/components/ClientesTable";
-import ExportButton from "@/components/export/ExportButton";
+import ExportClientesButton from "./_ExportClientesButton";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
+
+// Listado siempre fresco — los cambios de estado de cliente (p.ej. al
+// registrar una separación) deben verse al volver a /clientes sin necesidad
+// de hard refresh del navegador.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type SP = Promise<{
   q?: string | string[];
@@ -109,14 +115,10 @@ export default async function ClientesPage({ searchParams }: { searchParams: SP 
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start md:self-auto">
             {puedeExportar && (
-              <ExportButton
-                type="clientes"
-                data={clientes}
+              <ExportClientesButton
                 filters={exportFilters}
+                totalCount={total}
                 fileName="clientes"
-                label="Exportar"
-                size="sm"
-                variant="secondary"
               />
             )}
             <div className="text-sm text-crm-text-muted">

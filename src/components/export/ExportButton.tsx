@@ -39,6 +39,13 @@ export interface ExportButtonProps {
   showFormatOptions?: boolean;
   /** Incluir hoja de filtros en la exportación */
   includeFiltersSheet?: boolean;
+  /**
+   * Si se provee, al exportar se llama esta funcion para obtener TODOS los
+   * registros (ignora `data`). Usar cuando `data` es solo la pagina actual.
+   */
+  fetchAllData?: () => Promise<{ data: any[]; total: number }>;
+  /** Total de registros (para mostrar en dropdown cuando se usa fetchAllData) */
+  totalCount?: number;
 }
 
 /**
@@ -72,6 +79,8 @@ export default function ExportButton({
   variant = 'secondary',
   showFormatOptions = true,
   includeFiltersSheet = true,
+  fetchAllData,
+  totalCount,
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -91,8 +100,16 @@ export default function ExportButton({
     setShowDropdown(false);
 
     try {
-      // Agregar el conteo a los filtros
-      const filtersWithCount = addCountToFilters(filters, data.length);
+      let exportData = data;
+      let exportTotal = data.length;
+
+      if (fetchAllData) {
+        const full = await fetchAllData();
+        exportData = full.data;
+        exportTotal = full.total ?? full.data.length;
+      }
+
+      const filtersWithCount = addCountToFilters(filters, exportTotal);
 
       const exportOpts = {
         fileName: fileName || type,
@@ -101,15 +118,18 @@ export default function ExportButton({
       };
 
       if (type === 'proyectos') {
-        await exportFilteredProyectos(data, filtersWithCount as ProyectoExportFilters, format, exportOpts);
+        await exportFilteredProyectos(exportData, filtersWithCount as ProyectoExportFilters, format, exportOpts);
       } else if (type === 'lotes') {
-        await exportFilteredLotes(data, filtersWithCount as LoteExportFilters, format, exportOpts);
+        await exportFilteredLotes(exportData, filtersWithCount as LoteExportFilters, format, exportOpts);
       } else if (type === 'usuarios') {
-        await exportFilteredUsuarios(data, filtersWithCount as UsuarioExportFilters, format, exportOpts);
+        await exportFilteredUsuarios(exportData, filtersWithCount as UsuarioExportFilters, format, exportOpts);
       } else {
-        await exportFilteredClientes(data, filtersWithCount as ClienteExportFilters, format, exportOpts);
+        await exportFilteredClientes(exportData, filtersWithCount as ClienteExportFilters, format, exportOpts);
       }
 
+      if (fetchAllData) {
+        toast.success(`Exportación completada (${exportTotal} registros)`);
+      }
     } catch (error) {
       console.error('Error al exportar:', error);
       toast.error('Error al exportar los datos. Por favor, intente nuevamente.');
@@ -138,8 +158,10 @@ export default function ExportButton({
     lg: 'h-5 w-5',
   };
 
+  const displayCount = totalCount ?? data.length;
+
   // Si no hay datos, deshabilitar el botón
-  if (data.length === 0) {
+  if (displayCount === 0) {
     return (
       <button
         disabled
@@ -197,7 +219,7 @@ export default function ExportButton({
         <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
           {/* Header con resumen de filtros */}
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <p className="text-xs font-medium text-gray-700 mb-1">Exportar {data.length} registros</p>
+            <p className="text-xs font-medium text-gray-700 mb-1">Exportar {displayCount} registros</p>
             <p className="text-xs text-gray-500 truncate" title={formatFilterSummary(filters)}>
               {formatFilterSummary(filters)}
             </p>

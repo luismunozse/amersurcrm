@@ -21,7 +21,9 @@ export async function obtenerProcesos(filtros?: {
   const supabase = await createServerActionClient();
 
   try {
-    const puedeVerTodos = await tienePermiso(PERMISOS.VENTAS.VER_TODAS);
+    // Admin/coord/gerente ven todo. Resto cae al permiso explícito o filtra por su username.
+    const privilegiado = await esAdminOCoordinador();
+    const puedeVerTodos = privilegiado || (await tienePermiso(PERMISOS.VENTAS.VER_TODAS));
 
     let query = supabase
       .from('proceso_adquisicion')
@@ -101,7 +103,8 @@ export async function obtenerResumenPipeline() {
   const supabase = await createServerActionClient();
 
   try {
-    const puedeVerTodos = await tienePermiso(PERMISOS.VENTAS.VER_TODAS);
+    const privilegiado = await esAdminOCoordinador();
+    const puedeVerTodos = privilegiado || (await tienePermiso(PERMISOS.VENTAS.VER_TODAS));
 
     let query = supabase
       .from('proceso_adquisicion')

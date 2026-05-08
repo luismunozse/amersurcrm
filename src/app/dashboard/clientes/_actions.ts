@@ -445,6 +445,7 @@ export async function obtenerClientesPaginados(params: {
 }
 
 // Obtener todos los clientes con los filtros aplicados (sin paginación)
+// Supabase REST cap por request es 1000 filas, asi que paginamos hasta cubrir total.
 export async function obtenerTodosLosClientes(params: {
   searchTerm?: string;
   searchTelefono?: string;
@@ -452,18 +453,39 @@ export async function obtenerTodosLosClientes(params: {
   estado?: string;
   tipo?: string;
   vendedor?: string;
+  origen?: string;
+  proyectoInteres?: string;
   fechaDesde?: string;
   fechaHasta?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }) {
   try {
-    const result = await getCachedClientes({
+    const PAGE_SIZE = 1000;
+    const first = await getCachedClientes({
       ...params,
       page: 1,
-      pageSize: 1000,
+      pageSize: PAGE_SIZE,
     });
-    return result;
+
+    const total = first.total ?? first.data.length;
+    if (first.data.length >= total) {
+      return first;
+    }
+
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    const restPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        getCachedClientes({
+          ...params,
+          page: i + 2,
+          pageSize: PAGE_SIZE,
+        })
+      )
+    );
+
+    const data = first.data.concat(...restPages.map((r) => r.data));
+    return { data, total };
   } catch (error) {
     console.error('Error obteniendo clientes para exportación:', error);
     throw error;
