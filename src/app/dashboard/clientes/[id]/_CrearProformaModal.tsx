@@ -53,7 +53,7 @@ const MONEDAS: { value: ProformaMoneda; label: string }[] = [
 
 const TIPOS_OPERACION: { value: ProformaTipoOperacion; label: string }[] = [
   { value: "cotizacion", label: "Cotización" },
-  { value: "reserva", label: "Reserva" },
+  { value: "reserva", label: "Separación" },
   { value: "venta", label: "Venta" },
 ];
 
@@ -573,7 +573,7 @@ export default function CrearProformaModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-crm-text-secondary mb-1">
-                Asociar con reserva
+                Asociar con separación
               </label>
               <select
                 className="w-full px-3 py-2 rounded-lg border border-crm-border dark:border-gray-700 bg-white dark:bg-gray-900 text-crm-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-crm-primary"

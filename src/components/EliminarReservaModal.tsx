@@ -35,10 +35,10 @@ export default function EliminarReservaModal({
       const result = await eliminarReserva(reservaId);
 
       if (result.success) {
-        toast.success("Reserva eliminada exitosamente");
+        toast.success("Separación eliminada exitosamente");
         onClose();
       } else {
-        toast.error(result.error || "Error al eliminar la reserva");
+        toast.error(result.error || "Error al eliminar la separación");
       }
     });
   };
@@ -75,7 +75,7 @@ export default function EliminarReservaModal({
                   <div>
                     <Dialog.Title className="text-xl font-bold text-crm-text flex items-center gap-2">
                       <Trash2 className="h-6 w-6 text-red-500" />
-                      Eliminar Reserva
+                      Eliminar Separación
                     </Dialog.Title>
                     <p className="text-sm text-crm-text-muted mt-1">
                       {reservaCodigo} - {clienteNombre}
@@ -95,10 +95,10 @@ export default function EliminarReservaModal({
                     <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
-                        Esta accion eliminara permanentemente la reserva
+                        Esta accion eliminara permanentemente la separación
                       </p>
                       <ul className="text-xs text-red-700 dark:text-red-300 space-y-1 list-disc list-inside">
-                        <li>La reserva sera eliminada de la base de datos</li>
+                        <li>La separación sera eliminada de la base de datos</li>
                         <li>Esta accion no se puede deshacer</li>
                         {estado === 'activa' && loteNombre && (
                           <li>El lote &quot;{loteNombre}&quot; volvera a estado &quot;Disponible&quot;</li>
@@ -111,7 +111,7 @@ export default function EliminarReservaModal({
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
                   <p className="text-sm text-crm-text">
-                    ¿Estas seguro de que deseas eliminar permanentemente la reserva{" "}
+                    ¿Estas seguro de que deseas eliminar permanentemente la separación{" "}
                     <span className="font-semibold">{reservaCodigo}</span>?
                   </p>
 
@@ -131,7 +131,7 @@ export default function EliminarReservaModal({
                       disabled={isPending}
                     >
                       <Trash2 className="h-4 w-4" />
-                      {isPending ? "Eliminando..." : "Eliminar Reserva"}
+                      {isPending ? "Eliminando..." : "Eliminar Separación"}
                     </button>
                   </div>
                 </form>

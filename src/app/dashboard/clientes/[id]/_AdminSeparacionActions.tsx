@@ -30,7 +30,7 @@ export default function AdminSeparacionActions({
 
   function handleAnular() {
     if (!motivo.trim()) {
-      toast.error("Ingresá un motivo");
+      toast.error("Ingrese un motivo");
       return;
     }
     startTransition(async () => {
@@ -47,7 +47,7 @@ export default function AdminSeparacionActions({
 
   function handleExtender() {
     if (!nuevaFecha) {
-      toast.error("Seleccioná una fecha");
+      toast.error("Seleccione una fecha");
       return;
     }
     startTransition(async () => {
@@ -121,7 +121,7 @@ export default function AdminSeparacionActions({
                     placeholder="Ej: cliente se arrepintió, cayó el crédito bancario, etc."
                   />
                   <p className="text-xs text-crm-text-muted">
-                    Esto cancela la reserva, libera el lote, cancela el proceso de adquisición y
+                    Esto cancela la separación, libera el lote, cancela el proceso de adquisición y
                     revierte al cliente al estado <strong>potencial</strong>.
                   </p>
                 </>

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { LoadingButton } from "@/components/form/LoadingButton";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Inconsistencia {
   tipo_inconsistencia: string;
@@ -38,6 +39,7 @@ export default function SyncVendedorFieldsPage() {
   const [verificando, setVerificando] = useState(false);
   const [inconsistencias, setInconsistencias] = useState<Inconsistencia[]>([]);
   const [resultadoSync, setResultadoSync] = useState<ResultadoSync | null>(null);
+  const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
 
   const verificarInconsistencias = async () => {
     setVerificando(true);
@@ -69,17 +71,14 @@ export default function SyncVendedorFieldsPage() {
 
   const sincronizarCampos = async () => {
     if (inconsistencias.length === 0) {
-      toast.error("Primero verifica las inconsistencias");
+      toast.error("Primero verifique las inconsistencias");
       return;
     }
+    setConfirmSyncOpen(true);
+  };
 
-    const confirmar = window.confirm(
-      `¿Estás seguro de que deseas sincronizar los campos de vendedor?\n\n` +
-      `Esto actualizará ${inconsistencias.reduce((sum, inc) => sum + inc.cantidad, 0)} clientes.`
-    );
-
-    if (!confirmar) return;
-
+  const ejecutarSincronizacion = async () => {
+    setConfirmSyncOpen(false);
     setLoading(true);
     try {
       const response = await fetch("/api/admin/sync-vendedor-fields", {
@@ -113,7 +112,7 @@ export default function SyncVendedorFieldsPage() {
               Sincronizar Campos de Vendedor
             </h1>
             <p className="text-sm text-crm-text-muted">
-              Verifica y sincroniza los campos vendedor_asignado y vendedor_username en la tabla cliente
+              Verifique y sincronice los campos vendedor_asignado y vendedor_username en la tabla cliente
             </p>
           </div>
         </div>
@@ -242,6 +241,17 @@ export default function SyncVendedorFieldsPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmSyncOpen}
+        title="Sincronizar campos de vendedor"
+        description={`¿Está seguro de que desea sincronizar los campos de vendedor? Esto actualizará ${inconsistencias.reduce((sum, inc) => sum + inc.cantidad, 0)} clientes.`}
+        confirmText="Sincronizar"
+        cancelText="Cancelar"
+        disabled={loading}
+        onConfirm={ejecutarSincronizacion}
+        onClose={() => setConfirmSyncOpen(false)}
+      />
     </div>
   );
 }

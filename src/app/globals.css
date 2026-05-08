@@ -220,6 +220,7 @@
   --crm-text-secondary: #64748b;
   --crm-text-muted: #94a3b8;
   --crm-bg-primary: #f8fafc;
+  --crm-bg-secondary: #f1f5f9;
 
   /* shadcn/ui variables - mapeadas a paleta CRM */
   --background: 210 40% 98%;
@@ -274,6 +275,7 @@
   --crm-text-secondary: #cbd5e1;
   --crm-text-muted: #94a3b8;
   --crm-bg-primary: #0f172a;
+  --crm-bg-secondary: #1e293b;
 
   /* shadcn/ui variables - modo oscuro */
   --background: 222 47% 11%;

@@ -141,9 +141,9 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
         lote:lote!lote_id(
           id,
           codigo,
+          sup_m2,
           proyecto:proyecto!proyecto_id(id, nombre)
-        ),
-        vendedor:usuario_perfil!vendedor_username(username, nombre_completo)
+        )
       `)
       .eq('cliente_id', id)
       .order('created_at', { ascending: false }),
@@ -181,10 +181,17 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
 
   const { data: interacciones } = interaccionesResult;
   const { data: propiedadesInteresData } = propiedadesInteresResult;
-  const { data: reservasRaw } = reservasResult;
-  const { data: ventas } = ventasResult;
+  const { data: reservasRaw, error: reservasError } = reservasResult;
+  const { data: ventas, error: ventasError } = ventasResult;
   const { data: proformas } = proformasResult;
   const { data: vendedoresRaw } = vendedoresResult;
+
+  if (reservasError) {
+    console.error('[cliente/[id]] Error cargando reservas:', reservasError);
+  }
+  if (ventasError) {
+    console.error('[cliente/[id]] Error cargando ventas:', ventasError);
+  }
 
   // Procesar propiedades de interés
   const propiedadesInteres = (propiedadesInteresData ?? []).map((item) => {
@@ -353,6 +360,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           vendedores={vendedores || []}
           defaultTab={defaultTab}
           isAdmin={usuarioActual.rol === "ROL_ADMIN"}
+          esPrivilegiado={esPrivilegiado}
           seguimientosVencidos={seguimientosVencidos}
         />
       </div>

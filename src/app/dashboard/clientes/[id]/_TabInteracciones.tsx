@@ -197,7 +197,7 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
           <MessageSquare className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
           <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay interacciones registradas</p>
           <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
-            Cuando registres una llamada, visita o seguimiento, quedará visible aquí con su resultado.
+            Cuando registre una llamada, visita o seguimiento, quedará visible aquí con su resultado.
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -346,7 +346,7 @@ export default function TabInteracciones({ clienteId, clienteNombre, interaccion
         onClose={() => setConfirmDelete({ open: false, interaccionId: null })}
         onConfirm={handleDelete}
         title="Eliminar Interacción"
-        description="¿Estás seguro de que deseas eliminar esta interacción? Esta acción no se puede deshacer."
+        description="¿Está seguro de que desea eliminar esta interacción? Esta acción no se puede deshacer."
         confirmText={isPending ? "Eliminando…" : "Eliminar"}
         cancelText="Cancelar"
         disabled={isPending}

@@ -2,8 +2,9 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { requierePermiso, esAdmin } from "@/lib/permissions/server";
 import { obtenerUsernameActual, validarMonto, revalidarCliente } from "./_actions-crm-helpers";
+import { revalidatePath } from "next/cache";
 
 // ============================================================
 // CRONOGRAMA DE PAGOS (CUOTAS)
@@ -160,7 +161,103 @@ export async function registrarPagoCuota(data: {
     }
 
     revalidarCliente(data.clienteId);
+    revalidatePath('/dashboard/cobranza');
     return { success: true, data: pago };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================
+// HISTORIAL Y ANULACION DE PAGOS (Etapa 4)
+// ============================================================
+
+export interface PagoCuota {
+  id: string;
+  venta_id: string;
+  cuota_id: string | null;
+  numero_cuota: number | null;
+  monto: number;
+  moneda: string;
+  fecha_pago: string;
+  metodo_pago: string | null;
+  numero_operacion: string | null;
+  banco: string | null;
+  comprobante_url: string | null;
+  registrado_por: string;
+  notas: string | null;
+  anulado: boolean;
+  anulado_por: string | null;
+  fecha_anulacion: string | null;
+  motivo_anulacion: string | null;
+  created_at: string;
+}
+
+/**
+ * Lista los pagos asociados a una cuota (incluye anulados, ordenados por fecha desc).
+ */
+export async function obtenerPagosCuota(cuotaId: string): Promise<{
+  success: boolean;
+  error?: string;
+  data?: PagoCuota[];
+}> {
+  if (!cuotaId) return { success: false, error: 'ID de cuota requerido' };
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const { data, error } = await supabase
+      .from('pago')
+      .select('*')
+      .eq('cuota_id', cuotaId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return { success: true, data: (data ?? []) as PagoCuota[] };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Anula un pago registrado. Solo admin.
+ * Revierte cuota.monto_pagado y venta.saldo_pendiente atomicamente via RPC.
+ */
+export async function anularPago(
+  pagoId: string,
+  motivo: string,
+): Promise<{ success: boolean; error?: string; data?: { ventaId: string; cuotaId: string | null } }> {
+  if (!pagoId) return { success: false, error: 'ID de pago requerido' };
+  if (!motivo || !motivo.trim()) return { success: false, error: 'Motivo de anulacion requerido' };
+
+  if (!(await esAdmin())) {
+    return { success: false, error: 'Solo un administrador puede anular pagos' };
+  }
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const auth = await obtenerUsernameActual(supabase);
+    if (!auth.success) return auth;
+
+    const { data, error } = await supabase.rpc('anular_pago', {
+      p_pago_id: pagoId,
+      p_username: auth.username,
+      p_motivo: motivo.trim(),
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    const result = data as Record<string, unknown> | null;
+    const ventaId = (result?.venta_id as string) ?? '';
+    const cuotaId = (result?.cuota_id as string) ?? null;
+
+    // Revalidar paths que muestran cobranza/cronograma. No tenemos clienteId
+    // del pago directo: revalidamos el layout completo de clientes.
+    revalidatePath('/dashboard/clientes', 'layout');
+    revalidatePath('/dashboard/cobranza');
+
+    return { success: true, data: { ventaId, cuotaId } };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

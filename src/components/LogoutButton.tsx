@@ -31,7 +31,7 @@ export default function LogoutButton() {
       <ConfirmDialog
         open={showConfirm}
         title="Cerrar sesión"
-        description="¿Estás seguro de que deseas cerrar sesión?"
+        description="¿Está seguro de que desea cerrar sesión?"
         confirmText="Sí, salir"
         cancelText="Cancelar"
         onConfirm={handleLogout}

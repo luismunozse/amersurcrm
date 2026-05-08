@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import BlueprintUploader from '@/components/BlueprintUploader';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { toast } from 'sonner';
 import {
   guardarOverlayLayers,
@@ -251,6 +252,9 @@ export default function MapeoLotesMejorado({
   const [drawingLoteId, setDrawingLoteId] = useState<string | null>(null);
   const [savingLotePolygon, setSavingLotePolygon] = useState(false);
   const [deletingLoteId, setDeletingLoteId] = useState<string | null>(null);
+  const [confirmDeleteLayerId, setConfirmDeleteLayerId] = useState<string | null>(null);
+  const [confirmReubicarLoteId, setConfirmReubicarLoteId] = useState<string | null>(null);
+  const [confirmDeleteLoteId, setConfirmDeleteLoteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [focusRequest, setFocusRequest] = useState<{ id: string; ts: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'located'>('pending');
@@ -562,8 +566,13 @@ export default function MapeoLotesMejorado({
   };
 
   const handleDeleteLayer = (layerId: string) => {
-    const confirmDelete = confirm('¿Eliminar esta capa? Esta acción no se puede deshacer.');
-    if (!confirmDelete) return;
+    setConfirmDeleteLayerId(layerId);
+  };
+
+  const confirmarDeleteLayer = () => {
+    const layerId = confirmDeleteLayerId;
+    if (!layerId) return;
+    setConfirmDeleteLayerId(null);
 
     setOverlayLayers((prev) => {
       const filtered = prev.filter((layer) => layer.id !== layerId);
@@ -869,21 +878,34 @@ export default function MapeoLotesMejorado({
   );
 
   const handleReubicarLote = useCallback(
-    async (loteId: string) => {
-      const lote = lotesState.find((item) => item.id === loteId);
-      const mensaje = `El lote ${lote?.codigo ?? ''} volverá a la lista de pendientes para que puedas ubicarlo nuevamente. ¿Deseas continuar?`;
-      if (!confirm(mensaje)) return;
+    (loteId: string) => {
+      setConfirmReubicarLoteId(loteId);
+    },
+    []
+  );
+
+  const confirmarReubicarLote = useCallback(
+    async () => {
+      const loteId = confirmReubicarLoteId;
+      if (!loteId) return;
+      setConfirmReubicarLoteId(null);
       const removed = await handleRemoveLotePin(loteId, { skipConfirm: true });
       if (removed) {
         setActiveTab('pending');
         handleStartDrawingLote(loteId);
       }
     },
-    [handleRemoveLotePin, handleStartDrawingLote, lotesState]
+    [confirmReubicarLoteId, handleRemoveLotePin, handleStartDrawingLote]
   );
 
-  const handleDeleteLote = async (loteId: string) => {
-    if (!confirm('¿Eliminar este lote del proyecto? Esta acción no se puede deshacer.')) return;
+  const handleDeleteLote = (loteId: string) => {
+    setConfirmDeleteLoteId(loteId);
+  };
+
+  const confirmarDeleteLote = async () => {
+    const loteId = confirmDeleteLoteId;
+    if (!loteId) return;
+    setConfirmDeleteLoteId(null);
     setDeletingLoteId(loteId);
     try {
       await eliminarLote(loteId, proyectoId);
@@ -1767,6 +1789,40 @@ export default function MapeoLotesMejorado({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDeleteLayerId}
+        title="Eliminar capa"
+        description="¿Eliminar esta capa? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={confirmarDeleteLayer}
+        onClose={() => setConfirmDeleteLayerId(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmReubicarLoteId}
+        title="Reubicar lote"
+        description={(() => {
+          const lote = lotesState.find((item) => item.id === confirmReubicarLoteId);
+          return `El lote ${lote?.codigo ?? ''} volverá a la lista de pendientes para que pueda ubicarlo nuevamente. ¿Desea continuar?`;
+        })()}
+        confirmText="Reubicar"
+        cancelText="Cancelar"
+        onConfirm={confirmarReubicarLote}
+        onClose={() => setConfirmReubicarLoteId(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteLoteId}
+        title="Eliminar lote"
+        description="¿Eliminar este lote del proyecto? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        disabled={!!deletingLoteId}
+        onConfirm={confirmarDeleteLote}
+        onClose={() => setConfirmDeleteLoteId(null)}
+      />
     </div>
   );
 }

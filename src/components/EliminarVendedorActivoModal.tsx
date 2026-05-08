@@ -44,7 +44,7 @@ export default function EliminarVendedorActivoModal({
               Eliminar Vendedor de la Lista
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              ¿Estás seguro de que deseas eliminar a <strong>{vendedorNombre}</strong> de la lista de asignación automática?
+              ¿Está seguro de que desea eliminar a <strong>{vendedorNombre}</strong> de la lista de asignación automática?
             </p>
             <p className="text-xs text-gray-500">
               Esta acción no se puede deshacer. El vendedor no recibirá más leads automáticamente.

@@ -70,7 +70,7 @@ export default function EliminarLotesMasivoModal({
 
   const handleDeleteClick = () => {
     if (selectedLotes.size === 0) {
-      toast.error("Debes seleccionar al menos un lote");
+      toast.error("Debe seleccionar al menos un lote");
       return;
     }
     setShowConfirmation(true);
@@ -109,7 +109,7 @@ export default function EliminarLotesMasivoModal({
           onSuccess();
         }, 2000);
       } else {
-        toast.error("No se pudo eliminar ningún lote. Revisa los errores.");
+        toast.error("No se pudo eliminar ningún lote. Revise los errores.");
       }
     } catch (error) {
       console.error("Error:", error);
@@ -156,7 +156,7 @@ export default function EliminarLotesMasivoModal({
                   Advertencia
                 </h3>
                 <p className="text-xs text-red-800 dark:text-red-300 mt-1">
-                  Esta acción no se puede deshacer. Solo se pueden eliminar lotes que no tengan reservas o ventas asociadas.
+                  Esta acción no se puede deshacer. Solo se pueden eliminar lotes que no tengan separaciones o ventas asociadas.
                 </p>
               </div>
             </div>
@@ -373,14 +373,14 @@ export default function EliminarLotesMasivoModal({
             {/* Content */}
             <div className="p-6">
               <p className="text-crm-text-primary">
-                ¿Estás seguro de que deseas eliminar{" "}
+                ¿Está seguro de que desea eliminar{" "}
                 <span className="font-bold text-red-600 dark:text-red-400">
                   {selectedLotes.size} lote(s)
                 </span>
                 ?
               </p>
               <p className="text-sm text-crm-text-muted mt-3">
-                Los lotes que tengan reservas o ventas asociadas no podrán ser eliminados.
+                Los lotes que tengan separaciones o ventas asociadas no podrán ser eliminados.
               </p>
             </div>
 

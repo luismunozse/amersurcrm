@@ -5,6 +5,7 @@
 export type EtapaProceso = 'separacion' | 'calificacion_bancaria' | 'firma_contrato' | 'desembolso';
 export type EstadoProceso = 'activo' | 'completado' | 'cancelado' | 'pausado';
 export type EstadoEtapa = 'pendiente' | 'en_progreso' | 'completada' | 'omitida';
+export type EstadoRevision = 'pendiente' | 'en_revision' | 'aprobado' | 'observado';
 
 export interface ProcesoAdquisicion {
   id: string;
@@ -39,6 +40,11 @@ export interface ProcesoEtapa {
   fecha_limite?: string;
   fecha_completada?: string;
   notas?: string;
+  estado_revision?: EstadoRevision;
+  observaciones?: string;
+  fecha_revision?: string;
+  revisado_por?: string;
+  datos_especificos?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +59,10 @@ export interface ProcesoChecklistItem {
   completado_por?: string;
   fecha_completado?: string;
   documento_url?: string;
+  documento_nombre?: string;
+  documento_size?: number;
+  documento_subido_por?: string;
+  documento_subido_at?: string;
   created_at: string;
 }
 
@@ -101,6 +111,13 @@ export const ESTADOS_ETAPA: { value: EstadoEtapa; label: string; color: string }
   { value: 'en_progreso', label: 'En Progreso', color: 'blue' },
   { value: 'completada', label: 'Completada', color: 'green' },
   { value: 'omitida', label: 'Omitida', color: 'gray' },
+];
+
+export const ESTADOS_REVISION: { value: EstadoRevision; label: string; color: string }[] = [
+  { value: 'pendiente', label: 'Pendiente', color: 'gray' },
+  { value: 'en_revision', label: 'En Revisión', color: 'amber' },
+  { value: 'aprobado', label: 'Aprobado', color: 'green' },
+  { value: 'observado', label: 'Observado', color: 'red' },
 ];
 
 export function calcularProgresoProceso(etapas: ProcesoEtapa[]): number {

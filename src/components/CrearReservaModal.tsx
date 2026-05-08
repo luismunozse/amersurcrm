@@ -187,7 +187,7 @@ export default function CrearReservaModal({
     e.preventDefault();
 
     if (!selectedProyectoId) {
-      toast.error("Selecciona un proyecto para la reserva");
+      toast.error("Selecciona un proyecto para la separación");
       return;
     }
 
@@ -225,16 +225,16 @@ export default function CrearReservaModal({
       });
 
       if (result.success) {
-        toast.success(`Reserva ${result.data?.codigo_reserva} creada exitosamente`);
+        toast.success(`Separación ${result.data?.codigo_reserva} creada exitosamente`);
         resetForm();
         onClose();
         router.refresh();
       } else {
-        toast.error(result.error || "Error al crear reserva");
+        toast.error(result.error || "Error al crear separación");
       }
     } catch (error) {
       console.error("Error creando reserva:", error);
-      toast.error("Error inesperado al crear reserva");
+      toast.error("Error inesperado al crear separación");
     } finally {
       setIsSubmitting(false);
     }
@@ -267,7 +267,7 @@ export default function CrearReservaModal({
         <div className="flex items-start justify-between p-5 sm:p-6 pt-3 sm:pt-6 pb-4 shrink-0">
           <div>
             <h2 className="text-xl font-bold text-crm-text-primary">
-              Crear Reserva
+              Crear Separación
             </h2>
             <p className="text-sm text-crm-text-secondary mt-1">
               Cliente: {clienteNombre}
@@ -346,7 +346,7 @@ export default function CrearReservaModal({
               </select>
               {selectedProyectoId && !optionsLoading && lotesDisponibles.length === 0 && (
                 <p className="text-xs text-crm-text-muted mt-1">
-                  Este proyecto no tiene lotes disponibles para reservar.
+                  Este proyecto no tiene lotes disponibles para separar.
                 </p>
               )}
               {loteSeleccionado && (
@@ -364,7 +364,7 @@ export default function CrearReservaModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Monto de Reserva *
+                Monto de Separación *
               </label>
               <input
                 type="number"
@@ -451,14 +451,14 @@ export default function CrearReservaModal({
               rows={3}
               disabled={isSubmitting}
               className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary resize-none disabled:opacity-60"
-              placeholder="Observaciones sobre la reserva..."
+              placeholder="Observaciones sobre la separación..."
             />
           </div>
 
           {/* Info Box */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
             <p className="text-sm text-blue-800 dark:text-blue-300">
-              ℹ️ Al crear la reserva, el lote seleccionado cambiará automáticamente a estado <strong>&ldquo;Reservado&rdquo;</strong>
+              ℹ️ Al crear la separación, el lote seleccionado cambiará automáticamente a estado <strong>&ldquo;Reservado&rdquo;</strong>
             </p>
           </div>
 
@@ -477,7 +477,7 @@ export default function CrearReservaModal({
               disabled={isSubmitting || !selectedLoteId}
               className="px-4 py-2 text-sm font-medium text-white bg-crm-primary rounded-lg hover:bg-crm-primary/90 transition-colors disabled:opacity-50"
             >
-              {isSubmitting ? "Creando..." : "Crear Reserva"}
+              {isSubmitting ? "Creando..." : "Crear Separación"}
             </button>
           </div>
         </form>

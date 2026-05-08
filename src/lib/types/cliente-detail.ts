@@ -21,6 +21,7 @@ export interface ProyectoRelacion {
 export interface LoteRelacionReserva {
   id: string;
   codigo: string;
+  sup_m2?: number | null;
   proyecto?: ProyectoRelacion;
 }
 

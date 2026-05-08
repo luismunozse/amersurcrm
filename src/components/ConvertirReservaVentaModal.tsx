@@ -85,7 +85,7 @@ export default function ConvertirReservaVentaModal({
         toast.success(`Venta ${result.data?.codigo_venta} creada exitosamente`);
         onClose();
       } else {
-        toast.error(result.error || "Error al convertir reserva en venta");
+        toast.error(result.error || "Error al convertir separación en venta");
       }
     });
   };
@@ -111,10 +111,10 @@ export default function ConvertirReservaVentaModal({
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-crm-text-primary">
-              Convertir Reserva en Venta
+              Convertir Separación en Venta
             </h2>
             <p className="text-sm text-crm-text-secondary mt-1">
-              Reserva: {reserva.codigo_reserva}
+              Separación: {reserva.codigo_reserva}
             </p>
             <p className="text-sm text-crm-text-secondary">
               Cliente: {clienteNombre}
@@ -210,7 +210,7 @@ export default function ConvertirReservaVentaModal({
                     className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
                   />
                   <p className="text-xs text-crm-text-muted mt-1">
-                    Incluye monto de reserva: {simboloMoneda} {reserva.monto_reserva.toLocaleString()}
+                    Incluye monto de separación: {simboloMoneda} {reserva.monto_reserva.toLocaleString()}
                   </p>
                 </div>
 
@@ -309,12 +309,12 @@ export default function ConvertirReservaVentaModal({
           {/* Info Box */}
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
             <p className="text-sm text-green-800 dark:text-green-300">
-              ✅ Al convertir la reserva en venta:
+              ✅ Al convertir la separación en venta:
             </p>
             <ul className="text-xs text-green-700 dark:text-green-400 mt-2 space-y-1 ml-5 list-disc">
               <li>Se generará un código de venta automáticamente (VTA-YYYY-####)</li>
               <li>El lote cambiará a estado "Vendido"</li>
-              <li>La reserva se marcará como "Convertida en Venta"</li>
+              <li>La separación se marcará como "Convertida en Venta"</li>
               {montoInicial && parseFloat(montoInicial) > 0 && (
                 <li>Se registrará el monto inicial como primer pago</li>
               )}

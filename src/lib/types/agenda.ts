@@ -1,7 +1,7 @@
 export type TipoEvento = 'cita' | 'llamada' | 'email' | 'visita' | 'seguimiento' | 'recordatorio' | 'tarea';
 export type EstadoEvento = 'pendiente' | 'en_progreso' | 'vencida' | 'reprogramado' | 'completado' | 'cancelado';
 export type Prioridad = 'baja' | 'media' | 'alta' | 'urgente';
-export type TipoRecordatorio = 'seguimiento_cliente' | 'llamada_prospecto' | 'envio_documentos' | 'visita_propiedad' | 'reunion_equipo' | 'personalizado';
+export type TipoRecordatorio = 'seguimiento_cliente' | 'llamada_prospecto' | 'envio_documentos' | 'visita_propiedad' | 'reunion_equipo' | 'personalizado' | 'envio_template_whatsapp';
 export type EstadoRecordatorio = 'pendiente' | 'enviado' | 'leido' | 'completado' | 'cancelado';
 
 export interface Evento {
@@ -183,4 +183,5 @@ export const TIPOS_RECORDATORIO_OPTIONS: Array<{
   { value: 'visita_propiedad', label: 'Visita a propiedad', icon: '🏠' },
   { value: 'reunion_equipo', label: 'Reunión de equipo', icon: '👥' },
   { value: 'personalizado', label: 'Personalizado', icon: '✏️' },
+  { value: 'envio_template_whatsapp', label: 'Envío plantilla WhatsApp', icon: '💬' },
 ];

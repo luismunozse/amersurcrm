@@ -414,7 +414,7 @@ export default function ClientesTable({
             return;
           } else if (bulkAction === 'assignVendedor') {
             if (!bulkVendedor) {
-              toast.error('Debes seleccionar un vendedor');
+              toast.error('Debe seleccionar un vendedor');
               setBulkAction(null);
               return;
             }
@@ -921,7 +921,7 @@ export default function ClientesTable({
 
       {selectedIds.size > 0 && !puedeGestionarSeleccion && (
         <div className="crm-card p-4 bg-crm-card-hover border border-dashed border-crm-border text-sm text-crm-text-muted">
-          Seleccionaste {selectedIds.size === 1 ? 'un cliente' : `${selectedIds.size} clientes`}, pero tu rol no cuenta con acciones masivas disponibles. Si necesitas ayuda, contacta a tu coordinador.
+          Seleccionó {selectedIds.size === 1 ? 'un cliente' : `${selectedIds.size} clientes`}, pero su rol no cuenta con acciones masivas disponibles. Si necesita ayuda, contacte a su coordinador.
         </div>
       )}
 
@@ -940,7 +940,7 @@ export default function ClientesTable({
 
             const handleExportSeleccionados = async () => {
               if (selectedIds.size === 0) {
-                toast.error('Selecciona al menos un cliente');
+                toast.error('Seleccione al menos un cliente');
                 return;
               }
               try {
@@ -1211,7 +1211,7 @@ export default function ClientesTable({
             <p className="text-crm-text-muted">
               {searchQuery || estado || tipo || vendedor
                 ? "No se encontraron clientes con los filtros aplicados"
-                : "Comienza agregando tu primer cliente"
+                : "Comience agregando su primer cliente"
               }
             </p>
           </div>
@@ -1232,7 +1232,7 @@ export default function ClientesTable({
       <ConfirmDialog
         open={confirm.open}
         title="Eliminar cliente"
-        description={`Vas a eliminar a "${confirm.nombre ?? ""}". Esta acción no se puede deshacer.`}
+        description={`Va a eliminar a "${confirm.nombre ?? ""}". Esta acción no se puede deshacer.`}
         confirmText={isPending ? "Eliminando…" : "Eliminar"}
         onConfirm={doDelete}
         onClose={() => setConfirm({ open: false, id: null })}
@@ -1260,7 +1260,7 @@ export default function ClientesTable({
         title="Eliminar clientes"
         description={
           <>
-            ¿Estás seguro de eliminar <span className="font-bold text-crm-danger">{selectedIds.size}</span>{' '}
+            ¿Está seguro de eliminar <span className="font-bold text-crm-danger">{selectedIds.size}</span>{' '}
             {selectedIds.size === 1 ? 'cliente' : 'clientes'}?
             <br />
             <span className="text-crm-danger font-semibold">Esta acción no se puede deshacer.</span>

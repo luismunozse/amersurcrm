@@ -129,7 +129,7 @@ export function useProformaForm({
     () =>
       (reservas || []).map((reserva) => ({
         id: reserva.id,
-        label: `${reserva.codigo_reserva ?? "Reserva"} · ${reserva?.lote?.proyecto?.nombre ?? "Proyecto"} · Lote ${
+        label: `${reserva.codigo_reserva ?? "Separación"} · ${reserva?.lote?.proyecto?.nombre ?? "Proyecto"} · Lote ${
           reserva?.lote?.numero_lote ?? "-"
         }`,
         data: reserva,

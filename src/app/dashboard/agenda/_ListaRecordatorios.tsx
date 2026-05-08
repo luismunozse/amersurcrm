@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Recordatorio } from "@/lib/types/agenda";
 import { marcarRecordatorioCompletado, marcarRecordatorioLeido, eliminarRecordatorio } from "./actions";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import toast from "react-hot-toast";
 import {
   Check as CheckIcon,
@@ -17,6 +18,7 @@ import {
   Home,
   Bell,
   User,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +34,7 @@ export default function ListaRecordatorios({
   onCrearRecordatorio 
 }: ListaRecordatoriosProps) {
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>(recordatoriosIniciales);
+  const [eliminarTargetId, setEliminarTargetId] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todos' | 'pendientes' | 'completados'>('pendientes');
 
   const recordatoriosFiltrados = recordatorios.filter(recordatorio => {
@@ -82,15 +85,18 @@ export default function ListaRecordatorios({
     }
   };
 
-  const handleEliminar = async (recordatorioId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este recordatorio?")) {
-      return;
-    }
+  const handleEliminar = (recordatorioId: string) => {
+    setEliminarTargetId(recordatorioId);
+  };
 
+  const confirmarEliminar = async () => {
+    if (!eliminarTargetId) return;
+    const id = eliminarTargetId;
+    setEliminarTargetId(null);
     try {
-      const result = await eliminarRecordatorio(recordatorioId);
+      const result = await eliminarRecordatorio(id);
       if (result.success) {
-        setRecordatorios(prev => prev.filter(r => r.id !== recordatorioId));
+        setRecordatorios(prev => prev.filter(r => r.id !== id));
         toast.success("Recordatorio eliminado");
       } else {
         toast.error(result.message);
@@ -118,6 +124,7 @@ export default function ListaRecordatorios({
       case 'envio_documentos': return FileText;
       case 'visita_propiedad': return Home;
       case 'reunion_equipo': return Users;
+      case 'envio_template_whatsapp': return MessageSquare;
       default: return Bell;
     }
   };
@@ -279,6 +286,16 @@ export default function ListaRecordatorios({
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!eliminarTargetId}
+        title="Eliminar recordatorio"
+        description="¿Está seguro de que quiere eliminar este recordatorio?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={confirmarEliminar}
+        onClose={() => setEliminarTargetId(null)}
+      />
     </div>
   );
 }

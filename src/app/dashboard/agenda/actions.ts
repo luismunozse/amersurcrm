@@ -127,7 +127,7 @@ const EventoSchema = z.object({
 const RecordatorioSchema = z.object({
   titulo: z.string().min(1, "El título es requerido"),
   descripcion: z.string().optional(),
-  tipo: z.enum(['seguimiento_cliente', 'llamada_prospecto', 'envio_documentos', 'visita_propiedad', 'reunion_equipo', 'personalizado']),
+  tipo: z.enum(['seguimiento_cliente', 'llamada_prospecto', 'envio_documentos', 'visita_propiedad', 'reunion_equipo', 'personalizado', 'envio_template_whatsapp']),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']),
   fecha_recordatorio: z.string().min(1, "La fecha del recordatorio es requerida"),
   cliente_id: z.string().uuid().optional(),

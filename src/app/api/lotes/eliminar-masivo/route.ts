@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
         result.errors.push({
           lote_id: loteId,
           codigo: lote.codigo,
-          error: "No se puede eliminar porque tiene reservas asociadas",
+          error: "No se puede eliminar porque tiene separaciones asociadas",
         });
         continue;
       }

@@ -7,6 +7,7 @@ import { Search as MagnifyingGlassIcon, X as XMarkIcon, Gift } from "lucide-reac
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import ThemeToggle from "./ThemeToggle";
 import NotificationsDropdown from "./NotificationsDropdown";
+import AgendaQuickPopover from "./AgendaQuickPopover";
 import UserAvatarMenu from "./UserAvatarMenu";
 import GlobalSearch from "./GlobalSearch";
 import type { NotificacionNoLeida } from "@/types/crm";
@@ -112,6 +113,9 @@ export default function Header({
               </button>
 
               <CurrencyConverter exchangeRates={exchangeRates} />
+
+              {/* Acceso rápido a Agenda con popover de eventos del día */}
+              <AgendaQuickPopover />
 
               {/* Botón de Novedades/Changelog — oculto en mobile para dar aire */}
               {onOpenChangelog && (

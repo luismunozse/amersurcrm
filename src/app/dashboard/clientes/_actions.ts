@@ -17,7 +17,6 @@ import { crearNotificacion } from "@/app/_actionsNotifications";
 import { getCachedClientes } from "@/lib/cache.server";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
-import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
 import { parseOptionalNumber } from "@/lib/utils/numeric";
 import {
   TipoCliente,
@@ -144,17 +143,6 @@ export async function crearCliente(formData: FormData) {
       );
     } catch (error) {
       console.warn("No se pudo crear notificación:", error);
-    }
-
-    try {
-      await dispararAutomatizaciones("lead.created", {
-        clienteId: inserted!.id,
-        nombre: parsed.data.nombre,
-        telefono: parsed.data.telefono_whatsapp || parsed.data.telefono || undefined,
-        vendedorUsername: parsed.data.vendedor_asignado || undefined,
-      });
-    } catch (error) {
-      console.warn("[Marketing] Error disparando automatizaciones lead.created:", error);
     }
   });
 }
@@ -400,7 +388,7 @@ export async function eliminarCliente(id: string) {
     .limit(1);
 
   if (reservas && reservas.length > 0) {
-    throw new Error("No se puede eliminar el cliente porque tiene reservas asociadas. Elimine primero las reservas.");
+    throw new Error("No se puede eliminar el cliente porque tiene separaciones asociadas. Elimine primero las separaciones.");
   }
 
   if (ventas && ventas.length > 0) {

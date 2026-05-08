@@ -219,7 +219,7 @@ export default function VendedorReportesPage() {
           <p className="text-sm text-crm-text-muted">Monto en ventas</p>
         </div>
 
-        {/* Reservas Activas */}
+        {/* Separaciones Activas */}
         <div className="bg-crm-card border border-crm-border rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-crm-accent/20 rounded-lg">
@@ -227,7 +227,7 @@ export default function VendedorReportesPage() {
             </div>
           </div>
           <p className="text-2xl font-bold text-crm-text-primary">{data?.reservasActivas || 0}</p>
-          <p className="text-sm text-crm-text-muted">Reservas activas</p>
+          <p className="text-sm text-crm-text-muted">Separaciones activas</p>
         </div>
       </div>
 
@@ -315,7 +315,7 @@ export default function VendedorReportesPage() {
           </div>
           <div className="text-center p-4 bg-crm-bg-primary dark:bg-crm-sidebar rounded-lg">
             <p className="text-2xl font-bold text-crm-text-primary">{data?.totalReservas || 0}</p>
-            <p className="text-sm text-crm-text-muted">Total reservas</p>
+            <p className="text-sm text-crm-text-muted">Total separaciones</p>
           </div>
           <div className="text-center p-4 bg-crm-bg-primary dark:bg-crm-sidebar rounded-lg">
             <p className="text-2xl font-bold text-crm-primary">{porcentajeMeta}%</p>

@@ -1,11 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { esAdmin } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
-import { dispararPropiedadDisponible } from "@/lib/services/marketing-automatizaciones";
 import { parseOptionalNumber } from "@/lib/utils/numeric";
 
 export async function crearPropiedad(formData: FormData) {
@@ -143,7 +141,7 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
           : `🎉 Lote vendido`;
 
         const mensaje = nuevoEstado === 'reservado'
-          ? `Has reservado el lote "${propiedad.identificacion_interna}" (${propiedad.codigo}) por ${precioFormateado}`
+          ? `Ha separado el lote "${propiedad.identificacion_interna}" (${propiedad.codigo}) por ${precioFormateado}`
           : `Has vendido el lote "${propiedad.identificacion_interna}" (${propiedad.codigo}) por ${precioFormateado}`;
 
         await crearNotificacion(
@@ -165,19 +163,6 @@ export async function cambiarEstadoPropiedad(propiedadId: string, nuevoEstado: '
         console.error("Error creando notificación:", notifError);
         // No fallar la operación principal si la notificación falla
       }
-    }
-
-    // Disparar automatizaciones de marketing cuando la propiedad queda disponible
-    if (nuevoEstado === "disponible") {
-      after(async () => {
-        await dispararPropiedadDisponible({
-          propiedadId,
-          propiedadTipo: propiedad.tipo,
-          precioVenta: propiedad.precio ?? undefined,
-        }).catch((err) =>
-          console.error("[Propiedades] Error disparando propiedad.disponible:", err)
-        );
-      });
     }
 
     revalidatePath("/dashboard/propiedades");

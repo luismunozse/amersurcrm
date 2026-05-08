@@ -557,7 +557,7 @@ export default function LoteDetailModal({
                   className="flex-1 py-3 px-4 bg-crm-primary hover:bg-crm-primary-hover text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                   <CheckCircle className="w-5 h-5" />
-                  Reservar Lote
+                  Separar Lote
                 </button>
               )}
 

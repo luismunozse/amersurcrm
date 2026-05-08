@@ -1,16 +1,48 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Plus, Play, Pause, Eye, BarChart3, Calendar, Users, MessageSquare,
-  Trash2, AlertTriangle, X, CheckCircle, Clock, TrendingUp,
+  Plus,
+  Play,
+  Pause,
+  Eye,
+  Trash2,
+  AlertTriangle,
+  X,
+  CheckCircle,
+  Clock,
+  Users,
+  Send,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
-import { obtenerCampanas, actualizarEstadoCampana, eliminarCampana, obtenerConversionesCampana } from "@/app/dashboard/admin/marketing/_actions";
-import type { MarketingCampana } from "@/types/whatsapp-marketing";
 import toast from "react-hot-toast";
+import {
+  obtenerCampanas,
+  actualizarEstadoCampana,
+  eliminarCampana,
+  obtenerContactosCampana,
+  registrarApertura,
+  actualizarEstadoEnvio,
+  obtenerEnviosCampana,
+} from "@/app/dashboard/admin/marketing/_actions";
+import type {
+  MarketingCampana,
+  MarketingEnvioLog,
+  EstadoCampana,
+} from "@/types/whatsapp-marketing";
+import { renderTemplate } from "@/lib/marketing/whatsapp";
 import ModalCrearCampana from "./ModalCrearCampana";
 
-// ---- Modal de confirmación de eliminación ----
+const ESTADO_BADGE: Record<EstadoCampana, { label: string; cls: string }> = {
+  DRAFT: { label: "Borrador", cls: "bg-crm-card-hover text-crm-text-secondary" },
+  SCHEDULED: { label: "Programada", cls: "bg-crm-info/10 text-crm-info" },
+  RUNNING: { label: "En curso", cls: "bg-crm-success/10 text-crm-success" },
+  PAUSED: { label: "Pausada", cls: "bg-crm-warning/10 text-crm-warning" },
+  COMPLETED: { label: "Completada", cls: "bg-crm-primary/10 text-crm-primary" },
+  CANCELLED: { label: "Cancelada", cls: "bg-crm-error/10 text-crm-error" },
+};
+
 function ModalConfirmarEliminar({
   nombre,
   onConfirmar,
@@ -21,36 +53,30 @@ function ModalConfirmarEliminar({
   onCancelar: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="fixed inset-0 bg-black/50" onClick={onCancelar} />
-      <div className="relative bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-xl p-5 sm:p-6 w-full sm:max-w-sm pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
-        <div className="sm:hidden flex justify-center -mt-1 mb-3">
-          <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
-        </div>
+      <div className="relative bg-crm-card border border-crm-border rounded-xl shadow-xl p-6 w-full sm:max-w-sm">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-9 h-9 bg-crm-error/10 rounded-lg flex items-center justify-center flex-shrink-0">
-            <AlertTriangle className="w-5 h-5 text-crm-error" />
-          </div>
+          <AlertTriangle className="w-5 h-5 text-crm-error flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-base font-semibold text-crm-text-primary">Eliminar campaña</h4>
+            <h4 className="text-base font-semibold text-crm-text-primary">
+              Eliminar campaña
+            </h4>
             <p className="text-sm text-crm-text-secondary mt-1">
-              ¿Estás seguro de eliminar <strong>&quot;{nombre}&quot;</strong>? Esta acción no se puede deshacer.
+              ¿Eliminar <strong>&quot;{nombre}&quot;</strong>?
             </p>
           </div>
-          <button onClick={onCancelar} className="ml-auto text-crm-text-muted hover:text-crm-text-primary">
-            <X className="w-4 h-4" />
-          </button>
         </div>
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancelar}
-            className="px-4 py-2 text-sm text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors"
+            className="px-4 py-2 text-sm text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
           >
             Cancelar
           </button>
           <button
             onClick={onConfirmar}
-            className="px-4 py-2 text-sm bg-crm-error text-white rounded-lg hover:bg-crm-error/90 transition-colors"
+            className="px-4 py-2 text-sm bg-crm-error text-white rounded-lg hover:bg-crm-error/90"
           >
             Eliminar
           </button>
@@ -60,284 +86,376 @@ function ModalConfirmarEliminar({
   );
 }
 
-// ---- Modal de detalles de campaña ----
-type ConversionItem = {
+// ─────────────────────────────────────────────────────────────────────────────
+// Asistente de envío uno-a-uno
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Contacto {
   id: string;
-  conversion_registrada_at: string;
-  conversion_monto: number | null;
-  conversion_nota: string | null;
-  cliente: { id: string; nombre: string; telefono?: string } | null;
+  nombre: string;
+  telefono_whatsapp: string | null;
+  telefono: string | null;
+  email: string | null;
+  estado_cliente: string | null;
+}
+
+type CampanaConPlantilla = Omit<MarketingCampana, "template" | "audiencia"> & {
+  template?: { id: string; nombre: string; body_texto?: string; variables?: string[] };
+  audiencia?: { id: string; nombre: string; contactos_count: number };
 };
 
-function ModalDetalleCampana({
+function AsistenteCampana({
   campana,
   onCerrar,
 }: {
-  campana: MarketingCampana;
+  campana: CampanaConPlantilla;
   onCerrar: () => void;
 }) {
-  const [conversiones, setConversiones] = useState<ConversionItem[]>([]);
-  const [loadingROI, setLoadingROI] = useState(true);
-
-  const cargarConversiones = useCallback(async () => {
-    setLoadingROI(true);
-    const result = await obtenerConversionesCampana(campana.id);
-    if (result.data) {
-      // Supabase returns joined relations as arrays; normalize cliente to single object
-      const normalized = (result.data as Record<string, unknown>[]).map((c) => ({
-        ...c,
-        cliente: Array.isArray(c.cliente) ? (c.cliente[0] ?? null) : (c.cliente ?? null),
-      })) as ConversionItem[];
-      setConversiones(normalized);
-    }
-    setLoadingROI(false);
-  }, [campana.id]);
+  const [contactos, setContactos] = useState<Contacto[]>([]);
+  const [bodyTexto, setBodyTexto] = useState<string>("");
+  const [enviadosIds, setEnviadosIds] = useState<Set<string>>(new Set());
+  const [indice, setIndice] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [actualLogId, setActualLogId] = useState<string | null>(null);
+  const [procesando, setProcesando] = useState(false);
 
   useEffect(() => {
-    cargarConversiones();
-  }, [cargarConversiones]);
+    if (campana.template?.body_texto) {
+      setBodyTexto(campana.template.body_texto);
+    }
+  }, [campana.template?.body_texto]);
 
-  const tasaEntrega = campana.total_enviados > 0
-    ? ((campana.total_entregados / campana.total_enviados) * 100).toFixed(1)
-    : "0";
-  const tasaLectura = campana.total_entregados > 0
-    ? ((campana.total_leidos / campana.total_entregados) * 100).toFixed(1)
-    : "0";
-  const tasaRespuesta = campana.total_leidos > 0
-    ? ((campana.total_respondidos / campana.total_leidos) * 100).toFixed(1)
-    : "0";
-  const tasaConversion = campana.total_enviados > 0
-    ? ((campana.total_conversiones / campana.total_enviados) * 100).toFixed(1)
-    : "0";
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      obtenerContactosCampana(campana.id),
+      obtenerEnviosCampana(campana.id),
+    ]).then(([resCont, resEnv]) => {
+      if (!mounted) return;
+      if (resCont.error || !resCont.data) {
+        toast.error(resCont.error ?? "Error cargando contactos");
+        setLoading(false);
+        return;
+      }
+      const lista = (resCont.data.contactos ?? []) as Contacto[];
+      setContactos(lista);
 
-  const montoTotal = conversiones.reduce((sum, c) => sum + (c.conversion_monto ?? 0), 0);
+      const previos = new Set<string>(
+        (resEnv.data ?? [])
+          .map((e: MarketingEnvioLog) => e.cliente_id ?? "")
+          .filter(Boolean),
+      );
+      setEnviadosIds(previos);
 
-  const estadoColor: Record<string, string> = {
-    RUNNING: "text-crm-success bg-crm-success/10 border-crm-success/30",
-    SCHEDULED: "text-crm-info bg-crm-info/10 border-crm-info/30",
-    PAUSED: "text-crm-warning bg-crm-warning/10 border-crm-warning/30",
-    COMPLETED: "text-crm-text-secondary bg-crm-card-hover border-crm-border",
-    DRAFT: "text-crm-text-muted bg-crm-card-hover border-crm-border",
-    CANCELLED: "text-crm-error bg-crm-error/10 border-crm-error/30",
+      const idx = lista.findIndex((c) => !previos.has(c.id));
+      setIndice(idx >= 0 ? idx : 0);
+      setLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [campana.id]);
+
+  const contactoActual = contactos[indice];
+  const totalContactos = contactos.length;
+  const totalEnviados = enviadosIds.size;
+
+  const variablesAuto = useMemo(() => {
+    if (!contactoActual) return {};
+    return {
+      cliente: contactoActual.nombre,
+      ...campana.variables_valores,
+    };
+  }, [contactoActual, campana.variables_valores]);
+
+  const mensajeRender = useMemo(() => {
+    if (!bodyTexto || !contactoActual) return "";
+    return renderTemplate(bodyTexto, variablesAuto);
+  }, [bodyTexto, contactoActual, variablesAuto]);
+
+  const telefonoActual =
+    contactoActual?.telefono_whatsapp || contactoActual?.telefono || "";
+
+  const handleAbrirWhatsApp = async () => {
+    if (!contactoActual || !telefonoActual) return;
+    setProcesando(true);
+    try {
+      const result = await registrarApertura({
+        templateId: campana.template_id,
+        clienteId: contactoActual.id,
+        telefono: telefonoActual,
+        variables: variablesAuto,
+        campanaId: campana.id,
+      });
+      if (result.error || !result.data) {
+        toast.error(result.error ?? "Error registrando envío");
+        return;
+      }
+      setActualLogId(result.data.envioLog.id);
+      const win = window.open(
+        result.data.whatsappUrl,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      if (!win) {
+        try {
+          window.location.href = result.data.whatsappUrl;
+        } catch {
+          toast.error("Permite popups o haz clic manualmente.");
+        }
+      }
+    } finally {
+      setProcesando(false);
+    }
   };
 
+  const handleSiguiente = async (estado: "enviado" | "descartado") => {
+    if (actualLogId) {
+      await actualizarEstadoEnvio(actualLogId, estado);
+      if (contactoActual) {
+        setEnviadosIds((prev) => new Set(prev).add(contactoActual.id));
+      }
+    }
+    setActualLogId(null);
+    if (indice < totalContactos - 1) {
+      setIndice(indice + 1);
+    } else {
+      toast.success("Campaña completada");
+      await actualizarEstadoCampana(campana.id, "COMPLETED");
+      onCerrar();
+    }
+  };
+
+  const handleSaltar = () => {
+    if (indice < totalContactos - 1) {
+      setIndice(indice + 1);
+      setActualLogId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-crm-card rounded-xl p-8 flex items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-crm-primary" />
+          <span className="text-sm text-crm-text-primary">
+            Cargando contactos…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (totalContactos === 0) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="bg-crm-card rounded-xl p-6 max-w-sm">
+          <h3 className="text-lg font-semibold text-crm-text-primary mb-2">
+            Sin contactos
+          </h3>
+          <p className="text-sm text-crm-text-secondary mb-4">
+            La audiencia de esta campaña no tiene contactos disponibles.
+          </p>
+          <button
+            onClick={onCerrar}
+            className="w-full px-4 py-2 bg-crm-primary text-white rounded-lg"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onCerrar} />
-        <div className="relative w-full max-w-xl bg-crm-card rounded-xl shadow-xl border border-crm-border max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="sticky top-0 bg-crm-card border-b border-crm-border p-6 flex items-center justify-between z-10">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-crm-primary/10 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-crm-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-crm-text-primary">{campana.nombre}</h3>
-                <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full border ${estadoColor[campana.estado] ?? estadoColor.DRAFT}`}>
-                  {campana.estado}
-                </span>
-              </div>
-            </div>
-            <button onClick={onCerrar} className="text-crm-text-muted hover:text-crm-text-primary">
-              <X className="w-5 h-5" />
-            </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-crm-card border border-crm-border rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+        <div className="flex items-start justify-between p-5 border-b border-crm-border">
+          <div>
+            <h4 className="text-lg font-semibold text-crm-text-primary">
+              {campana.nombre}
+            </h4>
+            <p className="text-xs text-crm-text-muted mt-1">
+              Contacto {indice + 1} de {totalContactos} · {totalEnviados}{" "}
+              registrados
+            </p>
+          </div>
+          <button
+            onClick={onCerrar}
+            className="text-crm-text-muted hover:text-crm-text-primary"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Progreso */}
+          <div className="w-full bg-crm-border rounded-full h-2">
+            <div
+              className="bg-crm-primary h-2 rounded-full transition-all"
+              style={{
+                width: `${((indice + 1) / totalContactos) * 100}%`,
+              }}
+            />
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Descripción */}
-            {campana.descripcion && (
-              <p className="text-sm text-crm-text-secondary">{campana.descripcion}</p>
-            )}
-
-            {/* Info general */}
-            <div className="space-y-2">
-              {campana.template && (
-                <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                  <span>Plantilla: <strong className="text-crm-text-primary">{campana.template.nombre}</strong></span>
-                </div>
-              )}
-              {campana.audiencia && (
-                <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                  <Users className="w-4 h-4 flex-shrink-0" />
-                  <span>Audiencia: <strong className="text-crm-text-primary">{campana.audiencia.nombre}</strong> ({campana.audiencia.contactos_count} contactos)</span>
-                </div>
-              )}
-              {campana.fecha_inicio && (
-                <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                  <Calendar className="w-4 h-4 flex-shrink-0" />
-                  <span>Inicio: <strong className="text-crm-text-primary">{new Date(campana.fecha_inicio).toLocaleString("es-PE")}</strong></span>
-                </div>
-              )}
-              {campana.completado_at && (
-                <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                  <CheckCircle className="w-4 h-4 flex-shrink-0 text-crm-success" />
-                  <span>Completada: <strong className="text-crm-text-primary">{new Date(campana.completado_at).toLocaleString("es-PE")}</strong></span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                <Clock className="w-4 h-4 flex-shrink-0" />
-                <span>Velocidad: <strong className="text-crm-text-primary">{campana.max_envios_por_segundo} mensajes/seg</strong></span>
-              </div>
-            </div>
-
-            {/* Métricas principales */}
-            <div>
-              <h4 className="text-sm font-semibold text-crm-text-primary mb-3 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                Métricas de Envío
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Enviados", value: campana.total_enviados, color: "text-crm-text-primary" },
-                  { label: "Entregados", value: `${campana.total_entregados} (${tasaEntrega}%)`, color: "text-crm-success" },
-                  { label: "Leídos", value: `${campana.total_leidos} (${tasaLectura}%)`, color: "text-crm-info" },
-                  { label: "Respondidos", value: `${campana.total_respondidos} (${tasaRespuesta}%)`, color: "text-crm-primary" },
-                  { label: "Fallidos", value: campana.total_fallidos, color: "text-crm-error" },
-                  { label: "Conversiones", value: `${campana.total_conversiones} (${tasaConversion}%)`, color: "text-crm-warning" },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="bg-crm-bg-secondary border border-crm-border rounded-lg p-3">
-                    <p className="text-xs text-crm-text-muted mb-1">{label}</p>
-                    <p className={`text-lg font-bold ${color}`}>{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Objetivo / config adicional */}
-            {campana.objetivo && (
-              <div className="bg-crm-info/10 border border-crm-info/20 rounded-lg p-3">
-                <p className="text-xs font-medium text-crm-info mb-1">Configuración</p>
-                <p className="text-sm text-crm-text-secondary">{campana.objetivo}</p>
-              </div>
-            )}
-
-            {/* ROI — Conversiones atribuidas */}
-            <div>
-              <h4 className="text-sm font-semibold text-crm-text-primary mb-3 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-crm-success" />
-                ROI — Conversiones atribuidas
-              </h4>
-              {loadingROI ? (
-                <div className="space-y-2">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="h-12 bg-crm-border/40 rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : conversiones.length === 0 ? (
-                <p className="text-sm text-crm-text-muted text-center py-4">
-                  Sin conversiones registradas para esta campaña
+          {contactoActual && (
+            <>
+              <div className="bg-crm-bg-secondary border border-crm-border rounded-xl p-4">
+                <p className="text-xs text-crm-text-muted uppercase mb-1">
+                  Contacto actual
                 </p>
-              ) : (
-                <div className="space-y-2">
-                  {montoTotal > 0 && (
-                    <div className="flex items-center justify-between p-3 bg-crm-success/10 border border-crm-success/30 rounded-lg mb-3">
-                      <span className="text-sm font-medium text-crm-success">Monto total</span>
-                      <span className="text-lg font-bold text-crm-success">
-                        S/ {montoTotal.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                <p className="text-base font-semibold text-crm-text-primary">
+                  {contactoActual.nombre}
+                </p>
+                <p className="text-sm text-crm-text-secondary">
+                  {telefonoActual || (
+                    <span className="text-crm-warning">Sin teléfono</span>
                   )}
-                  {conversiones.map((c) => (
-                    <div key={c.id} className="flex items-start justify-between p-3 bg-crm-bg-secondary border border-crm-border rounded-lg gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-crm-text-primary truncate">
-                          {c.cliente?.nombre ?? "Cliente desconocido"}
-                        </p>
-                        {c.conversion_nota && (
-                          <p className="text-xs text-crm-text-muted truncate">{c.conversion_nota}</p>
-                        )}
-                        <p className="text-xs text-crm-text-muted">
-                          {new Date(c.conversion_registrada_at).toLocaleDateString("es-PE")}
-                        </p>
-                      </div>
-                      {c.conversion_monto != null && (
-                        <span className="text-sm font-semibold text-crm-success whitespace-nowrap">
-                          S/ {c.conversion_monto.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                </p>
+                {enviadosIds.has(contactoActual.id) && (
+                  <p className="text-xs text-crm-success mt-2 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Ya enviado anteriormente
+                  </p>
+                )}
+              </div>
+
+              {bodyTexto ? (
+                <div>
+                  <p className="text-xs text-crm-text-muted uppercase mb-1">
+                    Mensaje
+                  </p>
+                  <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-3 text-sm text-green-900 dark:text-green-50 whitespace-pre-wrap">
+                    {mensajeRender}
+                  </div>
                 </div>
+              ) : (
+                <p className="text-xs text-crm-text-muted">
+                  Cargando plantilla…
+                </p>
               )}
-            </div>
-          </div>
+            </>
+          )}
+        </div>
+
+        <div className="border-t border-crm-border p-5 flex flex-col gap-2">
+          {!actualLogId ? (
+            <>
+              <button
+                type="button"
+                disabled={procesando || !telefonoActual}
+                onClick={handleAbrirWhatsApp}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {procesando ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                Abrir WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={handleSaltar}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
+              >
+                Saltar este contacto
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-center text-crm-text-secondary">
+                ¿Enviaste el mensaje?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSiguiente("enviado")}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-crm-success text-white rounded-lg"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Sí, siguiente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSiguiente("descartado")}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-crm-card-hover text-crm-text-primary rounded-lg"
+                >
+                  No, siguiente
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ---- Componente principal ----
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente principal
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function GestionCampanas() {
-  const [campanas, setCampanas] = useState<MarketingCampana[]>([]);
+  const [campanas, setCampanas] = useState<CampanaConPlantilla[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalCrear, setModalCrear] = useState(false);
-  const [confirmarEliminar, setConfirmarEliminar] = useState<{ id: string; nombre: string } | null>(null);
-  const [detallesCampana, setDetallesCampana] = useState<MarketingCampana | null>(null);
+  const [confirmarEliminar, setConfirmarEliminar] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
+  const [asistenteCampana, setAsistenteCampana] =
+    useState<CampanaConPlantilla | null>(null);
 
-  useEffect(() => {
-    cargarCampanas();
-  }, []);
-
-  const cargarCampanas = async () => {
+  const cargar = async () => {
     setLoading(true);
     const result = await obtenerCampanas();
     if (result.error) {
       toast.error(result.error);
     } else if (result.data) {
-      setCampanas(result.data);
+      setCampanas(result.data as CampanaConPlantilla[]);
     }
     setLoading(false);
   };
 
-  const handleCambiarEstado = async (id: string, nuevoEstado: "RUNNING" | "PAUSED") => {
-    const result = await actualizarEstadoCampana(id, nuevoEstado);
-    if (result.success) {
-      toast.success(`Campaña ${nuevoEstado === "RUNNING" ? "iniciada" : "pausada"}`);
-      cargarCampanas();
-    } else {
-      toast.error(result.error || "Error actualizando campaña");
-    }
-  };
+  useEffect(() => {
+    cargar();
+  }, []);
 
   const handleEliminar = async () => {
     if (!confirmarEliminar) return;
     const result = await eliminarCampana(confirmarEliminar.id);
     if (result.success) {
-      toast.success("Campaña eliminada exitosamente");
+      toast.success("Campaña eliminada");
       setConfirmarEliminar(null);
-      cargarCampanas();
+      cargar();
     } else {
-      toast.error(result.error || "Error eliminando campaña");
+      toast.error(result.error || "Error eliminando");
     }
   };
 
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case "RUNNING":   return "bg-crm-success/10 text-crm-success border-crm-success/30";
-      case "SCHEDULED": return "bg-crm-info/10 text-crm-info border-crm-info/30";
-      case "PAUSED":    return "bg-crm-warning/10 text-crm-warning border-crm-warning/30";
-      default:          return "bg-crm-card-hover text-crm-text-secondary border-crm-border";
+  const handleEstado = async (id: string, estado: EstadoCampana) => {
+    const result = await actualizarEstadoCampana(id, estado);
+    if (result.success) {
+      toast.success("Estado actualizado");
+      cargar();
+    } else {
+      toast.error(result.error || "Error");
     }
   };
-
-  const calcularTasaEntrega = (c: MarketingCampana) =>
-    c.total_enviados === 0 ? 0 : ((c.total_entregados / c.total_enviados) * 100).toFixed(1);
-  const calcularTasaLectura = (c: MarketingCampana) =>
-    c.total_entregados === 0 ? 0 : ((c.total_leidos / c.total_entregados) * 100).toFixed(1);
-  const calcularTasaRespuesta = (c: MarketingCampana) =>
-    c.total_leidos === 0 ? 0 : ((c.total_respondidos / c.total_leidos) * 100).toFixed(1);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-crm-card border border-crm-border rounded-xl p-6 animate-pulse">
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, idx) => (
+          <div
+            key={idx}
+            className="bg-crm-card border border-crm-border rounded-xl p-6 animate-pulse"
+          >
             <div className="h-6 bg-crm-border rounded w-48 mb-4" />
-            <div className="h-4 bg-crm-border rounded w-full mb-2" />
-            <div className="h-4 bg-crm-border rounded w-3/4" />
+            <div className="h-4 bg-crm-border rounded w-full" />
           </div>
         ))}
       </div>
@@ -345,151 +463,156 @@ export default function GestionCampanas() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-crm-text-primary">Campañas de WhatsApp</h2>
-          <p className="text-sm text-crm-text-secondary mt-1">
-            Gestiona tus campañas masivas de marketing
-          </p>
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-crm-text-primary">
+              Campañas WhatsApp
+            </h2>
+            <p className="text-sm text-crm-text-secondary mt-1">
+              Envío asistido contacto por contacto vía WhatsApp Web.
+            </p>
+          </div>
+          <button
+            onClick={() => setModalCrear(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Campaña
+          </button>
         </div>
-        <button
-          onClick={() => setModalCrear(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Campaña
-        </button>
+
+        {campanas.length === 0 ? (
+          <div className="bg-crm-card border border-crm-border rounded-xl p-12 text-center">
+            <Users className="w-12 h-12 text-crm-primary mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-crm-text-primary mb-2">
+              Sin campañas
+            </h3>
+            <p className="text-sm text-crm-text-secondary mb-6">
+              Crea una campaña para enviar plantillas a tu audiencia.
+            </p>
+            <button
+              onClick={() => setModalCrear(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover"
+            >
+              <Plus className="w-4 h-4" />
+              Crear Primera Campaña
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {campanas.map((c) => {
+              const badge = ESTADO_BADGE[c.estado] ?? ESTADO_BADGE.DRAFT;
+              const total = c.audiencia?.contactos_count ?? 0;
+              const abiertos = c.total_abiertos ?? 0;
+              const enviados = c.total_marcados_enviados ?? 0;
+              const respondidos = c.total_respondidos ?? 0;
+              return (
+                <div
+                  key={c.id}
+                  className="bg-crm-card border border-crm-border rounded-xl p-5 hover:shadow transition-shadow"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-semibold text-crm-text-primary">
+                          {c.nombre}
+                        </h3>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-medium rounded-full ${badge.cls}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-crm-text-muted mt-1">
+                        {c.template?.nombre ?? "Plantilla eliminada"} ·{" "}
+                        {c.audiencia?.nombre ?? "Audiencia eliminada"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-3 mb-3 text-center">
+                    <div className="bg-crm-bg-secondary rounded-lg p-2">
+                      <p className="text-xs text-crm-text-muted">Audiencia</p>
+                      <p className="text-base font-semibold text-crm-text-primary">
+                        {total}
+                      </p>
+                    </div>
+                    <div className="bg-crm-bg-secondary rounded-lg p-2">
+                      <p className="text-xs text-crm-text-muted">Abiertos</p>
+                      <p className="text-base font-semibold text-crm-info">
+                        {abiertos}
+                      </p>
+                    </div>
+                    <div className="bg-crm-bg-secondary rounded-lg p-2">
+                      <p className="text-xs text-crm-text-muted">Enviados</p>
+                      <p className="text-base font-semibold text-crm-success">
+                        {enviados}
+                      </p>
+                    </div>
+                    <div className="bg-crm-bg-secondary rounded-lg p-2">
+                      <p className="text-xs text-crm-text-muted">
+                        Respondidos
+                      </p>
+                      <p className="text-base font-semibold text-crm-primary">
+                        {respondidos}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-3 border-t border-crm-border">
+                    {(c.estado === "RUNNING" ||
+                      c.estado === "DRAFT" ||
+                      c.estado === "SCHEDULED" ||
+                      c.estado === "PAUSED") && (
+                      <button
+                        onClick={() => setAsistenteCampana(c)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover text-sm"
+                      >
+                        <Send className="w-4 h-4" />
+                        Continuar envío
+                      </button>
+                    )}
+                    {c.estado === "RUNNING" && (
+                      <button
+                        onClick={() => handleEstado(c.id, "PAUSED")}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-crm-warning border border-crm-warning/30 rounded-lg hover:bg-crm-warning/10 text-sm"
+                      >
+                        <Pause className="w-4 h-4" />
+                        Pausar
+                      </button>
+                    )}
+                    {c.estado === "PAUSED" && (
+                      <button
+                        onClick={() => handleEstado(c.id, "RUNNING")}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-crm-success border border-crm-success/30 rounded-lg hover:bg-crm-success/10 text-sm"
+                      >
+                        <Play className="w-4 h-4" />
+                        Reanudar
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        setConfirmarEliminar({ id: c.id, nombre: c.nombre })
+                      }
+                      className="ml-auto inline-flex items-center justify-center w-8 h-8 text-crm-error hover:bg-crm-error/10 rounded-lg"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Lista */}
-      {campanas.length === 0 ? (
-        <div className="bg-crm-card border border-crm-border rounded-xl p-12 text-center">
-          <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
-            <BarChart3 className="w-8 h-8 text-crm-text-muted" />
-          </div>
-          <h3 className="text-lg font-medium text-crm-text-primary mb-2">No hay campañas creadas</h3>
-          <p className="text-sm text-crm-text-secondary mb-6">
-            Crea tu primera campaña para comenzar a enviar mensajes masivos
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {campanas.map((campana) => (
-            <div key={campana.id} className="bg-crm-card border border-crm-border rounded-xl p-6">
-              {/* Header de campaña */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-crm-text-primary mb-2 truncate">
-                    {campana.nombre}
-                  </h3>
-                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getEstadoColor(campana.estado)}`}>
-                    {campana.estado}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 ml-2">
-                  {campana.estado === "RUNNING" ? (
-                    <button
-                      onClick={() => handleCambiarEstado(campana.id, "PAUSED")}
-                      className="inline-flex items-center justify-center w-8 h-8 text-crm-warning hover:bg-crm-warning/10 rounded-lg transition-colors"
-                      title="Pausar campaña"
-                    >
-                      <Pause className="w-4 h-4" />
-                    </button>
-                  ) : (campana.estado === "PAUSED" || campana.estado === "DRAFT") ? (
-                    <button
-                      onClick={() => handleCambiarEstado(campana.id, "RUNNING")}
-                      className="inline-flex items-center justify-center w-8 h-8 text-crm-success hover:bg-crm-success/10 rounded-lg transition-colors"
-                      title="Iniciar campaña"
-                    >
-                      <Play className="w-4 h-4" />
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={() => setDetallesCampana(campana)}
-                    className="inline-flex items-center justify-center w-8 h-8 text-crm-info hover:bg-crm-info/10 rounded-lg transition-colors"
-                    title="Ver detalles"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setConfirmarEliminar({ id: campana.id, nombre: campana.nombre })}
-                    className="inline-flex items-center justify-center w-8 h-8 text-crm-error hover:bg-crm-error/10 rounded-lg transition-colors"
-                    title="Eliminar campaña"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Información */}
-              <div className="space-y-2 mb-4">
-                {campana.template && (
-                  <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                    <MessageSquare className="w-4 h-4" />
-                    <span>Plantilla: {campana.template.nombre}</span>
-                  </div>
-                )}
-                {campana.audiencia && (
-                  <div className="flex items-center gap-2 text-sm text-crm-text-secondary">
-                    <Users className="w-4 h-4" />
-                    <span>Audiencia: {campana.audiencia.nombre} ({campana.audiencia.contactos_count} contactos)</span>
-                  </div>
-                )}
-                {campana.fecha_inicio && (
-                  <div className={`flex items-center gap-2 text-sm ${campana.estado === "SCHEDULED" ? "text-crm-info font-medium" : "text-crm-text-secondary"}`}>
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      {campana.estado === "SCHEDULED" ? "Programada: " : "Inicio: "}
-                      {new Date(campana.fecha_inicio).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Métricas */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-crm-border">
-                <div>
-                  <p className="text-xs text-crm-text-muted mb-1">Enviados</p>
-                  <p className="text-lg font-semibold text-crm-text-primary">{campana.total_enviados}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-crm-text-muted mb-1">Entregados</p>
-                  <p className="text-lg font-semibold text-crm-success">
-                    {campana.total_entregados} ({calcularTasaEntrega(campana)}%)
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-crm-text-muted mb-1">Leídos</p>
-                  <p className="text-lg font-semibold text-crm-info">
-                    {campana.total_leidos} ({calcularTasaLectura(campana)}%)
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-crm-text-muted mb-1">Respondidos</p>
-                  <p className="text-lg font-semibold text-crm-primary">
-                    {campana.total_respondidos} ({calcularTasaRespuesta(campana)}%)
-                  </p>
-                </div>
-              </div>
-
-              {campana.total_conversiones > 0 && (
-                <div className="mt-4 p-3 bg-crm-success/10 border border-crm-success/30 rounded-lg flex items-center justify-between">
-                  <span className="text-sm font-medium text-crm-success">Conversiones</span>
-                  <span className="text-lg font-bold text-crm-success">{campana.total_conversiones}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Modales */}
       <ModalCrearCampana
         open={modalCrear}
         onClose={() => setModalCrear(false)}
-        onSuccess={cargarCampanas}
+        onSuccess={cargar}
       />
 
       {confirmarEliminar && (
@@ -500,12 +623,15 @@ export default function GestionCampanas() {
         />
       )}
 
-      {detallesCampana && (
-        <ModalDetalleCampana
-          campana={detallesCampana}
-          onCerrar={() => setDetallesCampana(null)}
+      {asistenteCampana && (
+        <AsistenteCampana
+          campana={asistenteCampana}
+          onCerrar={() => {
+            setAsistenteCampana(null);
+            cargar();
+          }}
         />
       )}
-    </div>
+    </>
   );
 }

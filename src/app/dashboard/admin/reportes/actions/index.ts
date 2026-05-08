@@ -48,3 +48,21 @@ export type {
   ClienteEtapaFunnel,
   ResultadoEtapaFunnel,
 } from "./clientes-etapa-funnel";
+
+// Cobranza (cross-data: cuotas + pagos)
+export { obtenerReporteCobranza } from "./cobranza";
+export type {
+  ReporteCobranza,
+  ReporteCobranzaResumen,
+  RecaudacionMensual,
+  TopDeudor,
+} from "./cobranza";
+
+// Comisiones (cross-data: comision + venta + perfil)
+export { obtenerReporteComisiones } from "./comisiones";
+export type {
+  ReporteComisiones,
+  ResumenComisionesReporte,
+  ComisionPorVendedor,
+  ComisionMensual,
+} from "./comisiones";

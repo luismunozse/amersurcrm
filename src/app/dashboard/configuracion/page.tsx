@@ -64,7 +64,7 @@ export default async function ConfiguracionPage() {
             <div className="flex items-center justify-between p-4 bg-crm-background rounded-lg border border-crm-border">
               <div className="flex-1">
                 <p className="text-sm font-medium text-crm-text-primary">Notificaciones de ventas</p>
-                <p className="text-xs text-crm-text-muted mt-1">Alertas sobre reservas, ventas y pagos</p>
+                <p className="text-xs text-crm-text-muted mt-1">Alertas sobre separaciones, ventas y pagos</p>
               </div>
               <div className="text-sm text-crm-text-muted">
                 Próximamente

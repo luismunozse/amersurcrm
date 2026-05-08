@@ -112,13 +112,13 @@ export default function TabCalificacion({ clienteId, clienteNombre, ventas, rese
         <div className="bg-crm-background border border-crm-border rounded-lg p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-crm-text mb-1">Reserva/Separación</label>
+              <label className="block text-sm font-medium text-crm-text mb-1">Separación</label>
               <select
                 value={formData.reservaId}
                 onChange={e => setFormData(prev => ({ ...prev, reservaId: e.target.value }))}
                 className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-card"
               >
-                <option value="">Sin reserva vinculada</option>
+                <option value="">Sin separación vinculada</option>
                 {reservas.filter((r: any) => r.estado === 'activa').map((r: any) => (
                   <option key={r.id} value={r.id}>{r.codigo_reserva}</option>
                 ))}

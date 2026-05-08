@@ -10,6 +10,7 @@ import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
 import ModalReservaLote from "./ModalReservaLote";
 import DeleteAllLotesModal from "./_DeleteAllLotesModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 
 type Lote = {
@@ -56,6 +57,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
   const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [confirmDeleteLote, setConfirmDeleteLote] = useState<{ id: string; codigo: string } | null>(null);
   const { esAdminOCoordinador, tienePermiso } = usePermissions();
   const puedeCrearLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.CREAR);
   const puedeEditarLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.EDITAR);
@@ -152,19 +154,20 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     setEditingLote(loteId);
   };
 
-  const handleDelete = async (loteId: string, codigo: string) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar el lote ${codigo}? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+  const handleDelete = (loteId: string, codigo: string) => {
+    setConfirmDeleteLote({ id: loteId, codigo });
+  };
+
+  const confirmarDeleteLote = async () => {
+    if (!confirmDeleteLote) return;
+    const { id: loteId, codigo } = confirmDeleteLote;
+    setConfirmDeleteLote(null);
 
     try {
-      // Actualización optimista
       setLotesState(prevLotes => prevLotes.filter(lote => lote.id !== loteId));
-
       await eliminarLote(loteId, proyectoId);
       toast.success(`Lote ${codigo} eliminado exitosamente`);
     } catch (error) {
-      // Revertir cambios en caso de error
       setLotesState(lotes);
       toast.error(`Error eliminando lote: ${(error as Error).message}`);
     }
@@ -264,7 +267,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
           className="px-2 py-1 text-xs font-medium text-yellow-600 bg-yellow-100 border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-colors"
         >
           <Clock className="w-3 h-3 mr-1" />
-          <span className="hidden xl:inline">Reservar</span>
+          <span className="hidden xl:inline">Separar</span>
         </Button>
       );
       buttons.push(
@@ -365,11 +368,11 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
               </div>
               <h4 className="text-xl font-medium text-crm-text-primary mb-3">No hay lotes registrados</h4>
               <p className="text-crm-text-muted mb-6 max-w-md mx-auto">
-                Comienza agregando tu primer lote usando el asistente paso a paso de arriba.
+                Comience agregando su primer lote usando el asistente paso a paso de arriba.
               </p>
               <div className="inline-flex items-center space-x-2 px-4 py-2 bg-crm-primary/10 text-crm-primary rounded-lg">
                 <Info className="w-5 h-5" />
-                <span className="text-sm font-medium">Usa el botón &quot;Crear Lote&quot; para comenzar</span>
+                <span className="text-sm font-medium">Use el botón &quot;Crear Lote&quot; para comenzar</span>
               </div>
             </div>
           ) : (
@@ -775,6 +778,19 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       onClose={() => setShowDeleteAllModal(false)}
       onConfirm={handleConfirmDeleteAll}
       lotesCount={totalLotes || lotesAMostrar.length}
+    />
+    <ConfirmDialog
+      open={!!confirmDeleteLote}
+      title="Eliminar lote"
+      description={
+        confirmDeleteLote
+          ? `¿Está seguro de que quiere eliminar el lote ${confirmDeleteLote.codigo}? Esta acción no se puede deshacer.`
+          : ""
+      }
+      confirmText="Eliminar"
+      cancelText="Cancelar"
+      onConfirm={confirmarDeleteLote}
+      onClose={() => setConfirmDeleteLote(null)}
     />
     </>
   );

@@ -109,7 +109,7 @@ export async function DashboardStats() {
       title: "Total Lotes",
       value: stats.totalLotes.toLocaleString(),
       subtitle: `${pctDisponibles}% disponibles`,
-      change: `${stats.lotesVendidos} vendidos / ${stats.lotesReservados} reservados`,
+      change: `${stats.lotesVendidos} vendidos / ${stats.lotesReservados} separados`,
       changeType: "neutral" as const,
       icon: (
         <Package className="w-4 h-4" />

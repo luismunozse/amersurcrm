@@ -89,13 +89,13 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
     if (success === "google_connected") {
       setUrlMessage({
         type: "success",
-        text: "Google Drive conectado exitosamente. Ahora puedes ingresar el ID de la carpeta raíz.",
+        text: "Google Drive conectado exitosamente. Ahora puede ingresar el ID de la carpeta raíz.",
       });
     } else if (error) {
       const errorMessages: Record<string, string> = {
-        google_auth_cancelled: "Cancelaste la autorización de Google Drive.",
+        google_auth_cancelled: "Canceló la autorización de Google Drive.",
         google_auth_invalid: "Error al autorizar con Google Drive.",
-        unauthorized: "No estás autorizado para realizar esta acción.",
+        unauthorized: "No está autorizado para realizar esta acción.",
         server_config_missing: "Faltan las credenciales de Google Drive en el servidor.",
         google_token_exchange_failed: "Error al obtener los tokens de Google Drive.",
         database_update_failed: "Error al actualizar la configuración en la base de datos.",
@@ -395,8 +395,8 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
                 disabled={!reemplazarWhatsappToken}
                 placeholder={
                   config.whatsappTokenConfigurado
-                    ? "Ingresa un token nuevo para reemplazar el existente"
-                    : "Ingresa el token de WhatsApp"
+                    ? "Ingrese un token nuevo para reemplazar el existente"
+                    : "Ingrese el token de WhatsApp"
                 }
                 autoComplete="new-password"
                 required={reemplazarWhatsappToken}
@@ -475,7 +475,7 @@ export function ConfiguracionForm({ config }: { config: ConfiguracionInicial }) 
                 />
                 <p className="text-xs text-crm-text-muted">
                   El ID de la carpeta raíz de Google Drive donde se sincronizarán los documentos.
-                  Lo puedes obtener de la URL: drive.google.com/drive/folders/<strong>ID_AQUI</strong>
+                  Lo puede obtener de la URL: drive.google.com/drive/folders/<strong>ID_AQUI</strong>
                 </p>
                 <FieldError message={state.fieldErrors?.googleDriveFolderId} />
               </div>

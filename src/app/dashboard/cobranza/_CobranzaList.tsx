@@ -1,30 +1,63 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Banknote, AlertTriangle, Clock, CheckCircle, RefreshCw } from "lucide-react";
-import { obtenerCobranza, obtenerResumenCobranza, ejecutarActualizacionMora } from "./_actions-cobranza";
+import {
+  Banknote, AlertTriangle, Clock, CheckCircle, RefreshCw, CreditCard, History,
+} from "lucide-react";
+import {
+  obtenerCobranza,
+  obtenerResumenCobranza,
+  ejecutarActualizacionMora,
+} from "./_actions-cobranza";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import toast from "react-hot-toast";
+import RegistrarPagoModal from "./_RegistrarPagoModal";
+import HistorialPagosCuota from "./_HistorialPagosCuota";
 
 type EstadoFiltro = '' | 'por_vencer_3d' | 'por_vencer_7d' | 'por_vencer_15d' | 'vencida' | 'en_mora' | 'al_dia';
 
-export default function CobranzaList() {
+interface Props {
+  esAdmin?: boolean;
+  /** Si se setea, fuerza un filtro fijo (Seguimiento Mora). */
+  filtroFijo?: EstadoFiltro[];
+  ocultarResumen?: boolean;
+}
+
+export default function CobranzaList({ esAdmin = false, filtroFijo, ocultarResumen = false }: Props) {
   const [items, setItems] = useState<any[]>([]);
   const [resumen, setResumen] = useState<any>(null);
   const [filtro, setFiltro] = useState<EstadoFiltro>('');
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => { loadData(); }, [filtro]);
+  const [pagarCuota, setPagarCuota] = useState<any | null>(null);
+  const [historialCuota, setHistorialCuota] = useState<any | null>(null);
+
+  // Si filtroFijo viene, no permitimos cambiar filtro y aplicamos union via fetch.
+  const filtroActivo = filtroFijo ? '' : filtro;
+
+  useEffect(() => { loadData(); }, [filtro, JSON.stringify(filtroFijo)]);
 
   async function loadData() {
     setLoading(true);
-    const [itemsRes, resumenRes] = await Promise.all([
-      obtenerCobranza({ estadoCobranza: filtro || undefined }),
-      obtenerResumenCobranza(),
-    ]);
-    if (itemsRes.success) setItems(itemsRes.data || []);
-    if (resumenRes.success) setResumen(resumenRes.data);
+    if (filtroFijo && filtroFijo.length > 0) {
+      // Multi-filtro: hacer N fetches y unir.
+      const results = await Promise.all(filtroFijo.map((f) => obtenerCobranza({ estadoCobranza: f })));
+      const merged: any[] = [];
+      for (const r of results) {
+        if (r.success && r.data) merged.push(...r.data);
+      }
+      setItems(merged.sort((a, b) => (b.dias_atraso ?? 0) - (a.dias_atraso ?? 0)));
+      const resumenRes = await obtenerResumenCobranza();
+      if (resumenRes.success) setResumen(resumenRes.data);
+    } else {
+      const [itemsRes, resumenRes] = await Promise.all([
+        obtenerCobranza({ estadoCobranza: filtro || undefined }),
+        obtenerResumenCobranza(),
+      ]);
+      if (itemsRes.success) setItems(itemsRes.data || []);
+      if (resumenRes.success) setResumen(resumenRes.data);
+    }
     setLoading(false);
   }
 
@@ -60,8 +93,7 @@ export default function CobranzaList() {
 
   return (
     <div className="space-y-4">
-      {/* Resumen */}
-      {resumen && (
+      {!ocultarResumen && resumen && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="bg-crm-card border border-crm-border rounded-lg p-4">
             <p className="text-xs text-crm-text-muted">Total Cuotas Pendientes</p>
@@ -91,17 +123,19 @@ export default function CobranzaList() {
 
       {/* Filtros y acciones */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex gap-2 flex-wrap">
-          {(['', 'por_vencer_3d', 'vencida', 'en_mora', 'al_dia'] as EstadoFiltro[]).map(f => (
-            <button
-              key={f}
-              onClick={() => setFiltro(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${filtro === f ? 'bg-crm-primary text-white' : 'bg-crm-background border border-crm-border text-crm-text-muted hover:bg-crm-card'}`}
-            >
-              {f === '' ? 'Todas' : getEstadoLabel(f)}
-            </button>
-          ))}
-        </div>
+        {!filtroFijo && (
+          <div className="flex gap-2 flex-wrap">
+            {(['', 'por_vencer_3d', 'vencida', 'en_mora', 'al_dia'] as EstadoFiltro[]).map(f => (
+              <button
+                key={f}
+                onClick={() => setFiltro(f)}
+                className={`px-3 py-1.5 rounded-lg text-sm ${filtroActivo === f ? 'bg-crm-primary text-white' : 'bg-crm-background border border-crm-border text-crm-text-muted hover:bg-crm-card'}`}
+              >
+                {f === '' ? 'Todas' : getEstadoLabel(f)}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           onClick={handleActualizarMora}
           disabled={isPending}
@@ -133,33 +167,87 @@ export default function CobranzaList() {
                 <th className="py-2 px-3 text-crm-text-muted font-medium text-right">Mora</th>
                 <th className="py-2 px-3 text-crm-text-muted font-medium">Estado</th>
                 <th className="py-2 px-3 text-crm-text-muted font-medium">Días</th>
+                <th className="py-2 px-3 text-crm-text-muted font-medium text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item: any) => (
-                <tr key={item.cuota_id} className="border-b border-crm-border/50 hover:bg-crm-background/50">
-                  <td className="py-2 px-3">
-                    <a href={`/dashboard/clientes/${item.cliente_id}`} className="text-crm-primary hover:underline font-medium">{item.cliente_nombre}</a>
-                  </td>
-                  <td className="py-2 px-3 font-mono text-xs">{item.codigo_venta}</td>
-                  <td className="py-2 px-3 text-crm-text-muted">{item.proyecto_nombre}</td>
-                  <td className="py-2 px-3 text-crm-text">{item.numero_cuota}</td>
-                  <td className="py-2 px-3 text-crm-text">{new Date(item.fecha_vencimiento).toLocaleDateString('es-PE')}</td>
-                  <td className="py-2 px-3 text-right font-medium">{formatearMoneda(item.monto_programado - item.monto_pagado, item.moneda)}</td>
-                  <td className="py-2 px-3 text-right text-red-600">{item.monto_mora > 0 ? formatearMoneda(item.monto_mora, item.moneda) : '-'}</td>
-                  <td className="py-2 px-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(item.estado_cobranza)}`}>
-                      {getEstadoLabel(item.estado_cobranza)}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3">
-                    {item.dias_atraso > 0 && <span className="text-red-600 font-medium">{item.dias_atraso}d</span>}
-                  </td>
-                </tr>
-              ))}
+              {items.map((item: any) => {
+                const saldo = (item.monto_programado ?? 0) - (item.monto_pagado ?? 0);
+                const puedePagar = saldo > 0 && item.estado_cuota !== 'pagada';
+                return (
+                  <tr key={item.cuota_id} className="border-b border-crm-border/50 hover:bg-crm-background/50">
+                    <td className="py-2 px-3">
+                      <a href={`/dashboard/clientes/${item.cliente_id}`} className="text-crm-primary hover:underline font-medium">{item.cliente_nombre}</a>
+                    </td>
+                    <td className="py-2 px-3 font-mono text-xs">{item.codigo_venta}</td>
+                    <td className="py-2 px-3 text-crm-text-muted">{item.proyecto_nombre}</td>
+                    <td className="py-2 px-3 text-crm-text">{item.numero_cuota}</td>
+                    <td className="py-2 px-3 text-crm-text">{new Date(item.fecha_vencimiento).toLocaleDateString('es-PE')}</td>
+                    <td className="py-2 px-3 text-right font-medium">{formatearMoneda(saldo, item.moneda)}</td>
+                    <td className="py-2 px-3 text-right text-red-600">{item.monto_mora > 0 ? formatearMoneda(item.monto_mora, item.moneda) : '-'}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(item.estado_cobranza)}`}>
+                        {getEstadoLabel(item.estado_cobranza)}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3">
+                      {item.dias_atraso > 0 && <span className="text-red-600 font-medium">{item.dias_atraso}d</span>}
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        {puedePagar && (
+                          <button
+                            onClick={() => setPagarCuota(item)}
+                            title="Registrar pago"
+                            className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 inline-flex items-center gap-1"
+                          >
+                            <CreditCard className="h-3 w-3" /> Pagar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setHistorialCuota(item)}
+                          title="Ver pagos"
+                          className="px-2 py-1 text-xs bg-crm-background border border-crm-border text-crm-text-muted rounded hover:bg-crm-card inline-flex items-center gap-1"
+                        >
+                          <History className="h-3 w-3" /> Pagos
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {pagarCuota && (
+        <RegistrarPagoModal
+          cuota={{
+            cuotaId: pagarCuota.cuota_id,
+            ventaId: pagarCuota.venta_id,
+            clienteId: pagarCuota.cliente_id,
+            numeroCuota: pagarCuota.numero_cuota,
+            estado: pagarCuota.estado_cuota,
+            montoProgramado: Number(pagarCuota.monto_programado) || 0,
+            montoPagado: Number(pagarCuota.monto_pagado) || 0,
+            montoMora: Number(pagarCuota.monto_mora) || 0,
+            moneda: pagarCuota.moneda || 'PEN',
+          }}
+          onClose={() => setPagarCuota(null)}
+          onSuccess={() => loadData()}
+        />
+      )}
+
+      {historialCuota && (
+        <HistorialPagosCuota
+          cuotaId={historialCuota.cuota_id}
+          numeroCuota={historialCuota.numero_cuota}
+          moneda={historialCuota.moneda || 'PEN'}
+          esAdmin={esAdmin}
+          onClose={() => setHistorialCuota(null)}
+          onChange={() => loadData()}
+        />
       )}
     </div>
   );

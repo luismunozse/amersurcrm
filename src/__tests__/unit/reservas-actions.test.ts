@@ -44,10 +44,6 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
   validarMonto: vi.fn().mockReturnValue({ valid: true }),
   validarFechaFutura: vi.fn().mockReturnValue({ valid: true }),
 }));
-vi.mock("@/lib/services/marketing-automatizaciones", () => ({
-  dispararAutomatizaciones: vi.fn().mockResolvedValue(undefined),
-}));
-
 import {
   registrarVisita,
   crearReserva,

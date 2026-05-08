@@ -33,7 +33,7 @@ export default function CancelarReservaModal({
     "Problemas de financiamiento",
     "Cambio de planes del cliente",
     "Propiedad vendida a otro cliente",
-    "Error en la reserva",
+    "Error en la separación",
     "Otro"
   ];
 
@@ -58,11 +58,11 @@ export default function CancelarReservaModal({
       const result = await cancelarReserva(reservaId, motivoFinal);
 
       if (result.success) {
-        toast.success("Reserva cancelada exitosamente");
+        toast.success("Separación cancelada exitosamente");
         resetForm();
         onClose();
       } else {
-        toast.error(result.error || "Error al cancelar la reserva");
+        toast.error(result.error || "Error al cancelar la separación");
       }
     });
   };
@@ -99,7 +99,7 @@ export default function CancelarReservaModal({
                   <div>
                     <Dialog.Title className="text-xl font-bold text-crm-text flex items-center gap-2">
                       <AlertTriangle className="h-6 w-6 text-red-500" />
-                      Cancelar Reserva
+                      Cancelar Separación
                     </Dialog.Title>
                     <p className="text-sm text-crm-text-muted mt-1">
                       {reservaCodigo} - {clienteNombre}
@@ -122,7 +122,7 @@ export default function CancelarReservaModal({
                         Esta acción no se puede deshacer
                       </p>
                       <ul className="text-xs text-red-700 dark:text-red-300 space-y-1 list-disc list-inside">
-                        <li>La reserva se marcará como cancelada</li>
+                        <li>La separación se marcará como cancelada</li>
                         {loteNombre && <li>El lote "{loteNombre}" volverá a estado "Disponible"</li>}
                         <li>Se registrará el motivo de cancelación</li>
                       </ul>
@@ -192,7 +192,7 @@ export default function CancelarReservaModal({
                       disabled={isPending}
                     >
                       <AlertTriangle className="h-4 w-4" />
-                      {isPending ? "Cancelando..." : "Cancelar Reserva"}
+                      {isPending ? "Cancelando..." : "Cancelar Separación"}
                     </button>
                   </div>
                 </form>

@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CalendarCheck, RefreshCw, CreditCard, X } from "lucide-react";
-import { obtenerCronogramaVenta, generarCronogramaPagos, registrarPagoCuota } from "../_actions-cuotas";
+import { CalendarCheck, RefreshCw, CreditCard, History } from "lucide-react";
+import { obtenerCronogramaVenta, generarCronogramaPagos } from "../_actions-cuotas";
 import { ESTADOS_CUOTA } from "@/lib/types/cuotas";
 import type { Cuota } from "@/lib/types/cuotas";
-import { formatearMoneda, METODOS_PAGO } from "@/lib/types/crm-flujo";
+import { formatearMoneda } from "@/lib/types/crm-flujo";
 import toast from "react-hot-toast";
+import RegistrarPagoModal from "../../cobranza/_RegistrarPagoModal";
+import HistorialPagosCuota from "../../cobranza/_HistorialPagosCuota";
 
 interface Props {
   clienteId: string;
   ventas: any[];
+  esAdmin?: boolean;
 }
 
-export default function TabCronograma({ clienteId, ventas }: Props) {
+export default function TabCronograma({ clienteId, ventas, esAdmin = false }: Props) {
   const [selectedVentaId, setSelectedVentaId] = useState('');
   const [cuotas, setCuotas] = useState<Cuota[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Modal de pago
-  const [pagoModal, setPagoModal] = useState<Cuota | null>(null);
-  const [pagoForm, setPagoForm] = useState({ monto: '', metodoPago: 'transferencia', banco: '', numeroOperacion: '', notas: '' });
+  const [pagarCuota, setPagarCuota] = useState<Cuota | null>(null);
+  const [historialCuota, setHistorialCuota] = useState<Cuota | null>(null);
 
   const ventasActivas = ventas.filter((v: any) => v.estado !== 'cancelada');
 
@@ -54,38 +56,6 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
     });
   }
 
-  function abrirPagoModal(cuota: Cuota) {
-    const saldo = cuota.monto_programado - cuota.monto_pagado + cuota.monto_mora;
-    setPagoForm({ monto: saldo.toFixed(2), metodoPago: 'transferencia', banco: '', numeroOperacion: '', notas: '' });
-    setPagoModal(cuota);
-  }
-
-  async function handleRegistrarPago() {
-    if (!pagoModal) return;
-    const monto = parseFloat(pagoForm.monto);
-    if (!monto || monto <= 0) { toast.error('Ingresa un monto válido'); return; }
-
-    startTransition(async () => {
-      const result = await registrarPagoCuota({
-        ventaId: selectedVentaId,
-        cuotaId: pagoModal.id,
-        monto,
-        metodoPago: pagoForm.metodoPago,
-        banco: pagoForm.banco || undefined,
-        numeroOperacion: pagoForm.numeroOperacion || undefined,
-        notas: pagoForm.notas || undefined,
-        clienteId,
-      });
-      if (result.success) {
-        toast.success('Pago registrado');
-        setPagoModal(null);
-        loadCronograma();
-      } else {
-        toast.error(result.error || 'Error al registrar pago');
-      }
-    });
-  }
-
   function getEstadoBadge(estado: string) {
     const e = ESTADOS_CUOTA.find(ec => ec.value === estado);
     const colors: Record<string, string> = {
@@ -99,7 +69,7 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
   const totalPagado = cuotas.reduce((sum, c) => sum + c.monto_pagado, 0);
   const totalMora = cuotas.reduce((sum, c) => sum + c.monto_mora, 0);
   const porcentajePagado = totalProgramado > 0 ? Math.round((totalPagado / totalProgramado) * 100) : 0;
-  const moneda = cuotas[0]?.moneda as any || 'PEN';
+  const moneda = (cuotas[0]?.moneda as any) || 'PEN';
 
   if (ventasActivas.length === 0) {
     return (
@@ -130,7 +100,6 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
         </div>
       </div>
 
-      {/* Resumen */}
       {cuotas.length > 0 && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -155,7 +124,6 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
             </div>
           </div>
 
-          {/* Tabla de cuotas */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -167,7 +135,7 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
                   <th className="py-2 px-3 text-crm-text-muted font-medium text-right">Pagado</th>
                   <th className="py-2 px-3 text-crm-text-muted font-medium text-right">Mora</th>
                   <th className="py-2 px-3 text-crm-text-muted font-medium">Estado</th>
-                  <th className="py-2 px-3 text-crm-text-muted font-medium"></th>
+                  <th className="py-2 px-3 text-crm-text-muted font-medium text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,15 +151,25 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
                       <td className="py-2 px-3 text-right font-medium text-green-600">{cuota.monto_pagado > 0 ? formatearMoneda(cuota.monto_pagado, cuota.moneda as any) : '-'}</td>
                       <td className="py-2 px-3 text-right text-red-600">{cuota.monto_mora > 0 ? formatearMoneda(cuota.monto_mora, cuota.moneda as any) : '-'}</td>
                       <td className="py-2 px-3">{getEstadoBadge(cuota.estado)}</td>
-                      <td className="py-2 px-3">
-                        {puedePagar && (
-                          <button
-                            onClick={() => abrirPagoModal(cuota)}
-                            className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors"
-                          >
-                            <CreditCard className="h-3 w-3" /> Pagar
-                          </button>
-                        )}
+                      <td className="py-2 px-3 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          {puedePagar && (
+                            <button
+                              onClick={() => setPagarCuota(cuota)}
+                              className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 inline-flex items-center gap-1"
+                            >
+                              <CreditCard className="h-3 w-3" /> Pagar
+                            </button>
+                          )}
+                          {cuota.monto_pagado > 0 && (
+                            <button
+                              onClick={() => setHistorialCuota(cuota)}
+                              className="px-2 py-1 text-xs bg-crm-background border border-crm-border text-crm-text-muted rounded hover:bg-crm-card inline-flex items-center gap-1"
+                            >
+                              <History className="h-3 w-3" /> Pagos
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -211,124 +189,33 @@ export default function TabCronograma({ clienteId, ventas }: Props) {
         </div>
       )}
 
-      {/* ========== Modal de Pago ========== */}
-      {pagoModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150" onClick={() => setPagoModal(null)}>
-          <div className="bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-md p-5 sm:p-6 space-y-4 pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="sm:hidden flex justify-center -mt-1">
-              <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
-            </div>
-            <div className="flex items-center justify-between">
-              <h4 className="text-lg font-semibold text-crm-text flex items-center gap-2">
-                <CreditCard className="h-5 w-5" /> Registrar Pago
-              </h4>
-              <button onClick={() => setPagoModal(null)} className="text-crm-text-muted hover:text-crm-text">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {pagarCuota && (
+        <RegistrarPagoModal
+          cuota={{
+            cuotaId: pagarCuota.id,
+            ventaId: selectedVentaId,
+            clienteId,
+            numeroCuota: pagarCuota.numero_cuota,
+            estado: pagarCuota.estado,
+            montoProgramado: Number(pagarCuota.monto_programado) || 0,
+            montoPagado: Number(pagarCuota.monto_pagado) || 0,
+            montoMora: Number(pagarCuota.monto_mora) || 0,
+            moneda: (pagarCuota.moneda as string) || 'PEN',
+          }}
+          onClose={() => setPagarCuota(null)}
+          onSuccess={() => loadCronograma()}
+        />
+      )}
 
-            <div className="bg-crm-background rounded-lg p-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-crm-text-muted">Cuota #{pagoModal.numero_cuota}</span>
-                {getEstadoBadge(pagoModal.estado)}
-              </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-crm-text-muted">Programado:</span>
-                <span className="font-medium">{formatearMoneda(pagoModal.monto_programado, pagoModal.moneda as any)}</span>
-              </div>
-              {pagoModal.monto_pagado > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-crm-text-muted">Ya pagado:</span>
-                  <span className="text-green-600">{formatearMoneda(pagoModal.monto_pagado, pagoModal.moneda as any)}</span>
-                </div>
-              )}
-              {pagoModal.monto_mora > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-crm-text-muted">Mora:</span>
-                  <span className="text-red-600">{formatearMoneda(pagoModal.monto_mora, pagoModal.moneda as any)}</span>
-                </div>
-              )}
-              <div className="flex justify-between mt-1 pt-1 border-t border-crm-border/50 font-semibold">
-                <span>Saldo a pagar:</span>
-                <span>{formatearMoneda(pagoModal.monto_programado - pagoModal.monto_pagado + pagoModal.monto_mora, pagoModal.moneda as any)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-crm-text mb-1">Monto *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={pagoForm.monto}
-                  onChange={e => setPagoForm(prev => ({ ...prev, monto: e.target.value }))}
-                  className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-card"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-crm-text mb-1">Método de Pago *</label>
-                <select
-                  value={pagoForm.metodoPago}
-                  onChange={e => setPagoForm(prev => ({ ...prev, metodoPago: e.target.value }))}
-                  className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-card"
-                >
-                  {METODOS_PAGO.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-              {(pagoForm.metodoPago === 'transferencia' || pagoForm.metodoPago === 'deposito' || pagoForm.metodoPago === 'cheque') && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-crm-text mb-1">Banco</label>
-                    <input
-                      type="text"
-                      value={pagoForm.banco}
-                      onChange={e => setPagoForm(prev => ({ ...prev, banco: e.target.value }))}
-                      className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-card"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-crm-text mb-1">N. Operación</label>
-                    <input
-                      type="text"
-                      value={pagoForm.numeroOperacion}
-                      onChange={e => setPagoForm(prev => ({ ...prev, numeroOperacion: e.target.value }))}
-                      className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-card"
-                    />
-                  </div>
-                </>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-crm-text mb-1">Notas</label>
-                <input
-                  type="text"
-                  value={pagoForm.notas}
-                  onChange={e => setPagoForm(prev => ({ ...prev, notas: e.target.value }))}
-                  className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-card"
-                  placeholder="Opcional"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={handleRegistrarPago}
-                disabled={isPending}
-                className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <CreditCard className="h-4 w-4" />
-                {isPending ? 'Registrando...' : 'Registrar Pago'}
-              </button>
-              <button
-                onClick={() => setPagoModal(null)}
-                className="px-4 py-2.5 border border-crm-border rounded-lg text-sm text-crm-text-muted hover:bg-crm-background"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+      {historialCuota && (
+        <HistorialPagosCuota
+          cuotaId={historialCuota.id}
+          numeroCuota={historialCuota.numero_cuota}
+          moneda={(historialCuota.moneda as string) || 'PEN'}
+          esAdmin={esAdmin}
+          onClose={() => setHistorialCuota(null)}
+          onChange={() => loadCronograma()}
+        />
       )}
     </div>
   );

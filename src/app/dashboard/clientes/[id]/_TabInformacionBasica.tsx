@@ -1,16 +1,30 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { User, Mail, Phone, MapPin, DollarSign, FileText, UserCheck, PenSquare } from "lucide-react";
-import { TIPOS_DOCUMENTO_OPTIONS, ESTADO_CIVIL_OPTIONS, ORIGENES_LEAD_OPTIONS, INTERESES_PRINCIPALES_OPTIONS, FORMAS_PAGO_OPTIONS } from "@/lib/types/clientes";
+import { User, Mail, Phone, MapPin, DollarSign, FileText, UserCheck, PenSquare, Activity, Lock } from "lucide-react";
+import { TIPOS_DOCUMENTO_OPTIONS, ESTADO_CIVIL_OPTIONS, ORIGENES_LEAD_OPTIONS, INTERESES_PRINCIPALES_OPTIONS, FORMAS_PAGO_OPTIONS, getEstadoClienteLabel, getEstadoClienteColor } from "@/lib/types/clientes";
+import type { EstadoCliente } from "@/lib/types/clientes";
 import { formatCapacidadCompra } from "@/lib/types/clientes";
+import { getStatusBadgeClasses } from "@/lib/utils/badge";
 import toast from "react-hot-toast";
 import { asignarVendedorCliente } from "@/app/dashboard/clientes/_actions";
+import { moverClientePipeline } from "@/app/dashboard/pipeline/_actions";
 import { useRouter } from "next/navigation";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 import EditarClienteModal from "@/components/EditarClienteModal";
+import DesestimarDialog from "@/app/dashboard/pipeline/_DesestimarDialog";
+import BotonEnviarWhatsApp from "@/components/marketing/BotonEnviarWhatsApp";
 
 import type { ClienteCompleto } from "@/lib/types/clientes";
+
+const ESTADOS_SELECCIONABLES: { value: EstadoCliente; label: string }[] = [
+  { value: "por_contactar", label: "Por Contactar" },
+  { value: "contactado", label: "Contactado" },
+  { value: "intermedio", label: "Intermedio" },
+  { value: "potencial", label: "Potencial" },
+  { value: "desestimado", label: "Desestimado" },
+  { value: "transferido", label: "Transferido" },
+];
 
 interface Props {
   cliente: ClienteCompleto;
@@ -30,10 +44,50 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
   const [isAssigning, startTransition] = useTransition();
   const [selectedVendedor, setSelectedVendedor] = useState<string>(cliente.vendedor_username || "");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [estadoActual, setEstadoActual] = useState<EstadoCliente>(cliente.estado_cliente);
+  const [isChangingEstado, startEstadoTransition] = useTransition();
+  const [desestimarOpen, setDesestimarOpen] = useState(false);
+
+  const esAdmin = esAdminOCoordinador();
+  const esEstadoBloqueado = estadoActual === "en_proceso";
+  const esEstadoTerminalSinAdmin = estadoActual === "transferido" && !esAdmin;
+  const puedeCambiarEstado = puedeEditar && !esEstadoBloqueado && !esEstadoTerminalSinAdmin;
 
   useEffect(() => {
     setSelectedVendedor(cliente.vendedor_username || "");
   }, [cliente.vendedor_username]);
+
+  useEffect(() => {
+    setEstadoActual(cliente.estado_cliente);
+  }, [cliente.estado_cliente]);
+
+  async function ejecutarCambioEstado(estadoNuevo: EstadoCliente, motivo?: string) {
+    const estadoPrev = estadoActual;
+    setEstadoActual(estadoNuevo);
+    startEstadoTransition(async () => {
+      const res = await moverClientePipeline(cliente.id, estadoNuevo, motivo);
+      if (!res.ok) {
+        setEstadoActual(estadoPrev);
+        toast.error(res.error || "No se pudo cambiar el estado");
+        return;
+      }
+      toast.success(`Estado actualizado: ${getEstadoClienteLabel(estadoNuevo)}`);
+      router.refresh();
+    });
+  }
+
+  function handleSeleccionarEstado(estadoNuevo: EstadoCliente) {
+    if (estadoNuevo === estadoActual) return;
+    if (estadoNuevo === "desestimado") {
+      setDesestimarOpen(true);
+      return;
+    }
+    if ((estadoActual === "transferido" || estadoActual === "en_proceso") && !esAdmin) {
+      toast.error("Solo un administrador puede revertir este estado");
+      return;
+    }
+    void ejecutarCambioEstado(estadoNuevo);
+  }
 
   const handleAsignarVendedor = (value: string) => {
     setSelectedVendedor(value);
@@ -93,6 +147,56 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
                 {vendedores.map((vendedor) => (
                   <option key={vendedor.id} value={vendedor.username || ""}>
                     {vendedor.nombre_completo || vendedor.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Estado del cliente */}
+      <div>
+        <h3 className="text-lg font-semibold text-crm-text mb-4 flex items-center gap-2">
+          <Activity className="h-5 w-5 text-crm-primary" />
+          Estado del cliente
+        </h3>
+        <div className="p-4 bg-crm-background rounded-lg border border-crm-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Estado actual</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={getStatusBadgeClasses(getEstadoClienteColor(estadoActual))}>
+                {getEstadoClienteLabel(estadoActual)}
+              </span>
+              {esEstadoBloqueado && (
+                <span className="inline-flex items-center gap-1 text-xs text-crm-text-muted">
+                  <Lock className="h-3 w-3" />
+                  Gestionado desde Separaciones
+                </span>
+              )}
+              {esEstadoTerminalSinAdmin && (
+                <span className="inline-flex items-center gap-1 text-xs text-crm-text-muted">
+                  <Lock className="h-3 w-3" />
+                  Solo admin puede revertir
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-crm-text-muted mt-2">
+              Mover entre etapas refleja la atención del cliente. <strong>Desestimado</strong> requiere motivo.
+              <strong> En Proceso</strong> se asigna automáticamente al registrar una separación.
+            </p>
+          </div>
+          {puedeCambiarEstado && (
+            <div className="w-full sm:w-64">
+              <select
+                value={estadoActual}
+                onChange={(e) => handleSeleccionarEstado(e.target.value as EstadoCliente)}
+                disabled={isChangingEstado}
+                className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-card text-crm-text focus:outline-none focus:ring-2 focus:ring-crm-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {ESTADOS_SELECCIONABLES.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -181,17 +285,31 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
             </div>
           )}
 
-          {cliente.telefono_whatsapp && (
+          {(cliente.telefono_whatsapp || cliente.telefono) && (
             <div className="p-4 bg-crm-background rounded-lg">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">WhatsApp</p>
-              <a
-                href={`https://wa.me/${cliente.telefono_whatsapp.replace(/[^0-9]/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-crm-primary hover:underline"
-              >
-                {cliente.telefono_whatsapp}
-              </a>
+              {cliente.telefono_whatsapp && (
+                <a
+                  href={`https://wa.me/${cliente.telefono_whatsapp.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-crm-primary hover:underline block mb-2"
+                >
+                  {cliente.telefono_whatsapp}
+                </a>
+              )}
+              <BotonEnviarWhatsApp
+                telefono={cliente.telefono_whatsapp ?? cliente.telefono ?? ""}
+                clienteId={cliente.id}
+                clienteNombre={cliente.nombre}
+                estadoCliente={cliente.estado_cliente ?? undefined}
+                variablesAuto={{
+                  vendedor: vendedores.find(v => v.username === cliente.vendedor_username)?.nombre_completo ?? cliente.vendedor_username ?? "",
+                }}
+                label="Enviar plantilla"
+                variant="primary"
+                className="w-full justify-center"
+              />
             </div>
           )}
         </div>
@@ -332,6 +450,18 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
           router.refresh();
         }}
         cliente={cliente}
+      />
+
+      {/* Diálogo de motivo al desestimar */}
+      <DesestimarDialog
+        open={desestimarOpen}
+        clienteNombre={cliente.nombre}
+        pending={isChangingEstado}
+        onCancel={() => setDesestimarOpen(false)}
+        onConfirm={(motivo) => {
+          setDesestimarOpen(false);
+          void ejecutarCambioEstado("desestimado", motivo);
+        }}
       />
     </div>
   );

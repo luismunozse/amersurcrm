@@ -74,14 +74,14 @@ export async function convertirReservaEnVenta(data: {
       .single();
 
     if (!reserva) {
-      return { success: false, error: 'Reserva no encontrada' };
+      return { success: false, error: 'Separación no encontrada' };
     }
 
     // Validar que la reserva este en estado activo
     if (reserva.estado !== 'activa') {
       return {
         success: false,
-        error: `No se puede convertir una reserva con estado "${reserva.estado}". Solo se permiten reservas activas.`
+        error: `No se puede convertir una separación con estado "${reserva.estado}". Solo se permiten separaciones activas.`
       };
     }
 
@@ -385,7 +385,7 @@ export async function obtenerTimelineCliente(
       // Visitas
       supabase
         .from('visita_propiedad')
-        .select('*, lote:lote!lote_id(numero_lote)')
+        .select('*, lote:lote!lote_id(codigo)')
         .eq('cliente_id', clienteId)
         .order('fecha_visita', { ascending: false })
         .limit(limit),
@@ -393,7 +393,7 @@ export async function obtenerTimelineCliente(
       // Reservas
       supabase
         .from('reserva')
-        .select('*, lote:lote!lote_id(numero_lote)')
+        .select('*, lote:lote!lote_id(codigo)')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false })
         .limit(limit),
@@ -401,7 +401,7 @@ export async function obtenerTimelineCliente(
       // Ventas con pagos
       supabase
         .from('venta')
-        .select('*, lote:lote!lote_id(numero_lote), pagos:pago(*)')
+        .select('*, lote:lote!lote_id(codigo), pagos:pago(*)')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false })
         .limit(limit),
@@ -458,7 +458,7 @@ export async function obtenerTimelineCliente(
         titulo: `Visita a propiedad`,
         descripcion: item.feedback,
         metadata: {
-          lote: item.lote?.numero_lote,
+          lote: item.lote?.codigo,
           nivel_interes: item.nivel_interes,
           duracion_minutos: item.duracion_minutos,
           vendedor_username: item.vendedor_username,
@@ -472,13 +472,13 @@ export async function obtenerTimelineCliente(
         id: `reserva-${item.id}`,
         type: 'reserva',
         fecha: item.fecha_reserva,
-        titulo: `Reserva ${item.codigo_reserva}`,
+        titulo: `Separación ${item.codigo_reserva}`,
         descripcion: item.notas,
         metadata: {
           codigo: item.codigo_reserva,
           monto: item.monto_reserva,
           moneda: item.moneda,
-          lote: item.lote?.numero_lote,
+          lote: item.lote?.codigo,
           estado: item.estado,
           vendedor_username: item.vendedor_username,
         },
@@ -498,7 +498,7 @@ export async function obtenerTimelineCliente(
           precio_total: item.precio_total,
           moneda: item.moneda,
           forma_pago: item.forma_pago,
-          lote: item.lote?.numero_lote,
+          lote: item.lote?.codigo,
           vendedor_username: item.vendedor_username,
         },
       });

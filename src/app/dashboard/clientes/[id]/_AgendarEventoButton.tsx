@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarPlus } from "lucide-react";
 import EventoModal from "@/app/dashboard/agenda/_EventoModal";
 import toast from "react-hot-toast";
@@ -12,6 +13,7 @@ interface Props {
 
 export default function AgendarEventoButton({ clienteId, clienteNombre }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <>
@@ -31,6 +33,9 @@ export default function AgendarEventoButton({ clienteId, clienteNombre }: Props)
         onSuccess={() => {
           setIsOpen(false);
           toast.success("Actividad agendada correctamente");
+          // El server action hace revalidatePath; router.refresh() es necesario
+          // para que el RSC del detalle de cliente vuelva a renderizar.
+          router.refresh();
         }}
         clienteInicial={{ id: clienteId, nombre: clienteNombre }}
       />

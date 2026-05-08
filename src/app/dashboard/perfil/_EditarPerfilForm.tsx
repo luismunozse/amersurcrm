@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { FormInput } from "@/components/form/FormInput";
 import { LoadingButton } from "@/components/form/LoadingButton";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { isValidPhone, normalizePhoneE164 } from "@/lib/utils/phone";
 import { Info } from "lucide-react";
 
@@ -25,6 +26,7 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
 
   // Trackear campos editados
   const [camposEditados, setCamposEditados] = useState<Set<string>>(new Set());
+  const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
 
   // Errores de validación
   const [errors, setErrors] = useState<{
@@ -68,7 +70,7 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
         const hasInvalidDomain = invalidDomains.some(invalid => domain?.endsWith(invalid));
         
         if (hasInvalidDomain) {
-          newErrors.email = "No se puede usar un dominio local (.local, .admin, etc.). Usa un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com";
+          newErrors.email = "No se puede usar un dominio local (.local, .admin, etc.). Use un email con un dominio válido de internet como @gmail.com, @outlook.com, @hotmail.com";
         }
       }
     }
@@ -80,28 +82,23 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validar formulario
     if (!validateForm()) {
-      toast.error("Por favor, corrige los errores del formulario");
+      toast.error("Por favor, corrija los errores del formulario");
       return;
     }
 
-    // Detectar si el email cambió (cambio importante que requiere confirmación)
     const emailChanged = email.trim() !== currentEmail;
-    
-    // Si el email cambió, mostrar confirmación
+
     if (emailChanged) {
-      const confirmar = window.confirm(
-        "¿Estás seguro de que deseas cambiar tu email?\n\n" +
-        "Se enviará un correo de confirmación al nuevo email. " +
-        "Tu email actual no cambiará hasta que confirmes desde el correo."
-      );
-      
-      if (!confirmar) {
-        return;
-      }
+      setConfirmEmailOpen(true);
+      return;
     }
 
+    ejecutarActualizacion();
+  };
+
+  const ejecutarActualizacion = () => {
+    setConfirmEmailOpen(false);
     startTransition(async () => {
       try {
         // Detectar si el email cambió
@@ -127,13 +124,13 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
             if (result.emailUpdatedDirectly) {
               // Email actualizado directamente (desde un email inválido)
               toast.success(
-                "Email actualizado exitosamente. Tu email ha sido cambiado directamente.",
+                "Email actualizado exitosamente. Su email ha sido cambiado directamente.",
                 { duration: 5000 }
               );
             } else {
               // Email actualizado con confirmación (desde un email válido)
               toast.success(
-                "Se ha enviado un correo de confirmación al nuevo email. Tu email actual no cambiará hasta que confirmes desde el correo.",
+                "Se ha enviado un correo de confirmación al nuevo email. Su email actual no cambiará hasta que confirme desde el correo.",
                 { duration: 8000 }
               );
             }
@@ -288,7 +285,7 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
             error={errors.email}
             placeholder="Ej: usuario@ejemplo.com"
             disabled={isPending}
-            helperText="Se enviará un correo de confirmación si cambias tu email"
+            helperText="Se enviará un correo de confirmación si cambia su email"
           />
         </div>
       </div>
@@ -298,7 +295,7 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
         <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center gap-2">
           <div className="w-2 h-2 bg-yellow-500 dark:bg-yellow-400 rounded-full"></div>
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            Tienes {camposEditados.size} campo{camposEditados.size > 1 ? 's' : ''} modificado{camposEditados.size > 1 ? 's' : ''}. No olvides guardar los cambios.
+            Tiene {camposEditados.size} campo{camposEditados.size > 1 ? 's' : ''} modificado{camposEditados.size > 1 ? 's' : ''}. No olvide guardar los cambios.
           </p>
         </div>
       )}
@@ -314,7 +311,7 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
               Cambio de email
             </p>
             <p className="text-xs text-blue-700 dark:text-blue-400">
-              Si cambias tu email, se enviará un correo de confirmación a la nueva dirección. Tu email actual <strong>no cambiará</strong> hasta que hagas clic en el enlace de confirmación del correo.
+              Si cambia su email, se enviará un correo de confirmación a la nueva dirección. Su email actual <strong>no cambiará</strong> hasta que haga clic en el enlace de confirmación del correo.
             </p>
           </div>
         </div>
@@ -330,6 +327,17 @@ export default function EditarPerfilForm({ perfil, isAdmin: _isAdmin = false, cu
       >
         Guardar Cambios
       </LoadingButton>
+
+      <ConfirmDialog
+        open={confirmEmailOpen}
+        title="Cambiar email"
+        description="¿Está seguro de que desea cambiar su email? Se enviará un correo de confirmación al nuevo email. Su email actual no cambiará hasta que confirme desde el correo."
+        confirmText="Cambiar email"
+        cancelText="Cancelar"
+        disabled={isPending}
+        onConfirm={ejecutarActualizacion}
+        onClose={() => setConfirmEmailOpen(false)}
+      />
     </form>
   );
 }

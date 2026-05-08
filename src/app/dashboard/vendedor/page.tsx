@@ -254,7 +254,7 @@ export default async function VendedorDashboardPage() {
             </div>
             <span className="text-2xl font-bold text-crm-text">{totalReservasActivas ?? 0}</span>
           </div>
-          <h3 className="text-sm font-medium text-crm-text-muted">Reservas Activas</h3>
+          <h3 className="text-sm font-medium text-crm-text-muted">Separaciones Activas</h3>
         </div>
 
         <div className="bg-crm-card border border-crm-border rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
@@ -420,21 +420,21 @@ export default async function VendedorDashboardPage() {
         </div>
       </div>
 
-      {/* Reservas y Ventas */}
+      {/* Separaciones y Ventas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Reservas Activas */}
+        {/* Separaciones Activas */}
         <div className="bg-crm-card border border-crm-border rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-crm-border">
             <h2 className="text-lg font-semibold text-crm-text flex items-center gap-2">
               <FileText className="h-5 w-5 text-crm-primary" />
-              Reservas Activas
+              Separaciones Activas
             </h2>
           </div>
           <div className="p-6">
             {!reservasActivas || reservasActivas.length === 0 ? (
               <div className="text-center py-8 text-crm-text-muted">
                 <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No hay reservas activas</p>
+                <p>No hay separaciones activas</p>
               </div>
             ) : (
               <div className="space-y-3">

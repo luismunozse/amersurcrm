@@ -2,9 +2,10 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { tienePermiso } from "@/lib/permissions/server";
+import { tienePermiso, esAdminOCoordinador, esAdmin } from "@/lib/permissions/server";
 import { obtenerUsernameActual, revalidarCliente } from "../clientes/_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
+import type { EstadoRevision } from "@/lib/types/proceso-adquisicion";
 
 // ============================================================
 // PROCESOS DE ADQUISICIÓN
@@ -37,7 +38,11 @@ export async function obtenerProcesos(filtros?: {
       query = query.eq('vendedor_username', authResult.username);
     }
 
-    if (filtros?.estado) query = query.eq('estado', filtros.estado);
+    if (filtros?.estado === 'activos') {
+      query = query.in('estado', ['activo', 'pausado']);
+    } else if (filtros?.estado) {
+      query = query.eq('estado', filtros.estado);
+    }
     if (filtros?.etapaActual) query = query.eq('etapa_actual', filtros.etapaActual);
 
     query = query
@@ -108,7 +113,7 @@ export async function obtenerResumenPipeline() {
       query = query.eq('vendedor_username', authResult.username);
     }
 
-    query = query.eq('estado', 'activo');
+    query = query.neq('estado', 'cancelado');
 
     const { data, error } = await query;
     if (error) throw error;
@@ -274,6 +279,87 @@ export async function avanzarEtapa(procesoId: string) {
   }
 }
 
+/**
+ * Elimina permanentemente un proceso de adquisicion.
+ * Solo admin. Borra documentos del bucket y dispara cascada FK
+ * sobre proceso_etapa y proceso_checklist_item.
+ * No toca reserva, lote, ni estado del cliente: si el admin necesita
+ * revertir esos efectos debe usar anularSeparacion().
+ */
+export async function eliminarProceso(procesoId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  if (!procesoId) return { success: false, error: 'ID de proceso requerido' };
+
+  if (!(await esAdmin())) {
+    return { success: false, error: 'Solo un administrador puede eliminar procesos' };
+  }
+
+  const supabase = await createServerActionClient();
+
+  const { data: proceso } = await supabase
+    .from('proceso_adquisicion')
+    .select('id, cliente_id')
+    .eq('id', procesoId)
+    .maybeSingle();
+
+  if (!proceso) return { success: false, error: 'Proceso no encontrado' };
+
+  // Borrar documentos del bucket antes del delete (cascada borra los rows pero no los archivos).
+  const { data: etapas } = await supabase
+    .from('proceso_etapa')
+    .select('id')
+    .eq('proceso_id', procesoId);
+
+  if (etapas && etapas.length > 0) {
+    const etapaIds = etapas.map((e: any) => e.id);
+    const { data: items } = await supabase
+      .from('proceso_checklist_item')
+      .select('documento_url')
+      .in('etapa_id', etapaIds)
+      .not('documento_url', 'is', null);
+
+    const paths = (items ?? [])
+      .map((it: any) => extraerPathDeUrl(it.documento_url, 'proceso-documentos'))
+      .filter((p: string | null): p is string => !!p);
+
+    if (paths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from('proceso-documentos')
+        .remove(paths);
+      if (storageError) {
+        console.error('[eliminarProceso] Error borrando documentos del storage:', storageError);
+        // No bloqueamos: archivos huerfanos son recuperables manualmente.
+      }
+    }
+  }
+
+  const { data: deleted, error: delError } = await supabase
+    .from('proceso_adquisicion')
+    .delete()
+    .eq('id', procesoId)
+    .select('id');
+
+  if (delError) {
+    return { success: false, error: `No se pudo eliminar el proceso: ${delError.message}` };
+  }
+
+  if (!deleted || deleted.length === 0) {
+    return {
+      success: false,
+      error: 'No se eliminó el proceso. Verifique que la migración 20260507010000_proceso_rls_delete.sql esté aplicada en Supabase (policy DELETE faltante).',
+    };
+  }
+
+  revalidatePath('/dashboard/adquisicion');
+  if (proceso.cliente_id) {
+    revalidarCliente(proceso.cliente_id);
+  }
+
+  return { success: true };
+}
+
 export async function cancelarProceso(procesoId: string, motivo?: string) {
   const supabase = await createServerActionClient();
 
@@ -292,6 +378,414 @@ export async function cancelarProceso(procesoId: string, motivo?: string) {
 
     revalidatePath('/dashboard/adquisicion');
     return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================
+// ETAPA 2: estados de revision, observaciones, documentos
+// ============================================================
+
+const ESTADOS_REVISION_VALIDOS: EstadoRevision[] = ['pendiente', 'en_revision', 'aprobado', 'observado'];
+
+/**
+ * Cambia el estado de revision de una etapa.
+ * - 'en_revision': vendedor o privilegiado (vendedor lo marca al terminar checklist).
+ * - 'aprobado' / 'observado' / 'pendiente' (revertir): solo admin/coord/gerente.
+ * Estados de revision son informativos: no bloquean avanzarEtapa en este sprint.
+ */
+export async function cambiarEstadoRevision(
+  etapaId: string,
+  estadoNuevo: EstadoRevision,
+  observaciones?: string,
+) {
+  if (!etapaId) return { success: false, error: 'ID de etapa requerido' };
+  if (!ESTADOS_REVISION_VALIDOS.includes(estadoNuevo)) {
+    return { success: false, error: 'Estado de revision invalido' };
+  }
+  if (estadoNuevo === 'observado' && (!observaciones || !observaciones.trim())) {
+    return { success: false, error: 'Las observaciones son obligatorias para marcar como observado' };
+  }
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const auth = await obtenerUsernameActual(supabase);
+    if (!auth.success) return auth;
+
+    const privilegiado = await esAdminOCoordinador();
+
+    if (!privilegiado && estadoNuevo !== 'en_revision') {
+      return {
+        success: false,
+        error: 'Solo administradores o coordinadores pueden aprobar, observar o revertir etapas',
+      };
+    }
+
+    const update: Record<string, unknown> = {
+      estado_revision: estadoNuevo,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (estadoNuevo === 'aprobado' || estadoNuevo === 'observado') {
+      update.fecha_revision = new Date().toISOString();
+      update.revisado_por = auth.username;
+    } else if (estadoNuevo === 'pendiente') {
+      update.fecha_revision = null;
+      update.revisado_por = null;
+    }
+
+    if (observaciones !== undefined) {
+      update.observaciones = observaciones.trim() || null;
+    }
+
+    const { error: updError } = await supabase
+      .from('proceso_etapa')
+      .update(update)
+      .eq('id', etapaId);
+
+    if (updError) throw updError;
+
+    revalidatePath('/dashboard/adquisicion');
+    revalidatePath('/dashboard/clientes', 'layout');
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Guarda observaciones libres en una etapa.
+ * Cualquier autenticado puede registrar; admin/coord puede sobrescribir.
+ */
+export async function guardarObservacionesEtapa(etapaId: string, observaciones: string) {
+  if (!etapaId) return { success: false, error: 'ID de etapa requerido' };
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const auth = await obtenerUsernameActual(supabase);
+    if (!auth.success) return auth;
+
+    const { error: updError } = await supabase
+      .from('proceso_etapa')
+      .update({
+        observaciones: observaciones.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', etapaId);
+
+    if (updError) throw updError;
+
+    revalidatePath('/dashboard/adquisicion');
+    revalidatePath('/dashboard/clientes', 'layout');
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Elimina el documento subido a un item del checklist.
+ * Borra el archivo del bucket privado y limpia los campos del item.
+ */
+export async function eliminarDocumentoChecklist(itemId: string) {
+  if (!itemId) return { success: false, error: 'ID de item requerido' };
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const auth = await obtenerUsernameActual(supabase);
+    if (!auth.success) return auth;
+
+    const { data: item } = await supabase
+      .from('proceso_checklist_item')
+      .select('id, documento_url, documento_subido_por')
+      .eq('id', itemId)
+      .maybeSingle();
+
+    if (!item) return { success: false, error: 'Item no encontrado' };
+
+    const privilegiado = await esAdminOCoordinador();
+    const esQuienSubio = item.documento_subido_por === auth.username;
+
+    if (!privilegiado && !esQuienSubio) {
+      return {
+        success: false,
+        error: 'Solo quien subio el documento o un administrador puede eliminarlo',
+      };
+    }
+
+    if (item.documento_url) {
+      const path = extraerPathDeUrl(item.documento_url, 'proceso-documentos');
+      if (path) {
+        await supabase.storage.from('proceso-documentos').remove([path]);
+      }
+    }
+
+    const { error: updError } = await supabase
+      .from('proceso_checklist_item')
+      .update({
+        documento_url: null,
+        documento_nombre: null,
+        documento_size: null,
+        documento_subido_por: null,
+        documento_subido_at: null,
+      })
+      .eq('id', itemId);
+
+    if (updError) throw updError;
+
+    revalidatePath('/dashboard/adquisicion');
+    revalidatePath('/dashboard/clientes', 'layout');
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Genera una signed URL temporal para descargar el documento de un item.
+ */
+export async function obtenerUrlDocumento(itemId: string, expiresInSeconds = 300) {
+  if (!itemId) return { success: false as const, error: 'ID de item requerido' };
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false as const, error: 'No autenticado' };
+
+    const { data: item } = await supabase
+      .from('proceso_checklist_item')
+      .select('documento_url')
+      .eq('id', itemId)
+      .maybeSingle();
+
+    if (!item?.documento_url) return { success: false as const, error: 'Item sin documento' };
+
+    const path = extraerPathDeUrl(item.documento_url, 'proceso-documentos');
+    if (!path) return { success: false as const, error: 'URL invalida' };
+
+    const { data, error } = await supabase
+      .storage
+      .from('proceso-documentos')
+      .createSignedUrl(path, expiresInSeconds);
+
+    if (error || !data) {
+      return { success: false as const, error: error?.message ?? 'No se pudo generar URL' };
+    }
+
+    return { success: true as const, data: { url: data.signedUrl } };
+  } catch (error: any) {
+    return { success: false as const, error: error.message };
+  }
+}
+
+function extraerPathDeUrl(url: string, bucket: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const marker = `/${bucket}/`;
+    const idx = parsed.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return parsed.pathname.slice(idx + marker.length);
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// ETAPA 3: cierre del proceso -> creacion de venta + cronograma
+// ============================================================
+
+interface CerrarVentaInput {
+  procesoId: string;
+  precioTotal: number;
+  montoInicial: number;
+  numeroCuotas: number;
+  fechaPrimeraCuota?: string;
+  notas?: string;
+}
+
+export interface CerrarVentaResult {
+  ventaId: string;
+  codigoVenta: string;
+  totalCuotas: number;
+  formaPago: string;
+  precioTotal: number;
+  saldoPendiente: number;
+}
+
+/**
+ * Cierra un proceso de adquisicion en etapa 'desembolso':
+ * crea la venta, genera el cronograma de cuotas, marca el lote como
+ * vendido, completa el proceso y marca la reserva como convertida.
+ * Autorizacion: vendedor asignado al proceso o admin/coord/gerente.
+ */
+export async function cerrarProcesoYCrearVenta(input: CerrarVentaInput): Promise<{
+  success: boolean;
+  error?: string;
+  data?: CerrarVentaResult;
+}> {
+  if (!input.procesoId) return { success: false, error: 'ID de proceso requerido' };
+  if (!Number.isFinite(input.precioTotal) || input.precioTotal <= 0) {
+    return { success: false, error: 'Precio total invalido' };
+  }
+  if (!Number.isFinite(input.montoInicial) || input.montoInicial < 0) {
+    return { success: false, error: 'Monto inicial invalido' };
+  }
+  if (input.montoInicial > input.precioTotal) {
+    return { success: false, error: 'El monto inicial no puede superar el precio total' };
+  }
+  if (!Number.isInteger(input.numeroCuotas) || input.numeroCuotas < 0) {
+    return { success: false, error: 'Numero de cuotas invalido' };
+  }
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const auth = await obtenerUsernameActual(supabase);
+    if (!auth.success) return auth;
+
+    const privilegiado = await esAdminOCoordinador();
+
+    // Cargar proceso para chequear permiso del vendedor.
+    const { data: proceso, error: procError } = await supabase
+      .from('proceso_adquisicion')
+      .select('id, vendedor_username, estado, etapa_actual, cliente_id')
+      .eq('id', input.procesoId)
+      .maybeSingle();
+
+    if (procError) return { success: false, error: procError.message };
+    if (!proceso) return { success: false, error: 'Proceso no encontrado' };
+
+    const esVendedorAsignado = proceso.vendedor_username === auth.username;
+    if (!privilegiado && !esVendedorAsignado) {
+      return {
+        success: false,
+        error: 'Solo el vendedor asignado o un administrador puede cerrar la venta',
+      };
+    }
+
+    const { data, error: rpcError } = await supabase.rpc('cerrar_proceso_y_crear_venta', {
+      p_proceso_id: input.procesoId,
+      p_precio_total: input.precioTotal,
+      p_monto_inicial: input.montoInicial,
+      p_numero_cuotas: input.numeroCuotas,
+      p_fecha_primera_cuota: input.fechaPrimeraCuota ?? null,
+      p_notas: input.notas ?? null,
+    });
+
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
+    }
+
+    revalidatePath('/dashboard/adquisicion');
+    revalidatePath('/dashboard/clientes', 'layout');
+    if (proceso.cliente_id) revalidarCliente(proceso.cliente_id);
+
+    const result = data as Record<string, unknown> | null;
+    if (!result || typeof result.venta_id !== 'string') {
+      return { success: false, error: 'Respuesta inesperada del servidor' };
+    }
+
+    return {
+      success: true,
+      data: {
+        ventaId: result.venta_id as string,
+        codigoVenta: (result.codigo_venta as string) ?? '',
+        totalCuotas: Number(result.total_cuotas ?? 0),
+        formaPago: (result.forma_pago as string) ?? '',
+        precioTotal: Number(result.precio_total ?? input.precioTotal),
+        saldoPendiente: Number(result.saldo_pendiente ?? 0),
+      },
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Carga datos de contexto para el modal de cierre de venta:
+ * lote (precio sugerido, moneda), reserva (monto seña, forma_pago),
+ * y configuracion financiera del proyecto (tasa, max cuotas).
+ */
+export async function obtenerContextoCierreVenta(procesoId: string): Promise<{
+  success: boolean;
+  error?: string;
+  data?: {
+    procesoCodigo: string;
+    loteCodigo: string;
+    proyectoNombre: string | null;
+    precioSugerido: number | null;
+    moneda: string;
+    montoSeparacion: number | null;
+    formaPagoReserva: string | null;
+    tasaEfectivaMensual: number;
+    maxCuotasSaldo: number;
+    porcentajeCuotaInicial: number;
+  };
+}> {
+  if (!procesoId) return { success: false, error: 'ID de proceso requerido' };
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const { data: proceso } = await supabase
+      .from('proceso_adquisicion')
+      .select(`
+        codigo,
+        lote:lote!lote_id(id, codigo, precio, moneda, proyecto_id, proyecto:proyecto!proyecto_id(nombre)),
+        reserva:reserva!reserva_id(monto_reserva, forma_pago, moneda)
+      `)
+      .eq('id', procesoId)
+      .maybeSingle();
+
+    if (!proceso) return { success: false, error: 'Proceso no encontrado' };
+
+    const lote = Array.isArray((proceso as any).lote) ? (proceso as any).lote[0] : (proceso as any).lote;
+    const reserva = Array.isArray((proceso as any).reserva) ? (proceso as any).reserva[0] : (proceso as any).reserva;
+    const proyecto = lote?.proyecto
+      ? (Array.isArray(lote.proyecto) ? lote.proyecto[0] : lote.proyecto)
+      : null;
+
+    let tasaEfectivaMensual = 0;
+    let maxCuotasSaldo = 120;
+    let porcentajeCuotaInicial = 20;
+
+    if (lote?.proyecto_id) {
+      const { data: config } = await supabase
+        .schema('crm')
+        .from('configuracion_proyecto_financiera')
+        .select('tasa_efectiva_mensual, max_cuotas_saldo, porcentaje_cuota_inicial')
+        .eq('proyecto_id', lote.proyecto_id)
+        .maybeSingle();
+      if (config) {
+        tasaEfectivaMensual = Number(config.tasa_efectiva_mensual) || 0;
+        maxCuotasSaldo = Number(config.max_cuotas_saldo) || 120;
+        porcentajeCuotaInicial = Number(config.porcentaje_cuota_inicial) || 20;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        procesoCodigo: proceso.codigo,
+        loteCodigo: lote?.codigo ?? '',
+        proyectoNombre: proyecto?.nombre ?? null,
+        precioSugerido: lote?.precio ?? null,
+        moneda: reserva?.moneda ?? lote?.moneda ?? 'PEN',
+        montoSeparacion: reserva?.monto_reserva ?? null,
+        formaPagoReserva: reserva?.forma_pago ?? null,
+        tasaEfectivaMensual,
+        maxCuotasSaldo,
+        porcentajeCuotaInicial,
+      },
+    };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

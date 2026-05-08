@@ -159,7 +159,7 @@ export default function DetalleReservaModal({
                   <div>
                     <Dialog.Title className="text-xl font-bold text-crm-text flex items-center gap-2">
                       <FileText className="h-6 w-6 text-crm-primary" />
-                      Detalle de Reserva
+                      Detalle de Separación
                     </Dialog.Title>
                     <p className="text-sm text-crm-text-muted mt-1">
                       {reserva.codigo_reserva}
@@ -227,7 +227,7 @@ export default function DetalleReservaModal({
                         </span>
                         <div>
                           <p className="text-xs text-crm-text-muted uppercase tracking-wide">
-                            Monto de Reserva
+                            Monto de Separación
                           </p>
                           <p className="text-xl font-bold text-crm-primary">
                             {formatearMoneda(reserva.monto_reserva, reserva.moneda as Moneda)}
@@ -253,7 +253,7 @@ export default function DetalleReservaModal({
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-crm-text-muted uppercase tracking-wide flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        Lote Reservado
+                        Lote Separado
                       </h3>
                       <div className="p-4 rounded-xl bg-crm-background border border-crm-border">
                         <p className="font-semibold text-crm-text">
@@ -273,7 +273,7 @@ export default function DetalleReservaModal({
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-crm-text-muted uppercase tracking-wide flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        Fecha de Reserva
+                        Fecha de Separación
                       </h3>
                       <div className="p-4 rounded-xl bg-crm-background border border-crm-border">
                         <p className="font-medium text-crm-text">

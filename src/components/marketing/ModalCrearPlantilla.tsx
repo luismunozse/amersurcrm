@@ -1,30 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Mail, MessageCircle } from "lucide-react";
-import { crearPlantilla, actualizarPlantilla } from "@/app/dashboard/admin/marketing/_actions";
-import type { MarketingTemplate, CategoriaTemplate, EstadoAprobacion } from "@/types/whatsapp-marketing";
+import { useEffect, useMemo, useState } from "react";
+import { X, Save, Loader2, MessageSquare, Plus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  crearPlantilla,
+  actualizarPlantilla,
+} from "@/app/dashboard/admin/marketing/_actions";
+import { extractVariables, renderTemplate } from "@/lib/marketing/whatsapp";
+import type { MarketingTemplate } from "@/types/whatsapp-marketing";
 
 interface ModalCrearPlantillaProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  plantilla?: MarketingTemplate; // Si se pasa, modo edición
+  plantilla?: MarketingTemplate;
 }
+
+const CATEGORIAS_SUGERIDAS = [
+  "bienvenida",
+  "seguimiento",
+  "cobranza",
+  "post_venta",
+  "promocion",
+  "recordatorio",
+  "general",
+];
 
 const FORM_DEFAULTS = {
   nombre: "",
-  canal_tipo: "whatsapp" as "whatsapp" | "sms" | "email",
-  whatsapp_template_id: "",
-  categoria: "MARKETING" as CategoriaTemplate,
-  idioma: "es",
+  categoria: "general",
   body_texto: "",
-  footer_texto: "",
-  subject: "",
-  body_html: "",
-  estado_aprobacion: "APPROVED" as EstadoAprobacion,
   objetivo: "",
+  tags: [] as string[],
   activo: true,
 };
 
@@ -35,496 +43,319 @@ export default function ModalCrearPlantilla({
   plantilla,
 }: ModalCrearPlantillaProps) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(FORM_DEFAULTS);
-  const [variables, setVariables] = useState<string[]>([]);
-  const [newVariable, setNewVariable] = useState("");
-  const [botones, setBotones] = useState<
-    Array<{
-      tipo: "URL" | "QUICK_REPLY" | "PHONE_NUMBER";
-      texto: string;
-      url?: string;
-      phone_number?: string;
-    }>
-  >([]);
+  const [form, setForm] = useState(FORM_DEFAULTS);
+  const [tagInput, setTagInput] = useState("");
 
   const esEdicion = !!plantilla;
 
-  // Pre-popular el formulario cuando se abre en modo edición
   useEffect(() => {
-    if (open && plantilla) {
-      setFormData({
+    if (!open) return;
+    if (plantilla) {
+      setForm({
         nombre: plantilla.nombre,
-        canal_tipo: plantilla.canal_tipo ?? "whatsapp",
-        whatsapp_template_id: plantilla.whatsapp_template_id || "",
-        categoria: plantilla.categoria,
-        idioma: plantilla.idioma,
+        categoria: plantilla.categoria || "general",
         body_texto: plantilla.body_texto,
-        footer_texto: plantilla.footer_texto || "",
-        subject: plantilla.subject || "",
-        body_html: plantilla.body_html || "",
-        estado_aprobacion: plantilla.estado_aprobacion,
-        objetivo: plantilla.objetivo || "",
+        objetivo: plantilla.objetivo ?? "",
+        tags: plantilla.tags ?? [],
         activo: plantilla.activo,
       });
-      setVariables(plantilla.variables || []);
-      setBotones(plantilla.botones || []);
-    } else if (open && !plantilla) {
-      // Modo creación: limpiar
-      setFormData(FORM_DEFAULTS);
-      setVariables([]);
-      setBotones([]);
+    } else {
+      setForm(FORM_DEFAULTS);
     }
-    setNewVariable("");
+    setTagInput("");
   }, [open, plantilla]);
+
+  const variablesDetectadas = useMemo(
+    () => extractVariables(form.body_texto),
+    [form.body_texto],
+  );
+
+  const previewSample = useMemo(() => {
+    const sample: Record<string, string> = {};
+    for (const v of variablesDetectadas) {
+      sample[v] = `[${v}]`;
+    }
+    return renderTemplate(form.body_texto, sample);
+  }, [form.body_texto, variablesDetectadas]);
 
   if (!open) return null;
 
-  const handleAddVariable = () => {
-    if (newVariable.trim()) {
-      setVariables([...variables, newVariable.trim()]);
-      setNewVariable("");
-    }
-  };
-
-  const handleRemoveVariable = (index: number) => {
-    setVariables(variables.filter((_, i) => i !== index));
-  };
-
-  const handleAddBoton = () => {
-    setBotones([...botones, { tipo: "URL", texto: "", url: "" }]);
-  };
-
-  const handleRemoveBoton = (index: number) => {
-    setBotones(botones.filter((_, i) => i !== index));
-  };
-
-  const handleBotonChange = (index: number, field: string, value: string) => {
-    const newBotones = [...botones];
-    newBotones[index] = { ...newBotones[index], [field]: value };
-    setBotones(newBotones);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!form.nombre.trim() || !form.body_texto.trim()) {
+      toast.error("Nombre y mensaje son obligatorios");
+      return;
+    }
 
+    setLoading(true);
     try {
-      const payload = {
-        ...formData,
-        variables,
-        botones: formData.canal_tipo === "email" ? [] : botones.filter((b) => b.texto.trim() !== ""),
-        tags: plantilla?.tags || [],
-        subject: formData.canal_tipo === "email" ? formData.subject : undefined,
-        body_html: formData.canal_tipo === "email" && formData.body_html ? formData.body_html : undefined,
+      const payload: Partial<MarketingTemplate> = {
+        nombre: form.nombre.trim(),
+        categoria: form.categoria.trim() || "general",
+        body_texto: form.body_texto,
+        variables: variablesDetectadas,
+        objetivo: form.objetivo.trim() || undefined,
+        tags: form.tags,
+        activo: form.activo,
       };
 
       const result = esEdicion
-        ? await actualizarPlantilla(plantilla.id, payload)
+        ? await actualizarPlantilla(plantilla!.id, payload)
         : await crearPlantilla(payload);
 
       if (result.error) {
         toast.error(result.error);
-      } else {
-        toast.success(esEdicion ? "Plantilla actualizada" : "Plantilla creada exitosamente");
-        onSuccess();
-        onClose();
+        return;
       }
-    } catch (error) {
-      console.error("Error guardando plantilla:", error);
-      toast.error(esEdicion ? "Error actualizando plantilla" : "Error creando plantilla");
+
+      toast.success(esEdicion ? "Plantilla actualizada" : "Plantilla creada");
+      onSuccess();
+      onClose();
     } finally {
       setLoading(false);
     }
   };
 
+  const agregarTag = () => {
+    const t = tagInput.trim();
+    if (!t || form.tags.includes(t)) return;
+    setForm((f) => ({ ...f, tags: [...f.tags, t] }));
+    setTagInput("");
+  };
+
+  const eliminarTag = (t: string) =>
+    setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }));
+
+  const insertarVariable = (v: string) => {
+    setForm((f) => ({ ...f, body_texto: f.body_texto + `{{${v}}}` }));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Backdrop */}
-        <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150">
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-crm-card border-t sm:border border-crm-border rounded-t-xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl max-h-[92vh] flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1">
+          <span className="h-1 w-10 rounded-full bg-crm-border" />
+        </div>
 
-        {/* Modal */}
-        <div className="relative w-full max-w-3xl bg-crm-card rounded-xl shadow-xl border border-crm-border">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-crm-border">
-            <div>
-              <h3 className="text-xl font-semibold text-crm-text-primary">
-                {esEdicion ? "Editar Plantilla" : "Crear Plantilla de Mensaje"}
-              </h3>
-              <p className="text-sm text-crm-text-secondary mt-1">
-                {esEdicion
-                  ? `Modificando: ${plantilla.nombre}`
-                  : "Crea plantillas de WhatsApp o SMS para tus campañas con Twilio"}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-crm-text-muted hover:text-crm-text-primary transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="flex items-start justify-between p-5 border-b border-crm-border">
+          <div>
+            <h4 className="text-lg font-semibold text-crm-text-primary flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-crm-primary" />
+              {esEdicion ? "Editar plantilla" : "Nueva plantilla WhatsApp"}
+            </h4>
+            <p className="text-xs text-crm-text-muted mt-1">
+              Texto enviable vía WhatsApp Web. Usa{" "}
+              <code className="px-1 bg-crm-bg-secondary rounded">{`{{variable}}`}</code>{" "}
+              para campos dinámicos.
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-crm-text-muted hover:text-crm-text-primary"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-          {/* Body */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-            {/* Canal */}
+        <form
+          onSubmit={handleSubmit}
+          className="overflow-y-auto p-5 space-y-4 flex-1"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-crm-text-primary mb-2">Canal de envío *</label>
-              <div className="flex gap-2">
-                {(["whatsapp", "email"] as const).map((canal) => (
-                  <button
-                    key={canal}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, canal_tipo: canal })}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm rounded-xl border transition-colors ${
-                      formData.canal_tipo === canal
-                        ? canal === "email"
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : "bg-crm-primary text-white border-crm-primary"
-                        : "border-crm-border text-crm-text-secondary hover:bg-crm-card-hover"
-                    }`}
-                  >
-                    {canal === "email" ? <Mail className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
-                    {canal === "email" ? "Email" : "WhatsApp"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Información básica */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-crm-text-primary">Información Básica</h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Nombre de la Plantilla *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    placeholder="Ej: Bienvenida AMERSUR"
-                  />
-                  <p className="text-xs text-crm-text-muted mt-1">
-                    Nombre descriptivo para identificar la plantilla en el CRM
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Código Interno
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.whatsapp_template_id}
-                    onChange={(e) =>
-                      setFormData({ ...formData, whatsapp_template_id: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    placeholder="ej: bienvenida_amersur (opcional)"
-                  />
-                  <p className="text-xs text-crm-text-muted mt-1">
-                    Código para identificar fácilmente esta plantilla (opcional)
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Categoría *
-                  </label>
-                  <select
-                    value={formData.categoria}
-                    onChange={(e) =>
-                      setFormData({ ...formData, categoria: e.target.value as CategoriaTemplate })
-                    }
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  >
-                    <option value="MARKETING">Marketing</option>
-                    <option value="UTILITY">Utility</option>
-                    <option value="AUTHENTICATION">Authentication</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Idioma *
-                  </label>
-                  <select
-                    value={formData.idioma}
-                    onChange={(e) => setFormData({ ...formData, idioma: e.target.value })}
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  >
-                    <option value="es">Español (es)</option>
-                    <option value="es_ES">Español - España (es_ES)</option>
-                    <option value="es_MX">Español - México (es_MX)</option>
-                    <option value="en">English (en)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Estado *
-                  </label>
-                  <select
-                    value={formData.estado_aprobacion}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        estado_aprobacion: e.target.value as EstadoAprobacion,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  >
-                    <option value="APPROVED">Activa (lista para usar)</option>
-                    <option value="DRAFT">Borrador</option>
-                  </select>
-                  <p className="text-xs text-crm-text-muted mt-1">
-                    Con Twilio no necesitas aprobación previa
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Contenido */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-crm-text-primary">Contenido del Mensaje</h4>
-
-              <div>
-                <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                  Cuerpo del Mensaje *
-                </label>
-                <textarea
-                  required
-                  value={formData.body_texto}
-                  onChange={(e) => setFormData({ ...formData, body_texto: e.target.value })}
-                  rows={5}
-                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  placeholder="Hola {{nombre}}, bienvenido a AMERSUR Inmobiliaria. Tu vendedor {{vendedor}} te atenderá..."
-                />
-                <p className="text-xs text-crm-text-muted mt-1">
-                  Usa {`{{nombre_variable}}`} para insertar variables personalizadas
-                </p>
-              </div>
-
-              {/* Campos específicos de email */}
-              {formData.canal_tipo === "email" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                      Asunto del email *
-                    </label>
-                    <input
-                      type="text"
-                      required={formData.canal_tipo === "email"}
-                      value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      placeholder="Ej: Nueva propiedad disponible para ti, {{nombre}}"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                      Cuerpo HTML (Opcional)
-                    </label>
-                    <textarea
-                      value={formData.body_html}
-                      onChange={(e) => setFormData({ ...formData, body_html: e.target.value })}
-                      rows={6}
-                      className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary font-mono text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                      placeholder="<p>Hola {{nombre}},</p><p>Tenemos una nueva propiedad...</p>"
-                    />
-                    <p className="text-xs text-crm-text-muted mt-1">
-                      Si está vacío, el sistema convertirá el cuerpo de texto a HTML automáticamente.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {formData.canal_tipo !== "email" && (
-                <div>
-                  <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                    Pie de Página (Opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.footer_texto}
-                    onChange={(e) => setFormData({ ...formData, footer_texto: e.target.value })}
-                    className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                    placeholder="AMERSUR - Tu hogar, nuestra pasión"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Variables */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-crm-text-primary">Variables</h4>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newVariable}
-                  onChange={(e) => setNewVariable(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddVariable();
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                  placeholder="nombre_cliente, nombre_vendedor, proyecto..."
-                />
-                <button
-                  type="button"
-                  onClick={handleAddVariable}
-                  className="px-4 py-2 bg-crm-secondary text-white rounded-lg hover:bg-crm-secondary-hover transition-colors flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Agregar
-                </button>
-              </div>
-
-              {variables.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {variables.map((variable, index) => (
-                    <div
-                      key={index}
-                      className="inline-flex items-center gap-2 px-3 py-1 bg-crm-info/10 text-crm-info rounded-lg border border-crm-info/30"
-                    >
-                      <span className="text-sm font-medium">
-                        {`{{${index + 1}}}`} = {variable}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveVariable(index)}
-                        className="text-crm-error hover:text-crm-error/80"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <p className="text-xs text-crm-text-muted">
-                Las variables te permiten personalizar el mensaje para cada cliente
-              </p>
-            </div>
-
-            {/* Botones de acción (opcional) */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-crm-text-primary">Botones (Opcional)</h4>
-                <button
-                  type="button"
-                  onClick={handleAddBoton}
-                  className="text-sm text-crm-primary hover:text-crm-primary-hover flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Agregar Botón
-                </button>
-              </div>
-
-              {botones.map((boton, index) => (
-                <div
-                  key={index}
-                  className="flex gap-2 p-3 bg-crm-bg-secondary rounded-lg border border-crm-border"
-                >
-                  <div className="flex-1 space-y-2">
-                    <select
-                      value={boton.tipo}
-                      onChange={(e) => handleBotonChange(index, "tipo", e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
-                    >
-                      <option value="URL">URL</option>
-                      <option value="QUICK_REPLY">Respuesta Rápida</option>
-                      <option value="PHONE_NUMBER">Teléfono</option>
-                    </select>
-
-                    <input
-                      type="text"
-                      value={boton.texto}
-                      onChange={(e) => handleBotonChange(index, "texto", e.target.value)}
-                      placeholder="Texto del botón"
-                      className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
-                    />
-
-                    {boton.tipo === "URL" && (
-                      <input
-                        type="url"
-                        value={boton.url || ""}
-                        onChange={(e) => handleBotonChange(index, "url", e.target.value)}
-                        placeholder="https://ejemplo.com"
-                        className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
-                      />
-                    )}
-
-                    {boton.tipo === "PHONE_NUMBER" && (
-                      <input
-                        type="tel"
-                        value={boton.phone_number || ""}
-                        onChange={(e) => handleBotonChange(index, "phone_number", e.target.value)}
-                        placeholder="+51987654321"
-                        className="w-full px-3 py-2 text-sm border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary"
-                      />
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveBoton(index)}
-                    className="text-crm-error hover:text-crm-error/80"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Objetivo */}
-            <div>
-              <label className="block text-sm font-medium text-crm-text-primary mb-2">
-                Objetivo de la Plantilla (Opcional)
+              <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+                Nombre *
               </label>
               <input
                 type="text"
-                value={formData.objetivo}
-                onChange={(e) => setFormData({ ...formData, objetivo: e.target.value })}
-                className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-bg-primary text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary"
-                placeholder="Ej: Dar bienvenida a nuevos clientes interesados"
+                value={form.nombre}
+                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+                required
+                placeholder="Ej: Bienvenida cliente nuevo"
+                className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+                Categoría
+              </label>
+              <input
+                type="text"
+                list="categorias-marketing"
+                value={form.categoria}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, categoria: e.target.value }))
+                }
+                placeholder="general"
+                className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+              />
+              <datalist id="categorias-marketing">
+                {CATEGORIAS_SUGERIDAS.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+          </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 pt-6 border-t border-crm-border">
+          <div>
+            <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+              Mensaje *
+            </label>
+            <textarea
+              value={form.body_texto}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, body_texto: e.target.value }))
+              }
+              required
+              rows={6}
+              placeholder={`Hola {{cliente}}, gracias por tu interés en {{proyecto}}...`}
+              className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary font-mono"
+            />
+            <div className="flex flex-wrap gap-1 mt-2">
+              <span className="text-xs text-crm-text-muted">
+                Variables rápidas:
+              </span>
+              {["cliente", "proyecto", "vendedor", "monto", "fecha"].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertarVariable(v)}
+                  className="px-2 py-0.5 text-xs bg-crm-info/10 text-crm-info rounded border border-crm-info/20 hover:bg-crm-info/20"
+                >
+                  + {`{{${v}}}`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {variablesDetectadas.length > 0 && (
+            <div className="bg-crm-bg-secondary border border-crm-border rounded-lg p-3">
+              <p className="text-xs font-medium text-crm-text-muted uppercase mb-1">
+                Variables detectadas
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {variablesDetectadas.map((v) => (
+                  <span
+                    key={v}
+                    className="px-2 py-0.5 text-xs bg-crm-info/10 text-crm-info rounded"
+                  >
+                    {`{{${v}}}`}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {form.body_texto && (
+            <div>
+              <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+                Vista previa
+              </label>
+              <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-3 text-sm text-green-900 dark:text-green-50 whitespace-pre-wrap">
+                {previewSample}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+              Objetivo (opcional)
+            </label>
+            <input
+              type="text"
+              value={form.objetivo}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, objetivo: e.target.value }))
+              }
+              placeholder="Ej: Convertir lead a visita"
+              className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+              Tags
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    agregarTag();
+                  }
+                }}
+                placeholder="Agregar tag…"
+                className="flex-1 px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+              />
               <button
                 type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="px-4 py-2 text-crm-text-muted hover:text-crm-text-primary border border-crm-border rounded-lg transition-colors disabled:opacity-50"
+                onClick={agregarTag}
+                className="px-3 py-2 bg-crm-card-hover text-crm-text-primary rounded-lg hover:bg-crm-border"
               >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-6 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading
-                  ? esEdicion
-                    ? "Guardando..."
-                    : "Creando..."
-                  : esEdicion
-                    ? "Guardar Cambios"
-                    : "Crear Plantilla"}
+                <Plus className="w-4 h-4" />
               </button>
             </div>
-          </form>
+            {form.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {form.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-crm-primary/10 text-crm-primary rounded"
+                  >
+                    {t}
+                    <button
+                      type="button"
+                      onClick={() => eliminarTag(t)}
+                      className="hover:text-crm-error"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-crm-text-primary">
+            <input
+              type="checkbox"
+              checked={form.activo}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, activo: e.target.checked }))
+              }
+              className="w-4 h-4"
+            />
+            Plantilla activa (disponible para envío)
+          </label>
+        </form>
+
+        <div className="flex justify-end gap-3 p-5 border-t border-crm-border">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-crm-text-secondary border border-crm-border rounded-lg hover:bg-crm-card-hover"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-4 py-2 text-sm bg-crm-primary text-white rounded-lg hover:bg-crm-primary-hover flex items-center gap-2 disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {esEdicion ? "Guardar cambios" : "Crear plantilla"}
+          </button>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import {
   obtenerLotesParaSeparacion,
   registrarSeparacion,
 } from "./_actions-separacion";
+import { descargarConstanciaSeparacion } from "@/components/separacion/generarConstanciaSeparacionPdf";
 
 type FormaPago =
   | "contado"
@@ -42,23 +43,39 @@ interface LoteOption {
   es_interes: boolean;
 }
 
+interface ProformaPrefill {
+  proformaId: string;
+  loteId: string | null;
+  montoSeparacion: number | null;
+  moneda: "PEN" | "USD";
+  formaPagoSugerida: FormaPago | null;
+  notas: string | null;
+  numero: string | null;
+  proyectoNombre: string | null;
+  loteCodigo: string | null;
+}
+
 interface Props {
   clienteId: string;
   onClose: () => void;
   onSuccess?: () => void;
+  /** Si se pasa, prefilla los campos y enlaza la proforma al registrar. */
+  proformaPrefill?: ProformaPrefill;
 }
 
-export default function SeparacionModal({ clienteId, onClose, onSuccess }: Props) {
+export default function SeparacionModal({ clienteId, onClose, onSuccess, proformaPrefill }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lotes, setLotes] = useState<LoteOption[]>([]);
-  const [loteId, setLoteId] = useState<string>("");
-  const [monto, setMonto] = useState<string>("");
-  const [moneda, setMoneda] = useState<"PEN" | "USD">("PEN");
-  const [formaPago, setFormaPago] = useState<FormaPago>("contado");
+  const [loteId, setLoteId] = useState<string>(proformaPrefill?.loteId ?? "");
+  const [monto, setMonto] = useState<string>(
+    proformaPrefill?.montoSeparacion ? String(proformaPrefill.montoSeparacion) : "",
+  );
+  const [moneda, setMoneda] = useState<"PEN" | "USD">(proformaPrefill?.moneda ?? "PEN");
+  const [formaPago, setFormaPago] = useState<FormaPago>(proformaPrefill?.formaPagoSugerida ?? "contado");
   const [metodoPago, setMetodoPago] = useState<string>("efectivo");
   const [fechaVencimiento, setFechaVencimiento] = useState<string>("");
-  const [notas, setNotas] = useState<string>("");
+  const [notas, setNotas] = useState<string>(proformaPrefill?.notas ?? "");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -98,12 +115,12 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess }: Props
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!loteId) {
-      toast.error("Seleccioná una unidad");
+      toast.error("Seleccione una unidad");
       return;
     }
     const montoNum = Number(monto);
     if (!Number.isFinite(montoNum) || montoNum <= 0) {
-      toast.error("Ingresá un monto válido");
+      toast.error("Ingrese un monto válido");
       return;
     }
 
@@ -117,6 +134,7 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess }: Props
         metodoPago,
         fechaVencimiento: fechaVencimiento || undefined,
         notas: notas || undefined,
+        proformaId: proformaPrefill?.proformaId,
       });
 
       if (!res.success) {
@@ -129,6 +147,35 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess }: Props
           ? `Separación ${res.data.codigoReserva} registrada`
           : "Separación registrada",
       );
+
+      // Descargar constancia automáticamente para que el vendedor
+      // pueda entregarla al cliente al instante.
+      if (res.data?.constancia) {
+        try {
+          const c = res.data.constancia;
+          await descargarConstanciaSeparacion({
+            comprador: {
+              nombre: c.compradorNombre,
+              dni: c.compradorDni ?? "—",
+            },
+            compradorDomicilio: c.compradorDomicilio,
+            montoSeparacion: c.montoSeparacion,
+            moneda: c.moneda,
+            metodoPago: c.metodoPago ?? "transferencia",
+            numeroOperacion: c.numeroOperacion,
+            loteNumero: c.loteNumero,
+            loteArea: c.loteArea,
+            proyectoNombre: c.proyectoNombre,
+            fechaDocumento: c.fechaDocumento,
+            observaciones: c.observaciones,
+          });
+          toast.success("Constancia descargada");
+        } catch (e) {
+          console.error("[SeparacionModal] Error descargando constancia:", e);
+          toast.error("Separación creada, pero falló la descarga de la constancia. Use el botón verde en la lista.");
+        }
+      }
+
       onSuccess?.();
       onClose();
     });
@@ -157,7 +204,9 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess }: Props
             <div>
               <h2 className="text-lg font-semibold text-crm-text-primary">Registrar Separación</h2>
               <p className="text-xs text-crm-text-muted">
-                Inicia el proceso de adquisición del cliente
+                {proformaPrefill
+                  ? `Desde proforma ${proformaPrefill.numero ?? ""} · ${proformaPrefill.proyectoNombre ?? ""} ${proformaPrefill.loteCodigo ?? ""}`.trim()
+                  : "Inicia el proceso de adquisición del cliente"}
               </p>
             </div>
           </div>

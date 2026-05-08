@@ -104,10 +104,10 @@ export default function ChangelogModal({ isOpen, onClose }: ChangelogModalProps)
       />
 
       {/* Modal: bottom-sheet en móvil, centrado en desktop */}
-      <div className="relative w-full sm:max-w-lg bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 fade-in duration-200 max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+      <div className="relative w-full sm:max-w-lg bg-crm-card border border-crm-border rounded-t-2xl sm:rounded-2xl shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 fade-in duration-200 max-h-[90vh] sm:max-h-[85vh] flex flex-col">
         {/* Indicador de drag en móvil */}
         <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          <div className="w-10 h-1 bg-crm-border rounded-full" />
         </div>
 
         {/* Header */}

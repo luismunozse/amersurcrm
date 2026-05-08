@@ -1,27 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban, Eye, Plus } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ArrowRight, Trash2, Ban, Eye, Plus, Download, Bug } from "lucide-react";
+import { descargarConstanciaSeparacion } from "@/components/separacion/generarConstanciaSeparacionPdf";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import type { ReservaConRelaciones } from "@/lib/types/cliente-detail";
-import CrearReservaModal from "@/components/CrearReservaModal";
+import SeparacionModal from "./_SeparacionModal";
 import CancelarReservaModal from "@/components/CancelarReservaModal";
 import EliminarReservaModal from "@/components/EliminarReservaModal";
 import DetalleReservaModal from "@/components/DetalleReservaModal";
 import AdminSeparacionActions from "./_AdminSeparacionActions";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
+import { diagnosticarReservasCliente } from "./_actions-separacion";
+import toast from "react-hot-toast";
 
 interface Props {
   clienteId: string;
   clienteNombre: string;
+  clienteDni?: string;
+  clienteDomicilio?: string;
   reservas: ReservaConRelaciones[];
   isAdmin?: boolean;
 }
 
-export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmin = false }: Props) {
-  const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
-  const [selectedLote, setSelectedLote] = useState<{ id: string; nombre: string } | null>(null);
+export default function TabReservas({ clienteId, clienteNombre, clienteDni, clienteDomicilio, reservas, isAdmin = false }: Props) {
+  const router = useRouter();
+  const [isSeparacionOpen, setIsSeparacionOpen] = useState(false);
+  const [diagOutput, setDiagOutput] = useState<string | null>(null);
+
+  async function handleDiagnostico() {
+    const res = await diagnosticarReservasCliente(clienteId);
+    if (!res.success || !res.data) {
+      toast.error(res.error || "Error en diagnóstico");
+      setDiagOutput(JSON.stringify(res, null, 2));
+      return;
+    }
+    setDiagOutput(JSON.stringify(res.data, null, 2));
+  }
 
   // Estado para modal de cancelar reserva
   const [cancelarModalOpen, setCancelarModalOpen] = useState(false);
@@ -65,29 +82,45 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-crm-text">Reservas</h3>
+        <h3 className="text-lg font-semibold text-crm-text">Separaciones</h3>
         <button
-          onClick={() => setIsCrearModalOpen(true)}
+          onClick={() => setIsSeparacionOpen(true)}
           className="px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors text-sm"
         >
-          Nueva Reserva
+          Registrar Separación
         </button>
       </div>
 
       {!reservas || reservas.length === 0 ? (
         <div className="text-center py-10 sm:py-12 px-4 bg-crm-background rounded-lg">
           <FileText className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-crm-text-muted opacity-50" aria-hidden />
-          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay reservas registradas</p>
+          <p className="text-sm sm:text-base font-semibold text-crm-text-primary mb-1">No hay separaciones registradas</p>
           <p className="text-xs sm:text-sm text-crm-text-muted mb-4 max-w-sm mx-auto">
-            Cuando registres una separación con seña, aparecerá acá con su estado y acciones disponibles.
+            Cuando registre una separación con seña, aparecerá acá con su estado y acciones disponibles.
           </p>
           <button
-            onClick={() => setIsCrearModalOpen(true)}
+            onClick={() => setIsSeparacionOpen(true)}
             className="inline-flex items-center gap-2 px-4 h-10 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors font-medium text-sm"
           >
             <Plus className="h-4 w-4" aria-hidden />
-            Crear primera reserva
+            Registrar primera separación
           </button>
+          {isAdmin && (
+            <div className="mt-6 max-w-2xl mx-auto">
+              <button
+                onClick={handleDiagnostico}
+                className="inline-flex items-center gap-1.5 text-xs text-crm-text-muted hover:text-crm-text-primary underline"
+              >
+                <Bug className="h-3 w-3" aria-hidden />
+                Ejecutar diagnóstico (admin)
+              </button>
+              {diagOutput && (
+                <pre className="mt-3 p-3 bg-crm-card border border-crm-border rounded-lg text-xs text-left overflow-auto max-h-96 whitespace-pre-wrap break-all">
+                  {diagOutput}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -135,7 +168,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
 
                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-crm-border">
                   <div className="text-sm">
-                    <p className="text-crm-text-muted text-xs mb-1">Fecha de Reserva</p>
+                    <p className="text-crm-text-muted text-xs mb-1">Fecha de Separación</p>
                     <p className="text-crm-text">
                       {new Date(reserva.fecha_reserva).toLocaleDateString('es-PE', {
                         day: '2-digit',
@@ -185,6 +218,31 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
 
                   {/* Botones de accion */}
                   <div className="flex gap-2">
+                    {/* Descargar Constancia de Separacion */}
+                    <button
+                      onClick={() =>
+                        descargarConstanciaSeparacion({
+                          comprador: {
+                            nombre: clienteNombre,
+                            dni: clienteDni ?? "—",
+                          },
+                          compradorDomicilio: clienteDomicilio,
+                          montoSeparacion: reserva.monto_reserva,
+                          moneda: reserva.moneda === "USD" ? "USD" : "PEN",
+                          metodoPago: (reserva.metodo_pago as any) ?? "transferencia",
+                          loteNumero: reserva.lote?.codigo ?? "—",
+                          loteArea: reserva.lote?.sup_m2 ?? 0,
+                          proyectoNombre: reserva.lote?.proyecto?.nombre ?? "—",
+                          fechaDocumento: reserva.fecha_reserva,
+                          observaciones: reserva.notas,
+                        })
+                      }
+                      className="p-1.5 text-green-700 hover:bg-green-50 rounded transition-colors"
+                      title="Descargar Constancia de Separacion"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+
                     {/* Boton Ver Detalle */}
                     <button
                       onClick={() => {
@@ -205,7 +263,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
                           setCancelarModalOpen(true);
                         }}
                         className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
-                        title="Cancelar reserva"
+                        title="Cancelar separación"
                       >
                         <Ban className="h-4 w-4" />
                       </button>
@@ -228,7 +286,7 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
                           setEliminarModalOpen(true);
                         }}
                         className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                        title="Eliminar reserva"
+                        title="Eliminar separación"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -241,18 +299,17 @@ export default function TabReservas({ clienteId, clienteNombre, reservas, isAdmi
         </div>
       )}
 
-      {/* Modal Crear Reserva */}
-      <CrearReservaModal
-        isOpen={isCrearModalOpen}
-        onClose={() => {
-          setIsCrearModalOpen(false);
-          setSelectedLote(null);
-        }}
-        clienteId={clienteId}
-        clienteNombre={clienteNombre}
-        loteId={selectedLote?.id}
-        loteNombre={selectedLote?.nombre}
-      />
+      {/* Modal Registrar Separación */}
+      {isSeparacionOpen && (
+        <SeparacionModal
+          clienteId={clienteId}
+          onClose={() => setIsSeparacionOpen(false)}
+          onSuccess={() => {
+            setIsSeparacionOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {/* Modal Cancelar Reserva */}
       {reservaACancelar && (

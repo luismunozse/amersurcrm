@@ -302,7 +302,7 @@ export default function ModalReservaLote({
     }
 
     if (data) {
-      toast.success(`Reserva ${data.codigo_reserva} creada exitosamente`);
+      toast.success(`Separación ${data.codigo_reserva} creada exitosamente`);
       onSuccess?.();
       onClose();
       // Limpiar formulario
@@ -337,7 +337,7 @@ export default function ModalReservaLote({
           {/* Header */}
           <div className="sticky top-0 bg-crm-card border-b border-crm-border px-6 py-4 flex items-center justify-between z-10">
             <div>
-              <h2 className="text-xl font-bold text-crm-text-primary">Reservar Lote</h2>
+              <h2 className="text-xl font-bold text-crm-text-primary">Separar Lote</h2>
               <p className="text-sm text-crm-text-muted mt-1">
                 Lote: {lote.codigo} • {lote.sup_m2 ? `${lote.sup_m2} m²` : 'Sin superficie'}
               </p>
@@ -529,7 +529,7 @@ export default function ModalReservaLote({
 
                 {pdfUrl && (
                   <p className="text-sm text-crm-text-muted mt-3">
-                    Vista previa de la proforma. Esta será guardada automáticamente al crear la reserva.
+                    Vista previa de la proforma. Esta será guardada automáticamente al crear la separación.
                   </p>
                 )}
               </div>
@@ -555,10 +555,10 @@ export default function ModalReservaLote({
                 {loading ? (
                   <>
                     <Spinner size="sm" />
-                    <span className="ml-2">Generando Reserva...</span>
+                    <span className="ml-2">Generando Separación...</span>
                   </>
                 ) : (
-                  'Generar Reserva'
+                  'Generar Separación'
                 )}
               </Button>
             </div>

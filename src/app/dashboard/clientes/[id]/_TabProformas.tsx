@@ -1,16 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Download, FilePlus2, FileText, PenSquare, Trash2 } from "lucide-react";
+import { Download, FilePlus2, FileText, PenSquare, Trash2, FileSignature } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
 import type { ProformaRecord } from "@/types/proforma";
 const CrearProformaModal = dynamic(() => import("./_CrearProformaModal"), { ssr: false });
+const SeparacionModal = dynamic(() => import("./_SeparacionModal"), { ssr: false });
 import { generarProformaPdf } from "@/components/proforma/generarProformaPdf";
 import { eliminarProformaAction } from "./proformas/_actions";
+import { obtenerDatosProformaParaSeparacion } from "./_actions-separacion";
 import { useSearchParams } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
+
+interface ProformaPrefill {
+  proformaId: string;
+  loteId: string | null;
+  montoSeparacion: number | null;
+  moneda: "PEN" | "USD";
+  formaPagoSugerida: "contado" | "transferencia" | "deposito" | "credito_hipotecario" | "credito_directo" | null;
+  notas: string | null;
+  numero: string | null;
+  proyectoNombre: string | null;
+  loteCodigo: string | null;
+}
 
 import type { ClienteCompleto } from "@/lib/types/clientes";
 import type {
@@ -69,6 +83,8 @@ export default function TabProformas({
   const [isGenerating, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [proformaAEliminar, setProformaAEliminar] = useState<ProformaRecord | null>(null);
+  const [separacionPrefill, setSeparacionPrefill] = useState<ProformaPrefill | null>(null);
+  const [generandoSeparacionId, setGenerandoSeparacionId] = useState<string | null>(null);
 
   const proformasOrdenadas = useMemo(
     () =>
@@ -92,6 +108,25 @@ export default function TabProformas({
 
   const handleEliminar = (proforma: ProformaRecord) => {
     setProformaAEliminar(proforma);
+  };
+
+  const handleGenerarSeparacion = async (proforma: ProformaRecord) => {
+    setGenerandoSeparacionId(proforma.id);
+    try {
+      const res = await obtenerDatosProformaParaSeparacion(proforma.id);
+      if (!res.success) {
+        toast.error(res.error || "No se pudo cargar la proforma");
+        return;
+      }
+      if (res.yaConvertida) {
+        toast("Esta proforma ya fue convertida en separación", { icon: "ℹ️" });
+        return;
+      }
+      if (!res.data) return;
+      setSeparacionPrefill(res.data);
+    } finally {
+      setGenerandoSeparacionId(null);
+    }
   };
 
   const confirmarEliminar = async () => {
@@ -136,7 +171,7 @@ export default function TabProformas({
         <div>
           <h3 className="text-lg font-semibold text-crm-text">Cotizaciones</h3>
           <p className="text-sm text-crm-text-muted">
-            Genera cotizaciones personalizadas para tu cliente antes de confirmar una reserva o venta.
+            Genere cotizaciones personalizadas para su cliente antes de confirmar una separación o venta.
           </p>
         </div>
 
@@ -154,7 +189,7 @@ export default function TabProformas({
           <FileText className="w-12 h-12 mx-auto text-crm-text-muted mb-4 opacity-50" />
           <h4 className="text-lg font-semibold text-crm-text mb-2">Sin cotizaciones registradas</h4>
           <p className="text-sm text-crm-text-muted mb-4">
-            Crea la primera cotización para este cliente y compártela antes de concretar la reserva.
+            Crea la primera cotización para este cliente y compártela antes de concretar la separación.
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -181,11 +216,13 @@ export default function TabProformas({
                       className={`
                         px-2 py-0.5 text-xs font-semibold rounded-full
                         ${
-                          proforma.estado === "aprobada"
-                            ? "bg-green-100 text-green-700"
-                            : proforma.estado === "enviada"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-crm-card text-crm-text-muted border border-crm-border"
+                          proforma.estado === "convertida"
+                            ? "bg-purple-100 text-purple-700"
+                            : proforma.estado === "aprobada"
+                              ? "bg-green-100 text-green-700"
+                              : proforma.estado === "enviada"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-crm-card text-crm-text-muted border border-crm-border"
                         }
                       `}
                     >
@@ -231,6 +268,23 @@ export default function TabProformas({
                       <Download className="w-4 h-4" />
                       Descargar
                     </button>
+                    {proforma.estado === "aprobada" && !proforma.reserva_id && (
+                      <button
+                        onClick={() => handleGenerarSeparacion(proforma)}
+                        disabled={generandoSeparacionId === proforma.id}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
+                        title="Crear separación heredando datos de la proforma"
+                      >
+                        <FileSignature className="w-4 h-4" />
+                        Generar Separación
+                      </button>
+                    )}
+                    {proforma.estado === "convertida" && (
+                      <span className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-purple-50 text-purple-700 rounded-lg border border-purple-200">
+                        <FileSignature className="w-4 h-4" />
+                        Convertida
+                      </span>
+                    )}
                     {isAdmin && (
                       <button
                         onClick={() => handleEliminar(proforma)}
@@ -279,12 +333,24 @@ export default function TabProformas({
         }}
       />
 
+      {separacionPrefill && (
+        <SeparacionModal
+          clienteId={cliente.id}
+          proformaPrefill={separacionPrefill}
+          onClose={() => setSeparacionPrefill(null)}
+          onSuccess={() => {
+            setSeparacionPrefill(null);
+            router.refresh();
+          }}
+        />
+      )}
+
       <ConfirmDialog
         open={!!proformaAEliminar}
         title="Eliminar cotización"
         description={
           <>
-            ¿Estás seguro de eliminar la cotización{" "}
+            ¿Está seguro de eliminar la cotización{" "}
             <strong>{proformaAEliminar?.numero || ""}</strong>?
             <br />
             <span className="text-red-500">Esta acción no se puede deshacer.</span>

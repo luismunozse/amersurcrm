@@ -26,6 +26,7 @@ import EventoModal from "./_EventoModal";
 import RecordatoriosPanel from "@/components/RecordatoriosPanel";
 import NotificacionesPanel from "@/components/NotificacionesPanel";
 import DateTimePicker from "@/components/ui/DateTimePicker";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import toast from "react-hot-toast";
 import {
   Calendar,
@@ -110,6 +111,10 @@ export default function AgendaDashboard() {
   const [eventoReprogramar, setEventoReprogramar] = useState<Evento | null>(null);
   const [nuevaFechaReprogramar, setNuevaFechaReprogramar] = useState('');
   const [procesandoAccion, setProcesandoAccion] = useState(false);
+
+  // Modal de confirmación cancelar evento
+  const [eventoACancelar, setEventoACancelar] = useState<Evento | null>(null);
+  const [cancelarDesdeDetalle, setCancelarDesdeDetalle] = useState(false);
 
   const cargarEventos = useCallback(async () => {
     try {
@@ -419,13 +424,22 @@ export default function AgendaDashboard() {
   const handleCancelar = async (evento: Evento, e: React.MouseEvent) => {
     e.stopPropagation();
     if (procesandoAccion) return;
-    const confirmado = window.confirm(`¿Cancelar el evento "${evento.titulo}"?`);
-    if (!confirmado) return;
+    setCancelarDesdeDetalle(false);
+    setEventoACancelar(evento);
+  };
+
+  const confirmarCancelarEvento = async () => {
+    if (!eventoACancelar) return;
+    const evento = eventoACancelar;
+    const desdeDetalle = cancelarDesdeDetalle;
+    setEventoACancelar(null);
+    setCancelarDesdeDetalle(false);
     setProcesandoAccion(true);
     try {
       const result = await cambiarEstadoEvento(evento.id, 'cancelado');
       if (result.success) {
         toast.success('Evento cancelado');
+        if (desdeDetalle) cerrarDetalleEvento();
         cargarEventos();
       } else {
         toast.error(result.message);
@@ -1466,24 +1480,9 @@ export default function AgendaDashboard() {
           setNuevaFechaReprogramar(evt.fecha_inicio.slice(0, 16));
           setMostrarModalReprogramar(true);
         }}
-        onCancelar={async (evt) => {
-          const confirmado = window.confirm(`¿Cancelar el evento "${evt.titulo}"?`);
-          if (!confirmado) return;
-          setProcesandoAccion(true);
-          try {
-            const result = await cambiarEstadoEvento(evt.id, 'cancelado');
-            if (result.success) {
-              toast.success('Evento cancelado');
-              cerrarDetalleEvento();
-              cargarEventos();
-            } else {
-              toast.error(result.message);
-            }
-          } catch {
-            toast.error('Error al cancelar evento');
-          } finally {
-            setProcesandoAccion(false);
-          }
+        onCancelar={(evt) => {
+          setCancelarDesdeDetalle(true);
+          setEventoACancelar(evt);
         }}
       />
 
@@ -1499,6 +1498,21 @@ export default function AgendaDashboard() {
           }}
         />
       )}
+
+      {/* Confirmar cancelar evento */}
+      <ConfirmDialog
+        open={!!eventoACancelar}
+        title="Cancelar evento"
+        description={eventoACancelar ? `¿Cancelar el evento "${eventoACancelar.titulo}"?` : ""}
+        confirmText="Cancelar evento"
+        cancelText="Volver"
+        disabled={procesandoAccion}
+        onConfirm={confirmarCancelarEvento}
+        onClose={() => {
+          setEventoACancelar(null);
+          setCancelarDesdeDetalle(false);
+        }}
+      />
     </div>
   );
 }

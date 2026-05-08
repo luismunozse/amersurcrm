@@ -56,7 +56,7 @@ export default function CambiarEstadoVendedorActivoModal({
               {accion} Vendedor
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              ¿Estás seguro de que deseas {accion.toLowerCase()} a <strong>{vendedorNombre}</strong>?
+              ¿Está seguro de que desea {accion.toLowerCase()} a <strong>{vendedorNombre}</strong>?
             </p>
             {nuevoEstado ? (
               <p className="text-xs text-gray-500">

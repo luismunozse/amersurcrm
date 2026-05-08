@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import {
   Calendar, Download, BarChart3, UserCheck, UserCog, MessageSquare,
   Users, PieChart, Target, Clock, AlertCircle, Building, DollarSign,
-  TrendingUp, GitCompare, FileDown,
+  TrendingUp, GitCompare, FileDown, Banknote, Wallet,
 } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
@@ -18,6 +18,8 @@ import ReporteInteracciones from "./components/ReporteInteracciones";
 import ReporteNivelInteres from "./components/ReporteNivelInteres";
 import ReporteOrigenLead from "./components/ReporteOrigenLead";
 import ReporteTiempoRespuesta from "./components/ReporteTiempoRespuesta";
+import ReporteCobranza from "./components/ReporteCobranza";
+import ReporteComisionesAdmin from "./components/ReporteComisionesAdmin";
 import ResumenKPIs from "./components/ResumenKPIs";
 import SidebarSecciones from "./components/SidebarSecciones";
 import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
@@ -74,6 +76,8 @@ const ALL_TABS = [
   { id: "interacciones",   title: "Interacciones",    icon: MessageSquare },
   { id: "propiedades",     title: "Propiedades",      icon: Building },
   { id: "ventas",          title: "Ventas",           icon: DollarSign },
+  { id: "cobranza",        title: "Cobranza",         icon: Banknote },
+  { id: "comisiones",      title: "Comisiones",       icon: Wallet },
   { id: "clientes",        title: "Clientes",         icon: UserCheck },
   { id: "rendimiento",     title: "Rendimiento",      icon: UserCog },
 ];
@@ -481,6 +485,34 @@ function ReportesPageContent() {
             >
               {visitedTabs.has("ventas") && (
                 <ReporteVentas
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+
+            <section
+              data-seccion="cobranza"
+              data-seccion-activa={activeTab === "cobranza" ? "true" : undefined}
+              className={activeTab === "cobranza" ? "" : "hidden"}
+            >
+              {visitedTabs.has("cobranza") && (
+                <ReporteCobranza
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+
+            <section
+              data-seccion="comisiones"
+              data-seccion-activa={activeTab === "comisiones" ? "true" : undefined}
+              className={activeTab === "comisiones" ? "" : "hidden"}
+            >
+              {visitedTabs.has("comisiones") && (
+                <ReporteComisionesAdmin
                   periodo={selectedPeriod}
                   fechaInicio={fechasEfectivas.fechaInicio}
                   fechaFin={fechasEfectivas.fechaFin}

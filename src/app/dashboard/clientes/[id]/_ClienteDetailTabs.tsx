@@ -39,6 +39,7 @@ interface Props {
   defaultTab?: ClienteTabType;
   vendedores: Array<{ id: string; username: string; nombre_completo?: string | null; telefono?: string | null; email?: string | null }>;
   isAdmin?: boolean;
+  esPrivilegiado?: boolean;
   seguimientosVencidos?: number;
 }
 
@@ -61,7 +62,7 @@ export type ClienteTabType =
   | 'postventa_hub';
 
 // Sub-tabs dentro de cada tab agrupado
-type AdquisicionSubTab = 'separaciones' | 'cotizaciones' | 'calificacion';
+type AdquisicionSubTab = 'procesos' | 'separaciones' | 'cotizaciones';
 type VentasSubTab = 'ventas' | 'cronograma' | 'contrato';
 type PostVentaSubTab = 'entregas' | 'solicitudes' | 'independizacion';
 
@@ -76,10 +77,11 @@ export default function ClienteDetailTabs({
   vendedores,
   defaultTab = 'info',
   isAdmin = false,
+  esPrivilegiado = false,
   seguimientosVencidos = 0,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ClienteTabType>(defaultTab);
-  const [adquisicionSubTab, setAdquisicionSubTab] = useState<AdquisicionSubTab>('separaciones');
+  const [adquisicionSubTab, setAdquisicionSubTab] = useState<AdquisicionSubTab>('procesos');
   const [ventasSubTab, setVentasSubTab] = useState<VentasSubTab>('ventas');
   const [postVentaSubTab, setPostVentaSubTab] = useState<PostVentaSubTab>('entregas');
   const [interaccionesCount, setInteraccionesCount] = useState(interacciones.length);
@@ -283,20 +285,27 @@ export default function ClienteDetailTabs({
           <>
             <SubTabBar
               items={[
-                { id: 'separaciones', label: 'Procesos' },
-                { id: 'cotizaciones', label: 'Separaciones' },
-                { id: 'calificacion', label: 'Cotizaciones' },
+                { id: 'procesos', label: 'Procesos' },
+                { id: 'separaciones', label: 'Separaciones' },
+                { id: 'cotizaciones', label: 'Cotizaciones' },
               ]}
               active={adquisicionSubTab}
               onChange={setAdquisicionSubTab}
             />
+            {adquisicionSubTab === 'procesos' && (
+              <TabProcesosCliente clienteId={cliente.id} esPrivilegiado={esPrivilegiado} />
+            )}
             {adquisicionSubTab === 'separaciones' && (
-              <TabProcesosCliente clienteId={cliente.id} />
+              <TabReservas
+                clienteId={cliente.id}
+                clienteNombre={cliente.nombre}
+                clienteDni={cliente.documento_identidad ?? undefined}
+                clienteDomicilio={[cliente.direccion?.calle, cliente.direccion?.distrito, cliente.direccion?.ciudad].filter(Boolean).join(", ") || undefined}
+                reservas={reservas}
+                isAdmin={isAdmin}
+              />
             )}
             {adquisicionSubTab === 'cotizaciones' && (
-              <TabReservas clienteId={cliente.id} clienteNombre={cliente.nombre} reservas={reservas} isAdmin={isAdmin} />
-            )}
-            {adquisicionSubTab === 'calificacion' && (
               <TabProformas
                 cliente={cliente}
                 proformas={proformas}
@@ -322,7 +331,7 @@ export default function ClienteDetailTabs({
               onChange={setVentasSubTab}
             />
             {ventasSubTab === 'ventas' && <TabVentas ventas={ventas} />}
-            {ventasSubTab === 'cronograma' && <TabCronograma clienteId={cliente.id} ventas={ventas} />}
+            {ventasSubTab === 'cronograma' && <TabCronograma clienteId={cliente.id} ventas={ventas} esAdmin={isAdmin} />}
             {ventasSubTab === 'contrato' && <TabContrato clienteId={cliente.id} clienteNombre={cliente.nombre} cliente={cliente} ventas={ventas} />}
           </>
         )}

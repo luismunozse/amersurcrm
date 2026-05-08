@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { Download, FileSpreadsheet, FileText, FileType, ChevronDown } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Spinner } from '@/components/ui/Spinner';
 import {
   exportFilteredProyectos,
@@ -111,7 +112,7 @@ export default function ExportButton({
 
     } catch (error) {
       console.error('Error al exportar:', error);
-      alert('Error al exportar los datos. Por favor, intenta nuevamente.');
+      toast.error('Error al exportar los datos. Por favor, intente nuevamente.');
     } finally {
       setIsExporting(false);
     }

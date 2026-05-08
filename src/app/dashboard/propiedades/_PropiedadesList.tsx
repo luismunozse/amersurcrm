@@ -76,7 +76,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
 
   const handleEliminar = (propiedad: Propiedad) => {
     const tipoTexto = propiedad.es_lote ? "lote" : "propiedad";
-    if (confirm(`¿Estás seguro de que deseas eliminar este ${tipoTexto}? Esta acción no se puede deshacer.`)) {
+    if (confirm(`¿Está seguro de que desea eliminar este ${tipoTexto}? Esta acción no se puede deshacer.`)) {
       startTransition(async () => {
         try {
           if (propiedad.es_lote) {
@@ -223,7 +223,7 @@ export default function PropiedadesList({ propiedades }: { propiedades: Propieda
           </div>
           <h4 className="text-xl font-medium text-crm-text-primary mb-3">No hay propiedades registradas</h4>
           <p className="text-crm-text-muted mb-6 max-w-md mx-auto">
-            Comienza agregando tu primera propiedad usando el botón &quot;Nueva Propiedad&quot;.
+            Comience agregando su primera propiedad usando el botón &quot;Nueva Propiedad&quot;.
           </p>
         </div>
       ) : (

@@ -617,9 +617,9 @@ function GlobalEmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed border-crm-border bg-crm-card text-center">
       <Inbox className="w-12 h-12 text-crm-text-muted mb-3" />
-      <h3 className="text-lg font-semibold text-crm-text-primary">Tu pipeline está vacío</h3>
+      <h3 className="text-lg font-semibold text-crm-text-primary">Su pipeline está vacío</h3>
       <p className="mt-1 text-sm text-crm-text-muted max-w-md">
-        Todavía no tenés clientes en ninguna etapa del embudo. Creá el primero para empezar a hacer
+        Todavía no tiene clientes en ninguna etapa del embudo. Cree el primero para empezar a hacer
         seguimiento.
       </p>
       <Link

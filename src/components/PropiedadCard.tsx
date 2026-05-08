@@ -279,7 +279,7 @@ export default function PropiedadCard({ propiedad }: { propiedad: Propiedad }) {
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleEliminar}
         title="Eliminar Propiedad"
-        description={`¿Estás seguro de que deseas eliminar la propiedad "${propiedad.identificacion_interna}"? Esta acción no se puede deshacer.`}
+        description={`¿Está seguro de que desea eliminar la propiedad "${propiedad.identificacion_interna}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         cancelText="Cancelar"
         disabled={isPending}

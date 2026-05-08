@@ -12,6 +12,7 @@ import {
   FileText,
   Users,
   Pencil,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const TIPO_RECORDATORIO_ICON: Record<string, LucideIcon> = {
   visita_propiedad: Home,
   reunion_equipo: Users,
   personalizado: Pencil,
+  envio_template_whatsapp: MessageSquare,
 };
 import DateTimePicker from "@/components/ui/DateTimePicker";
 

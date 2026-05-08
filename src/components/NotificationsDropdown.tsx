@@ -384,7 +384,7 @@ export default function NotificationsDropdown({ notificaciones, count }: Notific
 
       {isOpen && (
         <>
-          <div className="fixed inset-x-3 top-16 sm:inset-x-auto sm:top-auto sm:absolute sm:right-0 sm:mt-2 w-auto sm:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-crm-border z-50">
+          <div className="fixed inset-x-3 top-16 sm:inset-x-auto sm:top-auto sm:absolute sm:right-0 sm:mt-2 w-auto sm:w-80 bg-crm-card rounded-lg shadow-lg border border-crm-border z-50">
             <div className="p-4 border-b border-crm-border">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-crm-text-primary">Notificaciones</h3>

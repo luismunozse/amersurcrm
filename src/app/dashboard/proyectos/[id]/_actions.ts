@@ -2,13 +2,11 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso, esAdmin, esAdminOCoordinador, obtenerPermisosUsuario, tieneRol } from "@/lib/permissions/server";
 import type { LoteCoordenadas } from "@/types/proyectos";
 import type { OverlayLayerConfig } from "@/types/overlay-layers";
-import { dispararPropiedadDisponible } from "@/lib/services/marketing-automatizaciones";
 
 export async function subirPlanos(proyectoId: string, fd: FormData) {
   const planosFile = fd.get("planos") as File | null;
@@ -166,20 +164,6 @@ export async function crearLote(fd: FormData) {
     .single();
 
   if (error) throw new Error(error.message);
-
-  // Disparar automatizaciones cuando el lote se crea disponible
-  if (estado === "disponible" && lote) {
-    after(async () => {
-      await dispararPropiedadDisponible({
-        propiedadId: lote.id,
-        propiedadTipo: "lote",
-        precioVenta: precio ?? undefined,
-        proyectoId,
-      }).catch((err) =>
-        console.error("[Lotes] Error disparando propiedad.disponible:", err)
-      );
-    });
-  }
 
   revalidatePath(`/dashboard/proyectos/${proyectoId}`);
   revalidatePath("/dashboard/propiedades");
@@ -1037,7 +1021,7 @@ export async function crearReservaConVinculacion(datos: {
       .single();
 
     if (reservaError) {
-      return { data: null, error: `Error creando reserva: ${reservaError.message}` };
+      return { data: null, error: `Error creando separación: ${reservaError.message}` };
     }
 
     // 2. Cambiar estado del lote a reservado
@@ -1084,7 +1068,7 @@ export async function crearReservaConVinculacion(datos: {
     console.error('Error en crearReservaConVinculacion:', error);
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Error desconocido creando reserva'
+      error: error instanceof Error ? error.message : 'Error desconocido creando separación'
     };
   }
 }

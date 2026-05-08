@@ -15,7 +15,7 @@ export default function PipelineView() {
   const [isPending, startTransition] = useTransition();
 
   // Filtros
-  const [filtroEstado, setFiltroEstado] = useState('activo');
+  const [filtroEstado, setFiltroEstado] = useState('activos');
   const [filtroEtapa, setFiltroEtapa] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [showFiltros, setShowFiltros] = useState(false);
@@ -174,7 +174,7 @@ export default function PipelineView() {
         {/* Filtros rápidos */}
         <div className="flex gap-2">
           {[
-            { value: 'activo', label: 'Activos' },
+            { value: 'activos', label: 'Activos' },
             { value: 'completado', label: 'Completados' },
             { value: 'cancelado', label: 'Cancelados' },
             { value: '', label: 'Todos' },
@@ -272,6 +272,21 @@ export default function PipelineView() {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${etapaColorLight[etapaInfo?.color || 'blue']}`}>
                         {etapaInfo?.label}
                       </span>
+                      {proceso.estado === 'completado' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-green-50 border-green-200 text-green-700">
+                          Completado
+                        </span>
+                      )}
+                      {proceso.estado === 'cancelado' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-red-50 border-red-200 text-red-700">
+                          Cancelado
+                        </span>
+                      )}
+                      {proceso.estado === 'pausado' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-gray-50 border-gray-200 text-gray-600">
+                          Pausado
+                        </span>
+                      )}
                       <div className="flex items-center gap-1.5 w-20 hidden sm:flex">
                         <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                           <div className={`rounded-full h-1.5 transition-all ${etapaColor[etapaInfo?.color || 'blue']}`} style={{ width: `${progreso}%` }} />

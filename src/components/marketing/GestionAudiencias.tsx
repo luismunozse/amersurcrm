@@ -28,8 +28,8 @@ function ModalConfirmarEliminar({
           <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
         </div>
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div className="w-9 h-9 bg-crm-error/10 rounded-lg flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-crm-error" />
           </div>
           <div className="flex-1">
             <h4 className="text-base font-semibold text-crm-text-primary">Eliminar audiencia</h4>
@@ -50,7 +50,7 @@ function ModalConfirmarEliminar({
           </button>
           <button
             onClick={onConfirmar}
-            className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            className="px-4 py-2 text-sm bg-crm-error text-white rounded-lg hover:bg-crm-error/90 transition-colors"
           >
             Eliminar
           </button>
@@ -182,8 +182,8 @@ export default function GestionAudiencias() {
                       <p className="text-sm font-semibold text-crm-text-primary leading-tight">{a.nombre}</p>
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                         a.tipo === "DINAMICO"
-                          ? "bg-blue-100 text-blue-600"
-                          : "bg-gray-100 text-gray-600"
+                          ? "bg-crm-info/10 text-crm-info"
+                          : "bg-crm-card-hover text-crm-text-secondary"
                       }`}>
                         {a.tipo === "DINAMICO" ? "Dinámico" : "Estático"}
                       </span>
@@ -206,7 +206,7 @@ export default function GestionAudiencias() {
                     <button
                       onClick={() => setConfirmarEliminar({ id: a.id, nombre: a.nombre })}
                       title="Eliminar audiencia"
-                      className="p-1.5 text-crm-text-muted hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-1.5 text-crm-text-muted hover:text-crm-error rounded-lg hover:bg-crm-error/10 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -243,10 +243,10 @@ export default function GestionAudiencias() {
                         </span>
                       ))}
                       {(a.filtros as any).soloConWhatsApp && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-600 rounded">WhatsApp</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-crm-success/10 text-crm-success rounded">WhatsApp</span>
                       )}
                       {(a.filtros as any).diasSinContacto && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-crm-warning/10 text-crm-warning rounded">
                           +{(a.filtros as any).diasSinContacto}d sin contacto
                         </span>
                       )}

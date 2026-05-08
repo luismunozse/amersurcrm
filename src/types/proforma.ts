@@ -1,4 +1,4 @@
-export type ProformaEstado = 'borrador' | 'enviada' | 'aprobada' | 'rechazada' | 'anulada';
+export type ProformaEstado = 'borrador' | 'enviada' | 'aprobada' | 'rechazada' | 'anulada' | 'convertida';
 export type ProformaTipoOperacion = 'reserva' | 'venta' | 'cotizacion';
 export type ProformaMoneda = 'PEN' | 'USD';
 
@@ -69,6 +69,7 @@ export interface ProformaRecord {
   enviado_a: string | null;
   enviado_por: string | null;
   enviado_en: string | null;
+  reserva_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,9 +94,9 @@ export const REQUISITOS_CONTRATO_DEFAULT: string[] = [
 ];
 
 export const CUENTAS_EMPRESA_DEFAULT: string[] = [
-  'Inversiones de América del Sur S.A.C.',
-  'CCI BCP Soles: 002-123-45678901234-56',
-  'CCI BCP Dólares: 002-987-65432109876-54'
+  'INVERSIONES DE AMERICA DEL SUR S.A.C. - AMERSUR S.A.C.',
+  'Cuenta corriente Dolares BCP: 370-2438307-1-45 | CCI: 00237000243830714553',
+  'Cuenta Recaudadora Soles BCP: 370-2540669-0-94 | CCI: 00237000254066909458',
 ];
 
 export function buildDefaultProformaDatos(params: {

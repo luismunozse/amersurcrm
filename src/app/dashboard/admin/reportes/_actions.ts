@@ -35,3 +35,19 @@ export type {
   ClienteEtapaFunnel,
   ResultadoEtapaFunnel,
 } from "./actions/clientes-etapa-funnel";
+
+export { obtenerReporteCobranza } from "./actions/cobranza";
+export type {
+  ReporteCobranza,
+  ReporteCobranzaResumen,
+  RecaudacionMensual,
+  TopDeudor,
+} from "./actions/cobranza";
+
+export { obtenerReporteComisiones } from "./actions/comisiones";
+export type {
+  ReporteComisiones,
+  ResumenComisionesReporte,
+  ComisionPorVendedor,
+  ComisionMensual,
+} from "./actions/comisiones";

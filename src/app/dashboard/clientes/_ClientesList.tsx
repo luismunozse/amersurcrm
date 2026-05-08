@@ -14,6 +14,7 @@ import SimpleModal from "@/components/SimpleModal";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 import { getEstadoClienteLabel, type EstadoCliente } from "@/lib/types/clientes";
 import { Users, User, Mail, Phone, MessageCircle, IdCard, Clock } from "lucide-react";
+import BotonEnviarWhatsApp from "@/components/marketing/BotonEnviarWhatsApp";
 
 type Cliente = { 
   id: string; 
@@ -288,10 +289,10 @@ const ClienteItem = memo(function ClienteItem({
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
-      case 'por_contactar': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'contactado': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'transferido': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'por_contactar': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      case 'contactado': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
+      case 'transferido': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800';
+      default: return 'bg-crm-card-hover text-crm-text-secondary border-crm-border';
     }
   };
 
@@ -313,7 +314,7 @@ const ClienteItem = memo(function ClienteItem({
         <button
           key="contactar"
           onClick={() => onEstadoChange(cliente.id, 'por_contactar')}
-          className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-colors rounded-full"
+          className="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors rounded-full"
         >
           Por Contactar
         </button>
@@ -325,7 +326,7 @@ const ClienteItem = memo(function ClienteItem({
         <button
           key="contactado"
           onClick={() => onSolicitarContacto(cliente)}
-          className="px-2 py-1 text-xs font-medium text-yellow-600 bg-yellow-100 border border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 transition-colors rounded-full"
+          className="px-2 py-1 text-xs font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 hover:bg-yellow-200 dark:hover:bg-yellow-800/50 transition-colors rounded-full"
         >
           Contactado
         </button>
@@ -337,7 +338,7 @@ const ClienteItem = memo(function ClienteItem({
         <button
           key="transferir"
           onClick={() => onEstadoChange(cliente.id, 'transferido')}
-          className="px-2 py-1 text-xs font-medium text-green-600 bg-green-100 border border-green-200 hover:bg-green-200 hover:border-green-300 transition-colors rounded-full"
+          className="px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors rounded-full"
         >
           Transferir
         </button>
@@ -349,7 +350,7 @@ const ClienteItem = memo(function ClienteItem({
         <button
           key="revertir"
           onClick={() => onEstadoChange(cliente.id, 'contactado')}
-          className="px-2 py-1 text-xs font-medium text-orange-600 bg-orange-100 border border-orange-200 hover:bg-orange-200 hover:border-orange-300 transition-colors rounded-full"
+          className="px-2 py-1 text-xs font-medium text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors rounded-full"
         >
           Revertir
         </button>
@@ -372,7 +373,7 @@ const ClienteItem = memo(function ClienteItem({
         {/* Header con código y estado */}
         <div className="flex items-start justify-between">
           <div 
-            className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors group"
+            className="flex items-center gap-3 cursor-pointer hover:bg-crm-card-hover p-2 rounded-lg transition-colors group"
             onClick={() => onShowDetail(cliente)}
           >
             <div className="w-12 h-12 bg-crm-primary/10 rounded-full flex items-center justify-center group-hover:bg-crm-primary/20 transition-colors">
@@ -404,11 +405,27 @@ const ClienteItem = memo(function ClienteItem({
               Editar
             </button>
             <button
-              className="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
               onClick={() => onShowDetail(cliente)}
             >
               Ver Detalles
             </button>
+            {(cliente.telefono_whatsapp || cliente.telefono) && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <BotonEnviarWhatsApp
+                  telefono={cliente.telefono_whatsapp ?? cliente.telefono ?? ""}
+                  clienteId={cliente.id}
+                  clienteNombre={cliente.nombre}
+                  estadoCliente={cliente.estado_cliente ?? undefined}
+                  variablesAuto={{
+                    vendedor: cliente.vendedor_asignado ?? "",
+                  }}
+                  label=""
+                  variant="ghost"
+                  className="w-9 h-9 !px-0 !py-0 justify-center text-green-600 hover:bg-green-100"
+                />
+              </div>
+            )}
             <button
               className="px-3 py-1.5 text-sm font-medium text-crm-danger bg-crm-danger/10 hover:bg-crm-danger/20 rounded-lg transition-colors"
               onClick={() => onDelete(cliente)}
@@ -421,7 +438,7 @@ const ClienteItem = memo(function ClienteItem({
 
         {/* Información de contacto */}
         <div 
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors group"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 cursor-pointer hover:bg-crm-card-hover p-3 rounded-lg transition-colors group"
           onClick={() => onShowDetail(cliente)}
         >
           <div className="space-y-2">
@@ -483,7 +500,7 @@ const ClienteItem = memo(function ClienteItem({
 
         {/* Estadísticas de propiedades */}
         <div 
-          className="grid grid-cols-3 gap-4 pt-4 border-t border-crm-border cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors group"
+          className="grid grid-cols-3 gap-4 pt-4 border-t border-crm-border cursor-pointer hover:bg-crm-card-hover p-3 rounded-lg transition-colors group"
           onClick={() => onShowDetail(cliente)}
         >
           <div className="text-center group-hover:scale-105 transition-transform">
@@ -617,7 +634,7 @@ function RegistrarContactoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4 sm:py-6 animate-in fade-in duration-150">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl border-t sm:border border-crm-border overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[95vh] animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
+      <div className="relative w-full sm:max-w-lg bg-crm-card rounded-t-2xl sm:rounded-2xl shadow-xl border-t sm:border border-crm-border overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0 max-h-[95vh] animate-in slide-in-from-bottom-4 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200">
         <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
           <span className="h-1 w-10 rounded-full bg-crm-border" aria-hidden />
         </div>
@@ -643,7 +660,7 @@ function RegistrarContactoModal({
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as ContactoFormData['tipo'])}
-                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-bg-primary text-crm-text-primary focus:ring-crm-primary focus:border-crm-primary"
                 disabled={loading}
               >
                 <option value="llamada">Llamada</option>
@@ -659,7 +676,7 @@ function RegistrarContactoModal({
               <select
                 value={resultado}
                 onChange={(e) => setResultado(e.target.value as ContactoFormData['resultado'])}
-                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-bg-primary text-crm-text-primary focus:ring-crm-primary focus:border-crm-primary"
                 disabled={loading}
               >
                 <option value="contesto">Contestó</option>
@@ -693,7 +710,7 @@ function RegistrarContactoModal({
                 min="0"
                 value={duracion}
                 onChange={(e) => setDuracion(e.target.value)}
-                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-bg-primary text-crm-text-primary focus:ring-crm-primary focus:border-crm-primary"
                 disabled={loading}
               />
             </div>
@@ -702,7 +719,7 @@ function RegistrarContactoModal({
               <select
                 value={proximaAccion}
                 onChange={(e) => setProximaAccion(e.target.value as ContactoFormData['proximaAccion'])}
-                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm focus:ring-crm-primary focus:border-crm-primary"
+                className="w-full border border-crm-border rounded-lg px-3 py-2 text-sm bg-crm-bg-primary text-crm-text-primary focus:ring-crm-primary focus:border-crm-primary"
                 disabled={loading}
               >
                 <option value="ninguna">Ninguna</option>

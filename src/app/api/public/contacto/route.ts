@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase.server";
-import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
 
 export const dynamic = "force-dynamic";
 
@@ -237,16 +236,6 @@ export async function POST(request: NextRequest) {
 
     console.log(
       `[PublicAPI] Lead web creado: ${leadData.id} | Vendedor: ${vendedor}`
-    );
-
-    // Disparar automatizaciones de marketing (fire & forget)
-    dispararAutomatizaciones("lead.created", {
-      clienteId: leadData.id,
-      nombre,
-      telefono: telefono || undefined,
-      vendedorUsername: vendedor !== "Sin asignar" ? vendedor : undefined,
-    }).catch((err) =>
-      console.warn("[PublicAPI] Error automatizaciones lead.created:", err)
     );
 
     return NextResponse.json(

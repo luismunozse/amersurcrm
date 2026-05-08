@@ -414,7 +414,11 @@ export function SidebarShadcn() {
       <SidebarHeader>
         <SidebarMobileHeaderControls />
 
-        <div className="flex items-center gap-2 px-1 py-1">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 px-1 py-1 rounded-md hover:bg-sidebar-accent/40 transition-colors"
+          aria-label="Ir al inicio"
+        >
           <div className="relative group-data-[collapsible=icon]:hidden">
             <div className="absolute inset-0 bg-crm-primary/25 rounded-lg blur-sm" />
             <Image
@@ -439,7 +443,7 @@ export function SidebarShadcn() {
             className="hidden group-data-[collapsible=icon]:block h-7 w-7 object-contain mx-auto"
             priority
           />
-        </div>
+        </Link>
 
         <button
           type="button"

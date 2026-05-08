@@ -62,7 +62,8 @@ const config: Config = {
   				'text-primary': 'var(--crm-text-primary)',
   				'text-secondary': 'var(--crm-text-secondary)',
   				'text-muted': 'var(--crm-text-muted)',
-  				'bg-primary': 'var(--crm-bg-primary)'
+  				'bg-primary': 'var(--crm-bg-primary)',
+				'bg-secondary': 'var(--crm-bg-secondary)'
   			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

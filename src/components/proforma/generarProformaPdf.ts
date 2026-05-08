@@ -515,9 +515,8 @@ function extraerCuentasBancarias(valores: string[] | undefined): CuentasBancaria
     dolares: null,
   };
 
-  // Valores por defecto
-  const DEFAULT_SOLES = { tipo: "CCI BCP Soles", numero: "002-123-45678901234-56" };
-  const DEFAULT_DOLARES = { tipo: "CCI BCP Dólares", numero: "002-987-65432109876-54" };
+  const DEFAULT_SOLES = { tipo: "Cuenta Recaudadora Soles BCP", numero: "370-2540669-0-94 | CCI: 00237000254066909458" };
+  const DEFAULT_DOLARES = { tipo: "Cuenta corriente Dolares BCP", numero: "370-2438307-1-45 | CCI: 00237000243830714553" };
 
   if (!valores || valores.length === 0) {
     return {

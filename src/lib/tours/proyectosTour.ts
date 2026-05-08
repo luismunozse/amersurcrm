@@ -250,8 +250,8 @@ export const ventasReservasTourSteps: DriveStep[] = [
   {
     element: '[data-tour="new-reserva-button"]',
     popover: {
-      title: 'Nueva Reserva',
-      description: 'Registra una nueva reserva cuando un cliente aparte un lote. Esto cambiará automáticamente el estado del lote a "Reservado".',
+      title: 'Nueva Separación',
+      description: 'Registra una nueva separación cuando un cliente aparte un lote. Esto cambiará automáticamente el estado del lote a "Reservado".',
       side: 'bottom',
     },
   },
@@ -259,7 +259,7 @@ export const ventasReservasTourSteps: DriveStep[] = [
     element: '[data-tour="reserva-to-venta"]',
     popover: {
       title: 'Convertir a Venta',
-      description: 'Puedes convertir una reserva activa en venta cuando el cliente complete el proceso de compra.',
+      description: 'Puedes convertir una separación activa en venta cuando el cliente complete el proceso de compra.',
       side: 'bottom',
     },
   },

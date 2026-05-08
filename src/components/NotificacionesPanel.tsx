@@ -35,7 +35,7 @@ const TIPOS_NOTIFICACION: Record<
   recordatorio: { label: "Recordatorio", Icon: Clock, color: "bg-orange-100 text-orange-800" },
   sistema: { label: "Sistema", Icon: Settings, color: "bg-gray-100 text-gray-800" },
   venta: { label: "Venta", Icon: DollarSign, color: "bg-green-100 text-green-800" },
-  reserva: { label: "Reserva", Icon: Lock, color: "bg-purple-100 text-purple-800" },
+  reserva: { label: "Separación", Icon: Lock, color: "bg-purple-100 text-purple-800" },
   cliente: { label: "Cliente", Icon: User, color: "bg-indigo-100 text-indigo-800" },
   proyecto: { label: "Proyecto", Icon: Building2, color: "bg-green-100 text-green-800" },
   lote: { label: "Lote", Icon: Home, color: "bg-orange-100 text-orange-800" },

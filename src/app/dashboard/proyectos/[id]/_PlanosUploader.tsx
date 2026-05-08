@@ -5,6 +5,7 @@ import { subirPlanos, eliminarPlanos } from "./_actions";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 import toast from "react-hot-toast";
 import PlanosViewer from "./_PlanosViewer";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { UploadCloud } from "lucide-react";
 
 interface PlanosUploaderProps {
@@ -17,6 +18,7 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
   const [pending, start] = useTransition();
   const { loading, tienePermiso, esAdmin } = usePermissions();
   const [dragActive, setDragActive] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const puedeGestionarPlanos = esAdmin() || tienePermiso(PERMISOS.PROYECTOS.EDITAR);
 
   const handleFileUpload = (file: File) => {
@@ -50,8 +52,11 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
   };
 
   const handleDelete = () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar los planos?')) return;
+    setConfirmDeleteOpen(true);
+  };
 
+  const confirmarEliminarPlanos = () => {
+    setConfirmDeleteOpen(false);
     start(async () => {
       try {
         await eliminarPlanos(proyectoId);
@@ -109,7 +114,7 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-crm-text-primary">Planos del Proyecto</h3>
-          <p className="text-sm text-crm-text-muted">Sube el plano general de {proyectoNombre}</p>
+          <p className="text-sm text-crm-text-muted">Suba el plano general de {proyectoNombre}</p>
         </div>
         {planosUrl && (
           <button
@@ -169,10 +174,10 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
             
             <div>
               <p className="text-lg font-medium text-crm-text-primary">
-                {dragActive ? 'Suelta el archivo aquí' : 'Subir Planos del Proyecto'}
+                {dragActive ? 'Suelte el archivo aquí' : 'Subir Planos del Proyecto'}
               </p>
               <p className="text-sm text-crm-text-muted mt-1">
-                Arrastra y suelta o haz clic para seleccionar
+                Arrastre y suelte o haga clic para seleccionar
               </p>
               <p className="text-xs text-crm-text-muted mt-2">
                 Formatos: JPG, PNG, WEBP, SVG, PDF • Máx: 10MB
@@ -181,6 +186,17 @@ export default function PlanosUploader({ proyectoId, planosUrl, proyectoNombre }
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="Eliminar planos"
+        description="¿Está seguro de que quiere eliminar los planos del proyecto?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        disabled={pending}
+        onConfirm={confirmarEliminarPlanos}
+        onClose={() => setConfirmDeleteOpen(false)}
+      />
     </div>
   );
 }

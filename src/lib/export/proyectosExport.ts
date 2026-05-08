@@ -132,8 +132,8 @@ function transformReserva(reserva: Reserva): Record<string, any> {
     'Cliente': reserva.cliente ? `${reserva.cliente.nombre} ${reserva.cliente.apellido || ''}`.trim() : '',
     'Cliente DNI': reserva.cliente?.dni || '',
     'Vendedor': reserva.vendedor_username || '',
-    'Monto Reserva': formatCurrency(reserva.monto_reserva),
-    'Fecha Reserva': formatDate(reserva.fecha_reserva),
+    'Monto Separación': formatCurrency(reserva.monto_reserva),
+    'Fecha Separación': formatDate(reserva.fecha_reserva),
     'Fecha Vencimiento': formatDate(reserva.fecha_vencimiento),
     'Estado': reserva.estado,
     'Notas': reserva.notas || '',
@@ -176,7 +176,7 @@ export function exportToExcel(data: ExportData, fileName: string = 'export.xlsx'
   if (data.reservas && data.reservas.length > 0) {
     const reservasData = data.reservas.map(transformReserva);
     const reservasSheet = XLSX.utils.json_to_sheet(reservasData);
-    XLSX.utils.book_append_sheet(workbook, reservasSheet, 'Reservas');
+    XLSX.utils.book_append_sheet(workbook, reservasSheet, 'Separaciones');
   }
 
   // Generate and download

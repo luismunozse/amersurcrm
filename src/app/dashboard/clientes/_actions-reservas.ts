@@ -9,10 +9,8 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
-import { dispararAutomatizaciones } from "@/lib/services/marketing-automatizaciones";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { requierePermiso, esAdmin } from "@/lib/permissions/server";
 import type { EstadoEvento } from "@/lib/types/agenda";
 
 import {
@@ -187,20 +185,6 @@ export async function registrarVisita(data: {
     }
     revalidarCliente(data.clienteId);
 
-    // Disparar automatizaciones de marketing (no bloquea la respuesta)
-    const triggerEvento = estadoEvento === 'completado' ? 'visita.completada' : 'visita.agendada';
-    after(async () => {
-      try {
-        await dispararAutomatizaciones(triggerEvento, {
-          clienteId: data.clienteId,
-          vendedorUsername: authResult.username,
-          fechaVisita: fechaVisita,
-        });
-      } catch (error) {
-        console.warn(`[Marketing] Error disparando automatizaciones ${triggerEvento}:`, error);
-      }
-    });
-
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -240,11 +224,11 @@ export async function crearReserva(data: {
     }
 
     if (!data.loteId && !data.propiedadId) {
-      return { success: false, error: 'Debes seleccionar un lote o una propiedad para crear la reserva' };
+      return { success: false, error: 'Debes seleccionar un lote o una propiedad para crear la separación' };
     }
 
     // Validar monto de reserva
-    const validacionMonto = validarMonto(data.montoReserva, 'Monto de reserva');
+    const validacionMonto = validarMonto(data.montoReserva, 'Monto de separación');
     if (!validacionMonto.valid) {
       return { success: false, error: validacionMonto.error };
     }
@@ -270,7 +254,7 @@ export async function crearReserva(data: {
       if (reservaExistente) {
         return {
           success: false,
-          error: `Este lote ya tiene una reserva activa (${reservaExistente.codigo_reserva})`
+          error: `Este lote ya tiene una separación activa (${reservaExistente.codigo_reserva})`
         };
       }
 
@@ -389,19 +373,18 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
       .single();
 
     if (!reserva) {
-      return { success: false, error: 'Reserva no encontrada' };
+      return { success: false, error: 'Separación no encontrada' };
     }
 
     // Validar que la reserva este en un estado cancelable
     if (reserva.estado === 'cancelada') {
-      return { success: false, error: 'Esta reserva ya esta cancelada' };
+      return { success: false, error: 'Esta separación ya esta cancelada' };
     }
 
     if (reserva.estado === 'convertida_venta') {
-      return { success: false, error: 'No se puede cancelar una reserva que ya fue convertida en venta' };
+      return { success: false, error: 'No se puede cancelar una separación que ya fue convertida en venta' };
     }
 
-    // Cancelar reserva
     const { error } = await supabase
       .schema('crm')
       .from('reserva')
@@ -414,7 +397,19 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
 
     if (error) throw error;
 
-    // Liberar lote usando RPC (valida estado y hace la transicion de forma segura)
+    // Cancelar proceso de adquisición asociado (si existe activo) para
+    // mantener consistencia: una reserva cancelada no puede tener proceso vivo.
+    const { error: procError } = await supabase
+      .schema('crm')
+      .from('proceso_adquisicion')
+      .update({ estado: 'cancelado', fecha_cierre: new Date().toISOString().slice(0, 10) })
+      .eq('reserva_id', reservaId)
+      .eq('estado', 'activo');
+
+    if (procError) {
+      console.warn(`Error cancelando proceso asociado a reserva ${reservaId}:`, procError);
+    }
+
     if (reserva.lote_id) {
       const { error: rpcError } = await supabase.rpc('liberar_lote', {
         p_lote: reserva.lote_id
@@ -422,7 +417,6 @@ export async function cancelarReserva(reservaId: string, motivo: string) {
 
       if (rpcError) {
         console.warn(`Error liberando lote ${reserva.lote_id}:`, rpcError);
-        // No fallar la cancelacion si el lote ya esta liberado
       }
     }
 
@@ -439,10 +433,10 @@ export async function eliminarReserva(reservaId: string) {
   const supabase = await createServerActionClient();
 
   try {
-    // Verificar permiso de administrador
-    await requierePermiso(PERMISOS.RESERVAS.ELIMINAR);
+    if (!(await esAdmin())) {
+      return { success: false, error: "Solo un administrador puede eliminar separaciones" };
+    }
 
-    // Obtener datos de la reserva antes de eliminar
     const { data: reserva } = await supabase
       .schema('crm')
       .from('reserva')
@@ -451,10 +445,9 @@ export async function eliminarReserva(reservaId: string) {
       .single();
 
     if (!reserva) {
-      return { success: false, error: 'Reserva no encontrada' };
+      return { success: false, error: 'Separación no encontrada' };
     }
 
-    // Si la reserva esta activa y tiene un lote, liberar el lote primero
     if (reserva.estado === 'activa' && reserva.lote_id) {
       const { error: rpcError } = await supabase.rpc('liberar_lote', {
         p_lote: reserva.lote_id
@@ -462,18 +455,36 @@ export async function eliminarReserva(reservaId: string) {
 
       if (rpcError) {
         console.warn(`Error liberando lote ${reserva.lote_id}:`, rpcError);
-        // Continuar con la eliminacion aunque falle la liberacion del lote
       }
     }
 
-    // Eliminar la reserva
-    const { error } = await supabase
+    // Borrar el proceso de adquisición asociado antes que la reserva,
+    // para evitar quedarnos con un proceso huérfano (FK SET NULL deja
+    // el proceso sin reserva pero visible en el tab Procesos).
+    const { error: procError } = await supabase
+      .schema('crm')
+      .from('proceso_adquisicion')
+      .delete()
+      .eq('reserva_id', reservaId);
+
+    if (procError) {
+      console.warn(`Error eliminando proceso asociado a reserva ${reservaId}:`, procError);
+    }
+
+    const { data: deleted, error } = await supabase
       .schema('crm')
       .from('reserva')
       .delete()
-      .eq('id', reservaId);
+      .eq('id', reservaId)
+      .select('id');
 
     if (error) throw error;
+    if (!deleted || deleted.length === 0) {
+      return {
+        success: false,
+        error: 'No se eliminó la separación. Verifique policy DELETE en crm.reserva.',
+      };
+    }
 
     revalidarCliente(reserva.cliente_id);
     revalidatePath('/dashboard/proyectos');

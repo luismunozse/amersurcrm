@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FileSignature } from "lucide-react";
+import { useRouter } from "next/navigation";
 import SeparacionModal from "./_SeparacionModal";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 
 export default function RegistrarSeparacionButton({ clienteId }: Props) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <>
@@ -26,7 +28,7 @@ export default function RegistrarSeparacionButton({ clienteId }: Props) {
           clienteId={clienteId}
           onClose={() => setOpen(false)}
           onSuccess={() => {
-            // La acción hace revalidatePath; el RSC re-renderiza con el nuevo estado.
+            router.refresh();
           }}
         />
       )}

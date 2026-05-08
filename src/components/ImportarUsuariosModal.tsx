@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Upload, Check, AlertTriangle } from "lucide-react";
+import toast from "react-hot-toast";
 import { Spinner } from '@/components/ui/Spinner';
 
 type Rol = { id: string; nombre: string };
@@ -141,7 +142,7 @@ export default function ImportarUsuariosModal({ open, roles, onClose, onImportCo
       const rows = parseCSV(text);
 
       if (rows.length < 2) {
-        alert("El archivo debe tener al menos una fila de cabecera y una de datos.");
+        toast.error("El archivo debe tener al menos una fila de cabecera y una de datos.");
         return;
       }
 
