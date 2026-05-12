@@ -1,0 +1,229 @@
+{
+  "schemas": [
+    [
+      {
+        "name": "cliente_dni",
+        "type": "text",
+        "position": { "x": 69.79, "y": 73.18 },
+        "width": 49.74,
+        "height": 6.61,
+        "fontSize": 9,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "cliente_nombre",
+        "type": "text",
+        "position": { "x": 70.42, "y": 66.69 },
+        "width": 49.21,
+        "height": 6.61,
+        "fontSize": 9,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "cliente_telefono",
+        "type": "text",
+        "position": { "x": 70.05, "y": 80.1 },
+        "width": 48.95,
+        "height": 6.09,
+        "fontSize": 9,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "cliente_correo",
+        "type": "text",
+        "position": { "x": 69.79, "y": 86.8 },
+        "width": 49.74,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "asesor_nombre",
+        "type": "text",
+        "position": { "x": 168.43, "y": 66.74 },
+        "width": 23.81,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "asesor_celular",
+        "type": "text",
+        "position": { "x": 142.99, "y": 73.44 },
+        "width": 24.87,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "numero",
+        "type": "text",
+        "position": { "x": 168.87, "y": 73.51 },
+        "width": 22.75,
+        "height": 6.35,
+        "fontSize": 14,
+        "fontColor": "#dc2626",
+        "alignment": "center",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "terreno_proyecto",
+        "type": "text",
+        "position": { "x": 17.42, "y": 110.17 },
+        "width": 37.04,
+        "height": 6.35,
+        "fontSize": 8,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "terreno_lote",
+        "type": "text",
+        "position": { "x": 53.97, "y": 109.9 },
+        "width": 16.93,
+        "height": 6.35,
+        "fontSize": 8,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "terreno_etapa",
+        "type": "text",
+        "position": { "x": 71.41, "y": 109.38 },
+        "width": 69.59,
+        "height": 6.35,
+        "fontSize": 8,
+        "alignment": "left",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "terreno_area",
+        "type": "text",
+        "position": { "x": 141.02, "y": 109.38 },
+        "width": 29.1,
+        "height": 6.35,
+        "fontSize": 8,
+        "alignment": "center",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "terreno_precio",
+        "type": "text",
+        "position": { "x": 171.65, "y": 109.64 },
+        "width": 20.9,
+        "height": 6.35,
+        "fontSize": 8,
+        "alignment": "right",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "precio_lista",
+        "type": "text",
+        "position": { "x": 59.49, "y": 142.92 },
+        "width": 36.25,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "right",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "descuento",
+        "type": "text",
+        "position": { "x": 59.22, "y": 148.89 },
+        "width": 38,
+        "height": 6.4,
+        "fontSize": 9,
+        "alignment": "right",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "precio_final",
+        "type": "text",
+        "position": { "x": 58.43, "y": 156.02 },
+        "width": 38,
+        "height": 6.4,
+        "fontSize": 9,
+        "alignment": "right",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "separacion",
+        "type": "text",
+        "position": { "x": 135.68, "y": 142.39 },
+        "width": 17.99,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "right",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "abono_principal",
+        "type": "text",
+        "position": { "x": 136.28, "y": 149.47 },
+        "width": 17.73,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "right",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "numero_cuotas",
+        "type": "text",
+        "position": { "x": 135.68, "y": 156.02 },
+        "width": 18.26,
+        "height": 6.35,
+        "fontSize": 9,
+        "alignment": "center",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "moneda_soles",
+        "type": "text",
+        "position": { "x": 101.3, "y": 176.7 },
+        "width": 4,
+        "height": 4,
+        "fontSize": 10,
+        "fontColor": "#dc2626",
+        "alignment": "center",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "moneda_dolares",
+        "type": "text",
+        "position": { "x": 118.8, "y": 176.7 },
+        "width": 4,
+        "height": 4,
+        "fontSize": 10,
+        "fontColor": "#dc2626",
+        "alignment": "center",
+        "verticalAlignment": "middle"
+      },
+      {
+        "name": "comentarios",
+        "type": "text",
+        "position": { "x": 98.79, "y": 193.86 },
+        "width": 69.59,
+        "height": 19.58,
+        "fontSize": 8,
+        "alignment": "left",
+        "verticalAlignment": "top"
+      },
+      {
+        "name": "asesor_footer",
+        "type": "text",
+        "position": { "x": 62.62, "y": 246.21 },
+        "width": 92.87,
+        "height": 11.91,
+        "fontSize": 9,
+        "alignment": "center",
+        "verticalAlignment": "middle"
+      }
+    ]
+  ]
+}
