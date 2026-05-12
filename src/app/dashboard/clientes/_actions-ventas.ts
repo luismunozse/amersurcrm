@@ -306,6 +306,55 @@ export async function registrarPago(data: {
   }
 }
 
+/**
+ * Elimina una venta de forma atómica revirtiendo todo: cuotas, pagos (anulados),
+ * comisiones, libera el lote, reserva vuelve a activa, proceso vuelve a activo
+ * con etapa desembolso pendiente, y cliente vuelve a en_proceso o potencial.
+ *
+ * Bloquea si hay pagos activos (deben anularse primero).
+ * Solo admin/gerente/coordinador.
+ */
+export async function eliminarVenta(ventaId: string, motivo?: string) {
+  if (!ventaId) {
+    return { success: false, error: "ID de venta requerido" };
+  }
+
+  const supabase = await createServerActionClient();
+
+  try {
+    await requierePermiso(PERMISOS.VENTAS.ANULAR);
+
+    const { data: venta } = await supabase
+      .from("venta")
+      .select("id, cliente_id, codigo_venta")
+      .eq("id", ventaId)
+      .single();
+
+    if (!venta) {
+      return { success: false, error: "Venta no encontrada" };
+    }
+
+    const { data: result, error } = await supabase.rpc("eliminar_venta", {
+      p_venta_id: ventaId,
+      p_motivo: motivo ?? null,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidarCliente(venta.cliente_id);
+    revalidatePath("/dashboard/ventas");
+    revalidatePath("/dashboard/cobranza", "layout");
+    revalidatePath("/dashboard/comisiones");
+    revalidatePath("/dashboard/clientes", "layout");
+
+    return { success: true, data: result };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al eliminar la venta" };
+  }
+}
+
 export async function anularVenta(ventaId: string, motivo: string) {
   const supabase = await createServerActionClient();
 

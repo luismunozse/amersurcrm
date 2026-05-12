@@ -95,7 +95,6 @@ function buildInputs(p: ProformaPdfInput): Record<string, string> {
     cliente_correo: cliente.email ?? "",
     asesor_nombre: asesor.nombre ?? "",
     asesor_celular: asesor.celular ?? "",
-    numero: p.numero ?? "",
     terreno_proyecto: terreno.proyecto ?? "",
     terreno_lote: terreno.lote ?? "",
     terreno_etapa: terreno.etapa ?? "",

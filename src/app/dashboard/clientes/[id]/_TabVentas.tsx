@@ -1,17 +1,41 @@
 "use client";
 
-import { DollarSign, FileText, Calendar, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { DollarSign, FileText, Calendar, CreditCard, TrendingUp, AlertCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
+import toast from "react-hot-toast";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import type { Pago } from "@/lib/types/crm-flujo";
 import type { VentaConRelaciones } from "@/lib/types/cliente-detail";
 import { getSmallBadgeClasses } from "@/lib/utils/badge";
+import { eliminarVenta } from "../_actions-ventas";
 
 interface Props {
   ventas: VentaConRelaciones[];
+  isAdmin?: boolean;
 }
 
-export default function TabVentas({ ventas }: Props) {
+export default function TabVentas({ ventas, isAdmin = false }: Props) {
+  const router = useRouter();
+  const [ventaAEliminar, setVentaAEliminar] = useState<VentaConRelaciones | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  const confirmarEliminar = () => {
+    if (!ventaAEliminar) return;
+    startTransition(async () => {
+      const res = await eliminarVenta(ventaAEliminar.id, motivo.trim() || undefined);
+      if (res.success) {
+        toast.success(`Venta ${ventaAEliminar.codigo_venta} eliminada`);
+        setVentaAEliminar(null);
+        setMotivo("");
+        router.refresh();
+      } else {
+        toast.error(res.error || "No se pudo eliminar la venta");
+      }
+    });
+  };
   const getEstadoColor = (estado: string) => {
     const colores = {
       'en_proceso': 'blue',
@@ -245,12 +269,90 @@ export default function TabVentas({ ventas }: Props) {
                 )}
 
                 {/* Footer */}
-                <div className="mt-4 pt-3 border-t border-crm-border text-xs text-crm-text-muted">
-                  Vendedor: {venta.vendedor?.username || 'desconocido'}
+                <div className="mt-4 pt-3 border-t border-crm-border flex items-center justify-between">
+                  <div className="text-xs text-crm-text-muted">
+                    Vendedor: {venta.vendedor?.username || 'desconocido'}
+                  </div>
+                  {isAdmin && venta.estado !== 'cancelada' && (
+                    <button
+                      onClick={() => {
+                        setVentaAEliminar(venta);
+                        setMotivo("");
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+                      title="Eliminar venta (revierte todo)"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Eliminar venta
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal confirmar eliminación */}
+      {ventaAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-crm-text">Eliminar venta</h3>
+                <p className="text-xs text-crm-text-muted">{ventaAEliminar.codigo_venta}</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4 text-sm text-red-800 dark:text-red-300">
+              <p className="font-semibold mb-1">Esta acción revierte:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-xs">
+                <li>Cuotas y pagos anulados</li>
+                <li>Comisiones del vendedor</li>
+                <li>Lote vuelve a disponible o reservado</li>
+                <li>Reserva (si existía) vuelve a activa</li>
+                <li>Proceso vuelve a etapa desembolso pendiente</li>
+                <li>Cliente vuelve a en_proceso o potencial</li>
+              </ul>
+              <p className="mt-2 text-xs italic">
+                Si hay pagos no anulados, debes anularlos primero.
+              </p>
+            </div>
+
+            <label className="block text-sm font-medium text-crm-text mb-1">
+              Motivo (opcional)
+            </label>
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={3}
+              placeholder="Ej: error en datos de venta, cliente desistió, etc."
+              className="w-full px-3 py-2 border border-crm-border rounded-lg text-sm focus:ring-2 focus:ring-crm-primary focus:border-transparent"
+            />
+
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setVentaAEliminar(null);
+                  setMotivo("");
+                }}
+                disabled={isPending}
+                className="flex-1 px-4 py-2 border border-crm-border text-crm-text rounded-lg hover:bg-crm-background transition-colors disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminar}
+                disabled={isPending}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 font-medium"
+              >
+                {isPending ? "Eliminando..." : "Eliminar venta"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

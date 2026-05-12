@@ -62,17 +62,6 @@
         "verticalAlignment": "middle"
       },
       {
-        "name": "numero",
-        "type": "text",
-        "position": { "x": 168.87, "y": 73.51 },
-        "width": 22.75,
-        "height": 6.35,
-        "fontSize": 14,
-        "fontColor": "#dc2626",
-        "alignment": "center",
-        "verticalAlignment": "middle"
-      },
-      {
         "name": "terreno_proyecto",
         "type": "text",
         "position": { "x": 17.42, "y": 110.17 },

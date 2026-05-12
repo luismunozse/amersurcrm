@@ -330,7 +330,7 @@ export default function ClienteDetailTabs({
               active={ventasSubTab}
               onChange={setVentasSubTab}
             />
-            {ventasSubTab === 'ventas' && <TabVentas ventas={ventas} />}
+            {ventasSubTab === 'ventas' && <TabVentas ventas={ventas} isAdmin={isAdmin} />}
             {ventasSubTab === 'cronograma' && <TabCronograma clienteId={cliente.id} ventas={ventas} esAdmin={isAdmin} />}
             {ventasSubTab === 'contrato' && <TabContrato clienteId={cliente.id} clienteNombre={cliente.nombre} cliente={cliente} ventas={ventas} />}
           </>
