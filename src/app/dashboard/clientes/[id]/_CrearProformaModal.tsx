@@ -122,7 +122,10 @@ export default function CrearProformaModal({
     const cargarProyectos = async () => {
       setLoadingProyectos(true);
       try {
-        const response = await fetch('/api/reservas/opciones');
+        const url = cliente?.id
+          ? `/api/reservas/opciones?incluirLotesCliente=${encodeURIComponent(cliente.id)}`
+          : '/api/reservas/opciones';
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Error al cargar proyectos');
         const data = await response.json();
         setProyectos(data.proyectos || []);
@@ -135,7 +138,7 @@ export default function CrearProformaModal({
     };
 
     void cargarProyectos();
-  }, [isOpen]);
+  }, [isOpen, cliente?.id]);
 
   // Cargar lotes cuando se selecciona un proyecto
   useEffect(() => {
@@ -755,11 +758,14 @@ export default function CrearProformaModal({
                   }}
                 >
                   <option value="">Seleccionar lote</option>
-                  {lotes.map((lote) => (
-                    <option key={lote.id} value={lote.id}>
-                      Lote {lote.codigo} {lote.sup_m2 ? `• ${lote.sup_m2} m²` : ""} {lote.precio ? `• S/ ${lote.precio.toLocaleString("es-PE")}` : ""}
-                    </option>
-                  ))}
+                  {lotes.map((lote) => {
+                    const propio = lote.estado && lote.estado !== "disponible";
+                    return (
+                      <option key={lote.id} value={lote.id}>
+                        Lote {lote.codigo} {lote.sup_m2 ? `• ${lote.sup_m2} m²` : ""} {lote.precio ? `• S/ ${lote.precio.toLocaleString("es-PE")}` : ""}{propio ? ` (${lote.estado})` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
                 {errors.lote && (
                   <p className="mt-1 text-xs text-red-500">{errors.lote}</p>

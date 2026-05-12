@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +8,7 @@ type LoteDisponible = {
   codigo: string | null;
   precio: number | null;
   sup_m2: number | null;
+  estado?: string | null;
   data?: Record<string, unknown> | null;
 };
 
@@ -26,7 +27,7 @@ function extraerNumeroLote(lote: LoteDisponible): string | null {
   return lote.codigo;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const supabase = await createServerOnlyClient();
     const {
@@ -37,7 +38,31 @@ export async function GET() {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
-    const [{ data: proyectos, error: proyectosError }, { data: lotes, error: lotesError }] =
+    const incluirLotesCliente = req.nextUrl.searchParams.get("incluirLotesCliente");
+
+    // Lotes propios del cliente (reservados o vendidos) — solo si se pasa clienteId
+    let lotesDelClienteIds: string[] = [];
+    if (incluirLotesCliente) {
+      const [{ data: reservasCliente }, { data: ventasCliente }] = await Promise.all([
+        supabase
+          .schema("crm")
+          .from("reserva")
+          .select("lote_id")
+          .eq("cliente_id", incluirLotesCliente)
+          .in("estado", ["activa", "vencida", "convertida_venta"]),
+        supabase
+          .schema("crm")
+          .from("venta")
+          .select("lote_id")
+          .eq("cliente_id", incluirLotesCliente),
+      ]);
+      const ids = new Set<string>();
+      reservasCliente?.forEach((r: any) => r.lote_id && ids.add(r.lote_id));
+      ventasCliente?.forEach((v: any) => v.lote_id && ids.add(v.lote_id));
+      lotesDelClienteIds = Array.from(ids);
+    }
+
+    const [{ data: proyectos, error: proyectosError }, { data: lotesDisp, error: lotesError }] =
       await Promise.all([
         supabase
           .schema("crm")
@@ -55,6 +80,23 @@ export async function GET() {
     if (proyectosError || lotesError) {
       console.error("[reservas/opciones] Error cargando datos:", proyectosError || lotesError);
       return NextResponse.json({ error: "No se pudieron cargar los proyectos" }, { status: 500 });
+    }
+
+    // Combinar disponibles + lotes propios del cliente (sin duplicados)
+    let lotes: LoteDisponible[] = (lotesDisp as LoteDisponible[] | null) ?? [];
+    if (lotesDelClienteIds.length > 0) {
+      const yaIncluidos = new Set(lotes.map((l) => l.id));
+      const faltantes = lotesDelClienteIds.filter((id) => !yaIncluidos.has(id));
+      if (faltantes.length > 0) {
+        const { data: lotesCliente } = await supabase
+          .schema("crm")
+          .from("lote")
+          .select("id, proyecto_id, codigo, precio, sup_m2, estado, data")
+          .in("id", faltantes);
+        if (lotesCliente) {
+          lotes = lotes.concat(lotesCliente as LoteDisponible[]);
+        }
+      }
     }
 
     const lotesPorProyecto = new Map<string, LoteDisponible[]>();
@@ -85,6 +127,7 @@ export async function GET() {
           codigo: lote.codigo,
           precio: lote.precio,
           sup_m2: lote.sup_m2,
+          estado: lote.estado ?? null,
         };
       }),
     }));
