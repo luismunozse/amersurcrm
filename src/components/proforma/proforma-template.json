@@ -8,7 +8,7 @@
         "width": 49.74,
         "height": 6.61,
         "fontSize": 9,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -18,7 +18,7 @@
         "width": 49.21,
         "height": 6.61,
         "fontSize": 9,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -28,7 +28,7 @@
         "width": 48.95,
         "height": 6.09,
         "fontSize": 9,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -38,7 +38,7 @@
         "width": 49.74,
         "height": 6.35,
         "fontSize": 9,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -48,7 +48,7 @@
         "width": 23.81,
         "height": 6.35,
         "fontSize": 9,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -58,7 +58,7 @@
         "width": 24.87,
         "height": 6.35,
         "fontSize": 9,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -79,7 +79,7 @@
         "width": 37.04,
         "height": 6.35,
         "fontSize": 8,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -89,7 +89,7 @@
         "width": 16.93,
         "height": 6.35,
         "fontSize": 8,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -99,7 +99,7 @@
         "width": 69.59,
         "height": 6.35,
         "fontSize": 8,
-        "alignment": "left",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -119,7 +119,7 @@
         "width": 20.9,
         "height": 6.35,
         "fontSize": 8,
-        "alignment": "right",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -129,7 +129,7 @@
         "width": 36.25,
         "height": 6.35,
         "fontSize": 9,
-        "alignment": "right",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -139,7 +139,7 @@
         "width": 38,
         "height": 6.4,
         "fontSize": 9,
-        "alignment": "right",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -149,7 +149,7 @@
         "width": 38,
         "height": 6.4,
         "fontSize": 9,
-        "alignment": "right",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -159,7 +159,7 @@
         "width": 17.99,
         "height": 6.35,
         "fontSize": 9,
-        "alignment": "right",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -169,7 +169,7 @@
         "width": 17.73,
         "height": 6.35,
         "fontSize": 9,
-        "alignment": "right",
+        "alignment": "center",
         "verticalAlignment": "middle"
       },
       {
@@ -211,8 +211,8 @@
         "width": 69.59,
         "height": 19.58,
         "fontSize": 8,
-        "alignment": "left",
-        "verticalAlignment": "top"
+        "alignment": "center",
+        "verticalAlignment": "middle"
       },
       {
         "name": "asesor_footer",

@@ -349,11 +349,32 @@ export default function CrearProformaModal({
       setSelectedProyectoId(reserva.lote.proyecto.id);
     }
 
+    const lotePrecio = reserva.lote?.precio ?? null;
+    const loteMoneda = reserva.lote?.moneda ?? reserva.moneda ?? "PEN";
+    const loteArea = reserva.lote?.sup_m2 ? `${reserva.lote.sup_m2} m²` : null;
+
+    // Alinear forma de pago con la registrada en la separación.
+    // Convención Amersur: "Abono Principal" representa la seña pagada por el cliente,
+    // no el saldo. El campo "Separación" queda en 0 cuando no hay pago lock adicional.
+    const formaPagoReserva: string = reserva.forma_pago ?? "";
+    const senaPagada = reserva.monto_reserva ?? 0;
+
+    const formaPagoLabel: Record<string, string> = {
+      contado: "Contado",
+      transferencia: "Transferencia bancaria",
+      deposito: "Depósito en cuenta",
+      credito_hipotecario: "Crédito hipotecario",
+      credito_directo: "Crédito directo",
+    };
+    const notaFormaPago = formaPagoReserva
+      ? `Forma de pago acordada en separación: ${formaPagoLabel[formaPagoReserva] ?? formaPagoReserva}.`
+      : "";
+
     setForm((prev) => ({
       ...prev,
       reservaId,
       tipoOperacion: "reserva",
-      moneda: (reserva.moneda ?? "PEN") as ProformaMoneda,
+      moneda: loteMoneda as ProformaMoneda,
       loteId: reserva.lote_id ?? prev.loteId,
       datos: {
         ...prev.datos,
@@ -361,16 +382,25 @@ export default function CrearProformaModal({
           ...prev.datos.terreno,
           proyecto: reserva.lote?.proyecto?.nombre ?? prev.datos.terreno.proyecto,
           lote: reserva.lote?.codigo ?? prev.datos.terreno.lote,
+          area: loteArea ?? prev.datos.terreno.area,
+          precioLista: lotePrecio ?? prev.datos.terreno.precioLista,
         },
         precios: {
           ...prev.datos.precios,
-          precioLista: reserva.monto_reserva ?? prev.datos.precios.precioLista,
-          precioFinal: prev.datos.precios.precioFinal ?? reserva.monto_reserva,
+          precioLista: lotePrecio ?? prev.datos.precios.precioLista,
+          precioFinal: lotePrecio ?? prev.datos.precios.precioFinal,
         },
         formaPago: {
           ...prev.datos.formaPago,
-          separacion: reserva.monto_reserva ?? prev.datos.formaPago.separacion,
+          separacion: 0,
+          abonoPrincipal: senaPagada || prev.datos.formaPago.abonoPrincipal,
+          numeroCuotas: prev.datos.formaPago.numeroCuotas,
         },
+        comentariosAdicionales: notaFormaPago
+          ? prev.datos.comentariosAdicionales
+            ? `${notaFormaPago}\n${prev.datos.comentariosAdicionales}`
+            : notaFormaPago
+          : prev.datos.comentariosAdicionales,
       },
     }));
   };

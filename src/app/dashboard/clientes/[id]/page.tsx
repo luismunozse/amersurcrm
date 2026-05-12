@@ -139,6 +139,8 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           id,
           codigo,
           sup_m2,
+          precio,
+          moneda,
           proyecto:proyecto!proyecto_id(id, nombre)
         )
       `)

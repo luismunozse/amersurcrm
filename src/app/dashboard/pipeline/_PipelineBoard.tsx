@@ -36,8 +36,9 @@ const COLUMNAS_PRINCIPALES: ColumnaDef[] = [
 ];
 
 const COLUMNAS_TERMINALES: ColumnaDef[] = [
+  { estado: "propietario", label: "Propietario", dot: "bg-green-500", header: "border-t-green-500" },
   { estado: "desestimado", label: "Desestimado", dot: "bg-gray-400",  header: "border-t-gray-400" },
-  { estado: "transferido", label: "Transferido", dot: "bg-green-500", header: "border-t-green-500" },
+  { estado: "transferido", label: "Transferido", dot: "bg-teal-500",  header: "border-t-teal-500" },
 ];
 
 const TODAS_COLUMNAS = [...COLUMNAS_PRINCIPALES, ...COLUMNAS_TERMINALES];
@@ -239,7 +240,7 @@ export default function PipelineBoard({
   const porEstado = useMemo(() => {
     const acc: Record<string, PipelineCliente[]> = {
       por_contactar: [], contactado: [], intermedio: [], potencial: [],
-      en_proceso: [], desestimado: [], transferido: [],
+      en_proceso: [], propietario: [], desestimado: [], transferido: [],
     };
     for (const c of clientesFiltrados) {
       if (acc[c.estado_cliente]) acc[c.estado_cliente].push(c);

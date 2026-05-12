@@ -11,7 +11,8 @@ export type EstadoCliente =
   | 'intermedio'
   | 'desestimado'
   | 'potencial'
-  | 'en_proceso';
+  | 'en_proceso'
+  | 'propietario';
 
 export type OrigenLead =
   | 'web'
@@ -154,8 +155,10 @@ export const ESTADOS_CLIENTE_OPTIONS = [
   { value: 'contactado', label: 'Contactado', color: 'yellow' },
   { value: 'intermedio', label: 'Intermedio', color: 'cyan' },
   { value: 'potencial', label: 'Potencial', color: 'purple' },
+  { value: 'en_proceso', label: 'En Proceso', color: 'orange' },
+  { value: 'propietario', label: 'Propietario', color: 'green' },
   { value: 'desestimado', label: 'Desestimado', color: 'gray' },
-  { value: 'transferido', label: 'Transferido', color: 'green' }
+  { value: 'transferido', label: 'Transferido', color: 'teal' }
 ] as const;
 
 export const ESTADO_CIVIL_OPTIONS = [
@@ -212,10 +215,11 @@ export function getEstadoClienteColor(estado: EstadoCliente): string {
   switch (estado) {
     case 'por_contactar': return 'blue';
     case 'contactado': return 'yellow';
-    case 'transferido': return 'green';
+    case 'transferido': return 'teal';
     case 'intermedio': return 'cyan';
     case 'potencial': return 'purple';
     case 'en_proceso': return 'orange';
+    case 'propietario': return 'green';
     case 'desestimado': return 'gray';
     default: return 'gray';
   }
@@ -229,6 +233,7 @@ export function getEstadoClienteLabel(estado: EstadoCliente): string {
     case 'intermedio': return 'Intermedio';
     case 'potencial': return 'Potencial';
     case 'en_proceso': return 'En Proceso';
+    case 'propietario': return 'Propietario';
     case 'desestimado': return 'Desestimado';
     default: return estado;
   }

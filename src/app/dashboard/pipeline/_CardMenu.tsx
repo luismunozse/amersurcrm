@@ -10,7 +10,8 @@ const OPCIONES: { value: EstadoCliente; label: string; dot: string }[] = [
   { value: "intermedio", label: "Intermedio", dot: "bg-cyan-500" },
   { value: "potencial", label: "Potencial", dot: "bg-purple-500" },
   { value: "en_proceso", label: "En Proceso", dot: "bg-indigo-500" },
-  { value: "transferido", label: "Transferido", dot: "bg-green-500" },
+  { value: "propietario", label: "Propietario", dot: "bg-green-500" },
+  { value: "transferido", label: "Transferido", dot: "bg-teal-500" },
   { value: "desestimado", label: "Desestimado", dot: "bg-gray-400" },
 ];
 

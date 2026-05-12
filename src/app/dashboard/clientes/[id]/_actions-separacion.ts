@@ -312,9 +312,10 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
     console.error("[registrarSeparacion] Error moviendo estado cliente:", pipelineError);
   }
 
-  revalidatePath(`/dashboard/clientes/${input.clienteId}`);
-  revalidatePath("/dashboard/adquisicion");
-  revalidatePath("/dashboard/clientes");
+  revalidatePath(`/dashboard/clientes/${input.clienteId}`, "page");
+  revalidatePath("/dashboard/clientes", "layout");
+  revalidatePath("/dashboard/adquisicion", "layout");
+  revalidatePath("/dashboard/pipeline", "layout");
 
   // Cargar datos para que el cliente pueda generar la constancia
   // automáticamente sin consultas adicionales.

@@ -22,6 +22,8 @@ export interface LoteRelacionReserva {
   id: string;
   codigo: string;
   sup_m2?: number | null;
+  precio?: number | null;
+  moneda?: string | null;
   proyecto?: ProyectoRelacion;
 }
 
