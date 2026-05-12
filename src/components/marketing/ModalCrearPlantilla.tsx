@@ -27,6 +27,15 @@ const CATEGORIAS_SUGERIDAS = [
   "general",
 ];
 
+const ESTADOS_CLIENTE_SUGERIDOS = [
+  { value: "por_contactar", label: "Por contactar" },
+  { value: "contactado", label: "Contactado" },
+  { value: "intermedio", label: "Intermedio" },
+  { value: "potencial", label: "Potencial" },
+  { value: "en_proceso", label: "En proceso" },
+  { value: "transferido", label: "Transferido" },
+];
+
 const FORM_DEFAULTS = {
   nombre: "",
   categoria: "general",
@@ -276,7 +285,38 @@ export default function ModalCrearPlantilla({
 
           <div>
             <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
-              Tags
+              Estado de cliente sugerido
+            </label>
+            <p className="text-[11px] text-crm-text-muted mb-2">
+              Al marcar un estado, la plantilla aparece destacada cuando el cliente esté en ese estado.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {ESTADOS_CLIENTE_SUGERIDOS.map((e) => {
+                const activo = form.tags.includes(e.value);
+                return (
+                  <button
+                    key={e.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({
+                      ...f,
+                      tags: activo ? f.tags.filter((t) => t !== e.value) : [...f.tags, e.value],
+                    }))}
+                    className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                      activo
+                        ? "bg-crm-primary text-white border-crm-primary"
+                        : "bg-crm-bg-secondary text-crm-text-secondary border-crm-border hover:bg-crm-card-hover"
+                    }`}
+                  >
+                    {activo ? "★ " : ""}{e.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-crm-text-muted uppercase mb-1">
+              Tags adicionales
             </label>
             <div className="flex gap-2">
               <input

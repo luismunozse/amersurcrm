@@ -6,6 +6,7 @@ import { User, Phone, Clock } from "lucide-react";
 import { formatCapacidadCompra } from "@/lib/types/clientes";
 import type { PipelineCliente } from "@/lib/cache.server";
 import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
+import BotonEnviarWhatsApp from "@/components/marketing/BotonEnviarWhatsApp";
 
 const PROXIMA_ACCION_LABEL: Record<string, string> = {
   llamar: "Llamar",
@@ -113,8 +114,24 @@ export default function PipelineCard({ cliente, urgencia, asLink = true }: Props
         </div>
       ) : null}
 
-      <div className="mt-2 text-[11px] text-crm-text-muted">
-        Último contacto: {ultimoContacto}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="text-[11px] text-crm-text-muted truncate">
+          Último contacto: {ultimoContacto}
+        </div>
+        {(cliente.telefono_whatsapp || cliente.telefono) && (
+          <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+            <BotonEnviarWhatsApp
+              telefono={cliente.telefono_whatsapp ?? cliente.telefono ?? ""}
+              clienteId={cliente.id}
+              clienteNombre={cliente.nombre}
+              estadoCliente={cliente.estado_cliente ?? undefined}
+              variablesAuto={{ vendedor: cliente.vendedor_username ?? "" }}
+              label=""
+              variant="ghost"
+              className="w-7 h-7 !px-0 !py-0 justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -59,9 +59,11 @@ const config: Config = {
   				'card-hover': 'var(--crm-card-hover)',
   				border: 'var(--crm-border)',
   				'border-hover': 'var(--crm-border-hover)',
+  				text: 'var(--crm-text-primary)',
   				'text-primary': 'var(--crm-text-primary)',
   				'text-secondary': 'var(--crm-text-secondary)',
   				'text-muted': 'var(--crm-text-muted)',
+  				background: 'var(--crm-bg-primary)',
   				'bg-primary': 'var(--crm-bg-primary)',
 				'bg-secondary': 'var(--crm-bg-secondary)'
   			},

@@ -421,6 +421,8 @@ export type PipelineCliente = {
   fecha_proxima_accion: string | null;
   origen_lead: string | null;
   propiedades_reservadas: number;
+  telefono: string | null;
+  telefono_whatsapp: string | null;
 };
 
 interface GetPipelineParams {
@@ -495,6 +497,8 @@ export const getCachedPipelineClientes = cache(
             proxima_accion,
             origen_lead,
             propiedades_reservadas,
+            telefono,
+            telefono_whatsapp,
             fecha_alta
           `)
           .eq('estado_cliente', estado)

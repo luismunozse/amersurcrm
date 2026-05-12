@@ -16,7 +16,6 @@ import {
   Headphones,
   Building,
   Target,
-  Percent,
   ShoppingCart,
   KanbanSquare,
 } from "lucide-react";
@@ -50,12 +49,6 @@ export const navigation: NavItem[] = [
     href: "/dashboard/cobranza",
     icon: <Banknote className="w-5 h-5" />,
     permisos: [PERMISOS.PAGOS.VER_TODOS, PERMISOS.PAGOS.VER_PROPIOS],
-  },
-  {
-    name: "Comisiones",
-    href: "/dashboard/admin/reportes?tab=comisiones",
-    icon: <Percent className="w-5 h-5" />,
-    permisos: [PERMISOS.COMISIONES.VER_TODAS, PERMISOS.COMISIONES.VER_PROPIAS],
   },
   {
     name: "Entregas",

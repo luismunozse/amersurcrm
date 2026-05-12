@@ -144,10 +144,19 @@ function ModalEnviar({
 
   useEffect(() => {
     let mounted = true;
+    const sb = createClient();
     Promise.all([
       obtenerPlantillas(),
-      createClient().schema("crm").from("proyecto").select("id, nombre").order("nombre"),
-    ]).then(([resPlant, resProy]) => {
+      sb.schema("crm").from("proyecto").select("id, nombre").order("nombre"),
+      // Auto-fill proyecto desde la reserva más reciente del cliente
+      sb.schema("crm")
+        .from("reserva")
+        .select("lote:lote_id(proyecto:proyecto_id(nombre))")
+        .eq("cliente_id", clienteId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]).then(([resPlant, resProy, resReserva]) => {
       if (!mounted) return;
       if (resPlant.error) { toast.error(resPlant.error); return; }
       const lista = sortPlantillas((resPlant.data ?? []).filter((t) => t.activo));
@@ -157,6 +166,16 @@ function ModalEnviar({
       }
       if (resProy.error) console.error("proyectos error:", resProy.error);
       setProyectos(resProy.data ?? []);
+
+      // Pre-llenar proyecto si no vino en variablesAuto y hay reserva
+      if (!variablesAuto.proyecto && resReserva?.data) {
+        const lote = (resReserva.data as any).lote;
+        const proyectoNombre = lote?.proyecto?.nombre;
+        if (proyectoNombre) {
+          setVariables((p) => ({ ...p, proyecto: proyectoNombre }));
+        }
+      }
+
       setCargando(false);
     });
     return () => { mounted = false; };

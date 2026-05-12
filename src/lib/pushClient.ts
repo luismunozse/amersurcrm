@@ -82,8 +82,14 @@ export async function registerPushSubscription({
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
     } catch (error) {
-      console.error("[push] Error creando suscripción push:", error);
-      // AbortError suele indicar que el SW aún no controla la página; permitir reintentos posteriores
+      const err = error as Error;
+      // AbortError = servicio push no disponible (localhost sin HTTPS, FCM/Mozilla bloqueado, dev sin red).
+      // No es fatal: app funciona sin push. Log silencioso, no error.
+      if (err?.name === "AbortError" || err?.message?.includes("push service")) {
+        console.warn("[push] Servicio push no disponible (omitiendo suscripción)");
+      } else {
+        console.warn("[push] No se pudo crear suscripción:", err?.message ?? err);
+      }
       return;
     }
   }
