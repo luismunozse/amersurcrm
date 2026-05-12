@@ -480,11 +480,11 @@ export default function ModalReservaLote({
               </div>
             </div>
 
-            {/* Cotización PDF */}
+            {/* Proforma PDF */}
             {clienteId && vendedorNombre && (
               <div className="border-t border-crm-border pt-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-crm-text-primary">Cotización</h3>
+                  <h3 className="text-lg font-semibold text-crm-text-primary">Proforma</h3>
                   {pdfUrl && (
                     <Button
                       type="button"
@@ -512,17 +512,17 @@ export default function ModalReservaLote({
                   {isGeneratingPdf ? (
                     <div className="flex items-center justify-center py-16">
                       <Spinner size="lg" color="primary" />
-                      <span className="ml-3 text-crm-text-muted">Generando cotización...</span>
+                      <span className="ml-3 text-crm-text-muted">Generando proforma...</span>
                     </div>
                   ) : pdfUrl ? (
                     <iframe
                       src={pdfUrl}
                       className="w-full h-[500px]"
-                      title="Vista previa de cotización"
+                      title="Vista previa de proforma"
                     />
                   ) : (
                     <div className="flex items-center justify-center py-16 text-crm-text-muted">
-                      Selecciona un cliente para ver la cotización
+                      Selecciona un cliente para ver la proforma
                     </div>
                   )}
                 </div>

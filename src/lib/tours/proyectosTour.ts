@@ -275,7 +275,7 @@ export const ventasReservasTourSteps: DriveStep[] = [
     element: '[data-tour="generar-proforma"]',
     popover: {
       title: 'Generar Proforma',
-      description: 'Genera una proforma (cotización formal) en PDF para enviar al cliente antes de concretar la venta.',
+      description: 'Genera una proforma en PDF para enviar al cliente antes de concretar la venta.',
       side: 'bottom',
     },
   },

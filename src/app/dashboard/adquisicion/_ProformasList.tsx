@@ -16,7 +16,7 @@ const ESTADOS_PROFORMA = [
 ];
 
 const TIPOS_OPERACION = [
-  { value: 'cotizacion', label: 'Cotización' },
+  { value: 'cotizacion', label: 'Proforma' },
   { value: 'reserva', label: 'Separación' },
   { value: 'venta', label: 'Venta' },
 ];

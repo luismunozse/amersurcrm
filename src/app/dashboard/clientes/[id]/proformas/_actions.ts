@@ -170,7 +170,7 @@ export async function eliminarProformaAction(
       : null;
 
     if (!rolNombre || !['ROL_ADMIN', 'ROL_GERENTE'].includes(rolNombre)) {
-      return { success: false, error: `Solo los administradores pueden eliminar cotizaciones (rol detectado: ${rolNombre})` };
+      return { success: false, error: `Solo los administradores pueden eliminar proformas (rol detectado: ${rolNombre})` };
     }
 
     // Usar service role para bypasear RLS
@@ -183,7 +183,7 @@ export async function eliminarProformaAction(
 
     if (error) {
       console.error("eliminarProformaAction error", error);
-      return { success: false, error: "No se pudo eliminar la cotización" };
+      return { success: false, error: "No se pudo eliminar la proforma" };
     }
 
     revalidatePath(`/dashboard/clientes/${clienteId}`);
@@ -191,7 +191,7 @@ export async function eliminarProformaAction(
     return { success: true };
   } catch (error) {
     console.error("eliminarProformaAction exception", error);
-    return { success: false, error: "Error inesperado al eliminar la cotización" };
+    return { success: false, error: "Error inesperado al eliminar la proforma" };
   }
 }
 

@@ -287,7 +287,7 @@ export default function ClienteDetailTabs({
               items={[
                 { id: 'procesos', label: 'Procesos' },
                 { id: 'separaciones', label: 'Separaciones' },
-                { id: 'cotizaciones', label: 'Cotizaciones' },
+                { id: 'cotizaciones', label: 'Proformas' },
               ]}
               active={adquisicionSubTab}
               onChange={setAdquisicionSubTab}

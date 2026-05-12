@@ -52,7 +52,7 @@ const MONEDAS: { value: ProformaMoneda; label: string }[] = [
 ];
 
 const TIPOS_OPERACION: { value: ProformaTipoOperacion; label: string }[] = [
-  { value: "cotizacion", label: "Cotización" },
+  { value: "cotizacion", label: "Proforma" },
   { value: "reserva", label: "Separación" },
   { value: "venta", label: "Venta" },
 ];
@@ -270,7 +270,7 @@ export default function CrearProformaModal({
             return nextUrl;
           });
         } catch (error) {
-        console.error("Error generando vista previa de cotización:", error);
+        console.error("Error generando vista previa de proforma:", error);
           if (!cancelled) {
             setPreviewError("No se pudo generar la vista previa");
           }
@@ -458,11 +458,11 @@ export default function CrearProformaModal({
         : await crearProformaAction(payload);
 
       if (!response.success || !response.proforma) {
-        toast.error(response.error || "No se pudo guardar la cotización");
+        toast.error(response.error || "No se pudo guardar la proforma");
         return;
       }
 
-      toast.success(proformaInicial ? "Cotización actualizada" : "Cotización creada");
+      toast.success(proformaInicial ? "Proforma actualizada" : "Proforma creada");
       onCreated(response.proforma, downloadPdf);
       onClose();
     });
@@ -490,7 +490,7 @@ export default function CrearProformaModal({
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-crm-border bg-crm-card/80 backdrop-blur">
           <div>
             <h2 className="text-xl font-semibold text-crm-text-primary">
-              {proformaInicial ? "Editar cotización" : "Nueva cotización"}
+              {proformaInicial ? "Editar proforma" : "Nueva proforma"}
             </h2>
             <p className="text-sm text-crm-text-secondary">
               Cliente: {cliente?.nombre} · {cliente?.codigo_cliente ?? ""}
@@ -1038,7 +1038,7 @@ export default function CrearProformaModal({
                     </div>
                   ) : previewUrl ? (
                     <iframe
-                      title="Vista previa cotización"
+                      title="Vista previa proforma"
                       src={previewUrl}
                       className="absolute inset-0 h-full w-full"
                     />
@@ -1046,7 +1046,7 @@ export default function CrearProformaModal({
                     <div className="flex flex-col items-center gap-3 px-4 text-center">
                       <FileText className="w-16 h-16 text-crm-text-muted opacity-50" />
                       <p className="text-sm text-crm-text-muted">
-                        Completa los datos para ver la cotización en tiempo real
+                        Completa los datos para ver la proforma en tiempo real
                       </p>
                     </div>
                   )}
@@ -1058,7 +1058,7 @@ export default function CrearProformaModal({
 
         <div className="sticky bottom-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t border-crm-border bg-crm-card/80 backdrop-blur">
           <p className="text-xs text-crm-text-muted">
-            Las cotizaciones se guardan en el historial del cliente junto con la información del asesor.
+            Las proformas se guardan en el historial del cliente junto con la información del asesor.
           </p>
           <div className="flex items-center gap-3">
             <LoadingButton
@@ -1141,7 +1141,7 @@ export default function CrearProformaModal({
           <div className="flex-1 bg-white rounded-lg overflow-hidden">
             {previewUrl && (
               <iframe
-                title="Vista previa cotización fullscreen"
+                title="Vista previa proforma fullscreen"
                 src={previewUrl}
                 className="w-full h-full"
               />

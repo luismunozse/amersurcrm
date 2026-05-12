@@ -98,7 +98,7 @@ export default function TabProformas({
     startTransition(async () => {
       try {
         await generarProformaPdf(proforma);
-        toast.success("Cotización descargada");
+        toast.success("Proforma descargada");
       } catch (error) {
         console.error("Error generando PDF", error);
         toast.error("No se pudo generar la proforma");
@@ -136,14 +136,14 @@ export default function TabProformas({
     try {
       const result = await eliminarProformaAction(proformaAEliminar.id, cliente.id);
       if (result.success) {
-        toast.success("Cotización eliminada");
+        toast.success("Proforma eliminada");
         router.refresh();
       } else {
         toast.error(result.error || "No se pudo eliminar");
       }
     } catch (error) {
-      console.error("Error eliminando cotización", error);
-      toast.error("Error al eliminar la cotización");
+      console.error("Error eliminando proforma", error);
+      toast.error("Error al eliminar la proforma");
     } finally {
       setIsDeleting(null);
       setProformaAEliminar(null);
@@ -169,9 +169,9 @@ export default function TabProformas({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-crm-text">Cotizaciones</h3>
+          <h3 className="text-lg font-semibold text-crm-text">Proformas</h3>
           <p className="text-sm text-crm-text-muted">
-            Genere cotizaciones personalizadas para su cliente antes de confirmar una separación o venta.
+            Genere proformas personalizadas para su cliente antes de confirmar una separación o venta.
           </p>
         </div>
 
@@ -180,23 +180,23 @@ export default function TabProformas({
           className="inline-flex items-center gap-2 px-4 py-2 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition-colors"
         >
           <FilePlus2 className="w-4 h-4" />
-          Nueva cotización
+          Nueva proforma
         </button>
       </div>
 
       {proformasOrdenadas.length === 0 ? (
         <div className="text-center py-16 bg-crm-background rounded-xl border border-dashed border-crm-border">
           <FileText className="w-12 h-12 mx-auto text-crm-text-muted mb-4 opacity-50" />
-          <h4 className="text-lg font-semibold text-crm-text mb-2">Sin cotizaciones registradas</h4>
+          <h4 className="text-lg font-semibold text-crm-text mb-2">Sin proformas registradas</h4>
           <p className="text-sm text-crm-text-muted mb-4">
-            Crea la primera cotización para este cliente y compártela antes de concretar la separación.
+            Crea la primera proforma para este cliente y compártela antes de concretar la separación.
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
             className="inline-flex items-center gap-2 text-crm-primary hover:text-crm-primary/80 transition-colors"
           >
             <FilePlus2 className="w-4 h-4" />
-            Crear cotización
+            Crear proforma
           </button>
         </div>
       ) : (
@@ -290,7 +290,7 @@ export default function TabProformas({
                         onClick={() => handleEliminar(proforma)}
                         disabled={isDeleting === proforma.id}
                         className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors disabled:opacity-60"
-                        title="Eliminar cotización"
+                        title="Eliminar proforma"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -327,7 +327,7 @@ export default function TabProformas({
           if (download && result) {
             handleDescargar(result);
           } else {
-            toast.success("Cotización guardada correctamente");
+            toast.success("Proforma guardada correctamente");
           }
           router.refresh();
         }}
@@ -347,10 +347,10 @@ export default function TabProformas({
 
       <ConfirmDialog
         open={!!proformaAEliminar}
-        title="Eliminar cotización"
+        title="Eliminar proforma"
         description={
           <>
-            ¿Está seguro de eliminar la cotización{" "}
+            ¿Está seguro de eliminar la proforma{" "}
             <strong>{proformaAEliminar?.numero || ""}</strong>?
             <br />
             <span className="text-red-500">Esta acción no se puede deshacer.</span>
