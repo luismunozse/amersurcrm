@@ -301,7 +301,7 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
 
   // Fallback: si la columna no existe (42703) o cache stale (PGRST204), reintenta sin firma.
   if (reservaError && (reservaError.code === "42703" || reservaError.code === "PGRST204" || /firma_vendedor_base64/i.test(reservaError.message ?? ""))) {
-    console.warn("[registrarSeparacion] firma_vendedor_base64 no disponible, insertando sin firma:", reservaError.message);
+    console.warn("[registrarSeparacion] firma_vendedor_base64 no disponible, reintentando sin firma:", reservaError.message);
     const retry = await supabase
       .schema("crm")
       .from("reserva")
