@@ -37,6 +37,8 @@ export interface ConstanciaInput {
   fechaDocumento?: string | Date | null;
   ciudadDocumento?: string | null;
   observaciones?: string | null;
+  /** Firma digital del vendedor que registró la separación (data URL PNG base64). */
+  firmaVendedorBase64?: string | null;
 }
 
 export interface ConstanciaPdfResult {

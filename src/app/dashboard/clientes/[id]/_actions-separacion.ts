@@ -33,6 +33,8 @@ interface RegistrarSeparacionInput {
   notas?: string;
   /** Si la separacion proviene de una proforma aprobada, se enlaza y marca como convertida. */
   proformaId?: string;
+  /** Firma digital del vendedor como data URL (PNG base64). Obligatoria desde la UI. */
+  firmaVendedorBase64?: string;
 }
 
 interface ProformaPrefill {
@@ -181,6 +183,7 @@ export interface ConstanciaPayload {
   proyectoNombre: string;
   fechaDocumento: string;
   observaciones: string | null;
+  firmaVendedorBase64?: string | null;
 }
 
 export async function registrarSeparacion(input: RegistrarSeparacionInput): Promise<{
@@ -259,6 +262,19 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
     return { success: false, error: `No se pudo reservar el lote: ${rpcLoteError.message}` };
   }
 
+  // Validar formato de firma (data URL PNG, max ~500KB)
+  let firmaPayload: string | null = null;
+  if (input.firmaVendedorBase64) {
+    const f = input.firmaVendedorBase64;
+    if (!f.startsWith("data:image/png;base64,")) {
+      return { success: false, error: "Firma con formato invalido" };
+    }
+    if (f.length > 500_000) {
+      return { success: false, error: "Firma demasiado grande (max 500KB)" };
+    }
+    firmaPayload = f;
+  }
+
   // Crear la reserva con forma_pago y tipo_separacion.
   const { data: reserva, error: reservaError } = await supabase
     .schema("crm")
@@ -275,6 +291,7 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
       estado: "activa",
       tipo_separacion: input.tipoSeparacion ?? "separacion_simple",
       forma_pago: input.formaPago,
+      firma_vendedor_base64: firmaPayload,
     })
     .select("id, codigo_reserva")
     .single();
@@ -380,7 +397,7 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
         monto,
         moneda: input.moneda ?? "PEN",
         forma_pago: input.formaPago,
-        url: `/dashboard/clientes/${input.clienteId}?tab=reservas`,
+        url: `/dashboard/clientes/${input.clienteId}?tab=adquisicion&subtab=separaciones`,
       };
 
       await Promise.all(
@@ -442,6 +459,7 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
         proyectoNombre: proyecto?.nombre ?? "—",
         fechaDocumento: new Date().toISOString(),
         observaciones: input.notas ?? null,
+        firmaVendedorBase64: firmaPayload ?? null,
       };
     }
   } catch (e) {

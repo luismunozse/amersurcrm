@@ -495,6 +495,12 @@ export function ConstanciaSeparacionDocument({
 
         {/* Firma */}
         <View style={styles.firmaWrap}>
+          {input.firmaVendedorBase64 ? (
+            <Image
+              src={input.firmaVendedorBase64}
+              style={{ width: 180, height: 60, marginBottom: 2, objectFit: "contain" }}
+            />
+          ) : null}
           <View style={styles.firmaLine} />
           <Text style={styles.firmaText}>{VENDEDORA.razonSocial}</Text>
           <Text style={styles.firmaText}>"LA VENDEDORA"</Text>

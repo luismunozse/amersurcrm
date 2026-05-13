@@ -13,6 +13,7 @@ import { getStatusBadgeClasses } from "@/lib/utils/badge";
 
 type SearchParams = {
   tab?: string | string[];
+  subtab?: string | string[];
   action?: string | string[];
 };
 
@@ -27,22 +28,34 @@ function normalizeParam(value?: string | string[]): string | undefined {
 }
 
 function resolveDefaultTab(tabRaw: string | undefined): ClienteTabType {
+  // Legacy: tab=reservas/proformas ahora viven dentro del grupo "adquisicion".
+  if (tabRaw === "reservas" || tabRaw === "proformas") return "adquisicion";
   const allowed: ClienteTabType[] = [
     "info",
     "timeline",
     "interacciones",
     "propiedades",
-    "reservas",
+    "adquisicion",
     "ventas",
-    "proformas",
+    "postventa_hub",
   ];
   return allowed.includes(tabRaw as ClienteTabType) ? (tabRaw as ClienteTabType) : "info";
+}
+
+function resolveDefaultSubTab(tabRaw: string | undefined, subRaw: string | undefined): string | undefined {
+  // Legacy: si llegan a /clientes/{id}?tab=reservas, llevar al sub-tab separaciones.
+  if (tabRaw === "reservas") return "separaciones";
+  if (tabRaw === "proformas") return "cotizaciones";
+  return subRaw;
 }
 
 export default async function ClienteDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
   const sp = searchParams ? await searchParams : {};
-  const defaultTab = resolveDefaultTab(normalizeParam(sp.tab));
+  const tabRaw = normalizeParam(sp.tab);
+  const subRaw = normalizeParam(sp.subtab);
+  const defaultTab = resolveDefaultTab(tabRaw);
+  const defaultSubTab = resolveDefaultSubTab(tabRaw, subRaw);
   const supabase = await createServerOnlyClient();
 
   // Verificar autenticación
@@ -357,6 +370,7 @@ export default async function ClienteDetailPage({ params, searchParams }: Props)
           asesorActual={asesorActual || null}
           vendedores={vendedores || []}
           defaultTab={defaultTab}
+          defaultSubTab={defaultSubTab}
           isAdmin={usuarioActual.rol === "ROL_ADMIN"}
           esPrivilegiado={esPrivilegiado}
           seguimientosVencidos={seguimientosVencidos}

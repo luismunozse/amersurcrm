@@ -37,6 +37,7 @@ interface Props {
   proformas: ProformaRecord[];
   asesorActual: AsesorActual | null;
   defaultTab?: ClienteTabType;
+  defaultSubTab?: string;
   vendedores: Array<{ id: string; username: string; nombre_completo?: string | null; telefono?: string | null; email?: string | null }>;
   isAdmin?: boolean;
   esPrivilegiado?: boolean;
@@ -76,14 +77,28 @@ export default function ClienteDetailTabs({
   asesorActual,
   vendedores,
   defaultTab = 'info',
+  defaultSubTab,
   isAdmin = false,
   esPrivilegiado = false,
   seguimientosVencidos = 0,
 }: Props) {
+  const adquisicionInicial: AdquisicionSubTab =
+    defaultSubTab === 'separaciones' || defaultSubTab === 'cotizaciones' || defaultSubTab === 'procesos'
+      ? defaultSubTab
+      : 'procesos';
+  const ventasInicial: VentasSubTab =
+    defaultSubTab === 'cronograma' || defaultSubTab === 'contrato' || defaultSubTab === 'ventas'
+      ? defaultSubTab
+      : 'ventas';
+  const postVentaInicial: PostVentaSubTab =
+    defaultSubTab === 'solicitudes' || defaultSubTab === 'independizacion' || defaultSubTab === 'entregas'
+      ? defaultSubTab
+      : 'entregas';
+
   const [activeTab, setActiveTab] = useState<ClienteTabType>(defaultTab);
-  const [adquisicionSubTab, setAdquisicionSubTab] = useState<AdquisicionSubTab>('procesos');
-  const [ventasSubTab, setVentasSubTab] = useState<VentasSubTab>('ventas');
-  const [postVentaSubTab, setPostVentaSubTab] = useState<PostVentaSubTab>('entregas');
+  const [adquisicionSubTab, setAdquisicionSubTab] = useState<AdquisicionSubTab>(adquisicionInicial);
+  const [ventasSubTab, setVentasSubTab] = useState<VentasSubTab>(ventasInicial);
+  const [postVentaSubTab, setPostVentaSubTab] = useState<PostVentaSubTab>(postVentaInicial);
   const [interaccionesCount, setInteraccionesCount] = useState(interacciones.length);
 
   // Scroll horizontal de tabs superior: mostrar fades según posición
@@ -121,6 +136,16 @@ export default function ClienteDetailTabs({
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
+
+  useEffect(() => {
+    if (defaultSubTab === 'separaciones' || defaultSubTab === 'cotizaciones' || defaultSubTab === 'procesos') {
+      setAdquisicionSubTab(defaultSubTab);
+    } else if (defaultSubTab === 'cronograma' || defaultSubTab === 'contrato' || defaultSubTab === 'ventas') {
+      setVentasSubTab(defaultSubTab);
+    } else if (defaultSubTab === 'solicitudes' || defaultSubTab === 'independizacion' || defaultSubTab === 'entregas') {
+      setPostVentaSubTab(defaultSubTab);
+    }
+  }, [defaultSubTab]);
 
   useEffect(() => {
     setInteraccionesCount(interacciones.length);

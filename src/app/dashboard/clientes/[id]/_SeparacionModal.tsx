@@ -8,6 +8,7 @@ import {
   registrarSeparacion,
 } from "./_actions-separacion";
 import { descargarConstanciaSeparacion } from "@/components/separacion/generarConstanciaSeparacionPdf";
+import FirmaDigitalCanvas from "@/components/FirmaDigitalCanvas";
 
 type FormaPago =
   | "contado"
@@ -76,6 +77,7 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
   const [metodoPago, setMetodoPago] = useState<string>("efectivo");
   const [fechaVencimiento, setFechaVencimiento] = useState<string>("");
   const [notas, setNotas] = useState<string>(proformaPrefill?.notas ?? "");
+  const [firmaBase64, setFirmaBase64] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -123,6 +125,10 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
       toast.error("Ingrese un monto válido");
       return;
     }
+    if (!firmaBase64) {
+      toast.error("Debe firmar antes de registrar la separación");
+      return;
+    }
 
     startTransition(async () => {
       const res = await registrarSeparacion({
@@ -135,6 +141,7 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
         fechaVencimiento: fechaVencimiento || undefined,
         notas: notas || undefined,
         proformaId: proformaPrefill?.proformaId,
+        firmaVendedorBase64: firmaBase64 ?? undefined,
       });
 
       if (!res.success) {
@@ -168,6 +175,7 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
             proyectoNombre: c.proyectoNombre,
             fechaDocumento: c.fechaDocumento,
             observaciones: c.observaciones,
+            firmaVendedorBase64: c.firmaVendedorBase64,
           });
           toast.success("Constancia descargada");
         } catch (e) {
@@ -364,6 +372,14 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
                   placeholder="Ej: incluir arras confirmatorias, titulares adicionales, etc."
                 />
               </div>
+
+              <FirmaDigitalCanvas
+                value={firmaBase64}
+                onChange={setFirmaBase64}
+                label="Firma del vendedor"
+                helpText="El vendedor debe firmar antes de registrar la separación."
+                required
+              />
             </>
           )}
         </form>
