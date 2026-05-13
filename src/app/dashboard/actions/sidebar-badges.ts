@@ -25,12 +25,17 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
     const { data: perfil } = await s
       .schema("crm")
       .from("usuario_perfil")
-      .select("username")
+      .select("username, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
       .eq("id", userId)
       .maybeSingle();
 
     const username = perfil?.username;
     if (!username) return {};
+
+    const rolNombre = Array.isArray((perfil as any)?.rol)
+      ? (perfil as any).rol[0]?.nombre
+      : (perfil as any)?.rol?.nombre;
+    const esPrivilegiado = ["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"].includes(rolNombre);
 
     const today = new Date().toISOString().slice(0, 10);
     const startOfDay = `${today}T00:00:00`;
@@ -56,25 +61,29 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           .not("fecha_proxima_accion", "is", null)
           .lte("fecha_proxima_accion", endOfDay),
 
-        // Agenda — eventos de hoy no cancelados
-        s
-          .schema("crm")
-          .from("evento")
-          .select("id", { count: "exact", head: true })
-          .eq("vendedor_id", userId)
-          .neq("estado", "cancelado")
-          .gte("fecha_inicio", startOfDay)
-          .lte("fecha_inicio", endOfDay),
+        // Agenda — eventos de hoy no cancelados. Admin ve todos; vendedor solo propios.
+        (() => {
+          const q = s
+            .schema("crm")
+            .from("evento")
+            .select("id", { count: "exact", head: true })
+            .neq("estado", "cancelado")
+            .gte("fecha_inicio", startOfDay)
+            .lte("fecha_inicio", endOfDay);
+          return esPrivilegiado ? q : q.eq("vendedor_id", userId);
+        })(),
 
-        // Agenda — recordatorios de hoy pendientes
-        s
-          .schema("crm")
-          .from("recordatorio")
-          .select("id", { count: "exact", head: true })
-          .eq("vendedor_id", userId)
-          .eq("completado", false)
-          .gte("fecha_recordatorio", startOfDay)
-          .lte("fecha_recordatorio", endOfDay),
+        // Agenda — recordatorios de hoy pendientes. Admin ve todos; vendedor solo propios.
+        (() => {
+          const q = s
+            .schema("crm")
+            .from("recordatorio")
+            .select("id", { count: "exact", head: true })
+            .eq("completado", false)
+            .gte("fecha_recordatorio", startOfDay)
+            .lte("fecha_recordatorio", endOfDay);
+          return esPrivilegiado ? q : q.eq("vendedor_id", userId);
+        })(),
 
         // Cobranza — cuotas vencidas/en mora de ventas del vendedor
         s

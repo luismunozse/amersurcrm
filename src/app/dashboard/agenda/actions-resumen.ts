@@ -21,8 +21,6 @@ export type ResumenAgendaHoy = {
   proximoEnMinutos: number | null;
 };
 
-const ESTADOS_EVENTO_ACTIVOS = ["pendiente", "en_progreso", "reprogramado"];
-
 export async function obtenerResumenAgendaHoy(): Promise<ResumenAgendaHoy> {
   const empty: ResumenAgendaHoy = { eventos: [], total: 0, proximoEnMinutos: null };
   try {
@@ -36,32 +34,45 @@ export async function obtenerResumenAgendaHoy(): Promise<ResumenAgendaHoy> {
     const inicio = startOfDay(ahora);
     const fin = endOfDay(ahora);
 
-    const [eventosRes, recordatoriosRes] = await Promise.all([
-      supabase
-        .from("evento")
-        .select(
-          `id, titulo, tipo, estado, prioridad, fecha_inicio, ubicacion,
-           cliente:cliente_id(nombre)`
-        )
-        .eq("vendedor_id", user.id)
-        .in("estado", ESTADOS_EVENTO_ACTIVOS)
-        .gte("fecha_inicio", inicio.toISOString())
-        .lte("fecha_inicio", fin.toISOString())
-        .order("fecha_inicio", { ascending: true })
-        .limit(10),
+    const { data: perfil } = await supabase
+      .schema("crm")
+      .from("usuario_perfil")
+      .select("rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+      .eq("id", user.id)
+      .maybeSingle();
 
-      supabase
-        .from("recordatorio")
-        .select(
-          `id, titulo, tipo, prioridad, fecha_recordatorio, completado,
-           cliente:cliente_id(nombre)`
-        )
-        .eq("vendedor_id", user.id)
-        .eq("completado", false)
-        .gte("fecha_recordatorio", inicio.toISOString())
-        .lte("fecha_recordatorio", fin.toISOString())
-        .order("fecha_recordatorio", { ascending: true })
-        .limit(10),
+    const rolNombre = Array.isArray((perfil as any)?.rol)
+      ? (perfil as any).rol[0]?.nombre
+      : (perfil as any)?.rol?.nombre;
+    const esPrivilegiado = ["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"].includes(rolNombre);
+
+    const eventosQuery = supabase
+      .from("evento")
+      .select(
+        `id, titulo, tipo, estado, prioridad, fecha_inicio, ubicacion,
+         cliente:cliente_id(nombre)`
+      )
+      .neq("estado", "cancelado")
+      .gte("fecha_inicio", inicio.toISOString())
+      .lte("fecha_inicio", fin.toISOString())
+      .order("fecha_inicio", { ascending: true })
+      .limit(10);
+
+    const recordatoriosQuery = supabase
+      .from("recordatorio")
+      .select(
+        `id, titulo, tipo, prioridad, fecha_recordatorio, completado,
+         cliente:cliente_id(nombre)`
+      )
+      .eq("completado", false)
+      .gte("fecha_recordatorio", inicio.toISOString())
+      .lte("fecha_recordatorio", fin.toISOString())
+      .order("fecha_recordatorio", { ascending: true })
+      .limit(10);
+
+    const [eventosRes, recordatoriosRes] = await Promise.all([
+      esPrivilegiado ? eventosQuery : eventosQuery.eq("vendedor_id", user.id),
+      esPrivilegiado ? recordatoriosQuery : recordatoriosQuery.eq("vendedor_id", user.id),
     ]);
 
     const eventos: ItemAgendaResumen[] = (eventosRes.data ?? []).map((e: any) => {

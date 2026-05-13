@@ -220,23 +220,36 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
     return { success: false, error: `El lote no esta disponible (estado: ${lote.estado})` };
   }
 
-  // Dias de vigencia configurables por proyecto (default 7 si no hay config).
-  let diasVigencia = 7;
-  if (lote.proyecto_id) {
-    const { data: config } = await supabase
-      .schema("crm")
-      .from("configuracion_proyecto_financiera")
-      .select("dias_vigencia_reserva")
-      .eq("proyecto_id", lote.proyecto_id)
-      .maybeSingle();
-    if (typeof config?.dias_vigencia_reserva === "number") {
-      diasVigencia = config.dias_vigencia_reserva;
+  // Vencimiento por defecto: 3 dias habiles desde hoy (sabados y domingos no cuentan).
+  const sumarDiasHabiles = (desde: Date, n: number): Date => {
+    const d = new Date(desde);
+    let restantes = n;
+    while (restantes > 0) {
+      d.setDate(d.getDate() + 1);
+      const dia = d.getDay();
+      if (dia !== 0 && dia !== 6) restantes -= 1;
     }
-  }
+    return d;
+  };
 
-  const fechaVencimientoISO = input.fechaVencimiento
-    ? new Date(input.fechaVencimiento).toISOString()
-    : new Date(Date.now() + diasVigencia * 24 * 60 * 60 * 1000).toISOString();
+  const limiteMax = sumarDiasHabiles(new Date(), 3);
+  // Permitir overflow de zona horaria: comparar solo fecha (YYYY-MM-DD).
+  const limiteMaxYmd = limiteMax.toISOString().slice(0, 10);
+
+  let fechaVencimientoISO: string;
+  if (input.fechaVencimiento) {
+    const elegida = new Date(input.fechaVencimiento);
+    const elegidaYmd = elegida.toISOString().slice(0, 10);
+    if (elegidaYmd > limiteMaxYmd) {
+      return {
+        success: false,
+        error: `La fecha de vencimiento no puede superar los 3 dias habiles (max: ${limiteMaxYmd}).`,
+      };
+    }
+    fechaVencimientoISO = elegida.toISOString();
+  } else {
+    fechaVencimientoISO = limiteMax.toISOString();
+  }
 
   // Reservar el lote de forma atomica via RPC.
   const { error: rpcLoteError } = await supabase.rpc("reservar_lote", {
@@ -316,6 +329,75 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
   revalidatePath("/dashboard/clientes", "layout");
   revalidatePath("/dashboard/adquisicion", "layout");
   revalidatePath("/dashboard/pipeline", "layout");
+
+  // Notificar a admins/gerentes/coordinadores cuando un vendedor registra separacion.
+  // No notificar si el mismo admin la creo (evita ruido).
+  try {
+    const [{ data: clienteInfo }, { data: loteInfo }, { data: actorPerfil }] = await Promise.all([
+      supabase.from("cliente").select("nombre, codigo_cliente").eq("id", input.clienteId).maybeSingle(),
+      supabase.from("lote").select("codigo, proyecto:proyecto!proyecto_id(nombre)").eq("id", input.loteId).maybeSingle(),
+      supabase.schema("crm").from("usuario_perfil").select("nombre_completo, rol:rol!usuario_perfil_rol_id_fkey(nombre)").eq("id", auth.userId).maybeSingle(),
+    ]);
+
+    const rolActor = Array.isArray((actorPerfil as any)?.rol)
+      ? (actorPerfil as any).rol[0]?.nombre
+      : (actorPerfil as any)?.rol?.nombre;
+    const actorEsPrivilegiado = ["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"].includes(rolActor);
+
+    if (!actorEsPrivilegiado) {
+      const { data: adminsRaw } = await supabase
+        .schema("crm")
+        .from("usuario_perfil")
+        .select("id, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+        .eq("activo", true);
+
+      const adminIds = (adminsRaw ?? [])
+        .filter((u: any) => {
+          const r = Array.isArray(u.rol) ? u.rol[0]?.nombre : u.rol?.nombre;
+          return ["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"].includes(r);
+        })
+        .map((u: any) => u.id as string);
+
+      const proyecto = Array.isArray((loteInfo as any)?.proyecto)
+        ? (loteInfo as any).proyecto[0]
+        : (loteInfo as any)?.proyecto;
+      const vendedorNombre = (actorPerfil as any)?.nombre_completo ?? auth.username;
+      const titulo = `Nueva separacion: ${reserva.codigo_reserva ?? "(sin codigo)"}`;
+      const mensaje =
+        `${vendedorNombre} registro una separacion de ` +
+        `${input.moneda ?? "PEN"} ${monto.toLocaleString("es-PE")} ` +
+        `para el cliente ${(clienteInfo as any)?.nombre ?? "—"} ` +
+        `sobre el lote ${(loteInfo as any)?.codigo ?? "—"}` +
+        (proyecto?.nombre ? ` (${proyecto.nombre})` : "") + ".";
+
+      const data = {
+        reserva_id: reserva.id,
+        codigo_reserva: reserva.codigo_reserva,
+        cliente_id: input.clienteId,
+        cliente_nombre: (clienteInfo as any)?.nombre,
+        lote_id: input.loteId,
+        vendedor_username: auth.username,
+        monto,
+        moneda: input.moneda ?? "PEN",
+        forma_pago: input.formaPago,
+        url: `/dashboard/clientes/${input.clienteId}?tab=reservas`,
+      };
+
+      await Promise.all(
+        adminIds.map((adminId) =>
+          supabase.rpc("crear_notificacion", {
+            p_usuario_id: adminId,
+            p_tipo: "separacion",
+            p_titulo: titulo,
+            p_mensaje: mensaje,
+            p_data: data,
+          }),
+        ),
+      );
+    }
+  } catch (e) {
+    console.warn("[registrarSeparacion] No se pudo notificar a admins:", e);
+  }
 
   // Cargar datos para que el cliente pueda generar la constancia
   // automáticamente sin consultas adicionales.

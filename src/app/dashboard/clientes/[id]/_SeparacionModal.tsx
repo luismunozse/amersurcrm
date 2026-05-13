@@ -347,7 +347,7 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
                     className="w-full border border-crm-border rounded-lg px-3 py-2 bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <p className="text-xs text-crm-text-muted mt-1">
-                    Si se deja vacío, usa los días configurados del proyecto.
+                    No debe superar los 3 días hábiles.
                   </p>
                 </div>
               </div>
