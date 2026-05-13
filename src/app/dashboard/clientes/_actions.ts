@@ -534,6 +534,62 @@ export async function obtenerVendedores() {
   return vendedoresFiltrados;
 }
 
+// Sugerencia round-robin: usa la misma fuente de verdad que /dashboard/admin/vendedores-activos
+// (tabla crm.vendedor_activo + crm.asignacion_config.ultimo_indice).
+// Solo sugiere; no avanza el contador (asignaciones manuales no consumen el turno).
+export async function obtenerProximoVendedorSugerido(): Promise<{
+  id: string;
+  username: string;
+  nombre_completo: string;
+} | null> {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data: vendedoresActivos, error: vaErr } = await supabase
+    .schema("crm")
+    .from("vendedor_activo")
+    .select("vendedor_id, orden")
+    .eq("activo", true)
+    .order("orden", { ascending: true });
+
+  if (vaErr) {
+    console.error("[obtenerProximoVendedorSugerido] vendedor_activo:", vaErr);
+    return null;
+  }
+  if (!vendedoresActivos || vendedoresActivos.length === 0) return null;
+
+  const { data: config } = await supabase
+    .schema("crm")
+    .from("asignacion_config")
+    .select("ultimo_indice")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const ultimoIndice = config?.ultimo_indice ?? 0;
+  const idx = ultimoIndice % vendedoresActivos.length;
+  const seleccionado = vendedoresActivos[idx];
+  if (!seleccionado) return null;
+
+  const { data: perfil, error: perfilErr } = await supabase
+    .schema("crm")
+    .from("usuario_perfil")
+    .select("id, username, nombre_completo")
+    .eq("id", seleccionado.vendedor_id)
+    .maybeSingle();
+
+  if (perfilErr || !perfil) {
+    console.error("[obtenerProximoVendedorSugerido] usuario_perfil:", perfilErr);
+    return null;
+  }
+
+  return {
+    id: perfil.id,
+    username: perfil.username,
+    nombre_completo: perfil.nombre_completo,
+  };
+}
+
 export type ClienteQuickView = {
   id: string;
   codigo_cliente: string | null;

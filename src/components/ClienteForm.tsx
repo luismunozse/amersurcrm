@@ -3,7 +3,7 @@
 import { useState, FormEvent, useRef, useEffect, useCallback } from "react";
 import { User, MapPin, BarChart3, AlertTriangle } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
-import { crearCliente, actualizarCliente, obtenerVendedores } from "@/app/dashboard/clientes/_actions";
+import { crearCliente, actualizarCliente, obtenerVendedores, obtenerProximoVendedorSugerido } from "@/app/dashboard/clientes/_actions";
 import { detectarDuplicados } from "@/app/dashboard/clientes/_actions-duplicates";
 import type { DuplicadoEncontrado } from "@/app/dashboard/clientes/_actions-helpers";
 import DuplicateWarning from "./DuplicateWarning";
@@ -70,6 +70,8 @@ export default function ClienteForm({
   }>>([]);
   const [loadingVendedores, setLoadingVendedores] = useState(true);
   const [errorVendedores, setErrorVendedores] = useState(false);
+  const [vendedorSeleccionado, setVendedorSeleccionado] = useState(cliente?.vendedor_asignado || "");
+  const [sugerencia, setSugerencia] = useState<{ username: string; nombre_completo: string } | null>(null);
   const {
     loading: permisosLoading,
     tienePermiso,
@@ -104,6 +106,43 @@ export default function ClienteForm({
 
     cargarVendedores();
   }, []);
+
+  // Sugerencia round-robin (solo al crear, no al editar)
+  useEffect(() => {
+    if (isEditing) return;
+    if (permisosLoading || !puedeGestionarVendedor) return;
+    let cancelled = false;
+    obtenerProximoVendedorSugerido()
+      .then((s) => {
+        if (cancelled) return;
+        if (!s) {
+          console.warn("[ClienteForm] sugerencia round-robin: sin vendedores activos");
+          return;
+        }
+        setSugerencia(s);
+      })
+      .catch((err) => {
+        console.error("[ClienteForm] error cargando sugerencia round-robin:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing, permisosLoading, puedeGestionarVendedor]);
+
+  // Aplicar sugerencia al select cuando vendedores y sugerencia esten cargados
+  useEffect(() => {
+    if (!sugerencia) return;
+    if (loadingVendedores) return;
+    if (vendedorSeleccionado !== "") return;
+    if (!vendedores.some((v) => v.username === sugerencia.username)) {
+      console.warn(
+        "[ClienteForm] sugerencia username no encontrada en lista de vendedores:",
+        sugerencia.username
+      );
+      return;
+    }
+    setVendedorSeleccionado(sugerencia.username);
+  }, [sugerencia, loadingVendedores, vendedores, vendedorSeleccionado]);
 
   // Debounced duplicate check
   useEffect(() => {
@@ -475,6 +514,14 @@ export default function ClienteForm({
                         Solo coordinadores/admin
                       </span>
                     )}
+                    {!isEditing && sugerencia && vendedorSeleccionado === sugerencia.username && (
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full bg-crm-primary/10 text-crm-primary font-semibold uppercase tracking-wide"
+                        title={`Sugerencia por round-robin: ${sugerencia.nombre_completo}`}
+                      >
+                        Sugerido (round-robin)
+                      </span>
+                    )}
                   </div>
                   {permisosLoading ? (
                     <>
@@ -487,7 +534,8 @@ export default function ClienteForm({
                   ) : puedeGestionarVendedor ? (
                     <select
                       name="vendedor_asignado"
-                      defaultValue={cliente?.vendedor_asignado || ""}
+                      value={vendedorSeleccionado}
+                      onChange={(e) => setVendedorSeleccionado(e.target.value)}
                       className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 transition-all"
                       disabled={pending || loadingVendedores}
                     >
@@ -497,6 +545,7 @@ export default function ClienteForm({
                       {vendedores.map((vendedor) => (
                         <option key={vendedor.id} value={vendedor.username}>
                           {vendedor.nombre_completo}
+                          {sugerencia && vendedor.username === sugerencia.username ? " — Sugerido" : ""}
                         </option>
                       ))}
                     </select>
