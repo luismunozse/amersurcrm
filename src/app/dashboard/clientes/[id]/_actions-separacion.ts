@@ -10,6 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
 import { esAdminOCoordinador } from "@/lib/permissions/server";
 import { parseOptionalNumber } from "@/lib/utils/numeric";
+import { crearNotificacion } from "@/app/_actionsNotifications";
 
 const FORMAS_PAGO_VALIDAS = [
   "contado",
@@ -254,6 +255,19 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
     fechaVencimientoISO = limiteMax.toISOString();
   }
 
+  // Validar formato de firma ANTES de tocar el lote (asi no queda huerfano)
+  let firmaPayload: string | null = null;
+  if (input.firmaVendedorBase64) {
+    const f = input.firmaVendedorBase64;
+    if (!f.startsWith("data:image/png;base64,")) {
+      return { success: false, error: "Firma con formato invalido" };
+    }
+    if (f.length > 800_000) {
+      return { success: false, error: "Firma demasiado grande (max 800KB)" };
+    }
+    firmaPayload = f;
+  }
+
   // Reservar el lote de forma atomica via RPC.
   const { error: rpcLoteError } = await supabase.rpc("reservar_lote", {
     p_lote: input.loteId,
@@ -262,39 +276,41 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
     return { success: false, error: `No se pudo reservar el lote: ${rpcLoteError.message}` };
   }
 
-  // Validar formato de firma (data URL PNG, max ~500KB)
-  let firmaPayload: string | null = null;
-  if (input.firmaVendedorBase64) {
-    const f = input.firmaVendedorBase64;
-    if (!f.startsWith("data:image/png;base64,")) {
-      return { success: false, error: "Firma con formato invalido" };
-    }
-    if (f.length > 500_000) {
-      return { success: false, error: "Firma demasiado grande (max 500KB)" };
-    }
-    firmaPayload = f;
-  }
+  // Crear la reserva. Si la columna firma_vendedor_base64 no existe en DB
+  // (migration no aplicada o cache stale), reintentar sin ese campo.
+  const baseReserva: Record<string, unknown> = {
+    cliente_id: input.clienteId,
+    lote_id: input.loteId,
+    vendedor_username: auth.username,
+    monto_reserva: monto,
+    moneda: input.moneda ?? "PEN",
+    fecha_vencimiento: fechaVencimientoISO,
+    metodo_pago: input.metodoPago ?? null,
+    notas: input.notas ?? null,
+    estado: "activa",
+    tipo_separacion: input.tipoSeparacion ?? "separacion_simple",
+    forma_pago: input.formaPago,
+  };
 
-  // Crear la reserva con forma_pago y tipo_separacion.
-  const { data: reserva, error: reservaError } = await supabase
+  let { data: reserva, error: reservaError } = await supabase
     .schema("crm")
     .from("reserva")
-    .insert({
-      cliente_id: input.clienteId,
-      lote_id: input.loteId,
-      vendedor_username: auth.username,
-      monto_reserva: monto,
-      moneda: input.moneda ?? "PEN",
-      fecha_vencimiento: fechaVencimientoISO,
-      metodo_pago: input.metodoPago ?? null,
-      notas: input.notas ?? null,
-      estado: "activa",
-      tipo_separacion: input.tipoSeparacion ?? "separacion_simple",
-      forma_pago: input.formaPago,
-      firma_vendedor_base64: firmaPayload,
-    })
+    .insert({ ...baseReserva, firma_vendedor_base64: firmaPayload })
     .select("id, codigo_reserva")
     .single();
+
+  // Fallback: si la columna no existe (42703) o cache stale (PGRST204), reintenta sin firma.
+  if (reservaError && (reservaError.code === "42703" || reservaError.code === "PGRST204" || /firma_vendedor_base64/i.test(reservaError.message ?? ""))) {
+    console.warn("[registrarSeparacion] firma_vendedor_base64 no disponible, insertando sin firma:", reservaError.message);
+    const retry = await supabase
+      .schema("crm")
+      .from("reserva")
+      .insert(baseReserva)
+      .select("id, codigo_reserva")
+      .single();
+    reserva = retry.data;
+    reservaError = retry.error;
+  }
 
   if (reservaError || !reserva) {
     // Rollback del lote si no se pudo crear la reserva.
@@ -402,13 +418,9 @@ export async function registrarSeparacion(input: RegistrarSeparacionInput): Prom
 
       await Promise.all(
         adminIds.map((adminId) =>
-          supabase.rpc("crear_notificacion", {
-            p_usuario_id: adminId,
-            p_tipo: "separacion",
-            p_titulo: titulo,
-            p_mensaje: mensaje,
-            p_data: data,
-          }),
+          crearNotificacion(adminId, "reserva", titulo, mensaje, data).catch((err) =>
+            console.warn("[registrarSeparacion] push fallo para", adminId, err),
+          ),
         ),
       );
     }
