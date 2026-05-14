@@ -131,6 +131,45 @@ export async function crearCliente(formData: FormData) {
 
   revalidatePath("/dashboard/clientes");
 
+  // Avanzar puntero round-robin si se asignó un vendedor activo.
+  // Garantiza que el próximo cliente sugiera al siguiente vendedor de la lista.
+  if (insertData.vendedor_username) {
+    try {
+      const { data: perfilVend } = await supabase
+        .schema("crm")
+        .from("usuario_perfil")
+        .select("id")
+        .eq("username", insertData.vendedor_username)
+        .maybeSingle();
+
+      if (perfilVend?.id) {
+        const { data: enLista } = await supabase
+          .schema("crm")
+          .from("vendedor_activo")
+          .select("vendedor_id")
+          .eq("vendedor_id", perfilVend.id)
+          .eq("activo", true)
+          .maybeSingle();
+
+        if (enLista) {
+          const { data: cfg } = await supabase
+            .schema("crm")
+            .from("asignacion_config")
+            .select("ultimo_indice")
+            .eq("id", 1)
+            .maybeSingle();
+          const nuevo = (cfg?.ultimo_indice ?? 0) + 1;
+          await supabase
+            .schema("crm")
+            .from("asignacion_config")
+            .upsert({ id: 1, ultimo_indice: nuevo });
+        }
+      }
+    } catch (err) {
+      console.warn("[crearCliente] No se pudo avanzar índice round-robin:", err);
+    }
+  }
+
   // Notificación y automatizaciones no-bloqueantes (se ejecutan después de enviar la respuesta)
   after(async () => {
     try {
