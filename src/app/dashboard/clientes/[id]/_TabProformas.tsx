@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Download, FilePlus2, FileText, PenSquare, Trash2, FileSignature, Send, Loader2 } from "lucide-react";
+import { Download, FilePlus2, FileText, PenSquare, Trash2, FileSignature, Loader2 } from "lucide-react";
+import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
@@ -349,7 +350,7 @@ export default function TabProformas({
                       {enviandoWhatsAppId === proforma.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Send className="w-4 h-4" />
+                        <WhatsAppIcon className="w-4 h-4" />
                       )}
                       WhatsApp
                     </button>
