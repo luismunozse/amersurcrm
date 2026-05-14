@@ -21,26 +21,6 @@ export const AYUDAS_CHECKLIST: Record<string, string> = {
     "Formato interno de Amersur con los datos del cliente, la unidad reservada y el monto entregado en arras, firmado por el comprador.",
 
   // ============================================================
-  // Calificación Bancaria
-  // ============================================================
-  "Boletas de pago (3 ultimos meses)":
-    "Las tres últimas boletas de pago emitidas por el empleador. Para independientes, recibos por honorarios del mismo periodo.",
-  "Boletas de pago (3 últimos meses)":
-    "Las tres últimas boletas de pago emitidas por el empleador. Para independientes, recibos por honorarios del mismo periodo.",
-  "Estado de cuenta bancario":
-    "Estado de cuenta de los últimos 3 a 6 meses emitido por el banco del cliente.",
-  "DDJJ Renta":
-    "Declaración Jurada Anual de Renta presentada ante la SUNAT del último ejercicio. Se puede descargar desde Clave SOL.",
-  "Declaración Jurada de Renta":
-    "Declaración Jurada Anual de Renta presentada ante la SUNAT del último ejercicio. Se puede descargar desde Clave SOL.",
-  "Certificado de trabajo":
-    "Documento del empleador que acredita el vínculo laboral vigente, el cargo y el tiempo de servicio. Opcional para trabajadores independientes.",
-  "Carta de aprobacion del banco":
-    "Comunicación formal del banco confirmando que el crédito hipotecario fue aprobado, con el monto y las condiciones.",
-  "Carta de aprobación del banco":
-    "Comunicación formal del banco confirmando que el crédito hipotecario fue aprobado, con el monto y las condiciones.",
-
-  // ============================================================
   // Firma de Contrato
   // ============================================================
   "Minuta de compraventa":
@@ -55,7 +35,7 @@ export const AYUDAS_CHECKLIST: Record<string, string> = {
     "Partida registral emitida por SUNARP con el historial de titularidad y cargas del inmueble. Se obtiene en línea o en ventanilla.",
 
   // ============================================================
-  // Desembolso
+  // Pago
   // ============================================================
   "Comprobante de pago":
     "Voucher o constancia del pago/transferencia correspondiente al desembolso del crédito a la cuenta de Amersur.",

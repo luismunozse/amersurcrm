@@ -20,27 +20,23 @@ Guía completa para hacer una venta de punta a punta en AmersurCRM, desde la cre
        │
        ▼
 [5] Registrar separación       → cliente pasa a "en_proceso", lote a "reservado",
-                                  se crea proceso_adquisicion con 4 etapas
+                                  se crea proceso_adquisicion con 3 etapas
        │
        ▼
 [6] Etapa 1: Separación        → cargar 3 documentos obligatorios + Completar
        │
        ▼
-[7] Etapa 2: Calif. Bancaria   → omitida si forma_pago = contado/transferencia/depósito.
-                                  Si crédito: cargar 4 obligatorios + Completar
+[7] Etapa 2: Firma Contrato    → cargar 3 documentos + Completar
        │
        ▼
-[8] Etapa 3: Firma Contrato    → cargar 3 documentos + Completar
+[8] Etapa 3: Pago              → cargar 1 documento + Cerrar Venta
        │
        ▼
-[9] Etapa 4: Desembolso        → cargar 2 documentos + Cerrar Venta
-       │
-       ▼
-[10] Cerrar venta              → modal de monto/cuotas, RPC atómica:
+[9] Cerrar venta               → modal de monto/cuotas, RPC atómica:
                                   crea venta + cronograma + comisión + lote vendido
        │
        ▼
-[11] Verificar cobranza, comisión y cierre del proceso
+[10] Verificar cobranza, comisión y cierre del proceso
 ```
 
 ---
@@ -186,8 +182,7 @@ update crm.proforma set estado = 'aprobada' where numero = 'PRO-2026-0001';
 1. RPC `reservar_lote` → `lote.estado = 'reservado'`
 2. INSERT en `crm.reserva` con código `RES-YYYY-NNNN`, `forma_pago` y `tipo_separacion`
 3. Si vino de proforma: `proforma.estado = 'convertida'` + `proforma.reserva_id`
-4. RPC `crear_proceso_desde_plantilla` → crea `proceso_adquisicion` con código `ADQ-YYYY-NNNN` + 4 etapas + checklists
-   - Si forma_pago saltea calif: `proceso_etapa.estado = 'omitida'` para `calificacion_bancaria`
+4. RPC `crear_proceso_desde_plantilla` → crea `proceso_adquisicion` con código `ADQ-YYYY-NNNN` + 3 etapas + checklists
 5. RPC `mover_cliente_pipeline` → `cliente.estado_cliente = 'en_proceso'`
 
 ### Verificación
@@ -235,33 +230,11 @@ Detalle del cliente → tab **Adquisición** → sub-tab **Procesos** → expand
 1. Marcar los 3 checks (auto al subir documento)
 2. Opcional: agregar **Observaciones**
 3. Privilegiado puede **Aprobar** la etapa (badge verde) o **Observar** (requiere motivo)
-4. Botón **Completar** → la etapa queda `completada` y avanza a la siguiente no omitida
-
-> Si la etapa está marcada `omitida`, se salta sin tocarla. El botón Completar pasa directo a la siguiente.
+4. Botón **Completar** → la etapa queda `completada` y avanza a la siguiente
 
 ---
 
-## 7. Etapa 2: Calificación Bancaria
-
-**Se omite automáticamente** si la separación se registró con forma_pago = `contado`, `transferencia` o `deposito`. En ese caso el badge muestra **Omitida**, no requiere acción y `avanzarEtapa` salta directo a Firma Contrato.
-
-### Checklist (cuando aplica, crédito hipotecario o directo)
-
-| Ítem | Obligatorio |
-|---|---|
-| Boletas de pago (3 últimos meses) | Sí |
-| Estado de cuenta bancario | Sí |
-| DDJJ Renta | Sí |
-| Certificado de trabajo | No |
-| Carta de aprobación del banco | Sí |
-
-Plazo default: **30 días** (`fecha_limite` se calcula al pasar a `en_progreso`).
-
-Avance: subir 4 obligatorios → Completar.
-
----
-
-## 8. Etapa 3: Firma Contrato
+## 7. Etapa 2: Firma Contrato
 
 ### Checklist (3 items, todos obligatorios)
 
@@ -275,7 +248,7 @@ Plazo default: **15 días**. Avance: subir 3 → Completar.
 
 ---
 
-## 9. Etapa 4: Desembolso
+## 8. Etapa 3: Pago
 
 ### Checklist (1 ítem obligatorio)
 
@@ -287,11 +260,13 @@ Plazo default: **15 días**. Avance: subir 3 → Completar.
 
 Cuando el check está completo, en lugar del botón **Completar** aparece el botón verde **Cerrar venta** (`DollarSign`).
 
+> Clave interna `etapa = 'desembolso'` se mantiene en DB para compat con RPCs (`cerrar_proceso_y_crear_venta`, comisiones, etc.). Solo cambia label.
+
 ---
 
-## 10. Cerrar venta
+## 9. Cerrar venta
 
-Click **Cerrar venta** en la etapa Desembolso → abre `CerrarVentaModal`.
+Click **Cerrar venta** en la etapa Pago → abre `CerrarVentaModal`.
 
 ### Datos prefill
 
@@ -395,14 +370,14 @@ Lista de cuotas con estado, fecha de vencimiento, monto, capital, interés y sal
 
 ### `proceso_adquisicion.estado` + `etapa_actual`
 
-- `activo` + etapa actual avanza por las 4 etapas
+- `activo` + etapa actual avanza por las 3 etapas
 - `completado` cuando se cierra venta
 - `cancelado` cuando se anula la separación
 - `pausado` (manual)
 
 ### `proceso_etapa.estado`
 
-`pendiente` → `en_progreso` → `completada` | `omitida` (calif. bancaria con pago al contado)
+`pendiente` → `en_progreso` → `completada`
 
 ### `proceso_etapa.estado_revision` (informativo)
 
@@ -414,12 +389,12 @@ Lista de cuotas con estado, fecha de vencimiento, monto, capital, interés y sal
 
 ### TC-1 — Venta al contado, sin proforma
 
-1. Crear cliente → 2. interés → **omitir paso 3-4** → 5.B (forma_pago = `contado`) → 6 → 7 omitida → 8 → 9 → 10
-2. Esperado: proceso completado en 3 etapas reales, comisión generada, cuotas = 0
+1. Crear cliente → 2. interés → **omitir paso 3-4** → 5.B (forma_pago = `contado`) → 6 → 7 → 8 → 9
+2. Esperado: proceso completado en 3 etapas, comisión generada, cuotas = 0
 
 ### TC-2 — Venta con crédito, desde proforma
 
-1. Crear cliente → 2 → 3 (tipo `credito`, 60 cuotas) → 4 (aprobar) → 5.A → 6 → 7 (con docs bancarios) → 8 → 9 → 10
+1. Crear cliente → 2 → 3 (tipo `credito`, 60 cuotas) → 4 (aprobar) → 5.A → 6 → 7 → 8 → 9
 2. Esperado: cronograma de 60 cuotas, primera cuota a 30 días, comisión `pendiente`
 
 ### TC-3 — Anular separación post etapa 1

@@ -17,12 +17,12 @@ type FormaPago =
   | "credito_hipotecario"
   | "credito_directo";
 
-const FORMA_PAGO_OPTIONS: { value: FormaPago; label: string; saltaCalificacion: boolean }[] = [
-  { value: "contado", label: "Contado", saltaCalificacion: true },
-  { value: "transferencia", label: "Transferencia", saltaCalificacion: true },
-  { value: "deposito", label: "Depósito", saltaCalificacion: true },
-  { value: "credito_hipotecario", label: "Crédito Hipotecario", saltaCalificacion: false },
-  { value: "credito_directo", label: "Crédito Directo", saltaCalificacion: false },
+const FORMA_PAGO_OPTIONS: { value: FormaPago; label: string }[] = [
+  { value: "contado", label: "Contado" },
+  { value: "transferencia", label: "Transferencia" },
+  { value: "deposito", label: "Depósito" },
+  { value: "credito_hipotecario", label: "Crédito Hipotecario" },
+  { value: "credito_directo", label: "Crédito Directo" },
 ];
 
 const METODO_PAGO_OPTIONS = [
@@ -111,8 +111,6 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
       setMoneda(loteSeleccionado.moneda);
     }
   }, [loteSeleccionado]);
-
-  const infoFormaPago = FORMA_PAGO_OPTIONS.find((o) => o.value === formaPago);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -320,11 +318,6 @@ export default function SeparacionModal({ clienteId, onClose, onSuccess, proform
                     </option>
                   ))}
                 </select>
-                {infoFormaPago?.saltaCalificacion && (
-                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">
-                    Esta forma de pago saltea la etapa de Calificación Bancaria.
-                  </p>
-                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

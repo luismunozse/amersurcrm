@@ -314,7 +314,7 @@ export default function TabVentas({ ventas, isAdmin = false }: Props) {
                 <li>Comisiones del vendedor</li>
                 <li>Lote vuelve a disponible o reservado</li>
                 <li>Reserva (si existía) vuelve a activa</li>
-                <li>Proceso vuelve a etapa desembolso pendiente</li>
+                <li>Proceso vuelve a etapa de pago pendiente</li>
                 <li>Cliente vuelve a en_proceso o potencial</li>
               </ul>
               <p className="mt-2 text-xs italic">

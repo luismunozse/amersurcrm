@@ -7,13 +7,10 @@ function unauthorizedResponse() {
 }
 
 async function handleRequest(req: NextRequest) {
-  // Vercel envía automáticamente Authorization: Bearer <CRON_SECRET>
-  // cuando CRON_SECRET está configurado en las variables de entorno
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    // Si no hay CRON_SECRET configurado, rechazar por seguridad
     console.error("CRON_SECRET no está configurado en las variables de entorno");
     return unauthorizedResponse();
   }
@@ -38,7 +35,6 @@ async function handleRequest(req: NextRequest) {
     return NextResponse.json({ error: configError.message }, { status: 500 });
   }
 
-  // Determinar si el envío push está habilitado (opcional — no bloquea las notificaciones in-app)
   const pushHabilitado =
     configData?.notificaciones_push === true &&
     configData.notificaciones_recordatorios === true &&
@@ -46,7 +42,6 @@ async function handleRequest(req: NextRequest) {
     !!configData.push_vapid_public &&
     !!configData.push_vapid_private;
 
-  // Buscar recordatorios pendientes de todos modos (sin filtrar por notificar_push)
   const { data: pendientes, error } = await supabaseCrm
     .from("recordatorio")
     .select(
@@ -67,7 +62,7 @@ async function handleRequest(req: NextRequest) {
 
   const failures: Array<{ id: string; error: string }> = [];
 
-  // Preparar todos los datos primero
+  // Datos comunes
   const notificacionesData = pendientes.map((recordatorio) => {
     const mensaje =
       recordatorio.descripcion ??
@@ -84,7 +79,7 @@ async function handleRequest(req: NextRequest) {
     return { recordatorio, mensaje, dataPayload };
   });
 
-  // Batch insert de todas las notificaciones in-app (siempre, independiente de push)
+  // 1. Notificación in-app siempre (batch)
   const notificacionesInsert = notificacionesData.map(({ recordatorio, mensaje, dataPayload }) => ({
     usuario_id: recordatorio.vendedor_id,
     tipo: "sistema",
@@ -95,52 +90,52 @@ async function handleRequest(req: NextRequest) {
 
   await supabaseCrm.from("notificacion").insert(notificacionesInsert);
 
-  // Dispatch push notifications solo si está habilitado
-  const successIds: string[] = [];
-
+  // 2. Push (solo si habilitado en config)
+  const pushSuccessIds: string[] = [];
   if (pushHabilitado) {
+    const pushTargets = notificacionesData.filter(
+      ({ recordatorio }) => recordatorio.notificar_push,
+    );
     const dispatchResults = await Promise.allSettled(
-      notificacionesData
-        .filter(({ recordatorio }) => recordatorio.notificar_push)
-        .map(({ recordatorio, mensaje, dataPayload }) =>
-          dispatchNotificationChannels(
-            {
-              userId: recordatorio.vendedor_id,
-              titulo: recordatorio.titulo,
-              mensaje,
-              tipo: "sistema",
-              createdAt: new Date().toISOString(),
-              data: dataPayload,
-              url: "/dashboard/agenda?tab=recordatorios",
+      pushTargets.map(({ recordatorio, mensaje, dataPayload }) =>
+        dispatchNotificationChannels(
+          {
+            userId: recordatorio.vendedor_id,
+            titulo: recordatorio.titulo,
+            mensaje,
+            tipo: "sistema",
+            createdAt: new Date().toISOString(),
+            data: dataPayload,
+            url: "/dashboard/agenda?tab=recordatorios",
+          },
+          { pushEnabled: true, recordatoriosEnabled: true },
+          {
+            push: {
+              provider: "webpush",
+              vapidPublicKey: configData!.push_vapid_public,
+              vapidPrivateKey: configData!.push_vapid_private,
+              subject: configData!.push_vapid_subject ?? null,
             },
-            { pushEnabled: true, recordatoriosEnabled: true },
-            {
-              push: {
-                provider: "webpush",
-                vapidPublicKey: configData!.push_vapid_public,
-                vapidPrivateKey: configData!.push_vapid_private,
-                subject: configData!.push_vapid_subject ?? null,
-              },
-            },
-            { supabaseClient: supabase },
-          ).then(() => recordatorio.id)
-        )
+          },
+          { supabaseClient: supabase },
+        ).then(() => recordatorio.id),
+      ),
     );
 
     dispatchResults.forEach((result, index) => {
-      const filteredPendientes = pendientes.filter((r) => r.notificar_push);
+      const recordatorioId = pushTargets[index]?.recordatorio.id ?? "";
       if (result.status === "fulfilled") {
-        successIds.push(result.value);
+        pushSuccessIds.push(result.value);
       } else {
         failures.push({
-          id: filteredPendientes[index]?.id ?? "",
+          id: recordatorioId,
           error: result.reason instanceof Error ? result.reason.message : "Error desconocido",
         });
       }
     });
   }
 
-  // Marcar todos los recordatorios como enviados (la notif in-app ya fue insertada)
+  // 3. Marcar todos como enviados (in-app insertada)
   const allIds = pendientes.map((r) => r.id);
   if (allIds.length > 0) {
     await supabaseCrm
@@ -151,18 +146,16 @@ async function handleRequest(req: NextRequest) {
 
   return NextResponse.json({
     processed: pendientes.length,
-    success: allIds.length,
-    pushDispatched: successIds.length,
+    inApp: allIds.length,
+    pushDispatched: pushSuccessIds.length,
     failures,
   });
 }
 
-// Vercel Cron usa GET
 export async function GET(req: NextRequest) {
   return handleRequest(req);
 }
 
-// Mantener POST para llamadas manuales
 export async function POST(req: NextRequest) {
   return handleRequest(req);
 }

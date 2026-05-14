@@ -193,6 +193,60 @@ function ClienteSearch({
   );
 }
 
+// Chips de lotes marcados como interés del cliente.
+// Aparece cuando hay cliente seleccionado y aún no se eligió un lote.
+function LotesInteresChips({
+  clienteId,
+  onSeleccionar,
+}: {
+  clienteId: string;
+  onSeleccionar: (loteId: string, label: string) => void;
+}) {
+  const [intereses, setIntereses] = useState<Array<{
+    id: string;
+    lote: { id: string; codigo: string; estado: string; proyecto: { id: string; nombre: string } };
+  }>>([]);
+
+  useEffect(() => {
+    if (!clienteId) {
+      setIntereses([]);
+      return;
+    }
+    let cancelado = false;
+    fetch(`/api/clientes/${clienteId}/proyecto-interes`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelado) return;
+        const lista = (d?.proyectosInteres || []).filter((i: any) => i?.lote?.id);
+        setIntereses(lista);
+      })
+      .catch(() => { if (!cancelado) setIntereses([]); });
+    return () => { cancelado = true; };
+  }, [clienteId]);
+
+  if (intereses.length === 0) return null;
+
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+      <span className="text-xs text-crm-text-muted">Interés del cliente:</span>
+      {intereses.map((i) => (
+        <button
+          key={i.id}
+          type="button"
+          onClick={() => onSeleccionar(
+            i.lote.id,
+            `${i.lote.proyecto.nombre} — Lote ${i.lote.codigo}`,
+          )}
+          className="px-2 py-0.5 text-xs bg-crm-primary/10 text-crm-primary border border-crm-primary/30 rounded-full hover:bg-crm-primary/20 transition-colors"
+          title={`Usar ${i.lote.proyecto.nombre} · Lote ${i.lote.codigo}`}
+        >
+          {i.lote.proyecto.nombre} · {i.lote.codigo}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Selector de lote con búsqueda
 type LoteResultado = Awaited<ReturnType<typeof buscarLotes>>[number];
 
@@ -423,8 +477,8 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
       }
 
       // Valores por defecto para campos requeridos por el schema
-      payload.append("notificar_email", "true");
-      payload.append("notificar_push", "false");
+      payload.append("notificar_email", "false");
+      payload.append("notificar_push", "true");
       payload.append("todo_el_dia", "false");
       payload.append("es_recurrente", "false");
       payload.append("etiquetas", "[]");
@@ -545,6 +599,14 @@ export default function EventoModal({ evento, isOpen, onClose, onSuccess, fechaP
                 <Home className="w-4 h-4 inline mr-1" aria-hidden />
                 Proyecto / Lote <span className="text-crm-text-muted font-normal">(opcional)</span>
               </label>
+              {formData.cliente_id && !formData.propiedad_id && (
+                <LotesInteresChips
+                  clienteId={formData.cliente_id}
+                  onSeleccionar={(id, label) =>
+                    setFormData(prev => ({ ...prev, propiedad_id: id, propiedad_label: label }))
+                  }
+                />
+              )}
               <LoteSearch
                 value={formData.propiedad_id}
                 onChange={(id, label) =>

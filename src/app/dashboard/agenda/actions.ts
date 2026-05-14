@@ -168,6 +168,7 @@ async function sincronizarRecordatorioEvento(
     cliente_id?: string;
     propiedad_id?: string;
     notificar_email: boolean;
+    notificar_push?: boolean;
   }
 ): Promise<void> {
   const fechaEvento = new Date(datos.fecha_inicio);
@@ -207,7 +208,7 @@ async function sincronizarRecordatorioEvento(
     propiedad_id: datos.propiedad_id ?? null,
     evento_id: eventoId,
     notificar_email: datos.notificar_email,
-    notificar_push: true,
+    notificar_push: datos.notificar_push ?? false,
     data: {
       evento_id: eventoId,
       recordar_antes_minutos: datos.recordar_antes_minutos,
@@ -232,6 +233,23 @@ async function sincronizarRecordatorioEvento(
         ...recordatorioPayload,
         created_by: createdBy,
       });
+  }
+}
+
+// =====================================================
+// HELPER: permiso para mutar evento ajeno
+// =====================================================
+
+/**
+ * Devuelve true si el usuario puede mutar un evento de otro vendedor.
+ * Coordinadores/gerentes/admins pueden tocar eventos ajenos.
+ */
+async function puedeMutarEventoAjeno(): Promise<boolean> {
+  try {
+    const permisos = await obtenerPermisosUsuario();
+    return !!permisos && ['ROL_ADMIN', 'ROL_GERENTE', 'ROL_COORDINADOR_VENTAS'].includes(permisos.rol);
+  } catch {
+    return false;
   }
 }
 
@@ -630,6 +648,7 @@ export async function crearEvento(formData: FormData) {
           cliente_id: datos.cliente_id,
           propiedad_id: datos.propiedad_id,
           notificar_email: datos.notificar_email,
+          notificar_push: datos.notificar_push,
         });
       } catch (recordatorioError) {
         console.warn("No se pudo crear recordatorio automático:", recordatorioError);
@@ -664,7 +683,10 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
       .eq('id', eventoId)
       .single();
 
-    if (!eventoExistente || eventoExistente.vendedor_id !== user.id) {
+    if (!eventoExistente) {
+      throw new Error("Evento no encontrado");
+    }
+    if (eventoExistente.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error("No tienes permisos para editar este evento");
     }
 
@@ -724,6 +746,7 @@ export async function actualizarEvento(eventoId: string, formData: FormData) {
         cliente_id: datos.cliente_id,
         propiedad_id: datos.propiedad_id,
         notificar_email: datos.notificar_email,
+        notificar_push: datos.notificar_push,
       });
     } catch (recordatorioError) {
       console.warn("No se pudo sincronizar recordatorio al editar evento:", recordatorioError);
@@ -757,7 +780,10 @@ export async function eliminarEvento(eventoId: string) {
       .eq('id', eventoId)
       .single();
 
-    if (!eventoExistente || eventoExistente.vendedor_id !== user.id) {
+    if (!eventoExistente) {
+      throw new Error("Evento no encontrado");
+    }
+    if (eventoExistente.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error("No tienes permisos para eliminar este evento");
     }
 
@@ -814,7 +840,10 @@ export async function completarEventoConResultado(
       .eq('id', eventoId)
       .single();
 
-    if (!evento || evento.vendedor_id !== user.id) {
+    if (!evento) {
+      throw new Error('Evento no encontrado');
+    }
+    if (evento.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error('No tienes permisos para modificar este evento');
     }
 
@@ -960,7 +989,10 @@ export async function cambiarEstadoEvento(eventoId: string, nuevoEstado: EstadoE
       .eq('id', eventoId)
       .single();
 
-    if (!eventoExistente || eventoExistente.vendedor_id !== user.id) {
+    if (!eventoExistente) {
+      throw new Error("Evento no encontrado");
+    }
+    if (eventoExistente.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error("No tienes permisos para modificar este evento");
     }
 
@@ -1036,11 +1068,14 @@ export async function reprogramarEvento(
     // Verificar que el evento pertenece al usuario
     const { data: eventoExistente } = await supabase
       .from('evento')
-      .select('vendedor_id, titulo, recordar_antes_minutos, prioridad, cliente_id, propiedad_id, notificar_email')
+      .select('vendedor_id, titulo, recordar_antes_minutos, prioridad, cliente_id, propiedad_id, notificar_email, notificar_push')
       .eq('id', eventoId)
       .single();
 
-    if (!eventoExistente || eventoExistente.vendedor_id !== user.id) {
+    if (!eventoExistente) {
+      throw new Error("Evento no encontrado");
+    }
+    if (eventoExistente.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error("No tienes permisos para modificar este evento");
     }
 
@@ -1073,6 +1108,7 @@ export async function reprogramarEvento(
         cliente_id: eventoExistente.cliente_id ?? undefined,
         propiedad_id: eventoExistente.propiedad_id ?? undefined,
         notificar_email: eventoExistente.notificar_email ?? true,
+        notificar_push: eventoExistente.notificar_push ?? false,
       });
     } catch (recordatorioError) {
       console.warn("No se pudo sincronizar recordatorio al reprogramar:", recordatorioError);
@@ -1162,7 +1198,10 @@ export async function marcarRecordatorioCompletado(recordatorioId: string) {
       .eq('id', recordatorioId)
       .single();
 
-    if (!recordatorioExistente || recordatorioExistente.vendedor_id !== user.id) {
+    if (!recordatorioExistente) {
+      throw new Error("Recordatorio no encontrado");
+    }
+    if (recordatorioExistente.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error("No tienes permisos para modificar este recordatorio");
     }
 
@@ -1240,7 +1279,10 @@ export async function eliminarRecordatorio(recordatorioId: string) {
       .eq('id', recordatorioId)
       .single();
 
-    if (!recordatorioExistente || recordatorioExistente.vendedor_id !== user.id) {
+    if (!recordatorioExistente) {
+      throw new Error("Recordatorio no encontrado");
+    }
+    if (recordatorioExistente.vendedor_id !== user.id && !(await puedeMutarEventoAjeno())) {
       throw new Error("No tienes permisos para eliminar este recordatorio");
     }
 

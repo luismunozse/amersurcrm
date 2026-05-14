@@ -2,7 +2,7 @@
 // PROCESO DE ADQUISICIÓN - Types
 // ============================================================
 
-export type EtapaProceso = 'separacion' | 'calificacion_bancaria' | 'firma_contrato' | 'desembolso';
+export type EtapaProceso = 'separacion' | 'firma_contrato' | 'desembolso';
 export type EstadoProceso = 'activo' | 'completado' | 'cancelado' | 'pausado';
 export type EstadoEtapa = 'pendiente' | 'en_progreso' | 'completada' | 'omitida';
 export type EstadoRevision = 'pendiente' | 'en_revision' | 'aprobado' | 'observado';
@@ -94,9 +94,8 @@ export interface PlantillaEtapa {
 
 export const ETAPAS_PROCESO: { value: EtapaProceso; label: string; color: string; icon: string }[] = [
   { value: 'separacion', label: 'Separación', color: 'blue', icon: '1' },
-  { value: 'calificacion_bancaria', label: 'Calif. Bancaria', color: 'purple', icon: '2' },
-  { value: 'firma_contrato', label: 'Firma Contrato', color: 'orange', icon: '3' },
-  { value: 'desembolso', label: 'Desembolso', color: 'green', icon: '4' },
+  { value: 'firma_contrato', label: 'Firma Contrato', color: 'orange', icon: '2' },
+  { value: 'desembolso', label: 'Pago', color: 'green', icon: '3' },
 ];
 
 export const ESTADOS_PROCESO: { value: EstadoProceso; label: string; color: string }[] = [

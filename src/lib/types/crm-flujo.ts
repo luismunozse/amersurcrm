@@ -172,13 +172,25 @@ export interface Pago {
 // UTILIDADES
 // ============================================================
 
-export const TIPOS_INTERACCION: { value: TipoInteraccion; label: string; icon: string }[] = [
-  { value: 'llamada', label: 'Llamada', icon: '📞' },
-  { value: 'email', label: 'Email', icon: '📧' },
-  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { value: 'visita', label: 'Visita', icon: '🏢' },
-  { value: 'reunion', label: 'Reunión', icon: '🤝' },
-  { value: 'mensaje', label: 'Mensaje', icon: '✉️' },
+import type { ComponentType } from "react";
+import {
+  Phone,
+  Mail,
+  Users,
+  Video,
+  FileText,
+} from "lucide-react";
+import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
+
+type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+
+export const TIPOS_INTERACCION: { value: TipoInteraccion; label: string; icon: IconComponent }[] = [
+  { value: 'llamada', label: 'Llamada', icon: Phone },
+  { value: 'email', label: 'Email', icon: Mail },
+  { value: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon },
+  { value: 'visita', label: 'Visita', icon: Users },
+  { value: 'reunion', label: 'Reunión', icon: Video },
+  { value: 'mensaje', label: 'Mensaje', icon: FileText },
 ];
 
 export const RESULTADOS_INTERACCION: { value: ResultadoInteraccion; label: string; color: string }[] = [

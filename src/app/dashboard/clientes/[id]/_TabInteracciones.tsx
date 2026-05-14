@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { Plus, Phone, Mail, MessageSquare, Users, Video, FileText, Clock, Calendar, RefreshCw, Edit2, Trash2, AlertCircle, AlertTriangle } from "lucide-react";
+import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { PageLoader } from "@/components/ui/PageLoader";
 import { calcularSeguimientosPendientes } from "@/lib/utils/seguimientos";
 import RegistrarInteraccionModal from "@/components/RegistrarInteraccionModal";
@@ -23,7 +24,7 @@ function getIconoTipo(tipo: string) {
   const tipos = {
     'llamada': <Phone className="h-4 w-4" />,
     'email': <Mail className="h-4 w-4" />,
-    'whatsapp': <MessageSquare className="h-4 w-4" />,
+    'whatsapp': <WhatsAppIcon className="h-4 w-4" />,
     'visita': <Users className="h-4 w-4" />,
     'reunion': <Video className="h-4 w-4" />,
     'mensaje': <FileText className="h-4 w-4" />,

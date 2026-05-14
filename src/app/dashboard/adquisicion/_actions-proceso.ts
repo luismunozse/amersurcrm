@@ -123,7 +123,6 @@ export async function obtenerResumenPipeline() {
 
     const resumen: Record<string, number> = {
       separacion: 0,
-      calificacion_bancaria: 0,
       firma_contrato: 0,
       desembolso: 0,
     };
@@ -232,8 +231,6 @@ export async function avanzarEtapa(procesoId: string) {
       .eq('id', etapaActual.id);
 
     // Buscar la siguiente etapa que no este omitida.
-    // Las etapas con estado 'omitida' (p.ej. calificacion bancaria en pago contado)
-    // se saltan sin tocar su estado ni su fecha_completada.
     let siguienteIdx = etapaActualIdx + 1;
     while (siguienteIdx < etapas.length && etapas[siguienteIdx].estado === 'omitida') {
       siguienteIdx++;
@@ -450,12 +447,91 @@ export async function cambiarEstadoRevision(
 
     if (updError) throw updError;
 
+    if (estadoNuevo === 'en_revision') {
+      await notificarPrivilegiadosRevisionPendiente(supabase, etapaId, auth.username);
+    }
+
     revalidatePath('/dashboard/adquisicion');
     revalidatePath('/dashboard/clientes', 'layout');
 
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+async function notificarPrivilegiadosRevisionPendiente(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  etapaId: string,
+  vendedorUsername: string,
+) {
+  try {
+    const { data: etapa } = await supabase
+      .from('proceso_etapa')
+      .select(`
+        nombre,
+        proceso:proceso_id (
+          codigo,
+          cliente_id,
+          cliente:cliente_id ( id, nombre )
+        )
+      `)
+      .eq('id', etapaId)
+      .maybeSingle();
+
+    if (!etapa) return;
+
+    const procesoData = Array.isArray(etapa.proceso) ? etapa.proceso[0] : etapa.proceso;
+    const codigoProceso: string = procesoData?.codigo ?? 'proceso';
+    const clienteId: string | null = procesoData?.cliente_id ?? null;
+    const clienteData = procesoData?.cliente;
+    const cliente = Array.isArray(clienteData) ? clienteData[0] : clienteData;
+    const clienteNombre: string = cliente?.nombre ?? 'Cliente';
+    const etapaNombre: string = etapa.nombre ?? 'Etapa';
+    const url = clienteId
+      ? `/dashboard/clientes/${clienteId}?tab=adquisicion&subtab=procesos`
+      : '/dashboard/adquisicion';
+
+    const { data: roles } = await supabase
+      .from('rol')
+      .select('id')
+      .in('nombre', ['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS']);
+
+    if (!roles || roles.length === 0) return;
+    const rolIds = roles.map((r: { id: string }) => r.id);
+
+    const { data: usuarios } = await supabase
+      .from('usuario_perfil')
+      .select('id')
+      .eq('activo', true)
+      .in('rol_id', rolIds);
+
+    if (!usuarios || usuarios.length === 0) return;
+
+    const titulo = `Etapa pendiente de revisión: ${etapaNombre}`;
+    const mensaje = `${vendedorUsername} marcó la etapa "${etapaNombre}" del proceso ${codigoProceso} (${clienteNombre}) como lista para revisión.`;
+
+    const payload = usuarios.map((u: { id: string }) => ({
+      usuario_id: u.id,
+      tipo: 'sistema',
+      titulo,
+      mensaje,
+      data: {
+        etapa_id: etapaId,
+        proceso_codigo: codigoProceso,
+        cliente_id: clienteId,
+        cliente_nombre: clienteNombre,
+        accion: 'revisar_etapa_proceso',
+        url,
+      },
+    }));
+
+    const { error: insertError } = await supabase.from('notificacion').insert(payload);
+    if (insertError) {
+      console.error('Error creando notificaciones de revisión pendiente:', insertError);
+    }
+  } catch (err) {
+    console.error('Error notificando a privilegiados:', err);
   }
 }
 
@@ -624,7 +700,7 @@ export interface CerrarVentaResult {
 }
 
 /**
- * Cierra un proceso de adquisicion en etapa 'desembolso':
+ * Cierra un proceso de adquisicion en etapa 'pago':
  * crea la venta, genera el cronograma de cuotas, marca el lote como
  * vendido, completa el proceso y marca la reserva como convertida.
  * Autorizacion: vendedor asignado al proceso o admin/coord/gerente.

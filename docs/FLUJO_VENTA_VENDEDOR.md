@@ -104,13 +104,11 @@ Hay dos caminos. Use el que corresponda:
 | **Vence** | Si lo deja vacío usa los días configurados del proyecto. |
 | **Notas** | Para comentarios internos. |
 
-> **Importante:** si la forma de pago es **contado**, **transferencia** o **depósito**, el sistema **omite automáticamente** la etapa de Calificación Bancaria. Si elige crédito, esa etapa se vuelve obligatoria.
-
 ### Qué pasa al guardar
 
 - El lote pasa a **Reservado**.
 - El cliente pasa a **En Proceso**.
-- Se crea el **proceso de adquisición** con sus 4 etapas.
+- Se crea el **proceso de adquisición** con sus 3 etapas.
 - Si la separación vino de una cotización, esa cotización queda marcada como **Convertida**.
 
 ### Constancia de separación
@@ -137,25 +135,7 @@ Cuando los 3 estén cargados, presione **Completar**. La etapa queda en verde y 
 
 ---
 
-## Paso 7 — Etapa 2: Calificación Bancaria
-
-**Solo aplica si la forma de pago fue crédito hipotecario o crédito directo.** En pagos al contado o por transferencia/depósito esta etapa aparece en gris con el badge **Omitida** y se salta sola.
-
-Cuando aplica, los documentos a cargar son:
-
-- Boletas de pago de los últimos 3 meses (obligatorio).
-- Estado de cuenta bancario (obligatorio).
-- Declaración Jurada de Renta (obligatorio).
-- Certificado de trabajo (opcional).
-- Carta de aprobación del banco (obligatorio).
-
-Plazo sugerido por el sistema: 30 días desde el inicio de la etapa.
-
-Cargue los 4 obligatorios → **Completar**.
-
----
-
-## Paso 8 — Etapa 3: Firma de Contrato
+## Paso 7 — Etapa 2: Firma de Contrato
 
 Documentos a cargar (todos obligatorios):
 
@@ -169,7 +149,7 @@ Cuando los 3 estén cargados → **Completar**.
 
 ---
 
-## Paso 9 — Etapa 4: Desembolso
+## Paso 8 — Etapa 3: Pago
 
 Documentos a cargar:
 
@@ -179,7 +159,7 @@ Cuando esté cargado, en lugar del botón Completar aparece el botón verde **Ce
 
 ---
 
-## Paso 10 — Cerrar la venta
+## Paso 9 — Cerrar la venta
 
 Click en **Cerrar venta** abre el modal final.
 
@@ -287,8 +267,7 @@ Tab **Procesos** → ícono de tacho rojo en el header del proceso. Confirme la 
 - **Cotización (proforma)**: documento con precio y condiciones, todavía sin compromiso. Se imprime y se envía al cliente.
 - **Separación**: el cliente paga una seña y el lote queda tomado por un plazo limitado.
 - **Constancia de separación**: PDF firmado por la Gerencia General que se entrega al cliente al separar.
-- **Proceso de adquisición**: el camino de 4 etapas que va desde la separación hasta el desembolso final.
-- **Etapa omitida**: una etapa que el sistema saltea automáticamente porque no aplica al caso (típico: Calificación Bancaria cuando el pago es al contado).
+- **Proceso de adquisición**: el camino de 3 etapas que va desde la separación hasta el pago final.
 - **Cierre de venta**: el paso final que convierte la separación en una venta firme con cronograma de cuotas.
 - **Cuota**: cada pago programado del cronograma de la venta.
 - **Comisión**: monto que le corresponde al vendedor por la venta cerrada. Se calcula como un porcentaje del precio total, según configuración del proyecto.

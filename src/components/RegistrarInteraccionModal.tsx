@@ -157,21 +157,24 @@ export default function RegistrarInteraccionModal({
               Tipo de Interacción *
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {TIPOS_INTERACCION.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setTipo(item.value)}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                    tipo === item.value
-                      ? "border-crm-primary bg-crm-primary/10 text-crm-primary"
-                      : "border-crm-border text-crm-text-secondary hover:border-crm-primary/50"
-                  }`}
-                >
-                  <span className="mr-2">{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
+              {TIPOS_INTERACCION.map((item) => {
+                const Ic = item.icon;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setTipo(item.value)}
+                    className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                      tipo === item.value
+                        ? "border-crm-primary bg-crm-primary/10 text-crm-primary"
+                        : "border-crm-border text-crm-text-secondary hover:border-crm-primary/50"
+                    }`}
+                  >
+                    <Ic className="w-4 h-4 shrink-0" aria-hidden />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

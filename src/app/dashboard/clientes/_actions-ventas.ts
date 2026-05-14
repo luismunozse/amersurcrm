@@ -309,7 +309,7 @@ export async function registrarPago(data: {
 /**
  * Elimina una venta de forma atómica revirtiendo todo: cuotas, pagos (anulados),
  * comisiones, libera el lote, reserva vuelve a activa, proceso vuelve a activo
- * con etapa desembolso pendiente, y cliente vuelve a en_proceso o potencial.
+ * con etapa pago pendiente, y cliente vuelve a en_proceso o potencial.
  *
  * Bloquea si hay pagos activos (deben anularse primero).
  * Solo admin/gerente/coordinador.
