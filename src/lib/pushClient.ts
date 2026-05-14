@@ -117,3 +117,57 @@ export async function registerPushSubscription({
 
   onSubscribed?.();
 }
+
+/**
+ * Cancela suscripción push del browser y borra el registro DB.
+ * El permiso del navegador queda en 'granted' (no se puede revocar desde JS);
+ * para revocar permiso el usuario debe hacerlo desde settings del browser.
+ */
+export async function unsubscribePush(): Promise<{ unsubscribed: boolean; endpoint?: string }> {
+  if (typeof window === "undefined") return { unsubscribed: false };
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return { unsubscribed: false };
+  }
+
+  const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+  if (!registration) return { unsubscribed: false };
+
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return { unsubscribed: false };
+
+  const endpoint = subscription.endpoint;
+
+  try {
+    await subscription.unsubscribe();
+  } catch (err) {
+    console.warn("[push] No se pudo cancelar suscripción browser:", err);
+  }
+
+  const supabase = supabaseBrowser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    await supabase
+      .from("push_subscription")
+      .delete()
+      .eq("usuario_id", user.id)
+      .eq("endpoint", endpoint);
+  }
+
+  return { unsubscribed: true, endpoint };
+}
+
+/**
+ * Indica si hay suscripción activa del browser actual.
+ */
+export async function tieneSuscripcionPushActiva(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+
+  const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+  if (!registration) return false;
+
+  const subscription = await registration.pushManager.getSubscription();
+  return subscription !== null;
+}

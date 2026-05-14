@@ -9,6 +9,9 @@ type ActionResult = {
   avatarUrl?: string | null;
 };
 
+const AVATAR_BUCKET = "avatars";
+const AVATAR_FILENAME = "avatar.webp"; // path fijo: client comprime y convierte a WebP antes de subir
+
 export async function actualizarAvatarAction(formData: FormData): Promise<ActionResult> {
   const file = formData.get("avatar") as File | null;
 
@@ -16,14 +19,16 @@ export async function actualizarAvatarAction(formData: FormData): Promise<Action
     return { success: false, error: "Selecciona una imagen válida" };
   }
 
-  const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  // Aceptar webp (output del cliente) más fallbacks por si bypass
+  const validTypes = ["image/webp", "image/jpeg", "image/jpg", "image/png"];
   if (!validTypes.includes(file.type)) {
-    return { success: false, error: "Solo se permiten imágenes JPG, PNG o WebP" };
+    return { success: false, error: "Formato de imagen no soportado" };
   }
 
-  const maxSize = 2 * 1024 * 1024;
+  // Tras compresión cliente espera <500KB; 1MB margen seguro
+  const maxSize = 1 * 1024 * 1024;
   if (file.size > maxSize) {
-    return { success: false, error: "La imagen no debe superar los 2MB" };
+    return { success: false, error: "Imagen demasiado grande tras procesado" };
   }
 
   const supabase = await createServerActionClient();
@@ -36,12 +41,11 @@ export async function actualizarAvatarAction(formData: FormData): Promise<Action
   }
 
   try {
-    const fileExt = file.name.split(".").pop() ?? "jpg";
-    const path = `${user.id}/avatar.${fileExt}`;
+    const path = `${user.id}/${AVATAR_FILENAME}`;
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, buffer, {
+    const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, buffer, {
       contentType: file.type,
       upsert: true,
     });
@@ -53,7 +57,7 @@ export async function actualizarAvatarAction(formData: FormData): Promise<Action
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from("avatars").getPublicUrl(path);
+    } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
 
     const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`;
 
@@ -87,6 +91,15 @@ export async function eliminarAvatarAction(): Promise<ActionResult> {
   }
 
   try {
+    const path = `${user.id}/${AVATAR_FILENAME}`;
+
+    // Borrar archivo del storage. No bloqueamos si falla (ej: archivo legacy
+    // con otra extensión); la fuente de verdad es avatar_url=null en DB.
+    const { error: storageError } = await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+    if (storageError) {
+      console.warn("No se pudo borrar avatar del storage:", storageError.message);
+    }
+
     const { error } = await supabase
       .from("usuario_perfil")
       .update({ avatar_url: null })
@@ -97,7 +110,6 @@ export async function eliminarAvatarAction(): Promise<ActionResult> {
       return { success: false, error: error.message || "No se pudo eliminar la foto" };
     }
 
-    // Opcional: No eliminamos del storage para evitar problemas con URLs firmadas
     revalidatePath("/dashboard/perfil");
     revalidatePath("/dashboard", "layout");
     return { success: true, avatarUrl: null };

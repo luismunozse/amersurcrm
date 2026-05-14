@@ -51,6 +51,26 @@ export default function ReportePorVendedor({ periodo, fechaInicio, fechaFin }: P
     cargar();
   }, [cargar]);
 
+  const diasConActividad = (data?.diario ?? []).filter(
+    (d) => d.leadsAsignados > 0 || d.contactados > 0 || d.ventas > 0
+  );
+
+  const sort = useTableSort<ReportePorVendedorDia, SortKey>(
+    diasConActividad,
+    {
+      fecha:          (d) => d.fecha,
+      leadsAsignados: (d) => d.leadsAsignados,
+      contactados:    (d) => d.contactados,
+      ventas:         (d) => d.ventas,
+      conversionPct:  (d) => parseFloat(d.conversionPct) || 0,
+      alto:           (d) => d.nivelInteres.alto,
+      medio:          (d) => d.nivelInteres.medio,
+      bajo:           (d) => d.nivelInteres.bajo,
+      sinClasificar:  (d) => d.nivelInteres.sinClasificar,
+    },
+    { defaultKey: "fecha", defaultDir: "asc", ascByDefault: ["fecha"] },
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -74,26 +94,6 @@ export default function ReportePorVendedor({ periodo, fechaInicio, fechaFin }: P
       month: "short",
       weekday: "short",
     });
-
-  const diasConActividad = data.diario.filter(
-    (d) => d.leadsAsignados > 0 || d.contactados > 0 || d.ventas > 0
-  );
-
-  const sort = useTableSort<ReportePorVendedorDia, SortKey>(
-    diasConActividad,
-    {
-      fecha:          (d) => d.fecha,
-      leadsAsignados: (d) => d.leadsAsignados,
-      contactados:    (d) => d.contactados,
-      ventas:         (d) => d.ventas,
-      conversionPct:  (d) => parseFloat(d.conversionPct) || 0,
-      alto:           (d) => d.nivelInteres.alto,
-      medio:          (d) => d.nivelInteres.medio,
-      bajo:           (d) => d.nivelInteres.bajo,
-      sinClasificar:  (d) => d.nivelInteres.sinClasificar,
-    },
-    { defaultKey: "fecha", defaultDir: "asc", ascByDefault: ["fecha"] },
-  );
 
   const diasOrdenados = sort.sortedData;
 

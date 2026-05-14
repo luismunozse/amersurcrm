@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { Camera, Upload, X } from "lucide-react";
+import imageCompression from "browser-image-compression";
 import { Spinner } from "@/components/ui/Spinner";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -40,10 +41,10 @@ export default function AvatarUpload({ currentAvatarUrl, userName }: AvatarUploa
       return;
     }
 
-    // Validar tamaño (2MB máximo)
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    // Validar tamaño previo a compresión (5MB máximo, se comprime a ~200KB)
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      toast.error('La imagen no debe superar los 2MB');
+      toast.error('La imagen no debe superar los 5MB');
       return;
     }
 
@@ -54,8 +55,24 @@ export default function AvatarUpload({ currentAvatarUrl, userName }: AvatarUploa
     };
     reader.readAsDataURL(file);
 
-    // Subir archivo
-    await uploadAvatar(file);
+    // Comprimir y convertir a WebP
+    let processed: File;
+    try {
+      processed = await imageCompression(file, {
+        maxSizeMB: 0.2,
+        maxWidthOrHeight: 512,
+        useWebWorker: true,
+        fileType: 'image/webp',
+        initialQuality: 0.85,
+      });
+    } catch (err) {
+      console.error('Error comprimiendo imagen:', err);
+      toast.error('No se pudo procesar la imagen');
+      setPreview(null);
+      return;
+    }
+
+    await uploadAvatar(processed);
   };
 
   const uploadAvatar = async (file: File) => {

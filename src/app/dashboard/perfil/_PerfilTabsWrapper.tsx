@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import PerfilTabsContent from "./_PerfilTabsContent";
-import { User, Mail, Lock, Activity } from "lucide-react";
+import { User, Mail, Lock, Activity, Bell } from "lucide-react";
 
 interface Tab {
   id: string;
@@ -33,6 +33,7 @@ export default function PerfilTabsWrapper({
     { id: 'informacion', label: 'Información', icon: <User className="w-4 h-4" /> },
     { id: 'editar', label: 'Editar Perfil', icon: <Mail className="w-4 h-4" /> },
     { id: 'seguridad', label: 'Seguridad', icon: <Lock className="w-4 h-4" /> },
+    { id: 'notificaciones', label: 'Notificaciones', icon: <Bell className="w-4 h-4" /> },
     { id: 'estadisticas', label: 'Estadísticas', icon: <Activity className="w-4 h-4" /> },
   ];
 

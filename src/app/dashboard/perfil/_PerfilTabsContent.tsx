@@ -3,6 +3,7 @@
 import EditarPerfilForm from "./_EditarPerfilForm";
 import CambiarPasswordForm from "./_CambiarPasswordForm";
 import EstadisticasUsuario from "./_EstadisticasUsuario";
+import NotificacionesTab from "./_NotificacionesTab";
 import { Mail, Briefcase } from "lucide-react";
 
 interface PerfilTabsContentProps {
@@ -116,6 +117,8 @@ export default function PerfilTabsContent({
       );
     case 'seguridad':
       return <CambiarPasswordForm />;
+    case 'notificaciones':
+      return <NotificacionesTab />;
     case 'estadisticas':
       return (
         <EstadisticasUsuario

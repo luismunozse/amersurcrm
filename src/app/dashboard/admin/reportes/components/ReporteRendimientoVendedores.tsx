@@ -43,6 +43,18 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
     cargarDatos();
   }, [cargarDatos]);
 
+  const sortPerformers = useTableSort<TopPerformer, PerformerSortKey>(
+    data?.topPerformers ?? [],
+    {
+      name:         (p) => p.name,
+      sales:        (p) => p.sales,
+      deals:        (p) => p.deals,
+      conversion:   (p) => parseFloat(String(p.conversion).replace("%", "")) || 0,
+      cumplimiento: (p) => parseFloat(p.cumplimiento ?? "0") || 0,
+    },
+    { defaultKey: "sales", defaultDir: "desc", ascByDefault: ["name"] },
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -61,18 +73,6 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
   }
 
   const { performanceStats, topPerformers, resumen } = data;
-
-  const sortPerformers = useTableSort<TopPerformer, PerformerSortKey>(
-    topPerformers || [],
-    {
-      name:         (p) => p.name,
-      sales:        (p) => p.sales,
-      deals:        (p) => p.deals,
-      conversion:   (p) => parseFloat(String(p.conversion).replace("%", "")) || 0,
-      cumplimiento: (p) => parseFloat(p.cumplimiento ?? "0") || 0,
-    },
-    { defaultKey: "sales", defaultDir: "desc", ascByDefault: ["name"] },
-  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-PE', {
