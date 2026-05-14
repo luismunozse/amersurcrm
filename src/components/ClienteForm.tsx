@@ -517,9 +517,9 @@ export default function ClienteForm({
                     {!isEditing && sugerencia && vendedorSeleccionado === sugerencia.username && (
                       <span
                         className="text-[10px] px-2 py-0.5 rounded-full bg-crm-primary/10 text-crm-primary font-semibold uppercase tracking-wide"
-                        title={`Sugerencia por round-robin: ${sugerencia.nombre_completo}`}
+                        title={`Vendedor sugerido: ${sugerencia.nombre_completo}`}
                       >
-                        Sugerido (round-robin)
+                        Sugerido
                       </span>
                     )}
                   </div>
