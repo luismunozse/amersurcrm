@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Download, FilePlus2, FileText, PenSquare, Trash2, FileSignature } from "lucide-react";
+import { Download, FilePlus2, FileText, PenSquare, Trash2, FileSignature, Send, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
 import type { ProformaRecord } from "@/types/proforma";
 const CrearProformaModal = dynamic(() => import("./_CrearProformaModal"), { ssr: false });
 const SeparacionModal = dynamic(() => import("./_SeparacionModal"), { ssr: false });
-import { generarProformaPdf } from "@/components/proforma/generarProformaPdf";
-import { eliminarProformaAction } from "./proformas/_actions";
+import { buildProformaPdf, generarProformaPdf } from "@/components/proforma/generarProformaPdf";
+import { eliminarProformaAction, subirProformaPdfAction } from "./proformas/_actions";
 import { obtenerDatosProformaParaSeparacion } from "./_actions-separacion";
+import { buildWhatsAppUrl } from "@/lib/marketing/whatsapp";
 import { useSearchParams } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -85,6 +86,7 @@ export default function TabProformas({
   const [proformaAEliminar, setProformaAEliminar] = useState<ProformaRecord | null>(null);
   const [separacionPrefill, setSeparacionPrefill] = useState<ProformaPrefill | null>(null);
   const [generandoSeparacionId, setGenerandoSeparacionId] = useState<string | null>(null);
+  const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
 
   const proformasOrdenadas = useMemo(
     () =>
@@ -108,6 +110,72 @@ export default function TabProformas({
 
   const handleEliminar = (proforma: ProformaRecord) => {
     setProformaAEliminar(proforma);
+  };
+
+  const handleEnviarWhatsApp = async (proforma: ProformaRecord) => {
+    const telefono = cliente.telefono_whatsapp || cliente.telefono;
+    if (!telefono) {
+      toast.error("El cliente no tiene teléfono registrado");
+      return;
+    }
+
+    setEnviandoWhatsAppId(proforma.id);
+    try {
+      const { bytes, fileName } = await buildProformaPdf({
+        numero: proforma.numero,
+        total: proforma.total,
+        moneda: proforma.moneda,
+        datos: proforma.datos,
+        created_at: proforma.created_at,
+        updated_at: proforma.updated_at,
+      });
+
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const formData = new FormData();
+      formData.append("proformaId", proforma.id);
+      formData.append("file", blob, fileName);
+
+      const result = await subirProformaPdfAction(formData);
+      if (!result.success || !result.shareUrl) {
+        toast.error(result.error || "No se pudo preparar el enlace");
+        return;
+      }
+
+      const proyecto = proforma.datos?.terreno?.proyecto || "su proyecto";
+      const lote = proforma.datos?.terreno?.lote || "";
+      const numero = proforma.numero || "";
+      const partesLote = lote ? `, lote ${lote}` : "";
+      const partesNumero = numero ? ` ${numero}` : "";
+      const mensaje =
+        `Hola ${cliente.nombre}, le comparto la proforma${partesNumero} ` +
+        `del proyecto ${proyecto}${partesLote}. ` +
+        `Puede descargarla aquí: ${result.shareUrl}\n\n` +
+        `Quedo atento a sus consultas.`;
+
+      let waUrl: string;
+      try {
+        waUrl = buildWhatsAppUrl(telefono, mensaje);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Teléfono inválido");
+        return;
+      }
+
+      const a = document.createElement("a");
+      a.href = waUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      toast.success("Enlace generado. Continúe en WhatsApp.");
+      router.refresh();
+    } catch (error) {
+      console.error("Error enviando proforma por WhatsApp", error);
+      toast.error("No se pudo enviar la proforma");
+    } finally {
+      setEnviandoWhatsAppId(null);
+    }
   };
 
   const handleGenerarSeparacion = async (proforma: ProformaRecord) => {
@@ -267,6 +335,23 @@ export default function TabProformas({
                     >
                       <Download className="w-4 h-4" />
                       Descargar
+                    </button>
+                    <button
+                      onClick={() => handleEnviarWhatsApp(proforma)}
+                      disabled={enviandoWhatsAppId === proforma.id || !(cliente.telefono_whatsapp || cliente.telefono)}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60"
+                      title={
+                        cliente.telefono_whatsapp || cliente.telefono
+                          ? "Enviar proforma por WhatsApp"
+                          : "Cliente sin teléfono registrado"
+                      }
+                    >
+                      {enviandoWhatsAppId === proforma.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      WhatsApp
                     </button>
                     {proforma.estado === "aprobada" && !proforma.reserva_id && (
                       <button

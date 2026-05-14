@@ -14,6 +14,7 @@ import { usePermissions, PERMISOS } from "@/lib/permissions";
 import EditarClienteModal from "@/components/EditarClienteModal";
 import DesestimarDialog from "@/app/dashboard/pipeline/_DesestimarDialog";
 import BotonEnviarWhatsApp from "@/components/marketing/BotonEnviarWhatsApp";
+import WhatsAppOptOutToggle from "@/components/marketing/WhatsAppOptOutToggle";
 
 import type { ClienteCompleto } from "@/lib/types/clientes";
 
@@ -286,30 +287,41 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
           )}
 
           {(cliente.telefono_whatsapp || cliente.telefono) && (
-            <div className="p-4 bg-crm-background rounded-lg">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">WhatsApp</p>
+            <div className="p-4 bg-crm-background rounded-lg space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted">WhatsApp</p>
               {cliente.telefono_whatsapp && (
                 <a
                   href={`https://wa.me/${cliente.telefono_whatsapp.replace(/[^0-9]/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-crm-primary hover:underline block mb-2"
+                  className="text-sm text-crm-primary hover:underline block"
                 >
                   {cliente.telefono_whatsapp}
                 </a>
               )}
-              <BotonEnviarWhatsApp
-                telefono={cliente.telefono_whatsapp ?? cliente.telefono ?? ""}
+
+              <WhatsAppOptOutToggle
                 clienteId={cliente.id}
-                clienteNombre={cliente.nombre}
-                estadoCliente={cliente.estado_cliente ?? undefined}
-                variablesAuto={{
-                  vendedor: vendedores.find(v => v.username === cliente.vendedor_username)?.nombre_completo ?? cliente.vendedor_username ?? "",
-                }}
-                label="Enviar plantilla"
-                variant="primary"
-                className="w-full justify-center"
+                optOut={cliente.whatsapp_opt_out ?? false}
+                fecha={cliente.whatsapp_opt_out_fecha}
+                motivo={cliente.whatsapp_opt_out_motivo}
+                puedeEditar={puedeEditar}
               />
+
+              {!cliente.whatsapp_opt_out && (
+                <BotonEnviarWhatsApp
+                  telefono={cliente.telefono_whatsapp ?? cliente.telefono ?? ""}
+                  clienteId={cliente.id}
+                  clienteNombre={cliente.nombre}
+                  estadoCliente={cliente.estado_cliente ?? undefined}
+                  variablesAuto={{
+                    vendedor: vendedores.find(v => v.username === cliente.vendedor_username)?.nombre_completo ?? cliente.vendedor_username ?? "",
+                  }}
+                  label="Enviar plantilla"
+                  variant="primary"
+                  className="w-full justify-center"
+                />
+              )}
             </div>
           )}
         </div>

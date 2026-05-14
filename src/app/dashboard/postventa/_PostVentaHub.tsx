@@ -1,19 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Truck, Headphones, Building } from "lucide-react";
+import { Truck, Headphones } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const EntregasList = dynamic(() => import("../entregas/_EntregasList"), { ssr: false });
 const PostVentaList = dynamic(() => import("./_PostVentaList"), { ssr: false });
-const IndependizacionList = dynamic(() => import("../independizacion/_IndependizacionList"), { ssr: false });
 
-type PostVentaTab = 'entregas' | 'solicitudes' | 'independizacion';
+type PostVentaTab = 'entregas' | 'solicitudes';
 
 const tabs: { id: PostVentaTab; label: string; icon: typeof Truck }[] = [
   { id: 'entregas', label: 'Entregas', icon: Truck },
   { id: 'solicitudes', label: 'Solicitudes', icon: Headphones },
-  { id: 'independizacion', label: 'Independización', icon: Building },
 ];
 
 export default function PostVentaHub() {
@@ -23,7 +21,7 @@ export default function PostVentaHub() {
     <div className="space-y-4">
       {/* Tabs */}
       <div className="bg-crm-card border border-crm-border rounded-lg p-1">
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-2 gap-1">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -48,7 +46,6 @@ export default function PostVentaHub() {
       {/* Content */}
       {activeTab === 'entregas' && <EntregasList />}
       {activeTab === 'solicitudes' && <PostVentaList />}
-      {activeTab === 'independizacion' && <IndependizacionList />}
     </div>
   );
 }

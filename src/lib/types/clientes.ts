@@ -108,6 +108,11 @@ export interface ClienteCompleto {
   data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+
+  // WhatsApp opt-out (marketing)
+  whatsapp_opt_out?: boolean;
+  whatsapp_opt_out_fecha?: string | null;
+  whatsapp_opt_out_motivo?: string | null;
 }
 
 export interface ClienteFormData {

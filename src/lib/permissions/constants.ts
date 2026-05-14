@@ -262,12 +262,6 @@ export const PERMISOS = {
     RESOLVER: 'postventa.resolver' as const,
   },
 
-  // ========== INDEPENDIZACIÓN ==========
-  INDEPENDIZACION: {
-    VER: 'independizacion.ver' as const,
-    CREAR: 'independizacion.crear' as const,
-    EDITAR: 'independizacion.editar' as const,
-  },
 } as const;
 
 /**

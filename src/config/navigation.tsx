@@ -14,7 +14,6 @@ import {
   Banknote,
   Truck,
   Headphones,
-  Building,
   Target,
   ShoppingCart,
   KanbanSquare,
@@ -73,7 +72,6 @@ export const adminNavigation: NavItem[] = [
   { name: "Usuarios", href: "/dashboard/admin/usuarios", permisos: [PERMISOS.USUARIOS.VER], roles: ['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS'], icon: <UserCheck className="w-5 h-5" /> },
   { name: "Marketing", href: "/dashboard/admin/marketing", roles: ['ROL_ADMIN'], icon: <Megaphone className="w-5 h-5" /> },
   { name: "Reportes", href: "/dashboard/admin/reportes", permisos: [PERMISOS.REPORTES.GLOBALES], icon: <BarChart3 className="w-5 h-5" /> },
-  { name: "Independización", href: "/dashboard/independizacion", roles: ['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS'], icon: <Building className="w-5 h-5" /> },
   { name: "Metas", href: "/dashboard/admin/metas", permisos: [PERMISOS.METAS.ASIGNAR], icon: <Target className="w-5 h-5" /> },
   { name: "Configuración", href: "/dashboard/admin/configuracion", permisos: [PERMISOS.CONFIGURACION.SISTEMA], icon: <Settings className="w-5 h-5" /> },
 ];

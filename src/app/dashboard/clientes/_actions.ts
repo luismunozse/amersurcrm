@@ -667,3 +667,39 @@ export async function obtenerClienteParaQuickView(id: string): Promise<ClienteQu
     notas: cliente.notas,
   };
 }
+
+/**
+ * Activa/desactiva opt-out de WhatsApp para un cliente.
+ * Cuando opt_out = true, el cliente no recibe envíos de plantillas.
+ */
+export async function actualizarWhatsAppOptOut(
+  clienteId: string,
+  optOut: boolean,
+  motivo?: string,
+): Promise<void> {
+  await requierePermiso(PERMISOS.CLIENTES.EDITAR_ASIGNADOS, {
+    accion: optOut ? "activar_whatsapp_opt_out" : "desactivar_whatsapp_opt_out",
+    recurso_tipo: "cliente",
+    recurso_id: clienteId,
+  });
+
+  const supabase = await createServerActionClient();
+
+  const updates: Record<string, unknown> = {
+    whatsapp_opt_out: optOut,
+    whatsapp_opt_out_fecha: optOut ? new Date().toISOString() : null,
+    whatsapp_opt_out_motivo: optOut ? (motivo ?? null) : null,
+  };
+
+  const { error } = await supabase
+    .schema("crm")
+    .from("cliente")
+    .update(updates)
+    .eq("id", clienteId);
+
+  if (error) {
+    throw new Error(`Error actualizando opt-out WhatsApp: ${error.message}`);
+  }
+
+  revalidatePath(`/dashboard/clientes/${clienteId}`);
+}

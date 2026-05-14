@@ -61,7 +61,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
     hrefs: [
       "/dashboard/cobranza",
       "/dashboard/admin/reportes?tab=comisiones",
-      "/dashboard/independizacion",
     ],
   },
   {

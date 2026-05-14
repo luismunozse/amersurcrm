@@ -6,16 +6,16 @@ import { revalidatePath } from "next/cache";
 import {
   renderTemplate,
   extractVariables,
+  extractSnippetSlugs,
   normalizeWhatsAppPhone,
   buildWhatsAppUrl,
+  prependMedia,
 } from "@/lib/marketing/whatsapp";
 import type {
   MarketingTemplate,
-  MarketingCampana,
-  MarketingAudiencia,
+  MarketingSnippet,
   MarketingEnvioLog,
   EstadisticasMarketing,
-  EstadoCampana,
   EstadoEnvioLog,
 } from "@/types/whatsapp-marketing";
 
@@ -35,6 +35,7 @@ export async function obtenerPlantillas() {
       .schema("crm")
       .from("marketing_template")
       .select("*")
+      .is("eliminado_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -80,6 +81,8 @@ export async function crearPlantilla(plantilla: Partial<MarketingTemplate>) {
         objetivo: plantilla.objetivo ?? null,
         tags: plantilla.tags ?? [],
         activo: plantilla.activo ?? true,
+        media_url: plantilla.media_url ?? null,
+        media_tipo: plantilla.media_tipo ?? null,
         created_by: user.id,
       })
       .select()
@@ -124,6 +127,8 @@ export async function actualizarPlantilla(
     if (plantilla.objetivo !== undefined) updates.objetivo = plantilla.objetivo;
     if (plantilla.tags !== undefined) updates.tags = plantilla.tags;
     if (plantilla.activo !== undefined) updates.activo = plantilla.activo;
+    if (plantilla.media_url !== undefined) updates.media_url = plantilla.media_url || null;
+    if (plantilla.media_tipo !== undefined) updates.media_tipo = plantilla.media_tipo || null;
 
     const { data, error } = await supabase
       .schema("crm")
@@ -154,25 +159,11 @@ export async function eliminarPlantilla(id: string) {
     const isAdmin = await esAdmin();
     if (!isAdmin) return { success: false, error: "Solo administradores" };
 
-    const { count: campanasCount, error: countError } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .select("id", { count: "exact", head: true })
-      .eq("template_id", id);
-
-    if (countError) return { success: false, error: countError.message };
-
-    if ((campanasCount ?? 0) > 0) {
-      return {
-        success: false,
-        error: `No se puede eliminar: ${campanasCount} campaña${campanasCount === 1 ? "" : "s"} usa${campanasCount === 1 ? "" : "n"} esta plantilla. Elimina esas campañas primero.`,
-      };
-    }
-
+    // Soft-delete: conserva FK histórica desde marketing_envio_log.template_id.
     const { error } = await supabase
       .schema("crm")
       .from("marketing_template")
-      .delete()
+      .update({ eliminado_at: new Date().toISOString(), activo: false })
       .eq("id", id);
 
     if (error) return { success: false, error: error.message };
@@ -186,422 +177,6 @@ export async function eliminarPlantilla(id: string) {
 }
 
 // =====================================================
-// AUDIENCIAS
-// =====================================================
-
-interface FiltrosAudiencia {
-  estados?: string[];
-  proyectoId?: string;
-  capacidadMin?: number;
-  capacidadMax?: number;
-  diasSinContacto?: number;
-  soloConWhatsApp?: boolean;
-}
-
-export async function obtenerAudiencias() {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autorizado" };
-
-    const { data, error } = await supabase
-      .schema("crm")
-      .from("marketing_audiencia")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) return { data: null, error: error.message };
-
-    return { data: data as MarketingAudiencia[], error: null };
-  } catch (error) {
-    console.error("Error obteniendo audiencias:", error);
-    return { data: null, error: "Error desconocido" };
-  }
-}
-
-export async function calcularAudiencia(filtros: FiltrosAudiencia) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autorizado" };
-
-    let query = supabase
-      .from("cliente")
-      .select("id, nombre, telefono_whatsapp, whatsapp_opt_out")
-      .eq("whatsapp_opt_out", false);
-
-    if (filtros.estados?.length) {
-      query = query.in("estado_cliente", filtros.estados);
-    }
-    if (filtros.proyectoId) {
-      query = query.eq("proyecto_interes_id", filtros.proyectoId);
-    }
-    if (filtros.capacidadMin != null) {
-      query = query.gte("capacidad_compra_estimada", filtros.capacidadMin);
-    }
-    if (filtros.capacidadMax != null) {
-      query = query.lte("capacidad_compra_estimada", filtros.capacidadMax);
-    }
-    if (filtros.diasSinContacto != null) {
-      const fechaLimite = new Date(
-        Date.now() - filtros.diasSinContacto * 24 * 60 * 60 * 1000,
-      ).toISOString();
-      query = query.lt("ultimo_contacto", fechaLimite);
-    }
-    if (filtros.soloConWhatsApp) {
-      query = query.not("telefono_whatsapp", "is", null);
-    }
-
-    const { data, error } = await query.limit(500);
-    if (error) return { data: null, error: error.message };
-
-    return {
-      data: {
-        count: data?.length ?? 0,
-        preview: (data ?? []).slice(0, 5).map((c) => c.nombre),
-        ids: (data ?? []).map((c) => c.id),
-      },
-      error: null,
-    };
-  } catch (error) {
-    console.error("Error calculando audiencia:", error);
-    return { data: null, error: "Error desconocido" };
-  }
-}
-
-export async function crearAudiencia(params: {
-  nombre: string;
-  descripcion?: string;
-  tipo: "DINAMICO" | "ESTATICO";
-  filtros?: FiltrosAudiencia;
-  contactosIds?: string[];
-}) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autorizado" };
-
-    const isAdmin = await esAdmin();
-    if (!isAdmin) return { data: null, error: "Solo administradores" };
-
-    let contactosIds = params.contactosIds ?? [];
-    let contactosCount = contactosIds.length;
-
-    if (params.tipo === "DINAMICO" && params.filtros) {
-      const resultado = await calcularAudiencia(params.filtros);
-      if (resultado.data) {
-        contactosIds = resultado.data.ids;
-        contactosCount = resultado.data.count;
-      }
-    }
-
-    const { data, error } = await supabase
-      .schema("crm")
-      .from("marketing_audiencia")
-      .insert({
-        nombre: params.nombre,
-        descripcion: params.descripcion ?? null,
-        tipo: params.tipo,
-        filtros: params.filtros ?? null,
-        contactos_ids: contactosIds,
-        contactos_count: contactosCount,
-      })
-      .select()
-      .single();
-
-    if (error) return { data: null, error: error.message };
-
-    revalidatePath("/dashboard/admin/marketing");
-    return { data: data as MarketingAudiencia, error: null };
-  } catch (error) {
-    console.error("Error creando audiencia:", error);
-    return { data: null, error: "Error desconocido" };
-  }
-}
-
-export async function sincronizarAudiencia(audienciaId: string) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "No autorizado" };
-
-    const { data: audiencia } = await supabase
-      .schema("crm")
-      .from("marketing_audiencia")
-      .select("tipo, filtros")
-      .eq("id", audienciaId)
-      .maybeSingle();
-
-    if (!audiencia || audiencia.tipo !== "DINAMICO") {
-      return {
-        success: false,
-        error: "Solo se pueden sincronizar audiencias dinámicas",
-      };
-    }
-
-    const resultado = await calcularAudiencia(audiencia.filtros ?? {});
-    if (!resultado.data) return { success: false, error: resultado.error };
-
-    const { error } = await supabase
-      .schema("crm")
-      .from("marketing_audiencia")
-      .update({
-        contactos_ids: resultado.data.ids,
-        contactos_count: resultado.data.count,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", audienciaId);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/dashboard/admin/marketing");
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Error sincronizando audiencia:", error);
-    return { success: false, error: "Error desconocido" };
-  }
-}
-
-export async function eliminarAudiencia(id: string) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "No autorizado" };
-
-    const isAdmin = await esAdmin();
-    if (!isAdmin) return { success: false, error: "Solo administradores" };
-
-    const { count: campanasCount, error: countError } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .select("id", { count: "exact", head: true })
-      .eq("audiencia_id", id);
-
-    if (countError) return { success: false, error: countError.message };
-
-    if ((campanasCount ?? 0) > 0) {
-      return {
-        success: false,
-        error: `No se puede eliminar: ${campanasCount} campaña${campanasCount === 1 ? "" : "s"} usa${campanasCount === 1 ? "" : "n"} esta audiencia. Elimina o reasigna esas campañas primero.`,
-      };
-    }
-
-    const { error } = await supabase
-      .schema("crm")
-      .from("marketing_audiencia")
-      .delete()
-      .eq("id", id);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/dashboard/admin/marketing");
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Error eliminando audiencia:", error);
-    return { success: false, error: "Error desconocido" };
-  }
-}
-
-// =====================================================
-// CAMPAÑAS
-// =====================================================
-
-export async function obtenerCampanas() {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autorizado" };
-
-    const { data, error } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .select(
-        "*, template:template_id(id, nombre, body_texto, variables), audiencia:audiencia_id(id, nombre, contactos_count)",
-      )
-      .order("created_at", { ascending: false });
-
-    if (error) return { data: null, error: error.message };
-
-    return { data: data as MarketingCampana[], error: null };
-  } catch (error) {
-    console.error("Error obteniendo campañas:", error);
-    return { data: null, error: "Error desconocido" };
-  }
-}
-
-export async function crearCampana(campana: Partial<MarketingCampana>) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autorizado" };
-
-    const isAdmin = await esAdmin();
-    if (!isAdmin) return { data: null, error: "Solo administradores pueden crear campañas" };
-
-    if (!campana.nombre || !campana.template_id || !campana.audiencia_id) {
-      return {
-        data: null,
-        error: "Nombre, plantilla y audiencia son obligatorios",
-      };
-    }
-
-    const { data, error } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .insert({
-        nombre: campana.nombre,
-        descripcion: campana.descripcion ?? null,
-        template_id: campana.template_id,
-        audiencia_id: campana.audiencia_id,
-        variables_valores: campana.variables_valores ?? {},
-        objetivo: campana.objetivo ?? null,
-        utm_source: campana.utm_source ?? null,
-        utm_medium: campana.utm_medium ?? null,
-        utm_campaign: campana.utm_campaign ?? null,
-        fecha_inicio: campana.fecha_inicio ?? null,
-        fecha_fin: campana.fecha_fin ?? null,
-        enviar_inmediatamente: campana.enviar_inmediatamente ?? false,
-        estado: campana.estado ?? "DRAFT",
-        created_by: user.id,
-      })
-      .select()
-      .single();
-
-    if (error) return { data: null, error: error.message };
-
-    revalidatePath("/dashboard/admin/marketing");
-    return { data: data as MarketingCampana, error: null };
-  } catch (error) {
-    console.error("Error creando campaña:", error);
-    return { data: null, error: "Error desconocido" };
-  }
-}
-
-export async function actualizarEstadoCampana(
-  id: string,
-  estado: EstadoCampana,
-) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "No autorizado" };
-
-    const isAdmin = await esAdmin();
-    if (!isAdmin) return { success: false, error: "Solo administradores pueden cambiar estado de campañas" };
-
-    const updates: Record<string, unknown> = { estado };
-    if (estado === "COMPLETED") {
-      updates.completado_at = new Date().toISOString();
-    }
-
-    const { error } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .update(updates)
-      .eq("id", id);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/dashboard/admin/marketing");
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Error actualizando estado campaña:", error);
-    return { success: false, error: "Error desconocido" };
-  }
-}
-
-export async function eliminarCampana(id: string) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "No autorizado" };
-
-    const isAdmin = await esAdmin();
-    if (!isAdmin) return { success: false, error: "Solo administradores" };
-
-    const { error } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .delete()
-      .eq("id", id);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/dashboard/admin/marketing");
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Error eliminando campaña:", error);
-    return { success: false, error: "Error desconocido" };
-  }
-}
-
-export async function obtenerContactosCampana(campanaId: string) {
-  try {
-    const supabase = await createServerOnlyClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autorizado" };
-
-    const { data: campana, error: errCamp } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .select("audiencia_id, template_id, variables_valores")
-      .eq("id", campanaId)
-      .maybeSingle();
-
-    if (errCamp || !campana) {
-      return { data: null, error: errCamp?.message ?? "Campaña no encontrada" };
-    }
-
-    const { data: audiencia } = await supabase
-      .schema("crm")
-      .from("marketing_audiencia")
-      .select("contactos_ids")
-      .eq("id", campana.audiencia_id)
-      .maybeSingle();
-
-    const ids = (audiencia?.contactos_ids ?? []) as string[];
-    if (ids.length === 0) {
-      return { data: { contactos: [], campana }, error: null };
-    }
-
-    const { data: contactos, error: errCon } = await supabase
-      .from("cliente")
-      .select(
-        "id, nombre, telefono_whatsapp, telefono, email, estado_cliente, whatsapp_opt_out",
-      )
-      .in("id", ids)
-      .eq("whatsapp_opt_out", false);
-
-    if (errCon) return { data: null, error: errCon.message };
-
-    return { data: { contactos: contactos ?? [], campana }, error: null };
-  } catch (error) {
-    console.error("Error obteniendo contactos campaña:", error);
-    return { data: null, error: "Error desconocido" };
-  }
-}
-
-// =====================================================
 // ENVÍO LOG (registro click-to-chat)
 // =====================================================
 
@@ -610,7 +185,6 @@ export async function registrarApertura(params: {
   clienteId: string;
   telefono: string;
   variables: Record<string, string>;
-  campanaId?: string | null;
   recordatorioId?: string | null;
 }) {
   try {
@@ -623,7 +197,7 @@ export async function registrarApertura(params: {
     const { data: template, error: errT } = await supabase
       .schema("crm")
       .from("marketing_template")
-      .select("body_texto")
+      .select("body_texto, media_url")
       .eq("id", params.templateId)
       .maybeSingle();
 
@@ -631,7 +205,25 @@ export async function registrarApertura(params: {
       return { data: null, error: errT?.message ?? "Plantilla no encontrada" };
     }
 
-    const mensajeRenderizado = renderTemplate(template.body_texto, params.variables);
+    // Cargar solo snippets referenciados en el body para no bajar todos.
+    const slugs = extractSnippetSlugs(template.body_texto);
+    let snippetsMap: Record<string, string> = {};
+    if (slugs.length > 0) {
+      const { data: snippets } = await supabase
+        .schema("crm")
+        .from("marketing_snippet")
+        .select("slug, contenido")
+        .in("slug", slugs)
+        .is("eliminado_at", null);
+      snippetsMap = Object.fromEntries(
+        (snippets ?? []).map((s) => [s.slug as string, s.contenido as string]),
+      );
+    }
+
+    const renderizado = renderTemplate(template.body_texto, params.variables, {
+      snippets: snippetsMap,
+    });
+    const mensajeRenderizado = prependMedia(renderizado, template.media_url);
     const telNormalizado = normalizeWhatsAppPhone(params.telefono);
 
     const { data: perfil } = await supabase
@@ -647,7 +239,6 @@ export async function registrarApertura(params: {
       .insert({
         template_id: params.templateId,
         cliente_id: params.clienteId,
-        campana_id: params.campanaId ?? null,
         recordatorio_id: params.recordatorioId ?? null,
         vendedor_id: user.id,
         vendedor_username: perfil?.username ?? null,
@@ -713,7 +304,6 @@ export async function listarHistorialEnvios(filtros?: {
   vendedorId?: string;
   templateId?: string;
   clienteId?: string;
-  campanaId?: string;
   estado?: EstadoEnvioLog;
   desde?: string;
   hasta?: string;
@@ -733,7 +323,7 @@ export async function listarHistorialEnvios(filtros?: {
       .schema("crm")
       .from("marketing_envio_log")
       .select(
-        "*, template:template_id(id, nombre, categoria), campana:campana_id(id, nombre)",
+        "*, template:template_id(id, nombre, categoria)",
       )
       .order("created_at", { ascending: false })
       .limit(filtros?.limit ?? 200);
@@ -741,7 +331,6 @@ export async function listarHistorialEnvios(filtros?: {
     if (vendedorIdFilter) query = query.eq("vendedor_id", vendedorIdFilter);
     if (filtros?.templateId) query = query.eq("template_id", filtros.templateId);
     if (filtros?.clienteId) query = query.eq("cliente_id", filtros.clienteId);
-    if (filtros?.campanaId) query = query.eq("campana_id", filtros.campanaId);
     if (filtros?.estado) query = query.eq("estado", filtros.estado);
     if (filtros?.desde) query = query.gte("created_at", filtros.desde);
     if (filtros?.hasta) query = query.lte("created_at", filtros.hasta);
@@ -782,10 +371,6 @@ export async function listarHistorialEnvios(filtros?: {
 
 export async function obtenerHistorialPorCliente(clienteId: string) {
   return listarHistorialEnvios({ clienteId, limit: 100 });
-}
-
-export async function obtenerEnviosCampana(campanaId: string) {
-  return listarHistorialEnvios({ campanaId, limit: 1000 });
 }
 
 // =====================================================
@@ -898,6 +483,18 @@ export async function listarRecordatoriosEnvioTemplate(filtros?: {
 // MÉTRICAS / ESTADÍSTICAS
 // =====================================================
 
+export type PeriodoMarketing = "hoy" | "7d" | "30d" | "90d";
+
+function calcularDesde(periodo: PeriodoMarketing): Date {
+  const ahora = new Date();
+  if (periodo === "hoy") {
+    ahora.setHours(0, 0, 0, 0);
+    return ahora;
+  }
+  const dias = periodo === "7d" ? 7 : periodo === "30d" ? 30 : 90;
+  return new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+}
+
 export async function obtenerEstadisticasMarketing(): Promise<{
   data: EstadisticasMarketing | null;
   error: string | null;
@@ -915,17 +512,11 @@ export async function obtenerEstadisticasMarketing(): Promise<{
     inicioSemana.setDate(inicioSemana.getDate() - 7);
 
     const [
-      { count: campanasActivas },
       { count: enviosHoy },
       { count: enviosSemana },
       { count: marcadosEnviadosHoy },
       { count: respondidosHoy },
     ] = await Promise.all([
-      supabase
-        .schema("crm")
-        .from("marketing_campana")
-        .select("id", { count: "exact", head: true })
-        .in("estado", ["RUNNING", "SCHEDULED"]),
       supabase
         .schema("crm")
         .from("marketing_envio_log")
@@ -955,7 +546,6 @@ export async function obtenerEstadisticasMarketing(): Promise<{
 
     return {
       data: {
-        campanas_activas: campanasActivas ?? 0,
         envios_hoy: enviosHoy ?? 0,
         envios_semana: enviosSemana ?? 0,
         marcados_enviados_hoy: marcadosEnviadosHoy ?? 0,
@@ -970,7 +560,9 @@ export async function obtenerEstadisticasMarketing(): Promise<{
   }
 }
 
-export async function obtenerAnalyticsMarketing() {
+export async function obtenerAnalyticsMarketing(
+  periodo: PeriodoMarketing = "30d",
+) {
   try {
     const supabase = await createServerOnlyClient();
     const {
@@ -978,30 +570,65 @@ export async function obtenerAnalyticsMarketing() {
     } = await supabase.auth.getUser();
     if (!user) return { data: null, error: "No autorizado" };
 
-    const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const desde = calcularDesde(periodo).toISOString();
 
-    const { data: campanas } = await supabase
-      .schema("crm")
-      .from("marketing_campana")
-      .select(
-        "nombre, total_abiertos, total_marcados_enviados, total_respondidos, total_descartados, completado_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    const { data: enviosPorDia } = await supabase
+    const { data: envios, error } = await supabase
       .schema("crm")
       .from("marketing_envio_log")
-      .select("created_at, estado")
+      .select(
+        "created_at, estado, vendedor_id, vendedor_username, template_id, marcado_enviado_at, marcado_respondido_at, template:template_id(id, nombre)",
+      )
       .gte("created_at", desde);
+
+    if (error) return { data: null, error: error.message };
+
+    const rows = envios ?? [];
+
+    // Totales del período
+    let totalEnvios = 0;
+    let totalConfirmados = 0;
+    let totalRespondidos = 0;
 
     const tendenciaMap: Record<string, number> = {};
     const distribucionMap: Record<string, number> = {};
-    for (const env of enviosPorDia ?? []) {
+
+    type AggVendedor = { total: number; confirmados: number; respondidos: number; username: string };
+    const vendedoresMap: Record<string, AggVendedor> = {};
+
+    type AggTemplate = { total: number; confirmados: number; respondidos: number; nombre: string };
+    const templatesMap: Record<string, AggTemplate> = {};
+
+    for (const env of rows) {
+      totalEnvios++;
+      if (env.marcado_enviado_at) totalConfirmados++;
+      if (env.marcado_respondido_at) totalRespondidos++;
+
       const dia = (env.created_at as string).slice(0, 10);
       tendenciaMap[dia] = (tendenciaMap[dia] ?? 0) + 1;
-      distribucionMap[env.estado as string] =
-        (distribucionMap[env.estado as string] ?? 0) + 1;
+
+      const est = env.estado as string;
+      distribucionMap[est] = (distribucionMap[est] ?? 0) + 1;
+
+      const vId = (env.vendedor_id as string | null) ?? "desconocido";
+      const vUser = (env.vendedor_username as string | null) ?? "—";
+      if (!vendedoresMap[vId]) {
+        vendedoresMap[vId] = { total: 0, confirmados: 0, respondidos: 0, username: vUser };
+      }
+      vendedoresMap[vId].total++;
+      if (env.marcado_enviado_at) vendedoresMap[vId].confirmados++;
+      if (env.marcado_respondido_at) vendedoresMap[vId].respondidos++;
+
+      const tId = env.template_id as string | null;
+      if (tId) {
+        const tNombre =
+          (env.template as unknown as { nombre?: string } | null)?.nombre ?? "Plantilla eliminada";
+        if (!templatesMap[tId]) {
+          templatesMap[tId] = { total: 0, confirmados: 0, respondidos: 0, nombre: tNombre };
+        }
+        templatesMap[tId].total++;
+        if (env.marcado_enviado_at) templatesMap[tId].confirmados++;
+        if (env.marcado_respondido_at) templatesMap[tId].respondidos++;
+      }
     }
 
     const tendenciaMensajes = Object.entries(tendenciaMap)
@@ -1012,23 +639,200 @@ export async function obtenerAnalyticsMarketing() {
       ([estado, valor]) => ({ estado, valor }),
     );
 
+    const tasa = (resp: number, total: number) =>
+      total > 0 ? Math.round((resp / total) * 1000) / 10 : 0;
+
+    const rankingVendedores = Object.entries(vendedoresMap)
+      .map(([vendedor_id, v]) => ({
+        vendedor_id,
+        username: v.username,
+        envios: v.total,
+        confirmados: v.confirmados,
+        respondidos: v.respondidos,
+        tasa_respuesta: tasa(v.respondidos, v.total),
+        tasa_confirmacion: tasa(v.confirmados, v.total),
+      }))
+      .sort((a, b) => b.envios - a.envios);
+
+    const metricasPlantillas = Object.entries(templatesMap)
+      .map(([template_id, t]) => ({
+        template_id,
+        nombre: t.nombre,
+        envios: t.total,
+        confirmados: t.confirmados,
+        respondidos: t.respondidos,
+        tasa_respuesta: tasa(t.respondidos, t.total),
+        tasa_confirmacion: tasa(t.confirmados, t.total),
+      }))
+      .sort((a, b) => b.tasa_respuesta - a.tasa_respuesta || b.envios - a.envios);
+
     return {
       data: {
-        metricasCampanas: (campanas ?? []).map((c) => ({
-          nombre:
-            c.nombre.length > 20 ? c.nombre.slice(0, 20) + "…" : c.nombre,
-          abiertos: c.total_abiertos ?? 0,
-          enviados: c.total_marcados_enviados ?? 0,
-          respondidos: c.total_respondidos ?? 0,
-          descartados: c.total_descartados ?? 0,
-        })),
+        periodo,
+        desde,
+        totales: {
+          envios: totalEnvios,
+          confirmados: totalConfirmados,
+          respondidos: totalRespondidos,
+          tasa_respuesta: tasa(totalRespondidos, totalEnvios),
+          tasa_confirmacion: tasa(totalConfirmados, totalEnvios),
+        },
         tendenciaMensajes,
         distribucionEstados,
+        rankingVendedores,
+        metricasPlantillas,
       },
       error: null,
     };
   } catch (error) {
     console.error("Error obteniendo analytics:", error);
     return { data: null, error: "Error desconocido" };
+  }
+}
+
+// =====================================================
+// SNIPPETS REUTILIZABLES
+// =====================================================
+
+const SLUG_REGEX = /^[a-z][a-z0-9_-]{1,40}$/;
+
+export async function obtenerSnippets() {
+  try {
+    const supabase = await createServerOnlyClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    const { data, error } = await supabase
+      .schema("crm")
+      .from("marketing_snippet")
+      .select("*")
+      .is("eliminado_at", null)
+      .order("slug", { ascending: true });
+
+    if (error) return { data: null, error: error.message };
+    return { data: data as MarketingSnippet[], error: null };
+  } catch (error) {
+    console.error("Error obteniendo snippets:", error);
+    return { data: null, error: "Error desconocido" };
+  }
+}
+
+export async function crearSnippet(params: {
+  slug: string;
+  nombre: string;
+  contenido: string;
+  descripcion?: string;
+}) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    const isAdmin = await esAdmin();
+    if (!isAdmin) return { data: null, error: "Solo administradores" };
+
+    if (!SLUG_REGEX.test(params.slug)) {
+      return {
+        data: null,
+        error: "Slug inválido. Use letras minúsculas, números, _ o -. Empieza con letra.",
+      };
+    }
+    if (!params.nombre.trim() || !params.contenido.trim()) {
+      return { data: null, error: "Nombre y contenido son obligatorios" };
+    }
+
+    const { data, error } = await supabase
+      .schema("crm")
+      .from("marketing_snippet")
+      .insert({
+        slug: params.slug,
+        nombre: params.nombre.trim(),
+        contenido: params.contenido,
+        descripcion: params.descripcion?.trim() || null,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      const msg = error.code === "23505"
+        ? `El slug "${params.slug}" ya está en uso.`
+        : error.message;
+      return { data: null, error: msg };
+    }
+
+    revalidatePath("/dashboard/admin/marketing");
+    return { data: data as MarketingSnippet, error: null };
+  } catch (error) {
+    console.error("Error creando snippet:", error);
+    return { data: null, error: "Error desconocido" };
+  }
+}
+
+export async function actualizarSnippet(
+  id: string,
+  params: Partial<{ nombre: string; contenido: string; descripcion: string }>,
+) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autorizado" };
+
+    const isAdmin = await esAdmin();
+    if (!isAdmin) return { data: null, error: "Solo administradores" };
+
+    const updates: Record<string, unknown> = {};
+    if (params.nombre !== undefined) updates.nombre = params.nombre.trim();
+    if (params.contenido !== undefined) updates.contenido = params.contenido;
+    if (params.descripcion !== undefined) updates.descripcion = params.descripcion.trim() || null;
+
+    const { data, error } = await supabase
+      .schema("crm")
+      .from("marketing_snippet")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) return { data: null, error: error.message };
+
+    revalidatePath("/dashboard/admin/marketing");
+    return { data: data as MarketingSnippet, error: null };
+  } catch (error) {
+    console.error("Error actualizando snippet:", error);
+    return { data: null, error: "Error desconocido" };
+  }
+}
+
+export async function eliminarSnippet(id: string) {
+  try {
+    const supabase = await createServerOnlyClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autorizado" };
+
+    const isAdmin = await esAdmin();
+    if (!isAdmin) return { success: false, error: "Solo administradores" };
+
+    const { error } = await supabase
+      .schema("crm")
+      .from("marketing_snippet")
+      .update({ eliminado_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/dashboard/admin/marketing");
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("Error eliminando snippet:", error);
+    return { success: false, error: "Error desconocido" };
   }
 }

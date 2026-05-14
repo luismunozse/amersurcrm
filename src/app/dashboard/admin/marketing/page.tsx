@@ -4,17 +4,16 @@ import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   MessageSquare,
-  Users,
   BarChart3,
   Send,
   History,
   Bell,
   Sparkles,
+  Puzzle,
 } from "lucide-react";
 import DashboardMetricas from "@/components/marketing/DashboardMetricas";
 import GestionPlantillas from "@/components/marketing/GestionPlantillas";
-import GestionCampanas from "@/components/marketing/GestionCampanas";
-import GestionAudiencias from "@/components/marketing/GestionAudiencias";
+import GestionSnippets from "@/components/marketing/GestionSnippets";
 import HistorialEnvios from "@/components/marketing/HistorialEnvios";
 import RecordatoriosWhatsApp from "@/components/marketing/RecordatoriosWhatsApp";
 
@@ -27,8 +26,7 @@ type Tab = {
 const TABS: Tab[] = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
   { id: "plantillas", label: "Plantillas", icon: Send },
-  { id: "campanas", label: "Campañas", icon: Users },
-  { id: "audiencias", label: "Audiencias", icon: Users },
+  { id: "snippets", label: "Snippets", icon: Puzzle },
   { id: "historial", label: "Historial", icon: History },
   { id: "recordatorios", label: "Recordatorios", icon: Bell },
 ];
@@ -85,8 +83,7 @@ const TAB_CONTENT: Record<string, () => React.JSX.Element> = {
     </div>
   ),
   plantillas: () => <GestionPlantillas />,
-  campanas: () => <GestionCampanas />,
-  audiencias: () => <GestionAudiencias />,
+  snippets: () => <GestionSnippets />,
   historial: () => <HistorialEnvios />,
   recordatorios: () => <RecordatoriosWhatsApp />,
 };

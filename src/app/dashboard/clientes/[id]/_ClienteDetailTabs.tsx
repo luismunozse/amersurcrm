@@ -17,7 +17,6 @@ const TabContrato = dynamic(() => import("./_TabContrato"), { ssr: false });
 const TabCronograma = dynamic(() => import("./_TabCronograma"), { ssr: false });
 const TabEntrega = dynamic(() => import("./_TabEntrega"), { ssr: false });
 const TabPostVenta = dynamic(() => import("./_TabPostVenta"), { ssr: false });
-const TabIndependizacion = dynamic(() => import("./_TabIndependizacion"), { ssr: false });
 import type { ClienteCompleto } from "@/lib/types/clientes";
 import type {
   InteraccionConVendedor,
@@ -57,7 +56,6 @@ export type ClienteTabType =
   | 'cronograma'
   | 'entrega'
   | 'postventa'
-  | 'independizacion'
   // Tabs agrupados
   | 'adquisicion'
   | 'postventa_hub';
@@ -65,7 +63,7 @@ export type ClienteTabType =
 // Sub-tabs dentro de cada tab agrupado
 type AdquisicionSubTab = 'procesos' | 'separaciones' | 'cotizaciones';
 type VentasSubTab = 'ventas' | 'cronograma' | 'contrato';
-type PostVentaSubTab = 'entregas' | 'solicitudes' | 'independizacion';
+type PostVentaSubTab = 'entregas' | 'solicitudes';
 
 export default function ClienteDetailTabs({
   cliente,
@@ -91,7 +89,7 @@ export default function ClienteDetailTabs({
       ? defaultSubTab
       : 'ventas';
   const postVentaInicial: PostVentaSubTab =
-    defaultSubTab === 'solicitudes' || defaultSubTab === 'independizacion' || defaultSubTab === 'entregas'
+    defaultSubTab === 'solicitudes' || defaultSubTab === 'entregas'
       ? defaultSubTab
       : 'entregas';
 
@@ -142,7 +140,7 @@ export default function ClienteDetailTabs({
       setAdquisicionSubTab(defaultSubTab);
     } else if (defaultSubTab === 'cronograma' || defaultSubTab === 'contrato' || defaultSubTab === 'ventas') {
       setVentasSubTab(defaultSubTab);
-    } else if (defaultSubTab === 'solicitudes' || defaultSubTab === 'independizacion' || defaultSubTab === 'entregas') {
+    } else if (defaultSubTab === 'solicitudes' || defaultSubTab === 'entregas') {
       setPostVentaSubTab(defaultSubTab);
     }
   }, [defaultSubTab]);
@@ -368,14 +366,12 @@ export default function ClienteDetailTabs({
               items={[
                 { id: 'entregas', label: 'Entregas' },
                 { id: 'solicitudes', label: 'Solicitudes' },
-                { id: 'independizacion', label: 'Independización' },
               ]}
               active={postVentaSubTab}
               onChange={setPostVentaSubTab}
             />
             {postVentaSubTab === 'entregas' && <TabEntrega clienteId={cliente.id} clienteNombre={cliente.nombre} ventas={ventas} />}
             {postVentaSubTab === 'solicitudes' && <TabPostVenta clienteId={cliente.id} clienteNombre={cliente.nombre} ventas={ventas} />}
-            {postVentaSubTab === 'independizacion' && <TabIndependizacion clienteId={cliente.id} clienteNombre={cliente.nombre} ventas={ventas} />}
           </>
         )}
       </div>

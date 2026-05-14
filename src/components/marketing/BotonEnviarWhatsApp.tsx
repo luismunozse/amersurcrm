@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Check, X, Loader2, ChevronDown } from "lucide-react";
+import { ExternalLink, Check, X, Loader2, ChevronDown, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase.client";
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -14,6 +14,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 import toast from "react-hot-toast";
 import {
   obtenerPlantillas,
+  obtenerSnippets,
   registrarApertura,
   actualizarEstadoEnvio,
 } from "@/app/dashboard/admin/marketing/_actions";
@@ -22,8 +23,9 @@ import {
   extractVariables,
   buildWhatsAppUrl,
   findMissingVariables,
+  prependMedia,
 } from "@/lib/marketing/whatsapp";
-import type { MarketingTemplate } from "@/types/whatsapp-marketing";
+import type { MarketingTemplate, MarketingSnippet } from "@/types/whatsapp-marketing";
 
 interface BotonEnviarWhatsAppProps {
   telefono: string;
@@ -31,7 +33,6 @@ interface BotonEnviarWhatsAppProps {
   clienteNombre?: string;
   templateId?: string;
   estadoCliente?: string;
-  campanaId?: string;
   recordatorioId?: string;
   variablesAuto?: Record<string, string>;
   className?: string;
@@ -46,7 +47,6 @@ export default function BotonEnviarWhatsApp({
   clienteNombre,
   templateId,
   estadoCliente,
-  campanaId,
   recordatorioId,
   variablesAuto = {},
   className = "",
@@ -83,7 +83,6 @@ export default function BotonEnviarWhatsApp({
           clienteNombre={clienteNombre}
           templateIdFijo={templateId}
           estadoCliente={estadoCliente}
-          campanaId={campanaId}
           recordatorioId={recordatorioId}
           variablesAuto={variablesAuto}
           onClose={() => setOpen(false)}
@@ -104,7 +103,6 @@ interface ModalEnviarProps {
   clienteNombre?: string;
   templateIdFijo?: string;
   estadoCliente?: string;
-  campanaId?: string;
   recordatorioId?: string;
   variablesAuto: Record<string, string>;
   onClose: () => void;
@@ -117,13 +115,13 @@ function ModalEnviar({
   clienteNombre,
   templateIdFijo,
   estadoCliente,
-  campanaId,
   recordatorioId,
   variablesAuto,
   onClose,
   onEnviado,
 }: ModalEnviarProps) {
   const [plantillas, setPlantillas] = useState<MarketingTemplate[]>([]);
+  const [snippetsMap, setSnippetsMap] = useState<Record<string, string>>({});
   const [proyectos, setProyectos] = useState<{ id: string; nombre: string }[]>([]);
   const [cargando, setCargando] = useState(true);
   const [seleccionId, setSeleccionId] = useState<string>(templateIdFijo ?? "");
@@ -147,6 +145,7 @@ function ModalEnviar({
     const sb = createClient();
     Promise.all([
       obtenerPlantillas(),
+      obtenerSnippets(),
       sb.schema("crm").from("proyecto").select("id, nombre").order("nombre"),
       // Auto-fill proyecto desde la reserva más reciente del cliente
       sb.schema("crm")
@@ -156,11 +155,16 @@ function ModalEnviar({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-    ]).then(([resPlant, resProy, resReserva]) => {
+    ]).then(([resPlant, resSnip, resProy, resReserva]) => {
       if (!mounted) return;
       if (resPlant.error) { toast.error(resPlant.error); return; }
       const lista = sortPlantillas((resPlant.data ?? []).filter((t) => t.activo));
       setPlantillas(lista);
+      if (resSnip.data) {
+        const map: Record<string, string> = {};
+        for (const s of resSnip.data as MarketingSnippet[]) map[s.slug] = s.contenido;
+        setSnippetsMap(map);
+      }
       if (!templateIdFijo && estadoCliente && lista.length > 0 && lista[0].tags?.includes(estadoCliente)) {
         setSeleccionId(lista[0].id);
       }
@@ -186,6 +190,15 @@ function ModalEnviar({
     [plantillas, seleccionId],
   );
 
+  const sugeridas = useMemo(() => {
+    if (!estadoCliente) return [];
+    return plantillas.filter((p) => p.tags?.includes(estadoCliente));
+  }, [plantillas, estadoCliente]);
+
+  const seleccionEsSugerida = !!(
+    seleccionada && estadoCliente && seleccionada.tags?.includes(estadoCliente)
+  );
+
   const variablesRequeridas = useMemo(() => {
     if (!seleccionada) return [];
     return seleccionada.variables?.length
@@ -195,21 +208,27 @@ function ModalEnviar({
 
   const mensajeRender = useMemo(() => {
     if (!seleccionada) return "";
-    return renderTemplate(seleccionada.body_texto, {
-      cliente: clienteNombre ?? "",
-      ...variables,
-    });
-  }, [seleccionada, variables, clienteNombre]);
+    const renderizado = renderTemplate(
+      seleccionada.body_texto,
+      { cliente: clienteNombre ?? "", ...variables },
+      { snippets: snippetsMap },
+    );
+    return prependMedia(renderizado, seleccionada.media_url);
+  }, [seleccionada, variables, clienteNombre, snippetsMap]);
 
   const faltantes = useMemo(() => {
     if (!seleccionada) return [];
-    return findMissingVariables(seleccionada.body_texto, {
-      cliente: clienteNombre ?? "",
-      ...variables,
-    });
-  }, [seleccionada, variables, clienteNombre]);
+    return findMissingVariables(
+      seleccionada.body_texto,
+      { cliente: clienteNombre ?? "", ...variables },
+      { snippets: snippetsMap },
+    );
+  }, [seleccionada, variables, clienteNombre, snippetsMap]);
 
   const puedeEnviar = !!seleccionada && !!telefono && faltantes.length === 0;
+  const faltaCliente = faltantes.includes("cliente");
+  const esFaltante = (v: string) => faltantes.includes(v);
+  const inputClassFalta = "border-amber-500 ring-1 ring-amber-500/30 bg-amber-50 dark:bg-amber-950/20";
 
   const handleAbrirWhatsApp = async () => {
     if (!seleccionada || !puedeEnviar) return;
@@ -220,7 +239,6 @@ function ModalEnviar({
         clienteId,
         telefono,
         variables: { cliente: clienteNombre ?? "", ...Object.fromEntries(Object.entries(variables).filter(([k]) => !k.startsWith("_"))) },
-        campanaId: campanaId ?? null,
         recordatorioId: recordatorioId ?? null,
       });
 
@@ -310,23 +328,65 @@ function ModalEnviar({
                   No hay plantillas activas. Crea una en Marketing → Plantillas.
                 </p>
               ) : (
-                <select
-                  value={seleccionId}
-                  onChange={(e) => setSeleccionId(e.target.value)}
-                  className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
-                >
-                  <option value="">Seleccionar plantilla…</option>
-                  {plantillas.map((p) => {
-                    const sugerida = estadoCliente && p.tags?.includes(estadoCliente);
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {sugerida ? "★ " : ""}{p.nombre}
-                        {p.categoria ? ` · ${p.categoria}` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
+                <>
+                  {sugeridas.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-[11px] text-crm-text-muted mb-1.5 flex items-center gap-1">
+                        <span className="text-amber-500">★</span>
+                        Sugeridas para estado &quot;{estadoCliente}&quot;
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sugeridas.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSeleccionId(p.id)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                              seleccionId === p.id
+                                ? "bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border-amber-400"
+                                : "bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                            }`}
+                          >
+                            <span className="text-amber-500">★</span>
+                            {p.nombre}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <select
+                    value={seleccionId}
+                    onChange={(e) => setSeleccionId(e.target.value)}
+                    className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                  >
+                    <option value="">Seleccionar plantilla…</option>
+                    {plantillas.map((p) => {
+                      const sugerida = estadoCliente && p.tags?.includes(estadoCliente);
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {sugerida ? "★ " : ""}{p.nombre}
+                          {p.categoria ? ` · ${p.categoria}` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {seleccionEsSugerida && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1.5 flex items-center gap-1">
+                      <span className="text-amber-500">★</span>
+                      Plantilla sugerida para este cliente
+                    </p>
+                  )}
+                </>
               )}
+            </div>
+          )}
+
+          {faltaCliente && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-900 dark:text-amber-100">
+                <strong>Cliente sin nombre.</strong> La plantilla usa <code>{`{{cliente}}`}</code> pero este cliente no tiene nombre registrado. Edite el cliente antes de enviar.
+              </div>
             </div>
           )}
 
@@ -338,12 +398,14 @@ function ModalEnviar({
               {variablesRequeridas.map((v) => {
                 if (v === "cliente") return null;
                 const val = variables[v] ?? variablesAuto[v] ?? "";
+                const falta = esFaltante(v);
+                const labelExtra = falta ? <span className="text-amber-600 ml-1">*</span> : null;
 
                 // vendedor: read-only si viene pre-llenado
                 if (v === "vendedor") {
                   return (
                     <div key={v}>
-                      <label className="block text-xs text-crm-text-secondary mb-1">{`{{vendedor}}`}</label>
+                      <label className="block text-xs text-crm-text-secondary mb-1">{`{{vendedor}}`}{labelExtra}</label>
                       {val ? (
                         <div className="flex items-center gap-2 px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary">
                           <span className="flex-1">{val}</span>
@@ -361,7 +423,7 @@ function ModalEnviar({
                           value={val}
                           onChange={(e) => setVariables((p) => ({ ...p, vendedor: e.target.value }))}
                           placeholder="Nombre del asesor"
-                          className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                          className={`w-full px-3 py-2 bg-crm-bg-secondary border rounded-lg text-sm text-crm-text-primary ${falta ? inputClassFalta : "border-crm-border"}`}
                         />
                       )}
                     </div>
@@ -372,12 +434,12 @@ function ModalEnviar({
                 if (v === "proyecto") {
                   return (
                     <div key={v}>
-                      <label className="block text-xs text-crm-text-secondary mb-1">{`{{proyecto}}`}</label>
+                      <label className="block text-xs text-crm-text-secondary mb-1">{`{{proyecto}}`}{labelExtra}</label>
                       <div className="relative">
                         <select
                           value={val}
                           onChange={(e) => setVariables((p) => ({ ...p, proyecto: e.target.value }))}
-                          className="w-full px-3 py-2 pr-8 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary appearance-none"
+                          className={`w-full px-3 py-2 pr-8 bg-crm-bg-secondary border rounded-lg text-sm text-crm-text-primary appearance-none ${falta ? inputClassFalta : "border-crm-border"}`}
                         >
                           <option value="">Seleccionar proyecto…</option>
                           {proyectos.map((pr) => (
@@ -394,7 +456,7 @@ function ModalEnviar({
                 if (v === "fecha") {
                   return (
                     <div key={v}>
-                      <label className="block text-xs text-crm-text-secondary mb-1">{`{{fecha}}`}</label>
+                      <label className="block text-xs text-crm-text-secondary mb-1">{`{{fecha}}`}{labelExtra}</label>
                       <input
                         type="datetime-local"
                         value={variables["_fecha_raw"] ?? ""}
@@ -412,7 +474,7 @@ function ModalEnviar({
                             : "";
                           setVariables((p) => ({ ...p, _fecha_raw: raw, fecha: formatted }));
                         }}
-                        className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                        className={`w-full px-3 py-2 bg-crm-bg-secondary border rounded-lg text-sm text-crm-text-primary ${falta ? inputClassFalta : "border-crm-border"}`}
                       />
                       {variables["fecha"] && (
                         <p className="text-xs text-crm-text-muted mt-1">{variables["fecha"]}</p>
@@ -424,13 +486,13 @@ function ModalEnviar({
                 // resto: input libre
                 return (
                   <div key={v}>
-                    <label className="block text-xs text-crm-text-secondary mb-1">{`{{${v}}}`}</label>
+                    <label className="block text-xs text-crm-text-secondary mb-1">{`{{${v}}}`}{labelExtra}</label>
                     <input
                       type="text"
                       value={val}
                       onChange={(e) => setVariables((p) => ({ ...p, [v]: e.target.value }))}
                       placeholder={`Valor para ${v}`}
-                      className="w-full px-3 py-2 bg-crm-bg-secondary border border-crm-border rounded-lg text-sm text-crm-text-primary"
+                      className={`w-full px-3 py-2 bg-crm-bg-secondary border rounded-lg text-sm text-crm-text-primary ${falta ? inputClassFalta : "border-crm-border"}`}
                     />
                   </div>
                 );
@@ -451,9 +513,17 @@ function ModalEnviar({
                 )}
               </div>
               {faltantes.length > 0 && (
-                <p className="text-xs text-crm-warning mt-2">
-                  Faltan variables: {faltantes.join(", ")}
-                </p>
+                <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-900 dark:text-amber-100">
+                    Complete {faltantes.length === 1 ? "la variable" : "las variables"}:{" "}
+                    {faltantes.map((f) => (
+                      <code key={f} className="px-1 mx-0.5 bg-amber-100 dark:bg-amber-900 rounded">
+                        {`{{${f}}}`}
+                      </code>
+                    ))}
+                  </p>
+                </div>
               )}
             </div>
           )}
