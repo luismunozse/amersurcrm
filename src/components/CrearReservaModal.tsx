@@ -8,7 +8,6 @@ import toast from "react-hot-toast";
 import { crearReserva } from "@/app/dashboard/clientes/_actions_crm";
 import { MONEDAS, type Moneda } from "@/lib/types/crm-flujo";
 import { Spinner } from "@/components/ui/Spinner";
-import DateTimePicker from "@/components/DateTimePicker";
 
 interface Props {
   isOpen: boolean;

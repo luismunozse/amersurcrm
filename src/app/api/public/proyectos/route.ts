@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     // Obtener conteo de lotes por proyecto
     const proyectoIds = (proyectos || []).map((p) => p.id);
 
-    let loteStats: Record<string, { total: number; disponibles: number }> = {};
+    const loteStats: Record<string, { total: number; disponibles: number }> = {};
 
     if (proyectoIds.length > 0) {
       const { data: lotes } = await supabase

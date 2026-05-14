@@ -35,7 +35,6 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
 }));
 
 import { obtenerCobranza, obtenerResumenCobranza, ejecutarActualizacionMora } from "@/app/dashboard/cobranza/_actions-cobranza";
-import { requierePermiso } from "@/lib/permissions/server";
 
 describe("obtenerCobranza", () => {
   beforeEach(() => { vi.clearAllMocks(); mockGetUser.mockResolvedValue({ data: { user: { id: "uid-1" } } }); });

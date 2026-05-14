@@ -12,7 +12,6 @@ import TabProformas from "./_TabProformas";
 import dynamic from "next/dynamic";
 
 const TabProcesosCliente = dynamic(() => import("./_TabProcesosCliente"), { ssr: false });
-const TabCalificacion = dynamic(() => import("./_TabCalificacion"), { ssr: false });
 const TabContrato = dynamic(() => import("./_TabContrato"), { ssr: false });
 const TabCronograma = dynamic(() => import("./_TabCronograma"), { ssr: false });
 const TabEntrega = dynamic(() => import("./_TabEntrega"), { ssr: false });

@@ -12,7 +12,7 @@ interface Props {
   ventas: any[];
 }
 
-export default function TabPostVenta({ clienteId, clienteNombre, ventas }: Props) {
+export default function TabPostVenta({ clienteId, clienteNombre: _clienteNombre, ventas }: Props) {
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

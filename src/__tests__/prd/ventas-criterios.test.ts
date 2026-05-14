@@ -9,7 +9,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
 
 // Estados de lote según PRD
 type EstadoLote = 'disponible' | 'reservado' | 'vendido';

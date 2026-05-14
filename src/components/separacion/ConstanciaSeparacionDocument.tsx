@@ -408,6 +408,7 @@ export function ConstanciaSeparacionDocument({
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Header como imagen banner */}
+        {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <Image src={headerSrc} style={styles.headerImg} fixed />
 
         {/* Título */}
@@ -496,6 +497,7 @@ export function ConstanciaSeparacionDocument({
         {/* Firma */}
         <View style={styles.firmaWrap}>
           {input.firmaVendedorBase64 ? (
+            // eslint-disable-next-line jsx-a11y/alt-text
             <Image
               src={input.firmaVendedorBase64}
               style={{ width: 180, height: 60, marginBottom: 2, objectFit: "contain" }}
@@ -508,6 +510,7 @@ export function ConstanciaSeparacionDocument({
 
         {/* Footer */}
         {useFooterImage ? (
+          // eslint-disable-next-line jsx-a11y/alt-text
           <Image src={footerSrc} style={styles.footerImg} fixed />
         ) : (
           <FooterFallback />

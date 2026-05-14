@@ -21,7 +21,7 @@ interface VendedorConRol {
 export async function GET() {
   try {
     // Verificación optimizada: una sola query para auth + rol (evita ~400ms en producción)
-    const { isAdmin, user, error: authError } = await verificarAdminOptimizado();
+    const { isAdmin, user, error: _authError } = await verificarAdminOptimizado();
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });

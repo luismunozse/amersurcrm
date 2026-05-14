@@ -22,7 +22,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import { usePermissions, PERMISOS } from "@/lib/permissions";
+import { PERMISOS } from "@/lib/permissions";
 import { ProtectedAction } from "@/components/permissions";
 import UserEditModal from "@/components/UserEditModal";
 import EstadoUsuarioModal from "@/components/EstadoUsuarioModal";

@@ -126,7 +126,7 @@ function calcularPeriodoDias(fechaInicio: string, fechaFin: string): number {
 function obtenerFechasPeriodo(periodo: string): { fechaInicio: Date; fechaFin: Date } {
   const ahora = new Date();
   const fechaFin = new Date(ahora);
-  let fechaInicio = new Date(ahora);
+  const fechaInicio = new Date(ahora);
 
   switch (periodo) {
     case '7':

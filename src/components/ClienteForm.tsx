@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useRef, useEffect, useCallback } from "react";
+import { useState, FormEvent, useRef, useEffect } from "react";
 import { User, MapPin, BarChart3, AlertTriangle } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 import { crearCliente, actualizarCliente, obtenerVendedores, obtenerProximoVendedorSugerido } from "@/app/dashboard/clientes/_actions";

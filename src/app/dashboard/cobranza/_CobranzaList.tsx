@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import {
-  Banknote, AlertTriangle, Clock, CheckCircle, RefreshCw, CreditCard, History,
+  AlertTriangle, Clock, CheckCircle, RefreshCw, CreditCard, History,
 } from "lucide-react";
 import {
   obtenerCobranza,

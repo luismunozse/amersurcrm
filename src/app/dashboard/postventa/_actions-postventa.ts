@@ -3,7 +3,7 @@
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
-import { obtenerUsernameActual, revalidarCliente } from "../clientes/_actions-crm-helpers";
+import { revalidarCliente } from "../clientes/_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
 
 // ============================================================

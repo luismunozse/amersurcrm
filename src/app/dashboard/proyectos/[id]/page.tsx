@@ -250,28 +250,8 @@ export default async function ProyLotesPage({
 
   const overlayBoundsValue = parseOverlayBounds((proyecto as { overlay_bounds?: unknown } | null)?.overlay_bounds);
 
-  // Normalizar bounds al formato de 2 puntos [[lat, lng], [lat, lng]]
-  const normalizeBoundsTo2Points = (
-    bounds: unknown
-  ): [[number, number], [number, number]] | null | undefined => {
-    if (!bounds) return bounds as null | undefined;
-    if (!Array.isArray(bounds)) return undefined;
-
-    // Si ya tiene 2 puntos, retornar tal cual
-    if (bounds.length === 2) {
-      return bounds as [[number, number], [number, number]];
-    }
-
-    // Si tiene 4 puntos, extraer SW (punto 0) y NE (punto 2)
-    if (bounds.length === 4) {
-      return [bounds[0], bounds[2]] as [[number, number], [number, number]];
-    }
-
-    return undefined;
-  };
-
   const overlayRotationRaw = (proyecto as { overlay_rotation?: unknown } | null)?.overlay_rotation;
-  const overlayRotationValue = typeof overlayRotationRaw === 'number'
+  const _overlayRotationValue = typeof overlayRotationRaw === 'number'
     ? overlayRotationRaw
     : typeof overlayRotationRaw === 'string'
       ? Number(overlayRotationRaw)
@@ -332,7 +312,7 @@ export default async function ProyLotesPage({
         : [];
   const primaryOverlayLayer =
     overlayLayers.find((layer) => layer.isPrimary) ?? overlayLayers[0] ?? null;
-  const primaryOverlayBounds = primaryOverlayLayer?.bounds ?? overlayBoundsValue;
+  const _primaryOverlayBounds = primaryOverlayLayer?.bounds ?? overlayBoundsValue;
 
   const galeriaItems = parseGaleria((proyecto as { galeria_imagenes?: unknown } | null)?.galeria_imagenes);
 

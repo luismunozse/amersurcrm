@@ -14,7 +14,6 @@ import {
 import {
   renderTemplate,
   extractVariables,
-  buildWhatsAppUrl,
   findMissingVariables,
   prependMedia,
 } from "@/lib/marketing/whatsapp";

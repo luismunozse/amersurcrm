@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { Upload, X, Download, Play } from "lucide-react";
 import toast from "react-hot-toast";
 // xlsx y papaparse se cargan dinámicamente al procesar archivo (~700KB ahorrados)
-import type * as XLSXType from "xlsx";
-import type PapaType from "papaparse";
 import { getErrorMessage } from "@/lib/errors";
 import { downloadTemplate } from "@/lib/generateTemplate";
 import { normalizePhoneE164, isValidPhone } from "@/lib/utils/phone";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition, useMemo } from "react";
-import { ChevronRight, User, MapPin, Clock, CheckCircle2, Circle, AlertCircle, Search, Download, Filter, X, LayoutGrid } from "lucide-react";
+import { ChevronRight, User, MapPin, Clock, CheckCircle2, Circle, AlertCircle, Search, Download, X, LayoutGrid } from "lucide-react";
 import { obtenerProcesos, obtenerResumenPipeline, toggleChecklistItem, avanzarEtapa } from "./_actions-proceso";
 import { ETAPAS_PROCESO, calcularProgresoEtapa, puedeAvanzarEtapa } from "@/lib/types/proceso-adquisicion";
 import type { ProcesoConRelaciones } from "@/lib/types/proceso-adquisicion";
@@ -19,7 +19,6 @@ export default function PipelineView() {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroEtapa, setFiltroEtapa] = useState('');
   const [busqueda, setBusqueda] = useState('');
-  const [showFiltros, setShowFiltros] = useState(false);
 
   useEffect(() => { loadData(); }, [filtroEstado, filtroEtapa]);
 

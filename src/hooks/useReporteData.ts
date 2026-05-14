@@ -94,7 +94,6 @@ export function useReporteData<T>({
         setLoading(false);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullCacheKey]);
 
   const recargar = useCallback(() => {

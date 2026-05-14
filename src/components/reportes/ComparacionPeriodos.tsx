@@ -78,10 +78,6 @@ export default function ComparacionPeriodos({
     }).format(valor);
   };
 
-  const formatearPorcentaje = (valor: number): string => {
-    return `${valor.toFixed(1)}%`;
-  };
-
   const calcularCambio = (actual: number, anterior: number) => {
     if (anterior === 0) {
       if (actual === 0) return { valor: 0, tipo: 'sin-cambio' as const };

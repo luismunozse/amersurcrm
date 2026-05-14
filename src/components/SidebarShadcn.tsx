@@ -357,7 +357,6 @@ function useAutoScrollActive(deps: unknown[]) {
     if (active) {
       active.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return contentRef;
 }

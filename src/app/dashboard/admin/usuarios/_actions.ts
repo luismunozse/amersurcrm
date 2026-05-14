@@ -157,7 +157,7 @@ export async function cambiarEstadoUsuario(
       return { success: false, error: 'Usuario no encontrado' };
     }
 
-    const { data, error } = await serviceRole
+    const { error } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
       .update({

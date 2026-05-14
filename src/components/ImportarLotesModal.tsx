@@ -5,7 +5,6 @@ import { X, Download, CheckCircle2, XCircle, Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import { Spinner } from "@/components/ui/Spinner";
 // xlsx se carga dinámicamente al descargar plantilla (~600KB ahorrados en carga inicial)
-import type * as XLSXType from "xlsx";
 
 interface ImportarLotesModalProps {
   proyectoId: string;

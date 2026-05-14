@@ -251,7 +251,7 @@ function LotesInteresChips({
 type LoteResultado = Awaited<ReturnType<typeof buscarLotes>>[number];
 
 function LoteSearch({
-  value,
+  value: _value,
   onChange,
   loteInicial,
 }: {

@@ -30,7 +30,6 @@ const convertPdfToPng = async (pdfFile: File): Promise<File> => {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('No se pudo crear contexto canvas');
   // pdfjs-dist v4 espera canvasContext como Object
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await page.render({ canvasContext: ctx as unknown as object, viewport } as any).promise;
   return new Promise<File>((resolve, reject) => {
     canvas.toBlob((blob) => {

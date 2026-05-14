@@ -46,7 +46,6 @@ import {
   ArrowRight,
   MessageCircle,
   Hourglass,
-  XCircle,
   HeartCrack,
   ThumbsDown,
   Check,
@@ -292,11 +291,6 @@ export default function AgendaDashboard() {
     } else {
       setFechaPreseleccionada(null);
     }
-    setMostrarModalEvento(true);
-  };
-
-  const abrirModalEvento = (evento: Evento) => {
-    setEventoActivo(evento);
     setMostrarModalEvento(true);
   };
 

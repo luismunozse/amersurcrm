@@ -137,7 +137,7 @@ describe("obtenerSolicitudesPostVenta", () => {
     chain.order.mockReturnValue(chain);
     mockServerActionClient.from.mockReturnValue(chain);
 
-    const result = await obtenerSolicitudesPostVenta();
+    await obtenerSolicitudesPostVenta();
     expect(mockServerActionClient.from).toHaveBeenCalledWith("solicitud_postventa");
   });
 

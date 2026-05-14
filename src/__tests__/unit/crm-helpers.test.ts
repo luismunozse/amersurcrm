@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // Mock revalidatePath before importing
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-const { mockSupabase, createChainMock } = vi.hoisted(() => {
+const { mockSupabase: _mockSupabase, createChainMock: _createChainMock } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = ["select", "insert", "update", "eq", "single", "limit", "order", "maybeSingle"];

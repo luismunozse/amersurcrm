@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGetUser, mockServerActionClient, createChainMock } = vi.hoisted(() => {
+const { mockGetUser: _mockGetUser, mockServerActionClient, createChainMock } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = ["select", "insert", "update", "delete", "eq", "neq", "is", "or", "order", "range", "single", "in", "limit", "head", "maybeSingle", "upsert"];

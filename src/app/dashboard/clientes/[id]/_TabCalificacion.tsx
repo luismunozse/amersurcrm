@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Landmark, Plus, FileCheck, AlertCircle } from "lucide-react";
+import { Landmark, Plus, AlertCircle } from "lucide-react";
 import { obtenerCalificacionesCliente, crearCalificacionBancaria, actualizarCalificacionBancaria } from "../_actions-calificacion";
 import { ESTADOS_CALIFICACION, BANCOS_PERU } from "@/lib/types/calificacion-bancaria";
 import type { CalificacionBancaria } from "@/lib/types/calificacion-bancaria";
@@ -14,7 +14,7 @@ interface Props {
   reservas: any[];
 }
 
-export default function TabCalificacion({ clienteId, clienteNombre, ventas, reservas }: Props) {
+export default function TabCalificacion({ clienteId, clienteNombre: _clienteNombre, ventas: _ventas, reservas }: Props) {
   const [calificaciones, setCalificaciones] = useState<CalificacionBancaria[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

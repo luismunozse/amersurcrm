@@ -71,7 +71,7 @@ export async function exportFilteredUsuarios(
   options: ExportOptions = {}
 ): Promise<void> {
   // Importar dinámicamente para evitar circular dependency
-  const mod = await import('./filteredExport');
+  await import('./filteredExport');
 
   const {
     fileName = 'usuarios',

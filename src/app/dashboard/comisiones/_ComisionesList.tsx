@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import {
-  Wallet, CheckCircle, Clock, XCircle, Banknote, AlertCircle,
+  Wallet, CheckCircle, Clock, XCircle, Banknote,
   ShieldCheck, AlertOctagon, Loader2, ExternalLink,
 } from "lucide-react";
 import {

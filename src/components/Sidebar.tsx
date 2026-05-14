@@ -263,7 +263,7 @@ export function Sidebar({ isOpen, onClose, collapsed: externalCollapsed = false,
   }, []);
 
   const renderNavItems = (items: NavItem[]) =>
-    items.map((item, i) => {
+    items.map((item, _i) => {
       // Item con sub-items (grupo expandible)
       if (item.children && item.children.length > 0 && !collapsed) {
         const isExpanded = expandedGroups[item.name] || false;

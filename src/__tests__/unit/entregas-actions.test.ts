@@ -116,7 +116,7 @@ describe("obtenerEntregas", () => {
     chain.order.mockReturnValue(chain);
     mockServerActionClient.from.mockReturnValue(chain);
 
-    const result = await obtenerEntregas();
+    await obtenerEntregas();
     expect(mockServerActionClient.from).toHaveBeenCalledWith("entrega");
   });
 

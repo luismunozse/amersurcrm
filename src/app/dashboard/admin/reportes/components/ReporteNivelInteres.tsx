@@ -98,7 +98,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
     );
   }
 
-  const { resumen, clientesPorProyecto, distribucionPorVendedor, proyectos } = data;
+  const { resumen, clientesPorProyecto: _clientesPorProyecto, distribucionPorVendedor, proyectos } = data;
 
   return (
     <div className="space-y-6">

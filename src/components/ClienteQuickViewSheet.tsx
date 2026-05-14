@@ -5,12 +5,6 @@ import Link from "next/link";
 import {
   Phone,
   Mail,
-  MapPin,
-  UserCircle,
-  Calendar,
-  Target,
-  TrendingUp,
-  FileText,
   ExternalLink,
 } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";

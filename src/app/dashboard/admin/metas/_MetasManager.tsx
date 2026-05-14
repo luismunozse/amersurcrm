@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Target, TrendingUp } from "lucide-react";
-import { obtenerKPIs, guardarMeta } from "./_actions-metas";
+import { obtenerKPIs } from "./_actions-metas";
 import { MESES } from "@/lib/types/metas";
 import type { KPIVendedor } from "@/lib/types/metas";
-import toast from "react-hot-toast";
 
 export default function MetasManager() {
   const [kpis, setKpis] = useState<KPIVendedor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isPending, startTransition] = useTransition();
   const now = new Date();
   const [anio, setAnio] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);

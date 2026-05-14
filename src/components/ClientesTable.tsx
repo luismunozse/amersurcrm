@@ -22,7 +22,7 @@ import ClienteForm from "@/components/ClienteForm";
 import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
-import { Download, FileType, MoreVertical, Eye, Trash2, FileText, ChevronDown, Search, X, CheckCircle2, User, Users, Mail, Phone, Pencil } from "lucide-react";
+import { Download, MoreVertical, Eye, Trash2, FileText, ChevronDown, Search, X, CheckCircle2, User, Users, Mail, Phone, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import DatePicker from "@/components/ui/DatePicker";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
@@ -337,7 +337,6 @@ export default function ClientesTable({
     }, 400); // Espera 400ms después de que el usuario deja de escribir
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSearchQuery]);
 
   const sortBy = initialSortBy as keyof Cliente;
@@ -572,10 +571,6 @@ export default function ClientesTable({
     router.push(`/dashboard/clientes?${buildFilterParams({ vendedor: value }).toString()}`);
   };
 
-  const handleClearVendedorFilter = () => {
-    handleVendedorFilterChange('');
-  };
-
   // Opciones de origen del lead
   const ORIGEN_LEAD_OPTIONS = [
     { value: 'web', label: 'Web' },
@@ -594,10 +589,6 @@ export default function ClientesTable({
 
   const handleOrigenFilterChange = (value: string) => {
     router.push(`/dashboard/clientes?${buildFilterParams({ origen: value }).toString()}`);
-  };
-
-  const handleClearOrigenFilter = () => {
-    handleOrigenFilterChange('');
   };
 
   const handleEstadoFilterChange = (value: string) => {

@@ -18,7 +18,7 @@ vi.mock("@/lib/contratos/plantilla-compraventa", () => ({
 }));
 
 vi.mock("next/dynamic", () => ({
-  default: (fn: any) => {
+  default: (_fn: any) => {
     const Component = vi.fn((props: any) => {
       if (!props.isOpen) return null;
       return (
@@ -33,7 +33,7 @@ vi.mock("next/dynamic", () => ({
 
 // Import components after mocks
 import TabContrato from "@/app/dashboard/clientes/[id]/_TabContrato";
-import { obtenerContratosCliente, crearContrato } from "@/app/dashboard/clientes/_actions-contrato";
+import { obtenerContratosCliente } from "@/app/dashboard/clientes/_actions-contrato";
 
 // ==================== TESTS ====================
 

@@ -5,8 +5,6 @@ import { ScrollText, Plus, ExternalLink, FileText, Upload } from "lucide-react";
 import { obtenerContratosCliente, crearContrato, actualizarContrato } from "../_actions-contrato";
 import { ESTADOS_CONTRATO } from "@/lib/types/contrato";
 import type { Contrato } from "@/lib/types/contrato";
-import { formatearMoneda } from "@/lib/types/crm-flujo";
-import type { Moneda } from "@/lib/types/crm-flujo";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 
