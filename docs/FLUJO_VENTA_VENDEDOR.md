@@ -173,10 +173,9 @@ Cuando los 3 estén cargados → **Completar**.
 
 Documentos a cargar:
 
-- Carta de desembolso del banco.
-- Comprobante de transferencia.
+- Comprobante de pago.
 
-Cuando los 2 estén cargados, en lugar del botón Completar aparece el botón verde **Cerrar venta**.
+Cuando esté cargado, en lugar del botón Completar aparece el botón verde **Cerrar venta**.
 
 ---
 

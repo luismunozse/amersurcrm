@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/Button";
 import { MessageSquare, Phone, Mail, Users, Clock } from "lucide-react";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { obtenerReporteInteracciones } from "../_actions";
+import { obtenerReporteInteracciones, type ReporteInteraccionesData, type RankingVendedor } from "../_actions";
 import toast from "react-hot-toast";
 import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
 import { Progress } from "@/components/ui/progress";
 import { CRMBadge } from "@/components/ui/crm-badge";
 import { usePaginacion } from "@/hooks/usePaginacion";
 import PaginacionReporte from "@/components/reportes/PaginacionReporte";
+import { useTableSort, SortableHeadContent } from "@/components/reportes/useTableSort";
 
 interface ReporteInteraccionesProps {
   periodo: string;
@@ -19,12 +20,27 @@ interface ReporteInteraccionesProps {
   fechaFin?: string;
 }
 
+type RankingSortKey = "nombre" | "totalInteracciones" | "clientesAtendidos" | "promedioPorCliente" | "duracionTotal";
+
 export default function ReporteInteracciones({ periodo, fechaInicio, fechaFin }: ReporteInteraccionesProps) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ReporteInteraccionesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const paginacionRanking = usePaginacion(data?.rankingVendedores || [], { tamanioPagina: 10 });
+  const ranking: RankingVendedor[] = data?.rankingVendedores || [];
+  const sortRanking = useTableSort<RankingVendedor, RankingSortKey>(
+    ranking,
+    {
+      nombre:             (v) => v.nombre,
+      totalInteracciones: (v) => v.totalInteracciones,
+      clientesAtendidos:  (v) => v.clientesAtendidos,
+      promedioPorCliente: (v) => parseFloat(v.promedioPorCliente) || 0,
+      duracionTotal:      (v) => v.duracionTotal,
+    },
+    { defaultKey: "totalInteracciones", defaultDir: "desc", ascByDefault: ["nombre"] },
+  );
+
+  const paginacionRanking = usePaginacion(sortRanking.sortedData, { tamanioPagina: 10 });
 
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -189,16 +205,26 @@ export default function ReporteInteracciones({ periodo, fechaInicio, fechaFin }:
                 <CRMTableHeader>
                   <CRMTableRow>
                     <CRMTableHead>#</CRMTableHead>
-                    <CRMTableHead>Vendedor</CRMTableHead>
-                    <CRMTableHead className="text-center">Total</CRMTableHead>
-                    <CRMTableHead className="text-center">Clientes</CRMTableHead>
-                    <CRMTableHead className="text-center">Prom/Cliente</CRMTableHead>
-                    <CRMTableHead className="text-center">Min.</CRMTableHead>
+                    <CRMTableHead>
+                      <SortableHeadContent label="Vendedor" sortKey="nombre" align="left" current={sortRanking.sortKey} dir={sortRanking.sortDir} onSort={sortRanking.handleSort} />
+                    </CRMTableHead>
+                    <CRMTableHead className="text-center">
+                      <SortableHeadContent label="Total" sortKey="totalInteracciones" align="center" current={sortRanking.sortKey} dir={sortRanking.sortDir} onSort={sortRanking.handleSort} />
+                    </CRMTableHead>
+                    <CRMTableHead className="text-center">
+                      <SortableHeadContent label="Clientes" sortKey="clientesAtendidos" align="center" current={sortRanking.sortKey} dir={sortRanking.sortDir} onSort={sortRanking.handleSort} />
+                    </CRMTableHead>
+                    <CRMTableHead className="text-center">
+                      <SortableHeadContent label="Prom/Cliente" sortKey="promedioPorCliente" align="center" current={sortRanking.sortKey} dir={sortRanking.sortDir} onSort={sortRanking.handleSort} />
+                    </CRMTableHead>
+                    <CRMTableHead className="text-center">
+                      <SortableHeadContent label="Min." sortKey="duracionTotal" align="center" current={sortRanking.sortKey} dir={sortRanking.sortDir} onSort={sortRanking.handleSort} />
+                    </CRMTableHead>
                     <CRMTableHead>Por Tipo</CRMTableHead>
                   </CRMTableRow>
                 </CRMTableHeader>
                 <CRMTableBody>
-                  {paginacionRanking.items.map((vendedor: any, idx: number) => {
+                  {paginacionRanking.items.map((vendedor: RankingVendedor, idx: number) => {
                     const globalIndex = (paginacionRanking.paginaActual - 1) * paginacionRanking.tamanioPagina + idx;
                     return (
                       <CRMTableRow key={globalIndex}>

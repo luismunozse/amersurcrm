@@ -2,6 +2,37 @@
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
 
+export interface PerformanceStat {
+  label: string;
+  value: number;
+  change: string;
+  type: "positive" | "negative" | "neutral";
+}
+
+export interface TopPerformer {
+  name: string;
+  avatar: string;
+  sales: number;
+  deals: number;
+  conversion: string;
+  meta: number;
+  cumplimiento: string;
+}
+
+export interface ReporteRendimientoData {
+  performanceStats: PerformanceStat[];
+  topPerformers: TopPerformer[];
+  resumen: {
+    totalVendedores: number;
+    vendedoresActivos: number;
+    ventasTotales: number;
+    propiedadesTotales: number;
+    promedioPorVendedor: number;
+    vendedoresQueSuperaronMeta: number;
+  };
+  periodo: { inicio: string; fin: string; dias: number };
+}
+
 /**
  * Obtiene reporte de rendimiento de vendedores con datos reales
  */
@@ -9,7 +40,7 @@ export async function obtenerReporteRendimiento(
   periodo: string = '30',
   fechaInicio?: string,
   fechaFin?: string
-): Promise<{ data: any | null; error: string | null }> {
+): Promise<{ data: ReporteRendimientoData | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
     const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
@@ -86,11 +117,11 @@ export async function obtenerReporteRendimiento(
     const vendedoresQueSuperaronMeta = Array.from(ventasPorVendedor.values())
       .filter(v => v.meta > 0 && v.ventas >= v.meta).length;
 
-    const performanceStats = [
+    const performanceStats: PerformanceStat[] = [
       { label: "Total Vendedores", value: vendedores?.length || 0, change: "0", type: "positive" },
       { label: "Ventas Totales", value: ventasTotales, change: "0", type: "positive" },
       { label: "Promedio por Vendedor", value: promedioPorVendedor, change: "0", type: "positive" },
-      { label: "Cumplieron Meta", value: vendedoresQueSuperaronMeta, change: "0", type: "positive" }
+      { label: "Cumplieron Meta", value: vendedoresQueSuperaronMeta, change: "0", type: "positive" },
     ];
 
     return {

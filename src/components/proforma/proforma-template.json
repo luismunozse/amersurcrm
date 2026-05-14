@@ -2,6 +2,18 @@
   "schemas": [
     [
       {
+        "name": "proforma_numero",
+        "type": "text",
+        "position": { "x": 140, "y": 44 },
+        "width": 55,
+        "height": 10,
+        "fontSize": 16,
+        "fontColor": "#1d4d2f",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "characterSpacing": 0.5
+      },
+      {
         "name": "cliente_dni",
         "type": "text",
         "position": { "x": 69.79, "y": 73.18 },

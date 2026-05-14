@@ -1,71 +1,120 @@
 "use server";
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
+import { buildCachedReportFetcher } from "./shared-cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-/**
- * Obtiene reporte de nivel de interés de leads por proyecto
- */
-export async function obtenerReporteNivelInteres(
-  periodo: string = '30',
-  proyectoId?: string,
-  fechaInicio?: string,
-  fechaFin?: string
-): Promise<{ data: any | null; error: string | null }> {
-  return safeAction(async () => {
-    const supabase = await getAuthorizedClient();
-    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
+export interface NivelInteresDistribucion {
+  nivel: string;
+  cantidad: number;
+  porcentaje: string;
+  color: string;
+}
 
-    // Obtener todos los proyectos para el filtro
-    const { data: proyectos } = await supabase
-      .schema('crm')
-      .from('proyecto')
-      .select('id, nombre')
-      .eq('estado', 'activo')
-      .order('nombre');
+export interface NivelInteresPorProyecto {
+  proyecto: string;
+  proyectoId: string;
+  total: number;
+  niveles: Record<string, number>;
+}
 
-    // Obtener clientes con su última interacción
-    const { data: clientes } = await supabase
-      .schema('crm')
-      .from('cliente')
-      .select(`
-        id,
-        nombre,
-        estado_cliente,
-        vendedor_username,
-        fecha_alta,
-        ultimo_contacto
-      `);
+export interface NivelInteresPorVendedor {
+  vendedor: string;
+  totalInteresados: number;
+  proyectos: Array<{ proyecto: string; cantidad: number }>;
+  porcentaje: string;
+}
 
-    // Obtener TODAS las interacciones para determinar la última de cada cliente
-    const interaccionesQuery = supabase
-      .schema('crm')
-      .from('cliente_interaccion')
-      .select(`
-        cliente_id,
-        resultado,
-        fecha_interaccion
-      `)
-      .order('fecha_interaccion', { ascending: false });
+export interface ClientesPorProyectoEntry {
+  proyectoId: string;
+  proyecto: string;
+  clientesInteresados: number;
+}
 
-    const { data: interacciones } = await interaccionesQuery;
+export interface ReporteNivelInteresData {
+  resumen: {
+    totalRegistros: number;
+    totalProyectos: number;
+    totalClientesConInteres: number;
+    fechaInicio: string;
+    fechaFin: string;
+  };
+  distribucionNiveles: NivelInteresDistribucion[];
+  distribucionPorProyecto: NivelInteresPorProyecto[];
+  distribucionPorVendedor: NivelInteresPorVendedor[];
+  clientesPorProyecto: ClientesPorProyectoEntry[];
+  proyectos: Array<{ id: string; nombre: string }>;
+  periodo: { inicio: string; fin: string; dias: number };
+}
 
-    // Obtener intereses de clientes en proyectos CON PRIORIDAD
-    const interesQuery = supabase
-      .schema('crm')
-      .from('cliente_propiedad_interes')
-      .select(`
-        cliente_id,
-        prioridad,
-        proyecto_id,
-        lote:lote_id (
-          proyecto_id
-        ),
-        propiedad:propiedad_id (
-          proyecto_id
-        )
-      `);
+async function _fetchNivelInteres(
+  supabase: SupabaseClient<any, "crm">,
+  startISO: string,
+  endISO: string,
+  days: number,
+  proyectoId: string | null,
+): Promise<ReporteNivelInteresData> {
+    const startDate = new Date(startISO);
+    const endDate = new Date(endISO);
+    const fechaInicio = startISO;
+    const fechaFin = endISO;
 
-    const { data: interesesProyecto } = await interesQuery;
+    // 1) Proyectos activos (para filtro/labels) y intereses cliente↔proyecto.
+    //    Hacemos primero el fetch de intereses para extraer los IDs de
+    //    clientes a procesar y restringir las queries siguientes.
+    const [proyectosRes, interesesRes] = await Promise.all([
+      supabase
+        .schema('crm')
+        .from('proyecto')
+        .select('id, nombre')
+        .eq('estado', 'activo')
+        .order('nombre'),
+      supabase
+        .schema('crm')
+        .from('cliente_propiedad_interes')
+        .select(`
+          cliente_id,
+          prioridad,
+          proyecto_id,
+          lote:lote_id ( proyecto_id ),
+          propiedad:propiedad_id ( proyecto_id )
+        `),
+    ]);
+
+    const proyectos = proyectosRes.data;
+    const interesesProyecto = interesesRes.data;
+
+    // IDs únicos de clientes con algún interés (los únicos relevantes para este reporte).
+    const clienteIdsConInteres = Array.from(
+      new Set(
+        (interesesProyecto || [])
+          .map((i: any) => i.cliente_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    // 2) Clientes + interacciones SOLO de los que tienen interés.
+    //    Reduce drásticamente el payload cuando crece la base.
+    let clientes: any[] | null = [];
+    let interacciones: any[] | null = [];
+
+    if (clienteIdsConInteres.length > 0) {
+      const [clientesRes, interaccionesRes] = await Promise.all([
+        supabase
+          .schema('crm')
+          .from('cliente')
+          .select('id, nombre, estado_cliente, vendedor_username, fecha_alta, ultimo_contacto')
+          .in('id', clienteIdsConInteres),
+        supabase
+          .schema('crm')
+          .from('cliente_interaccion')
+          .select('cliente_id, resultado, fecha_interaccion')
+          .in('cliente_id', clienteIdsConInteres)
+          .order('fecha_interaccion', { ascending: false }),
+      ]);
+      clientes = clientesRes.data;
+      interacciones = interaccionesRes.data;
+    }
 
     // ID especial para consultas generales (sin proyecto específico)
     const CONSULTA_GENERAL_ID = '__general__';
@@ -373,5 +422,28 @@ export async function obtenerReporteNivelInteres(
         dias: days
       }
     };
+}
+
+const fetchNivelInteresCached = buildCachedReportFetcher(
+  _fetchNivelInteres,
+  ["reporte-nivel-interes"],
+  60,
+);
+
+export async function obtenerReporteNivelInteres(
+  periodo: string = '30',
+  proyectoId?: string,
+  fechaInicio?: string,
+  fechaFin?: string
+): Promise<{ data: ReporteNivelInteresData | null; error: string | null }> {
+  return safeAction(async () => {
+    await getAuthorizedClient();
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
+    return fetchNivelInteresCached(
+      startDate.toISOString(),
+      endDate.toISOString(),
+      days,
+      proyectoId ?? null,
+    );
   });
 }

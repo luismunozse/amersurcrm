@@ -1,6 +1,15 @@
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { esAdmin } from "@/lib/permissions/server";
-import { unstable_cache } from "next/cache";
+
+/**
+ * Helpers compartidos por todas las server actions de reportes.
+ *
+ * IMPORTANTE: este archivo NO debe importar `next/cache`. Para cache TTL
+ * o revalidación de tags, usar `./shared-cache` (server-only). Mantener
+ * este módulo libre de imports server-only permite que tipos derivados
+ * de aquí puedan referenciarse desde código que termina en client bundles
+ * sin romper el build.
+ */
 
 /**
  * Shared auth guard for all report actions.
@@ -23,19 +32,27 @@ export async function getAuthorizedClient() {
 }
 
 /**
- * Calculate start/end dates from period string or explicit dates
+ * Calculate start/end dates from period string or explicit dates.
+ * Always normalizes startDate to 00:00:00.000 and endDate to 23:59:59.999
+ * so range queries with .gte/.lte include the full first and last day.
+ *
+ * For explicit `fechaInicio`/`fechaFin` (YYYY-MM-DD) the dates are interpreted
+ * in local time and snapped to day boundaries, avoiding UTC-shift off-by-one.
  */
 export function calcularFechas(periodo: string, fechaInicio?: string, fechaFin?: string) {
-  const days = parseInt(periodo);
+  const days = parseInt(periodo) || 30;
   let startDate: Date;
-  let endDate = new Date();
+  let endDate: Date;
 
   if (fechaInicio && fechaFin) {
-    startDate = new Date(fechaInicio);
-    endDate = new Date(fechaFin);
+    startDate = new Date(`${fechaInicio}T00:00:00`);
+    endDate = new Date(`${fechaFin}T23:59:59.999`);
   } else {
-    startDate = new Date();
+    endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
   }
 
   return { startDate, endDate, days };
@@ -45,36 +62,16 @@ export function calcularFechas(periodo: string, fechaInicio?: string, fechaFin?:
  * Wraps a report action with standard error handling pattern
  */
 export async function safeAction<T>(
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<{ data: T | null; error: string | null }> {
   try {
     const data = await fn();
     return { data, error: null };
   } catch (error) {
-    console.error('Error en acción de reportes:', error);
+    console.error("Error en acción de reportes:", error);
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Error desconocido'
+      error: error instanceof Error ? error.message : "Error desconocido",
     };
   }
-}
-
-/**
- * Server-side cache wrapper for report data.
- * Caches for 60s with tag-based revalidation.
- * Use `revalidateTag("reportes")` to bust all report caches.
- */
-export function cachedReport<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  keyParts: string[],
-  revalidateSeconds = 60
-): T {
-  return unstable_cache(
-    fn,
-    keyParts,
-    {
-      revalidate: revalidateSeconds,
-      tags: ["reportes", ...keyParts],
-    }
-  ) as unknown as T;
 }

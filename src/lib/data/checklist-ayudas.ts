@@ -57,14 +57,8 @@ export const AYUDAS_CHECKLIST: Record<string, string> = {
   // ============================================================
   // Desembolso
   // ============================================================
-  "Carta de desembolso del banco":
-    "Documento del banco que autoriza la entrega del monto financiado a Amersur una vez firmada la escritura pública.",
-  "Comprobante de transferencia":
-    "Voucher de la transferencia del monto del crédito desde el banco a la cuenta de Amersur.",
-  "Liquidacion de haberes":
-    "Detalle final de los montos pagados por el cliente, el saldo del crédito hipotecario y el cierre de la operación.",
-  "Liquidación de haberes":
-    "Detalle final de los montos pagados por el cliente, el saldo del crédito hipotecario y el cierre de la operación.",
+  "Comprobante de pago":
+    "Voucher o constancia del pago/transferencia correspondiente al desembolso del crédito a la cuenta de Amersur.",
 };
 
 export function getAyudaChecklist(descripcion: string): string | undefined {

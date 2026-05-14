@@ -2,6 +2,43 @@
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
 
+export interface RankingVendedor {
+  username: string;
+  nombre: string;
+  totalInteracciones: number;
+  clientesAtendidos: number;
+  duracionTotal: number;
+  promedioPorCliente: string;
+  porTipo: Record<string, number>;
+  porResultado: Record<string, number>;
+}
+
+export interface DistribucionItem {
+  tipo?: string;
+  resultado?: string;
+  cantidad: number;
+  porcentaje: string;
+}
+
+export interface TendenciaDiaria {
+  fecha: string;
+  cantidad: number;
+}
+
+export interface ReporteInteraccionesData {
+  resumen: {
+    totalInteracciones: number;
+    vendedoresActivos: number;
+    promedioPorVendedor: number;
+    clientesContactados: number;
+  };
+  rankingVendedores: RankingVendedor[];
+  distribucionTipo: Array<{ tipo: string; cantidad: number; porcentaje: string }>;
+  distribucionResultado: Array<{ resultado: string; cantidad: number; porcentaje: string }>;
+  tendenciaDiaria: TendenciaDiaria[];
+  periodo: { inicio: string; fin: string; dias: number };
+}
+
 /**
  * Obtiene reporte de interacciones por vendedor
  */
@@ -9,7 +46,7 @@ export async function obtenerReporteInteracciones(
   periodo: string = '30',
   fechaInicio?: string,
   fechaFin?: string
-): Promise<{ data: any | null; error: string | null }> {
+): Promise<{ data: ReporteInteraccionesData | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
     const { startDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);

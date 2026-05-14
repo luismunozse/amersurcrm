@@ -16,7 +16,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { obtenerReporteFunnel, type EtapaFunnel } from "../_actions";
+import {
+  obtenerReporteFunnel,
+  type EtapaFunnel,
+  type ReporteFunnelData,
+  type EtapaFunnelStat,
+  type ConversionEntreEtapas,
+} from "../_actions";
 import toast from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ModalClientesEtapaFunnel from "./ModalClientesEtapaFunnel";
@@ -80,7 +86,7 @@ const LBL_X   = CX - MAX_W / 2 - 14; // fixed left label X
 const CNT_X   = CX + MAX_W / 2 + 14; // fixed right count X
 
 export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: ReporteFunnelProps) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ReporteFunnelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [etapaActiva, setEtapaActiva] = useState<{
@@ -216,7 +222,7 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
                 role="img"
                 aria-label="Embudo de conversión de ventas"
               >
-                {data.etapas.map((etapa: any, idx: number) => {
+                {data.etapas.map((etapa: EtapaFunnelStat, idx: number) => {
                   const yBase   = idx * (BAR_H + CONN_H);
                   const topW    = barW(etapa.cantidad);
                   const nextEt  = data.etapas[idx + 1];
@@ -451,7 +457,7 @@ export default function ReporteFunnel({ periodo, fechaInicio, fechaFin }: Report
               <CardTitle className="text-sm font-semibold text-crm-text-primary">Conversión por etapa</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {data.conversiones.map((conv: any, idx: number) => (
+              {data.conversiones.map((conv: ConversionEntreEtapas, idx: number) => (
                 <div key={idx}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-xs text-crm-text-secondary truncate max-w-[160px]">{conv.desde}</span>

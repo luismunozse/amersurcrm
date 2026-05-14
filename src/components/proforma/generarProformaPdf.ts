@@ -89,6 +89,7 @@ function buildInputs(p: ProformaPdfInput): Record<string, string> {
   const asesor = datos.asesor ?? { nombre: "" };
 
   return {
+    proforma_numero: p.numero ?? "",
     cliente_nombre: cliente.nombre ?? "",
     cliente_dni: cliente.dni ?? "",
     cliente_telefono: cliente.telefono ?? "",

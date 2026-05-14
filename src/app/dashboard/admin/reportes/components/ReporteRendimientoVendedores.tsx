@@ -3,10 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Users, TrendingUp, Target, Award } from "lucide-react";
+import { Users, TrendingUp, Target, Award, ArrowUp, ArrowDown } from "lucide-react";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { obtenerReporteRendimiento } from "../_actions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { obtenerReporteRendimiento, type ReporteRendimientoData, type TopPerformer } from "../_actions";
+import { useTableSort } from "@/components/reportes/useTableSort";
 import toast from "react-hot-toast";
+
+type PerformerSortKey = "name" | "sales" | "deals" | "conversion" | "cumplimiento";
 
 interface ReporteRendimientoVendedoresProps {
   periodo: string;
@@ -15,7 +19,7 @@ interface ReporteRendimientoVendedoresProps {
 }
 
 export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fechaFin }: ReporteRendimientoVendedoresProps) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ReporteRendimientoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +62,18 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
 
   const { performanceStats, topPerformers, resumen } = data;
 
+  const sortPerformers = useTableSort<TopPerformer, PerformerSortKey>(
+    topPerformers || [],
+    {
+      name:         (p) => p.name,
+      sales:        (p) => p.sales,
+      deals:        (p) => p.deals,
+      conversion:   (p) => parseFloat(String(p.conversion).replace("%", "")) || 0,
+      cumplimiento: (p) => parseFloat(p.cumplimiento ?? "0") || 0,
+    },
+    { defaultKey: "sales", defaultDir: "desc", ascByDefault: ["name"] },
+  );
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
@@ -83,7 +99,7 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {performanceStats.map((stat: any, index: number) => (
+        {performanceStats.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-crm-text-secondary">
@@ -112,14 +128,47 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
       {topPerformers && topPerformers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Top Performers</CardTitle>
-            <CardDescription>
-              Vendedores con mejor rendimiento del período
-            </CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle>Top Performers</CardTitle>
+                <CardDescription>
+                  Vendedores con mejor rendimiento del período
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-crm-text-secondary">Ordenar:</span>
+                <Select
+                  value={sortPerformers.sortKey}
+                  onValueChange={(v) => {
+                    if (v !== sortPerformers.sortKey) sortPerformers.handleSort(v as PerformerSortKey);
+                  }}
+                >
+                  <SelectTrigger className="w-[170px] h-8 bg-crm-card border-crm-border text-crm-text-primary text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-crm-card border-crm-border">
+                    <SelectItem value="sales" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Ventas (monto)</SelectItem>
+                    <SelectItem value="deals" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Propiedades</SelectItem>
+                    <SelectItem value="conversion" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Conversión</SelectItem>
+                    <SelectItem value="cumplimiento" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">% Meta</SelectItem>
+                    <SelectItem value="name" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">Nombre</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sortPerformers.handleSort(sortPerformers.sortKey)}
+                  title={sortPerformers.sortDir === "asc" ? "Ascendente" : "Descendente"}
+                  className="h-8 px-2"
+                >
+                  {sortPerformers.sortDir === "asc" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topPerformers.map((performer: any, index: number) => (
+              {sortPerformers.sortedData.map((performer, index) => (
                 <div key={index} className="flex items-center justify-between p-4 border border-crm-border rounded-lg hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-crm-primary text-white rounded-full flex items-center justify-center font-bold text-sm">

@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
 import { PieChart as PieChartIcon, Filter } from "lucide-react";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { obtenerReporteNivelInteres } from "../_actions";
+import {
+  obtenerReporteNivelInteres,
+  type ReporteNivelInteresData,
+  type NivelInteresPorVendedor,
+  type ClientesPorProyectoEntry,
+} from "../_actions";
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CRMTable, CRMTableHeader, CRMTableHead, CRMTableBody, CRMTableRow, CRMTableCell } from "@/components/ui/crm-table";
@@ -22,7 +27,7 @@ interface ReporteNivelInteresProps {
 }
 
 export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fechaFinDefault }: ReporteNivelInteresProps) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ReporteNivelInteresData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,7 +131,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
                   <SelectItem value="todos" className="text-crm-text-primary hover:bg-crm-card-hover focus:bg-crm-card-hover cursor-pointer">
                     - Todos los proyectos -
                   </SelectItem>
-                  {proyectos.map((proyecto: any) => (
+                  {proyectos.map((proyecto) => (
                     <SelectItem
                       key={proyecto.id}
                       value={proyecto.id}
@@ -194,7 +199,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
             </CRMTableHeader>
             <CRMTableBody>
               {paginacionProyectos.items.length > 0 ? (
-                paginacionProyectos.items.map((item: any, index: number) => (
+                paginacionProyectos.items.map((item: ClientesPorProyectoEntry, index: number) => (
                   <CRMTableRow key={index}>
                     <CRMTableCell className="font-medium">{item.proyecto}</CRMTableCell>
                     <CRMTableCell className="text-center">
@@ -253,7 +258,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
                 </CRMTableRow>
               </CRMTableHeader>
               <CRMTableBody>
-                {distribucionPorVendedor.map((item: any, index: number) => (
+                {distribucionPorVendedor.map((item: NivelInteresPorVendedor, index: number) => (
                   <CRMTableRow key={index}>
                     <CRMTableCell className="font-medium">
                       {item.vendedor}
@@ -268,7 +273,7 @@ export default function ReporteNivelInteres({ periodo, fechaInicioDefault, fecha
                     </CRMTableCell>
                     <CRMTableCell>
                       <div className="flex flex-wrap gap-1">
-                        {item.proyectos.map((p: any, i: number) => (
+                        {item.proyectos.map((p, i) => (
                           <span key={i} className="text-xs bg-crm-bg-primary border border-crm-border rounded px-2 py-0.5">
                             {p.proyecto} ({p.cantidad})
                           </span>

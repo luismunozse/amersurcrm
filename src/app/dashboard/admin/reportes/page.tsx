@@ -6,13 +6,18 @@ import dynamic from "next/dynamic";
 import {
   Calendar, Download, BarChart3, UserCheck, UserCog, MessageSquare,
   Users, PieChart, Target, Clock, AlertCircle, Building, DollarSign,
-  TrendingUp, GitCompare, FileDown, Banknote, Wallet,
+  TrendingUp, GitCompare, FileDown, Banknote, Wallet, Layers, Bell,
 } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
 import ReporteClientes from "./components/ReporteClientes";
 import ReportePropiedades from "./components/ReportePropiedades";
 import ReporteRendimientoVendedores from "./components/ReporteRendimientoVendedores";
+import ReportePorVendedor from "./components/ReportePorVendedor";
+import ReportePorProyecto from "./components/ReportePorProyecto";
+import ReporteComparacionVendedores from "./components/ReporteComparacionVendedores";
+import ReporteCohortes from "./components/ReporteCohortes";
+import ReporteAlertas from "./components/ReporteAlertas";
 import ReporteGestionClientes from "./components/ReporteGestionClientes";
 import ReporteInteracciones from "./components/ReporteInteracciones";
 import ReporteNivelInteres from "./components/ReporteNivelInteres";
@@ -23,6 +28,7 @@ import ReporteComisionesAdmin from "./components/ReporteComisionesAdmin";
 import ResumenKPIs from "./components/ResumenKPIs";
 import SidebarSecciones from "./components/SidebarSecciones";
 import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
+import SavedViewsBar from "@/components/reportes/SavedViewsBar";
 import DatePicker from "@/components/ui/DatePicker";
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,25 +71,62 @@ function calcularFechasPeriodo(periodo: string): { fechaInicio: string; fechaFin
   };
 }
 
-const ALL_TABS = [
-  { id: "analisis",        title: "Análisis",        icon: BarChart3 },
-  { id: "comparacion",     title: "Comparación",      icon: GitCompare },
-  { id: "funnel",          title: "Funnel",           icon: TrendingUp },
-  { id: "nivel-interes",   title: "Nivel Interés",    icon: PieChart },
-  { id: "origen-lead",     title: "Origen Lead",      icon: Target },
-  { id: "tiempo-respuesta",title: "Tiempo Respuesta", icon: Clock },
-  { id: "gestion",         title: "Gestión",          icon: Users },
-  { id: "interacciones",   title: "Interacciones",    icon: MessageSquare },
-  { id: "propiedades",     title: "Propiedades",      icon: Building },
-  { id: "ventas",          title: "Ventas",           icon: DollarSign },
-  { id: "cobranza",        title: "Cobranza",         icon: Banknote },
-  { id: "comisiones",      title: "Comisiones",       icon: Wallet },
-  { id: "clientes",        title: "Clientes",         icon: UserCheck },
-  { id: "rendimiento",     title: "Rendimiento",      icon: UserCog },
+const GRUPOS_TABS = [
+  {
+    id: "general",
+    title: "General",
+    secciones: [
+      { id: "analisis",    title: "Análisis",    icon: BarChart3 },
+      { id: "comparacion", title: "Comparación", icon: GitCompare },
+      { id: "alertas",     title: "Alertas",     icon: Bell },
+    ],
+  },
+  {
+    id: "pipeline",
+    title: "Pipeline",
+    secciones: [
+      { id: "funnel",           title: "Funnel",           icon: TrendingUp },
+      { id: "cohortes",         title: "Cohortes",         icon: Layers },
+      { id: "nivel-interes",    title: "Nivel Interés",    icon: PieChart },
+      { id: "origen-lead",      title: "Origen Lead",      icon: Target },
+      { id: "tiempo-respuesta", title: "Tiempo Respuesta", icon: Clock },
+    ],
+  },
+  {
+    id: "equipo",
+    title: "Equipo",
+    secciones: [
+      { id: "rendimiento",         title: "Rendimiento",  icon: UserCog },
+      { id: "por-vendedor",        title: "Por Vendedor", icon: UserCog },
+      { id: "comparar-vendedores", title: "Comparar",     icon: GitCompare },
+      { id: "interacciones",       title: "Interacciones",icon: MessageSquare },
+      { id: "gestion",             title: "Gestión",      icon: Users },
+    ],
+  },
+  {
+    id: "negocio",
+    title: "Negocio",
+    secciones: [
+      { id: "ventas",       title: "Ventas",       icon: DollarSign },
+      { id: "cobranza",     title: "Cobranza",     icon: Banknote },
+      { id: "comisiones",   title: "Comisiones",   icon: Wallet },
+      { id: "propiedades",  title: "Propiedades",  icon: Building },
+      { id: "por-proyecto", title: "Por Proyecto", icon: Building },
+      { id: "clientes",     title: "Clientes",     icon: UserCheck },
+    ],
+  },
 ];
 
+const ALL_TABS = GRUPOS_TABS.flatMap((g) => g.secciones);
 const SECCION_DEFAULT = "analisis";
 const SECCIONES_VALIDAS = new Set(ALL_TABS.map((t) => t.id));
+const PERIODOS_VALIDOS = new Set(["7", "30", "90", "365", "custom"]);
+const PERIODO_DEFAULT = "30";
+
+const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+function esFechaValida(f: string | null): f is string {
+  return !!f && FECHA_REGEX.test(f) && !Number.isNaN(new Date(f).getTime());
+}
 
 export default function ReportesPage() {
   return (
@@ -98,12 +141,33 @@ function ReportesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [selectedPeriod, setSelectedPeriod] = useState("30");
-
   // Fuente de verdad del tab activo: URL param ?seccion=<id>
   const seccionUrl = searchParams.get("seccion");
   const activeTab =
     seccionUrl && SECCIONES_VALIDAS.has(seccionUrl) ? seccionUrl : SECCION_DEFAULT;
+
+  // Período + fechas también desde URL (?periodo=&inicio=&fin=) → URL es shareable.
+  const periodoUrl = searchParams.get("periodo");
+  const inicioUrl = searchParams.get("inicio");
+  const finUrl = searchParams.get("fin");
+
+  const periodoInicial = periodoUrl && PERIODOS_VALIDOS.has(periodoUrl) ? periodoUrl : PERIODO_DEFAULT;
+  const customInicial = periodoInicial === "custom" && esFechaValida(inicioUrl) && esFechaValida(finUrl);
+
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(
+    customInicial ? "custom" : periodoInicial === "custom" ? PERIODO_DEFAULT : periodoInicial,
+  );
+  const [modoPersonalizado, setModoPersonalizado] = useState<boolean>(customInicial);
+
+  const fechasPreset = calcularFechasPeriodo(
+    customInicial ? PERIODO_DEFAULT : (selectedPeriod === "custom" ? PERIODO_DEFAULT : selectedPeriod),
+  );
+  const [fechaInicio, setFechaInicio] = useState<string>(
+    customInicial && esFechaValida(inicioUrl) ? inicioUrl : fechasPreset.fechaInicio,
+  );
+  const [fechaFin, setFechaFin] = useState<string>(
+    customInicial && esFechaValida(finUrl) ? finUrl : fechasPreset.fechaFin,
+  );
 
   // Registra qué secciones ya se visitaron (lazy load + caché sin re-fetch)
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
@@ -118,16 +182,20 @@ function ReportesPageContent() {
   // Ref al <main> con las secciones, para captura visual PDF
   const mainContentRef = useRef<HTMLDivElement>(null);
 
-  // Fechas personalizadas
-  const fechasPreset = calcularFechasPeriodo(selectedPeriod);
-  const [fechaInicio, setFechaInicio] = useState(fechasPreset.fechaInicio);
-  const [fechaFin, setFechaFin] = useState(fechasPreset.fechaFin);
-  const [modoPersonalizado, setModoPersonalizado] = useState(false);
-
   // Fechas efectivas: si es personalizado, usar las del state; si no, calcular del preset
   const fechasEfectivas = modoPersonalizado
     ? { fechaInicio, fechaFin }
     : calcularFechasPeriodo(selectedPeriod);
+
+  // Helper: actualizar URL preservando params existentes
+  const actualizarURL = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v === null || v === "") params.delete(k);
+      else params.set(k, v);
+    });
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const { data, loading, error } = useReportes({
     periodo: selectedPeriod,
@@ -139,6 +207,8 @@ function ReportesPageContent() {
   const handlePeriodoChange = (nuevoPeriodo: string) => {
     if (nuevoPeriodo === "custom") {
       setModoPersonalizado(true);
+      // Al entrar a custom, escribir fechas actuales a la URL para shareable.
+      actualizarURL({ periodo: "custom", inicio: fechaInicio, fin: fechaFin });
       return;
     }
     setModoPersonalizado(false);
@@ -148,22 +218,28 @@ function ReportesPageContent() {
     setFechaFin(nuevasFechas.fechaFin);
     // Al cambiar período, reiniciar para forzar re-fetch en todos los tabs
     setVisitedTabs(new Set([activeTab]));
+    // Default 30d no se escribe a URL para mantenerla limpia.
+    actualizarURL({
+      periodo: nuevoPeriodo === PERIODO_DEFAULT ? null : nuevoPeriodo,
+      inicio: null,
+      fin: null,
+    });
   };
 
   const handleFechaInicioChange = (fecha: string) => {
     setFechaInicio(fecha);
     setVisitedTabs(new Set([activeTab]));
+    if (modoPersonalizado) actualizarURL({ inicio: fecha });
   };
 
   const handleFechaFinChange = (fecha: string) => {
     setFechaFin(fecha);
     setVisitedTabs(new Set([activeTab]));
+    if (modoPersonalizado) actualizarURL({ fin: fecha });
   };
 
   const handleTabChange = (tab: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("seccion", tab);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    actualizarURL({ seccion: tab });
     setVisitedTabs((prev) => new Set([...prev, tab]));
   };
 
@@ -326,6 +402,14 @@ function ReportesPageContent() {
         </Alert>
       )}
 
+      {/* Vistas guardadas: combinaciones rápidas de sección + filtros */}
+      <SavedViewsBar
+        currentQuery={searchParams.toString()}
+        defaultName={
+          ALL_TABS.find((t) => t.id === activeTab)?.title || "Vista"
+        }
+      />
+
       {/* Resumen de KPIs del período (Fase 1) */}
       <ResumenKPIs
         periodo={selectedPeriod}
@@ -337,7 +421,7 @@ function ReportesPageContent() {
       <div className="bg-crm-card border border-crm-border rounded-xl overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <SidebarSecciones
-            secciones={ALL_TABS}
+            secciones={GRUPOS_TABS}
             activeId={activeTab}
             onChange={handleTabChange}
           />
@@ -546,6 +630,64 @@ function ReportesPageContent() {
                   fechaFin={fechasEfectivas.fechaFin}
                 />
               )}
+            </section>
+
+            <section
+              data-seccion="por-vendedor"
+              data-seccion-activa={activeTab === "por-vendedor" ? "true" : undefined}
+              className={activeTab === "por-vendedor" ? "" : "hidden"}
+            >
+              {visitedTabs.has("por-vendedor") && (
+                <ReportePorVendedor
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+
+            <section
+              data-seccion="por-proyecto"
+              data-seccion-activa={activeTab === "por-proyecto" ? "true" : undefined}
+              className={activeTab === "por-proyecto" ? "" : "hidden"}
+            >
+              {visitedTabs.has("por-proyecto") && (
+                <ReportePorProyecto
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+
+            <section
+              data-seccion="comparar-vendedores"
+              data-seccion-activa={activeTab === "comparar-vendedores" ? "true" : undefined}
+              className={activeTab === "comparar-vendedores" ? "" : "hidden"}
+            >
+              {visitedTabs.has("comparar-vendedores") && (
+                <ReporteComparacionVendedores
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+
+            <section
+              data-seccion="cohortes"
+              data-seccion-activa={activeTab === "cohortes" ? "true" : undefined}
+              className={activeTab === "cohortes" ? "" : "hidden"}
+            >
+              {visitedTabs.has("cohortes") && <ReporteCohortes />}
+            </section>
+
+            <section
+              data-seccion="alertas"
+              data-seccion-activa={activeTab === "alertas" ? "true" : undefined}
+              className={activeTab === "alertas" ? "" : "hidden"}
+            >
+              {visitedTabs.has("alertas") && <ReporteAlertas />}
             </section>
           </main>
         </div>

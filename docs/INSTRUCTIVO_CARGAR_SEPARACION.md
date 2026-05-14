@@ -277,16 +277,15 @@ Plazo default: **15 días**. Avance: subir 3 → Completar.
 
 ## 9. Etapa 4: Desembolso
 
-### Checklist (2 items obligatorios)
+### Checklist (1 ítem obligatorio)
 
 | Ítem |
 |---|
-| Carta de desembolso del banco |
-| Comprobante de transferencia |
+| Comprobante de pago |
 
 ### Acción final
 
-Cuando los 2 checks están completos, en lugar del botón **Completar** aparece el botón verde **Cerrar venta** (`DollarSign`).
+Cuando el check está completo, en lugar del botón **Completar** aparece el botón verde **Cerrar venta** (`DollarSign`).
 
 ---
 

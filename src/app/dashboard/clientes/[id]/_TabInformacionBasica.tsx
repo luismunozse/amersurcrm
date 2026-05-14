@@ -18,6 +18,27 @@ import WhatsAppOptOutToggle from "@/components/marketing/WhatsAppOptOutToggle";
 
 import type { ClienteCompleto } from "@/lib/types/clientes";
 
+const MESES_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+function formatearFechaAlta(fechaIso: string | null | undefined): string {
+  if (!fechaIso) return "—";
+  const d = new Date(fechaIso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = MESES_ES[d.getMonth()];
+  const anio = d.getFullYear();
+  let hora = d.getHours();
+  const minutos = String(d.getMinutes()).padStart(2, "0");
+  const sufijo = hora >= 12 ? "p.m." : "a.m.";
+  hora = hora % 12;
+  if (hora === 0) hora = 12;
+  const horaStr = String(hora).padStart(2, "0");
+  return `${dia} de ${mes} de ${anio} a las ${horaStr}:${minutos} ${sufijo}`;
+}
+
 const ESTADOS_SELECCIONABLES: { value: EstadoCliente; label: string }[] = [
   { value: "por_contactar", label: "Por Contactar" },
   { value: "contactado", label: "Contactado" },
@@ -239,19 +260,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
           <div className="p-4 bg-crm-background rounded-lg">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted mb-1.5">Fecha de Alta</p>
             <p className="text-sm sm:text-base text-crm-text-primary font-semibold">
-              {(() => {
-                const date = new Date(cliente.fecha_alta);
-                const fechaParte = date.toLocaleDateString('es-PE', {
-                  day: '2-digit',
-                  month: 'long',
-                  year: 'numeric'
-                });
-                const horaParte = date.toLocaleTimeString('es-PE', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                });
-                return `${fechaParte} a las ${horaParte}`;
-              })()}
+              {formatearFechaAlta(cliente.fecha_alta)}
             </p>
           </div>
         </div>

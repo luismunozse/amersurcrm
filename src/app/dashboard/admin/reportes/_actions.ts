@@ -1,53 +1,11 @@
 /**
- * Backward-compatible re-export barrel.
- * All implementations have been split into /actions/*.ts for maintainability.
- * Note: "use server" is declared in each individual action file, not here,
- * because barrel files with re-exports cannot use "use server" in Next.js 15.
+ * Backward-compatible barrel.
+ *
+ * Sólo re-exporta `./actions` (single source of truth). Mantiene
+ * compatibilidad con imports históricos `from "@/.../reportes/_actions"`.
+ *
+ * Note: `"use server"` se declara en cada archivo individual de actions
+ * (barrel files con re-exports no pueden tener "use server" en Next.js 15).
  */
 
-export { obtenerMetricasReportes } from "./actions/metricas";
-export type { ReporteMetricas } from "./actions/metricas";
-
-export { obtenerReporteVentas, obtenerMetricasRendimiento, obtenerObjetivosVsRealidad } from "./actions/ventas";
-
-export { obtenerReporteClientes, obtenerReporteGestionClientes } from "./actions/clientes";
-
-export { obtenerReportePropiedades } from "./actions/propiedades";
-
-export { obtenerReporteRendimiento } from "./actions/rendimiento";
-
-export { obtenerReporteInteracciones } from "./actions/interacciones";
-
-export { obtenerReporteNivelInteres } from "./actions/nivel-interes";
-
-export { obtenerReporteOrigenLead } from "./actions/origen-lead";
-
-export { obtenerReporteTiempoRespuesta } from "./actions/tiempo-respuesta";
-
-export { obtenerReporteFunnel } from "./actions/funnel";
-
-export { obtenerResumenKPIs } from "./actions/resumen-kpis";
-export type { ResumenKPIs } from "./actions/resumen-kpis";
-
-export { obtenerClientesPorEtapaFunnel } from "./actions/clientes-etapa-funnel";
-export type {
-  EtapaFunnel,
-  ClienteEtapaFunnel,
-  ResultadoEtapaFunnel,
-} from "./actions/clientes-etapa-funnel";
-
-export { obtenerReporteCobranza } from "./actions/cobranza";
-export type {
-  ReporteCobranza,
-  ReporteCobranzaResumen,
-  RecaudacionMensual,
-  TopDeudor,
-} from "./actions/cobranza";
-
-export { obtenerReporteComisiones } from "./actions/comisiones";
-export type {
-  ReporteComisiones,
-  ResumenComisionesReporte,
-  ComisionPorVendedor,
-  ComisionMensual,
-} from "./actions/comisiones";
+export * from "./actions";
