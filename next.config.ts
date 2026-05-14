@@ -115,6 +115,11 @@ const nextConfig: NextConfig = {
           tls: false,
         };
       }
+      // Silenciar warning de peer opcional 'encoding' (node-fetch via html-to-docx)
+      config.ignoreWarnings = [
+        ...(config.ignoreWarnings || []),
+        { module: /node_modules[\\/]html-to-docx/ },
+      ];
       return config;
     },
   }),

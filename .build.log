@@ -1,0 +1,161 @@
+
+> amersur-crm-web@1.4.0 build
+> cross-env NODE_OPTIONS=--max-old-space-size=4096 next build
+
+   ▲ Next.js 15.5.16
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+ ✓ (serwist) Bundling the service worker script with the URL '/sw.js' and the scope '/'...
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/28) ...
+   Generating static pages (7/28) 
+   Generating static pages (14/28) 
+   Generating static pages (21/28) 
+ ✓ Generating static pages (28/28)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                       Size  First Load JS
+┌ ○ /                                          1.14 kB         120 kB
+├ ○ /_not-found                                   1 kB         105 kB
+├ ƒ /api/admin/auth/reset-password               338 B         105 kB
+├ ƒ /api/admin/reportes                          338 B         105 kB
+├ ƒ /api/admin/reportes/exportar                 338 B         105 kB
+├ ƒ /api/admin/roles                             338 B         105 kB
+├ ƒ /api/admin/sync-vendedor-fields              338 B         105 kB
+├ ƒ /api/admin/usuarios                          338 B         105 kB
+├ ƒ /api/admin/usuarios/firma                    338 B         105 kB
+├ ƒ /api/admin/vendedores-activos                338 B         105 kB
+├ ƒ /api/agenda/clientes                         338 B         105 kB
+├ ƒ /api/agenda/eventos                          338 B         105 kB
+├ ƒ /api/agenda/oportunidades                    338 B         105 kB
+├ ƒ /api/agenda/propiedades                      338 B         105 kB
+├ ƒ /api/auth/cambiar-password                   338 B         105 kB
+├ ƒ /api/auth/check-admin                        338 B         105 kB
+├ ƒ /api/auth/login                              338 B         105 kB
+├ ƒ /api/auth/login-audit                        338 B         105 kB
+├ ƒ /api/auth/login-dni                          338 B         105 kB
+├ ƒ /api/auth/login-username                     338 B         105 kB
+├ ƒ /api/auth/me                                 338 B         105 kB
+├ ƒ /api/auth/perfil                             338 B         105 kB
+├ ƒ /api/auth/permissions                        338 B         105 kB
+├ ƒ /api/auth/refresh                            338 B         105 kB
+├ ƒ /api/auth/reset-request                      338 B         105 kB
+├ ƒ /api/clientes/[id]/estado                    338 B         105 kB
+├ ƒ /api/clientes/[id]/interacciones             338 B         105 kB
+├ ƒ /api/clientes/[id]/notas                     338 B         105 kB
+├ ƒ /api/clientes/[id]/pendientes                338 B         105 kB
+├ ƒ /api/clientes/[id]/proyecto-interes          338 B         105 kB
+├ ƒ /api/clientes/check-phones                   338 B         105 kB
+├ ƒ /api/clientes/create-lead                    338 B         105 kB
+├ ƒ /api/clientes/import                         338 B         105 kB
+├ ƒ /api/clientes/search                         338 B         105 kB
+├ ƒ /api/clientes/vendedores                     338 B         105 kB
+├ ƒ /api/contratos/docx                          338 B         105 kB
+├ ƒ /api/contratos/upload                        338 B         105 kB
+├ ƒ /api/cron/reportes-alertas                   338 B         105 kB
+├ ƒ /api/diagnostico                             338 B         105 kB
+├ ƒ /api/extension/templates                     338 B         105 kB
+├ ƒ /api/google-drive/download/[fileId]          338 B         105 kB
+├ ƒ /api/google-drive/files                      338 B         105 kB
+├ ƒ /api/google-drive/files/[fileId]             338 B         105 kB
+├ ƒ /api/google-drive/folders                    338 B         105 kB
+├ ƒ /api/google-drive/folders/[folderId]/path    338 B         105 kB
+├ ƒ /api/google-drive/search                     338 B         105 kB
+├ ƒ /api/google-drive/sync                       338 B         105 kB
+├ ƒ /api/google-drive/test                       338 B         105 kB
+├ ƒ /api/google/auth                             338 B         105 kB
+├ ƒ /api/google/callback                         338 B         105 kB
+├ ƒ /api/google/check-config                     338 B         105 kB
+├ ƒ /api/logs/extension                          338 B         105 kB
+├ ƒ /api/lotes/coordenadas                       338 B         105 kB
+├ ƒ /api/lotes/eliminar-masivo                   338 B         105 kB
+├ ƒ /api/lotes/importar                          338 B         105 kB
+├ ƒ /api/meta/webhook                            338 B         105 kB
+├ ƒ /api/metrics/extension                       338 B         105 kB
+├ ƒ /api/notificaciones                          338 B         105 kB
+├ ƒ /api/notificaciones/[id]                     338 B         105 kB
+├ ƒ /api/notifications/send-recordatorios        338 B         105 kB
+├ ƒ /api/notifications/test                      338 B         105 kB
+├ ƒ /api/perfil/actualizar                       338 B         105 kB
+├ ƒ /api/perfil/cambiar-password                 338 B         105 kB
+├ ƒ /api/proceso/checklist/upload                338 B         105 kB
+├ ƒ /api/proyectos/[id]/lotes                    338 B         105 kB
+├ ƒ /api/proyectos/list                          338 B         105 kB
+├ ƒ /api/proyectos/search-by-name                338 B         105 kB
+├ ƒ /api/proyectos/upload-overlay-layer          338 B         105 kB
+├ ƒ /api/proyectos/upload-plano                  338 B         105 kB
+├ ƒ /api/public/contacto                         338 B         105 kB
+├ ƒ /api/public/disponibilidad/[proyectoId]      338 B         105 kB
+├ ƒ /api/public/proyectos                        338 B         105 kB
+├ ƒ /api/public/proyectos/[id]                   338 B         105 kB
+├ ƒ /api/reservas/opciones                       338 B         105 kB
+├ ƒ /api/ubigeo-v2/departamentos                 338 B         105 kB
+├ ƒ /api/ubigeo-v2/distritos                     338 B         105 kB
+├ ƒ /api/ubigeo-v2/provincias                    338 B         105 kB
+├ ƒ /api/ubigeo/departamentos                    338 B         105 kB
+├ ƒ /api/ubigeo/distritos                        338 B         105 kB
+├ ƒ /api/ubigeo/provincias                       338 B         105 kB
+├ ƒ /api/ubigeo/search                           338 B         105 kB
+├ ƒ /api/vendedor/reportes                       338 B         105 kB
+├ ƒ /api/whatsapp/bot/status                     338 B         105 kB
+├ ƒ /api/whatsapp/bot/stream                     338 B         105 kB
+├ ƒ /api/whatsapp/lead/create                    338 B         105 kB
+├ ○ /apple-icon.png                                0 B            0 B
+├ ƒ /auth/callback                               338 B         105 kB
+├ ○ /auth/cambiar-password                     2.93 kB         170 kB
+├ ƒ /auth/login                                6.12 kB         177 kB
+├ ƒ /dashboard                                 4.28 kB         112 kB
+├ ƒ /dashboard/admin                             503 B         108 kB
+├ ƒ /dashboard/admin/configuracion             3.78 kB         108 kB
+├ ƒ /dashboard/admin/extension-logs            3.56 kB         127 kB
+├ ƒ /dashboard/admin/marketing                 22.6 kB         328 kB
+├ ƒ /dashboard/admin/metas                     2.41 kB         107 kB
+├ ƒ /dashboard/admin/reportes                    61 kB         354 kB
+├ ƒ /dashboard/admin/sync-vendedor-fields      3.83 kB         122 kB
+├ ƒ /dashboard/admin/usuarios                  17.9 kB         148 kB
+├ ƒ /dashboard/admin/vendedores-activos        7.39 kB         131 kB
+├ ƒ /dashboard/adquisicion                     2.66 kB         107 kB
+├ ƒ /dashboard/agenda                          22.9 kB         233 kB
+├ ƒ /dashboard/ayuda                           48.3 kB         153 kB
+├ ƒ /dashboard/cambiar-password                3.24 kB         113 kB
+├ ƒ /dashboard/clientes                         150 kB         382 kB
+├ ƒ /dashboard/clientes/[id]                    370 kB        1.18 MB
+├ ƒ /dashboard/cobranza                        2.53 kB         107 kB
+├ ƒ /dashboard/comisiones                      7.96 kB         117 kB
+├ ƒ /dashboard/configuracion                   1.01 kB         105 kB
+├ ƒ /dashboard/configuracion/whatsapp-bot       8.9 kB         113 kB
+├ ƒ /dashboard/documentos                      8.61 kB         141 kB
+├ ƒ /dashboard/entregas                        2.31 kB         107 kB
+├ ƒ /dashboard/extension                         503 B         108 kB
+├ ƒ /dashboard/leads                             569 B         227 kB
+├ ƒ /dashboard/notificaciones                  2.18 kB         123 kB
+├ ƒ /dashboard/perfil                          12.9 kB         200 kB
+├ ƒ /dashboard/pipeline                        23.5 kB         218 kB
+├ ƒ /dashboard/postventa                       2.35 kB         107 kB
+├ ƒ /dashboard/propiedades                     10.5 kB         134 kB
+├ ƒ /dashboard/proyectos                         17 kB         165 kB
+├ ƒ /dashboard/proyectos/[id]                  39.8 kB         758 kB
+├ ƒ /dashboard/proyectos/[id]/reportes         3.15 kB         111 kB
+├ ƒ /dashboard/reportar-problema               3.76 kB         157 kB
+├ ƒ /dashboard/vendedor                          503 B         108 kB
+├ ƒ /dashboard/vendedor/reportes               3.36 kB         108 kB
+├ ○ /icon.png                                      0 B            0 B
+├ ƒ /logout                                      338 B         105 kB
+├ ○ /notifications                               338 B         105 kB
+├ ○ /offline                                     503 B         108 kB
+└ ƒ /p/proforma/[token]                          338 B         105 kB
++ First Load JS shared by all                   104 kB
+  ├ chunks/4bd1b696-182b6b13bdad92e3.js        54.2 kB
+  ├ chunks/6061-6337621415e6d532.js            47.4 kB
+  └ other shared chunks (total)                2.73 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
