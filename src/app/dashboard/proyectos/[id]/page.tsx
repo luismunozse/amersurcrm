@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/permissions/server";
+import { esAdmin, esAdminOCoordinador } from "@/lib/permissions/server";
 import NewLoteForm from "./_NewLoteForm";
 import LotesList from "./_LotesList";
 import MapeoLotes from "./_MapeoLotes";
@@ -64,6 +64,7 @@ export default async function ProyLotesPage({
   } = await supabase.auth.getUser();
 
   const isAdmin = user ? await esAdmin() : false;
+  const puedeVerAuditoria = user ? await esAdminOCoordinador() : false;
 
   // Proyecto (para título/404)
   const proyectoSelectBase = "id,nombre,estado,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,overlay_layers,created_at,tipo";
@@ -415,6 +416,7 @@ export default async function ProyLotesPage({
       <ProjectTabs
         proyectoId={proyecto.id}
         isAdmin={isAdmin}
+        puedeVerAuditoria={puedeVerAuditoria}
         lotesSection={
           <>
             {/* Filtros compactos */}

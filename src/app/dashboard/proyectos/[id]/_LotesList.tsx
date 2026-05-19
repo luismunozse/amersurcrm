@@ -3,13 +3,22 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Lock, Building2, Info, Copy } from "lucide-react";
+import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Lock, Building2, Info, Copy, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { actualizarLote, eliminarLote, duplicarLote, eliminarTodosLosLotes } from "./_actions";
+import {
+  actualizarLote,
+  eliminarLote,
+  duplicarLote,
+  eliminarTodosLosLotes,
+  cambiarEstadoMasivoLotes,
+  asignarVendedorMasivoLotes,
+  listarVendedoresActivos,
+} from "./_actions";
 import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
 import ModalReservaLote from "./ModalReservaLote";
 import DeleteAllLotesModal from "./_DeleteAllLotesModal";
+import BulkImportLotesModal from "./_BulkImportLotesModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 
@@ -57,11 +66,100 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
   const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [confirmDeleteLote, setConfirmDeleteLote] = useState<{ id: string; codigo: string } | null>(null);
   const { esAdminOCoordinador, tienePermiso } = usePermissions();
   const puedeCrearLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.CREAR);
   const puedeEditarLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.EDITAR);
   const puedeEliminarLotes = esAdminOCoordinador() || tienePermiso(PERMISOS.LOTES.ELIMINAR);
+  const puedeLiberar = esAdminOCoordinador();
+  const puedeAsignarVendedor = esAdminOCoordinador();
+  const puedeBulk = puedeEditarLotes;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [vendedoresList, setVendedoresList] = useState<Array<{ username: string; nombre_completo: string; rol: string }>>([]);
+
+  useEffect(() => {
+    if (puedeAsignarVendedor) {
+      listarVendedoresActivos()
+        .then((res) => {
+          if (res.data) setVendedoresList(res.data);
+        })
+        .catch(() => undefined);
+    }
+  }, [puedeAsignarVendedor]);
+
+  const toggleSelected = (loteId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(loteId)) {
+        next.delete(loteId);
+      } else {
+        next.add(loteId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (lotes: Lote[]) => {
+    setSelectedIds((prev) => {
+      const allIds = lotes.map((l) => l.id);
+      const allSelected = allIds.every((id) => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        allIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...allIds]);
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkEstado = async (nuevoEstado: "disponible" | "reservado" | "vendido") => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await cambiarEstadoMasivoLotes(proyectoId, ids, nuevoEstado);
+      if (res.success) {
+        toast.success(`${res.actualizados} lote(s) actualizado(s) a ${getEstadoText(nuevoEstado)}`);
+        setLotesState((prev) =>
+          prev.map((l) => (selectedIds.has(l.id) ? { ...l, estado: nuevoEstado } : l)),
+        );
+        clearSelection();
+      } else {
+        toast.error(res.error || "No se pudo cambiar estado masivo");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error en cambio masivo");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkAsignarVendedor = async (vendedorUsername: string | null) => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await asignarVendedorMasivoLotes(proyectoId, ids, vendedorUsername);
+      if (res.success) {
+        toast.success(
+          vendedorUsername
+            ? `${res.actualizados} lote(s) asignado(s) a ${vendedorUsername}`
+            : `${res.actualizados} lote(s) sin vendedor`,
+        );
+        clearSelection();
+      } else {
+        toast.error(res.error || "No se pudo asignar vendedor");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error asignando vendedor");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   // Sincronizar el estado cuando cambien los lotes
   useEffect(() => {
@@ -345,19 +443,35 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
               </span>
             </CardTitle>
 
-            {/* Botón eliminar todos los lotes */}
-            {totalListado > 0 && (
-              <Button
-                onClick={handleDeleteAll}
-                variant="outline"
-                size="sm"
-                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-crm-danger border-crm-danger hover:bg-crm-danger hover:text-white transition-colors w-full sm:w-auto"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden md:inline">Eliminar todos los lotes</span>
-                <span className="md:hidden">Eliminar todos</span>
-              </Button>
-            )}
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {/* Botón importar CSV/Excel */}
+              {puedeCrearLotes && (
+                <Button
+                  onClick={() => setShowBulkImportModal(true)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-crm-primary border-crm-primary hover:bg-crm-primary hover:text-white transition-colors w-full sm:w-auto"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span className="hidden md:inline">Importar CSV</span>
+                  <span className="md:hidden">Importar</span>
+                </Button>
+              )}
+
+              {/* Botón eliminar todos los lotes */}
+              {totalListado > 0 && (
+                <Button
+                  onClick={handleDeleteAll}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-crm-danger border-crm-danger hover:bg-crm-danger hover:text-white transition-colors w-full sm:w-auto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden md:inline">Eliminar todos los lotes</span>
+                  <span className="md:hidden">Eliminar todos</span>
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -377,11 +491,87 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
             </div>
           ) : (
             <div className="space-y-3">
+              {puedeBulk && selectedIds.size > 0 && (
+                <div className="hidden lg:flex sticky top-0 z-10 items-center gap-3 rounded-lg border border-crm-primary/30 bg-crm-primary/10 px-4 py-3 shadow-sm">
+                  <span className="text-sm font-medium text-crm-text-primary">
+                    {selectedIds.size} lote(s) seleccionado(s)
+                  </span>
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <select
+                      disabled={bulkLoading}
+                      defaultValue=""
+                      onChange={(e) => {
+                        const val = e.target.value as "disponible" | "reservado" | "vendido" | "";
+                        if (val) {
+                          handleBulkEstado(val);
+                          e.target.value = "";
+                        }
+                      }}
+                      className="rounded-md border border-crm-border bg-crm-card px-3 py-1.5 text-sm text-crm-text-primary"
+                    >
+                      <option value="" disabled>
+                        Cambiar estado…
+                      </option>
+                      <option value="disponible">Disponible</option>
+                      <option value="reservado">Reservado</option>
+                      <option value="vendido">Vendido</option>
+                    </select>
+                    {puedeAsignarVendedor && (
+                      <select
+                        disabled={bulkLoading}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "__clear__") {
+                            handleBulkAsignarVendedor(null);
+                          } else if (val) {
+                            handleBulkAsignarVendedor(val);
+                          }
+                          e.target.value = "";
+                        }}
+                        className="rounded-md border border-crm-border bg-crm-card px-3 py-1.5 text-sm text-crm-text-primary"
+                      >
+                        <option value="" disabled>
+                          Asignar vendedor…
+                        </option>
+                        <option value="__clear__">Sin vendedor</option>
+                        {vendedoresList.map((v) => (
+                          <option key={v.username} value={v.username}>
+                            {v.nombre_completo} ({v.username})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      disabled={bulkLoading}
+                      className="rounded-md border border-crm-border bg-crm-card px-3 py-1.5 text-sm text-crm-text-primary hover:bg-crm-card-hover"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Vista de escritorio - Tabla completa */}
               <div className="hidden lg:block space-y-3">
               {/* Header de la tabla */}
               <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-crm-card-hover rounded-lg text-sm font-medium text-crm-text-muted">
-                <div className="col-span-2">Código</div>
+                <div className="col-span-2 flex items-center gap-2">
+                  {puedeBulk && (
+                    <input
+                      type="checkbox"
+                      checked={
+                        lotesAMostrar.length > 0 &&
+                        lotesAMostrar.every((l) => selectedIds.has(l.id))
+                      }
+                      onChange={() => toggleSelectAll(lotesAMostrar)}
+                      className="h-4 w-4 cursor-pointer rounded border-crm-border"
+                      title="Seleccionar todos"
+                    />
+                  )}
+                  <span>Código</span>
+                </div>
                 <div className="col-span-2">Tipo de Unidad</div>
                 <div className="col-span-2">Proyecto</div>
                 <div className="col-span-1">Estado</div>
@@ -395,10 +585,21 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                 {lotesAMostrar.map((lote) => (
                   <div
                     key={lote.id}
-                    className="grid grid-cols-12 gap-3 px-4 py-4 bg-crm-card border border-crm-border rounded-lg hover:bg-crm-card-hover transition-colors"
+                    className={`grid grid-cols-12 gap-3 px-4 py-4 bg-crm-card border rounded-lg hover:bg-crm-card-hover transition-colors ${
+                      selectedIds.has(lote.id) ? "border-crm-primary" : "border-crm-border"
+                    }`}
                   >
                     {/* Código */}
-                    <div className="col-span-2 flex items-center">
+                    <div className="col-span-2 flex items-center gap-2">
+                      {puedeBulk && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(lote.id)}
+                          onChange={() => toggleSelected(lote.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 cursor-pointer rounded border-crm-border"
+                        />
+                      )}
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
                           <span className="text-xs font-semibold text-crm-primary">
@@ -754,6 +955,26 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
             }
           : undefined
       }
+      puedeLiberar={puedeLiberar}
+      onLiberado={() => {
+        if (selectedLote) {
+          setLotesState((prev) =>
+            prev.map((l) =>
+              l.id === selectedLote.id ? { ...l, estado: "disponible" as const } : l,
+            ),
+          );
+        }
+      }}
+      puedeConvertirVenta={puedeEditarLotes}
+      onConvertidoVenta={() => {
+        if (selectedLote) {
+          setLotesState((prev) =>
+            prev.map((l) =>
+              l.id === selectedLote.id ? { ...l, estado: "vendido" as const } : l,
+            ),
+          );
+        }
+      }}
     />
     {reservandoLoteId && (
       <ModalReservaLote
@@ -778,6 +999,14 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       onClose={() => setShowDeleteAllModal(false)}
       onConfirm={handleConfirmDeleteAll}
       lotesCount={totalLotes || lotesAMostrar.length}
+    />
+    <BulkImportLotesModal
+      open={showBulkImportModal}
+      onClose={() => setShowBulkImportModal(false)}
+      proyectoId={proyectoId}
+      onSuccess={() => {
+        window.location.reload();
+      }}
     />
     <ConfirmDialog
       open={!!confirmDeleteLote}

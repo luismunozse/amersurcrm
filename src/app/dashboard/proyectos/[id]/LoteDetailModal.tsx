@@ -27,7 +27,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { obtenerDetalleLote } from "./_actions";
+import { obtenerDetalleLote, liberarLote } from "./_actions";
+import ConvertirVentaModal from "./_ConvertirVentaModal";
 
 type LoteBasico = {
   id: string;
@@ -55,6 +56,10 @@ interface Props {
   proyectoId: string;
   onReservar?: () => void;
   onEditar?: () => void;
+  puedeLiberar?: boolean;
+  onLiberado?: () => void;
+  puedeConvertirVenta?: boolean;
+  onConvertidoVenta?: () => void;
 }
 
 export default function LoteDetailModal({
@@ -64,11 +69,19 @@ export default function LoteDetailModal({
   proyectoId,
   onReservar,
   onEditar,
+  puedeLiberar = false,
+  onLiberado,
+  puedeConvertirVenta = false,
+  onConvertidoVenta,
 }: Props) {
   const [detalle, setDetalle] = useState<LoteDetalle | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"info" | "fotos" | "plano" | "3d">("info");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [mostrarLiberar, setMostrarLiberar] = useState(false);
+  const [motivoLiberar, setMotivoLiberar] = useState("");
+  const [liberando, setLiberando] = useState(false);
+  const [mostrarConvertir, setMostrarConvertir] = useState(false);
 
   // Cargar detalle completo al abrir
   useEffect(() => {
@@ -564,11 +577,22 @@ export default function LoteDetailModal({
               {lote.estado === "reservado" && cliente && (
                 <a
                   href={`tel:${cliente.telefono}`}
-                  className="flex-1 py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                   <Phone className="w-5 h-5" />
-                  Llamar Cliente
+                  <span className="hidden md:inline">Llamar</span>
                 </a>
+              )}
+
+              {puedeConvertirVenta && lote.estado === "reservado" && (
+                <button
+                  onClick={() => setMostrarConvertir(true)}
+                  className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  title="Convertir reserva en venta"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Convertir a venta
+                </button>
               )}
 
               {lote.estado === "vendido" && (
@@ -579,6 +603,17 @@ export default function LoteDetailModal({
                   <User className="w-5 h-5" />
                   Ver Cliente
                 </Link>
+              )}
+
+              {puedeLiberar && lote.estado !== "disponible" && (
+                <button
+                  onClick={() => setMostrarLiberar(true)}
+                  className="py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  title="Liberar lote (revertir a disponible)"
+                >
+                  <XCircle className="w-5 h-5" />
+                  Liberar
+                </button>
               )}
 
               {/* Botón cerrar si no hay acción principal */}
@@ -595,7 +630,82 @@ export default function LoteDetailModal({
             </div>
           </div>
         </div>
+
+        {mostrarLiberar && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-xl bg-crm-card p-6 shadow-xl">
+              <h3 className="mb-2 text-lg font-semibold text-crm-text-primary">
+                Liberar lote {lote.codigo}
+              </h3>
+              <p className="mb-4 text-sm text-crm-text-secondary">
+                Esta acción cancela la reserva activa y devuelve el lote a estado "disponible". Indique el motivo (mínimo 5 caracteres).
+              </p>
+              <textarea
+                value={motivoLiberar}
+                onChange={(e) => setMotivoLiberar(e.target.value)}
+                rows={3}
+                placeholder="Motivo de la liberación..."
+                className="w-full rounded-lg border border-crm-border bg-crm-card-hover px-3 py-2 text-sm text-crm-text-primary"
+                disabled={liberando}
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarLiberar(false);
+                    setMotivoLiberar("");
+                  }}
+                  disabled={liberando}
+                  className="rounded-lg border border-crm-border px-4 py-2 text-sm text-crm-text-primary hover:bg-crm-card-hover"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={liberando || motivoLiberar.trim().length < 5}
+                  onClick={async () => {
+                    setLiberando(true);
+                    try {
+                      const res = await liberarLote(lote.id, motivoLiberar.trim());
+                      if (res.success) {
+                        toast.success(`Lote ${lote.codigo} liberado`);
+                        setMostrarLiberar(false);
+                        setMotivoLiberar("");
+                        onLiberado?.();
+                        onClose();
+                      } else {
+                        toast.error(res.error || "No se pudo liberar");
+                      }
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Error liberando lote");
+                    } finally {
+                      setLiberando(false);
+                    }
+                  }}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {liberando ? "Liberando..." : "Confirmar liberación"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {mostrarConvertir && lote && (
+        <ConvertirVentaModal
+          open={mostrarConvertir}
+          onClose={() => setMostrarConvertir(false)}
+          loteId={lote.id}
+          loteCodigo={lote.codigo}
+          precioSugerido={lote.precio}
+          reservaId={detalle?.reserva?.id}
+          onSuccess={() => {
+            onConvertidoVenta?.();
+            onClose();
+          }}
+        />
+      )}
     </div>,
     document.body
   );

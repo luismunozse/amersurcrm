@@ -127,6 +127,66 @@ export async function crearNotificacion(
   return inserted;
 }
 
+type NotificacionTipo =
+  | 'cliente'
+  | 'proyecto'
+  | 'lote'
+  | 'sistema'
+  | 'evento'
+  | 'recordatorio'
+  | 'venta'
+  | 'reserva'
+  | 'lead_asignado';
+
+export async function notificarUsuariosPorRoles(
+  roles: string[],
+  tipo: NotificacionTipo,
+  titulo: string,
+  mensaje: string,
+  data?: Record<string, unknown>,
+  excluirUsuarioId?: string,
+): Promise<{ enviadas: number; errores: number }> {
+  if (roles.length === 0) return { enviadas: 0, errores: 0 };
+
+  const supabase = await createServerActionClient();
+
+  const { data: usuarios, error } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('id, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+    .eq('activo', true);
+
+  if (error || !usuarios) {
+    console.warn('notificarUsuariosPorRoles: error obteniendo usuarios', error);
+    return { enviadas: 0, errores: 1 };
+  }
+
+  const destinatarios = usuarios
+    .filter((u) => {
+      const rolObj = Array.isArray(u.rol) ? u.rol[0] : u.rol;
+      return rolObj && roles.includes(rolObj.nombre);
+    })
+    .map((u) => u.id as string)
+    .filter((id) => id && id !== excluirUsuarioId);
+
+  let enviadas = 0;
+  let errores = 0;
+
+  await Promise.all(
+    destinatarios.map(async (usuarioId) => {
+      try {
+        await crearNotificacion(usuarioId, tipo, titulo, mensaje, data);
+        enviadas += 1;
+      } catch (err) {
+        console.warn(`Error enviando notif a ${usuarioId}:`, err);
+        errores += 1;
+      }
+    }),
+  );
+
+  return { enviadas, errores };
+}
+
 export async function eliminarNotificacion(notificacionId: string) {
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -1,25 +1,40 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, List, Settings2 } from 'lucide-react';
+import { MapPin, List, Settings2, History } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const ConfigFinancieraTab = dynamic(() => import('./_ConfigFinancieraTab'), { ssr: false });
+const AuditoriaTab = dynamic(() => import('./_AuditoriaTab'), { ssr: false });
 
 interface ProjectTabsProps {
   lotesSection: React.ReactNode;
   mapeoSection: React.ReactNode;
   proyectoId?: string;
   isAdmin?: boolean;
+  puedeVerAuditoria?: boolean;
 }
 
-export default function ProjectTabs({ lotesSection, mapeoSection, proyectoId, isAdmin }: ProjectTabsProps) {
-  const [activeTab, setActiveTab] = useState<'lotes' | 'mapeo' | 'config_financiera'>('lotes');
+type TabId = 'lotes' | 'mapeo' | 'config_financiera' | 'auditoria';
+
+export default function ProjectTabs({
+  lotesSection,
+  mapeoSection,
+  proyectoId,
+  isAdmin,
+  puedeVerAuditoria,
+}: ProjectTabsProps) {
+  const [activeTab, setActiveTab] = useState<TabId>('lotes');
 
   const tabs = [
     { id: 'lotes' as const, label: 'Gestión de Lotes', icon: List },
     { id: 'mapeo' as const, label: 'Mapeo de Lotes', icon: MapPin },
-    ...(isAdmin && proyectoId ? [{ id: 'config_financiera' as const, label: 'Config. Financiera', icon: Settings2 }] : []),
+    ...(isAdmin && proyectoId
+      ? [{ id: 'config_financiera' as const, label: 'Config. Financiera', icon: Settings2 }]
+      : []),
+    ...(puedeVerAuditoria && proyectoId
+      ? [{ id: 'auditoria' as const, label: 'Auditoría', icon: History }]
+      : []),
   ];
 
   return (
@@ -52,6 +67,7 @@ export default function ProjectTabs({ lotesSection, mapeoSection, proyectoId, is
         {activeTab === 'lotes' && lotesSection}
         {activeTab === 'mapeo' && mapeoSection}
         {activeTab === 'config_financiera' && proyectoId && <ConfigFinancieraTab proyectoId={proyectoId} />}
+        {activeTab === 'auditoria' && proyectoId && <AuditoriaTab proyectoId={proyectoId} />}
       </div>
     </div>
   );

@@ -1053,6 +1053,27 @@ export async function crearReservaConVinculacion(datos: {
         .eq('id', datos.clienteId);
     }
 
+    // Notificar admins + coordinadores sobre la nueva reserva
+    try {
+      const { notificarUsuariosPorRoles } = await import('@/app/_actionsNotifications');
+      await notificarUsuariosPorRoles(
+        ['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS'],
+        'reserva',
+        `Nueva reserva: lote ${lote.codigo}`,
+        `${usuario.nombre_completo || usuario.email} reservó el lote ${lote.codigo} por ${datos.montoInicial} (código ${codigoReserva})`,
+        {
+          loteId: datos.loteId,
+          proyectoId: datos.proyectoId,
+          reservaId: nuevaReserva.id,
+          codigoReserva,
+          url: `/dashboard/proyectos/${datos.proyectoId}`,
+        },
+        usuario.id,
+      );
+    } catch (notifError) {
+      console.warn('Error notificando reserva:', notifError);
+    }
+
     // Revalidar páginas
     revalidatePath(`/dashboard/proyectos/${datos.proyectoId}`);
     revalidatePath('/dashboard/clientes');
@@ -1155,4 +1176,599 @@ export async function obtenerDetalleLote(loteId: string): Promise<{
       error: error instanceof Error ? error.message : 'Error obteniendo detalle'
     };
   }
+}
+
+// ============================================================================
+// LIBERAR LOTE — revierte estado a 'disponible' y cancela reserva activa
+// Solo admin/coordinador. Notifica al vendedor original.
+// ============================================================================
+export async function liberarLote(
+  loteId: string,
+  motivo: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!loteId || typeof loteId !== 'string') {
+    return { success: false, error: 'ID de lote inválido' };
+  }
+  if (!motivo || motivo.trim().length < 5) {
+    return { success: false, error: 'Motivo requerido (mínimo 5 caracteres)' };
+  }
+
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const puedeLiberar = await esAdminOCoordinador();
+    if (!puedeLiberar) {
+      return { success: false, error: 'Solo administradores o coordinadores pueden liberar lotes' };
+    }
+
+    const { data: lote, error: loteError } = await supabase
+      .schema('crm')
+      .from('lote')
+      .select('id, codigo, estado, proyecto_id')
+      .eq('id', loteId)
+      .single();
+
+    if (loteError || !lote) {
+      return { success: false, error: 'Lote no encontrado' };
+    }
+
+    if (lote.estado === 'disponible') {
+      return { success: false, error: 'El lote ya está disponible' };
+    }
+
+    const { data: reservasActivas } = await supabase
+      .schema('crm')
+      .from('reserva')
+      .select('id, vendedor_username, cliente_id')
+      .eq('lote_id', loteId)
+      .eq('estado', 'activa');
+
+    const { error: updateError } = await supabase
+      .schema('crm')
+      .from('lote')
+      .update({ estado: 'disponible' })
+      .eq('id', loteId);
+
+    if (updateError) {
+      return { success: false, error: `Error actualizando estado: ${updateError.message}` };
+    }
+
+    if (reservasActivas && reservasActivas.length > 0) {
+      const ids = reservasActivas.map((r) => r.id);
+      await supabase
+        .schema('crm')
+        .from('reserva')
+        .update({
+          estado: 'cancelada',
+          motivo_cancelacion: motivo.trim(),
+        })
+        .in('id', ids);
+    }
+
+    try {
+      const { notificarUsuariosPorRoles } = await import('@/app/_actionsNotifications');
+      await notificarUsuariosPorRoles(
+        ['ROL_ADMIN', 'ROL_COORDINADOR_VENTAS'],
+        'lote',
+        `Lote ${lote.codigo} liberado`,
+        `El lote ${lote.codigo} fue liberado. Motivo: ${motivo.trim()}`,
+        { loteId, proyectoId: lote.proyecto_id, motivo: motivo.trim() },
+        user.id,
+      );
+    } catch (notifError) {
+      console.warn('Error enviando notificación de liberación:', notifError);
+    }
+
+    revalidatePath(`/dashboard/proyectos/${lote.proyecto_id}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error en liberarLote:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error liberando lote',
+    };
+  }
+}
+
+// ============================================================================
+// CAMBIAR ESTADO MASIVO — actualiza múltiples lotes a un nuevo estado
+// Solo admin/coordinador. Bloquea cambios inválidos.
+// ============================================================================
+export async function cambiarEstadoMasivoLotes(
+  proyectoId: string,
+  loteIds: string[],
+  nuevoEstado: 'disponible' | 'reservado' | 'vendido',
+): Promise<{ success: boolean; actualizados: number; error?: string }> {
+  if (!proyectoId || !loteIds || loteIds.length === 0) {
+    return { success: false, actualizados: 0, error: 'Parámetros inválidos' };
+  }
+
+  if (!['disponible', 'reservado', 'vendido'].includes(nuevoEstado)) {
+    return { success: false, actualizados: 0, error: 'Estado inválido' };
+  }
+
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, actualizados: 0, error: 'No autenticado' };
+
+    await requierePermiso(PERMISOS.LOTES.EDITAR);
+    const puede = await esAdminOCoordinador();
+    if (!puede) {
+      return {
+        success: false,
+        actualizados: 0,
+        error: 'Solo administradores o coordinadores pueden cambiar estado masivo',
+      };
+    }
+
+    const { data: updated, error } = await supabase
+      .schema('crm')
+      .from('lote')
+      .update({ estado: nuevoEstado })
+      .eq('proyecto_id', proyectoId)
+      .in('id', loteIds)
+      .select('id');
+
+    if (error) {
+      return { success: false, actualizados: 0, error: error.message };
+    }
+
+    const count = updated?.length ?? 0;
+
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    return { success: true, actualizados: count };
+  } catch (error) {
+    console.error('Error en cambiarEstadoMasivoLotes:', error);
+    return {
+      success: false,
+      actualizados: 0,
+      error: error instanceof Error ? error.message : 'Error en cambio masivo',
+    };
+  }
+}
+
+// ============================================================================
+// ASIGNAR VENDEDOR MASIVO — set vendedor_asignado en varios lotes
+// Solo admin/coordinador. Username debe corresponder a usuario activo.
+// ============================================================================
+export async function asignarVendedorMasivoLotes(
+  proyectoId: string,
+  loteIds: string[],
+  vendedorUsername: string | null,
+): Promise<{ success: boolean; actualizados: number; error?: string }> {
+  if (!proyectoId || !loteIds || loteIds.length === 0) {
+    return { success: false, actualizados: 0, error: 'Parámetros inválidos' };
+  }
+
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, actualizados: 0, error: 'No autenticado' };
+
+    await requierePermiso(PERMISOS.LOTES.EDITAR);
+    const puede = await esAdminOCoordinador();
+    if (!puede) {
+      return {
+        success: false,
+        actualizados: 0,
+        error: 'Solo administradores o coordinadores pueden asignar vendedores',
+      };
+    }
+
+    if (vendedorUsername) {
+      const { data: vendedor, error: vendedorError } = await supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('id, username, activo')
+        .eq('username', vendedorUsername)
+        .eq('activo', true)
+        .maybeSingle();
+
+      if (vendedorError || !vendedor) {
+        return {
+          success: false,
+          actualizados: 0,
+          error: `Vendedor "${vendedorUsername}" no existe o está inactivo`,
+        };
+      }
+    }
+
+    const { data: updated, error } = await supabase
+      .schema('crm')
+      .from('lote')
+      .update({ vendedor_asignado: vendedorUsername })
+      .eq('proyecto_id', proyectoId)
+      .in('id', loteIds)
+      .select('id');
+
+    if (error) {
+      return { success: false, actualizados: 0, error: error.message };
+    }
+
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    return { success: true, actualizados: updated?.length ?? 0 };
+  } catch (error) {
+    console.error('Error en asignarVendedorMasivoLotes:', error);
+    return {
+      success: false,
+      actualizados: 0,
+      error: error instanceof Error ? error.message : 'Error asignando vendedor',
+    };
+  }
+}
+
+// ============================================================================
+// LISTA VENDEDORES ACTIVOS — para UI de asignación masiva
+// ============================================================================
+export async function listarVendedoresActivos(): Promise<{
+  data: Array<{ username: string; nombre_completo: string; rol: string }>;
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: 'No autenticado' };
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('username, nombre_completo, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+      .eq('activo', true)
+      .order('nombre_completo');
+
+    if (error) return { data: [], error: error.message };
+
+    const vendedores = (data || [])
+      .map((u) => {
+        const rolObj = Array.isArray(u.rol) ? u.rol[0] : u.rol;
+        return {
+          username: u.username as string,
+          nombre_completo: u.nombre_completo as string,
+          rol: (rolObj?.nombre as string) ?? '',
+        };
+      })
+      .filter(
+        (u) =>
+          u.username &&
+          ['ROL_VENDEDOR', 'ROL_COORDINADOR_VENTAS', 'ROL_ADMIN'].includes(u.rol),
+      );
+
+    return { data: vendedores, error: null };
+  } catch (error) {
+    console.error('Error listando vendedores:', error);
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : 'Error listando vendedores',
+    };
+  }
+}
+
+// ============================================================================
+// IMPORTACION MASIVA DE LOTES — CSV/Excel
+// ============================================================================
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type LoteImportRow = {
+  codigo: string;
+  sup_m2?: number | null;
+  precio?: number | null;
+  moneda?: 'PEN' | 'USD' | 'ARS' | null;
+  estado?: 'disponible' | 'reservado' | 'vendido' | null;
+  manzana?: string | null;
+  etapa?: string | null;
+  tipo_unidad?: string | null;
+  numero?: string | null;
+  vendedor_asignado?: string | null;
+};
+
+export type ImportError = {
+  fila: number;
+  codigo?: string;
+  mensaje: string;
+};
+
+export type ImportarLotesResult = {
+  success: boolean;
+  insertados: number;
+  errores: ImportError[];
+  warnings: string[];
+};
+
+const MONEDAS_VALIDAS: ReadonlyArray<'PEN' | 'USD' | 'ARS'> = ['PEN', 'USD', 'ARS'];
+const ESTADOS_VALIDOS: ReadonlyArray<'disponible' | 'reservado' | 'vendido'> = [
+  'disponible',
+  'reservado',
+  'vendido',
+];
+
+export async function importarLotesMasivo(
+  proyectoId: string,
+  filas: LoteImportRow[],
+  opciones?: { dryRun?: boolean },
+): Promise<ImportarLotesResult> {
+  const dryRun = opciones?.dryRun === true;
+  const errores: ImportError[] = [];
+  const warnings: string[] = [];
+
+  if (!proyectoId || !UUID_REGEX.test(proyectoId)) {
+    return {
+      success: false,
+      insertados: 0,
+      errores: [{ fila: 0, mensaje: 'ID de proyecto inválido' }],
+      warnings,
+    };
+  }
+
+  if (!Array.isArray(filas) || filas.length === 0) {
+    return {
+      success: false,
+      insertados: 0,
+      errores: [{ fila: 0, mensaje: 'No hay filas para importar' }],
+      warnings,
+    };
+  }
+
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      success: false,
+      insertados: 0,
+      errores: [{ fila: 0, mensaje: 'No autenticado' }],
+      warnings,
+    };
+  }
+
+  await requierePermiso(PERMISOS.LOTES.CREAR);
+  const puedeCrear = await esAdminOCoordinador();
+  if (!puedeCrear) {
+    return {
+      success: false,
+      insertados: 0,
+      errores: [
+        { fila: 0, mensaje: 'Solo administradores o coordinadores pueden importar lotes' },
+      ],
+      warnings,
+    };
+  }
+
+  // 1) Validacion por fila + deteccion de duplicados en batch
+  const codigosVistos = new Map<string, number>();
+  const filasValidadas: Array<{ index: number; row: LoteImportRow }> = [];
+
+  for (let i = 0; i < filas.length; i++) {
+    const numeroFila = i + 1;
+    const row = filas[i] || ({} as LoteImportRow);
+
+    const codigo = typeof row.codigo === 'string' ? row.codigo.trim() : '';
+    if (!codigo) {
+      errores.push({ fila: numeroFila, mensaje: 'Código requerido' });
+      continue;
+    }
+
+    if (codigosVistos.has(codigo)) {
+      errores.push({
+        fila: numeroFila,
+        codigo,
+        mensaje: `Código duplicado en el archivo (también en fila ${codigosVistos.get(codigo)})`,
+      });
+      continue;
+    }
+    codigosVistos.set(codigo, numeroFila);
+
+    if (row.sup_m2 !== undefined && row.sup_m2 !== null) {
+      if (typeof row.sup_m2 !== 'number' || !Number.isFinite(row.sup_m2) || row.sup_m2 < 0) {
+        errores.push({
+          fila: numeroFila,
+          codigo,
+          mensaje: 'Superficie (sup_m2) debe ser un número mayor o igual a 0',
+        });
+        continue;
+      }
+    }
+
+    if (row.precio !== undefined && row.precio !== null) {
+      if (typeof row.precio !== 'number' || !Number.isFinite(row.precio) || row.precio < 0) {
+        errores.push({
+          fila: numeroFila,
+          codigo,
+          mensaje: 'Precio debe ser un número mayor o igual a 0',
+        });
+        continue;
+      }
+    }
+
+    if (row.moneda && !MONEDAS_VALIDAS.includes(row.moneda)) {
+      errores.push({
+        fila: numeroFila,
+        codigo,
+        mensaje: `Moneda inválida: "${row.moneda}". Use PEN, USD o ARS`,
+      });
+      continue;
+    }
+
+    if (row.estado && !ESTADOS_VALIDOS.includes(row.estado)) {
+      errores.push({
+        fila: numeroFila,
+        codigo,
+        mensaje: `Estado inválido: "${row.estado}". Use disponible, reservado o vendido`,
+      });
+      continue;
+    }
+
+    filasValidadas.push({ index: numeroFila, row: { ...row, codigo } });
+  }
+
+  // 2) Verificacion de existencia en DB (skip + warning) — una sola query
+  const codigosLista = filasValidadas.map((f) => f.row.codigo);
+  if (codigosLista.length > 0) {
+    const { data: existentes, error: errExist } = await supabase
+      .from('lote')
+      .select('codigo')
+      .eq('proyecto_id', proyectoId)
+      .in('codigo', codigosLista);
+
+    if (errExist) {
+      return {
+        success: false,
+        insertados: 0,
+        errores: [{ fila: 0, mensaje: `Error verificando lotes existentes: ${errExist.message}` }],
+        warnings,
+      };
+    }
+
+    const setExistentes = new Set((existentes || []).map((e) => e.codigo));
+    if (setExistentes.size > 0) {
+      const filtradas: typeof filasValidadas = [];
+      for (const f of filasValidadas) {
+        if (setExistentes.has(f.row.codigo)) {
+          warnings.push(
+            `Lote "${f.row.codigo}" ya existe en el proyecto — omitido (fila ${f.index})`,
+          );
+        } else {
+          filtradas.push(f);
+        }
+      }
+      filasValidadas.length = 0;
+      filasValidadas.push(...filtradas);
+    }
+  }
+
+  // 3) Validar vendedor_asignado en una sola query batch
+  const usernamesUnicos = Array.from(
+    new Set(
+      filasValidadas
+        .map((f) => (f.row.vendedor_asignado || '').trim())
+        .filter((u) => u.length > 0),
+    ),
+  );
+
+  if (usernamesUnicos.length > 0) {
+    const { data: vendedores, error: errVend } = await supabase
+      .from('usuario_perfil')
+      .select('username, activo')
+      .in('username', usernamesUnicos)
+      .eq('activo', true);
+
+    if (errVend) {
+      return {
+        success: false,
+        insertados: 0,
+        errores: [{ fila: 0, mensaje: `Error verificando vendedores: ${errVend.message}` }],
+        warnings,
+      };
+    }
+
+    const setVendedoresValidos = new Set((vendedores || []).map((v) => v.username as string));
+    const filtradas: typeof filasValidadas = [];
+    for (const f of filasValidadas) {
+      const vendedor = (f.row.vendedor_asignado || '').trim();
+      if (vendedor && !setVendedoresValidos.has(vendedor)) {
+        errores.push({
+          fila: f.index,
+          codigo: f.row.codigo,
+          mensaje: `Vendedor "${vendedor}" no existe o está inactivo`,
+        });
+      } else {
+        filtradas.push(f);
+      }
+    }
+    filasValidadas.length = 0;
+    filasValidadas.push(...filtradas);
+  }
+
+  // 4) Si dryRun, retornar sin insertar
+  if (dryRun) {
+    return {
+      success: errores.length === 0,
+      insertados: 0,
+      errores,
+      warnings,
+    };
+  }
+
+  if (filasValidadas.length === 0) {
+    return {
+      success: errores.length === 0 && warnings.length > 0,
+      insertados: 0,
+      errores,
+      warnings,
+    };
+  }
+
+  // 5) Construir filas a insertar
+  const filasInsert = filasValidadas.map(({ row }) => {
+    const data: Record<string, unknown> = {};
+    if (row.manzana) data.manzana = row.manzana.trim();
+    if (row.etapa) data.etapa = row.etapa.trim();
+    if (row.tipo_unidad) data.tipo_unidad = row.tipo_unidad.trim();
+    if (row.numero) data.numero = row.numero.trim();
+
+    const insertRow: Record<string, unknown> = {
+      proyecto_id: proyectoId,
+      codigo: row.codigo,
+      sup_m2: row.sup_m2 ?? null,
+      precio: row.precio ?? null,
+      moneda: row.moneda || 'PEN',
+      estado: row.estado || 'disponible',
+      created_by: user.id,
+      data: Object.keys(data).length > 0 ? data : null,
+    };
+
+    const vendedor = (row.vendedor_asignado || '').trim();
+    if (vendedor) {
+      insertRow.vendedor_asignado = vendedor;
+    }
+
+    return insertRow;
+  });
+
+  // 6) Bulk insert con fallback row-by-row si falla
+  const { data: insertResult, error: bulkError } = await supabase
+    .from('lote')
+    .insert(filasInsert)
+    .select('id');
+
+  let insertados = 0;
+  if (!bulkError && insertResult) {
+    insertados = insertResult.length;
+  } else {
+    // Fallback fila por fila para identificar cuáles fallan
+    for (let i = 0; i < filasInsert.length; i++) {
+      const fila = filasInsert[i];
+      const numeroFila = filasValidadas[i].index;
+      const codigo = filasValidadas[i].row.codigo;
+      const { error: rowErr } = await supabase
+        .from('lote')
+        .insert(fila)
+        .select('id')
+        .single();
+
+      if (rowErr) {
+        errores.push({
+          fila: numeroFila,
+          codigo,
+          mensaje: `Error al insertar: ${rowErr.message}`,
+        });
+      } else {
+        insertados++;
+      }
+    }
+  }
+
+  if (insertados > 0) {
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    revalidatePath('/dashboard/propiedades');
+  }
+
+  return {
+    success: insertados > 0 && errores.length === 0,
+    insertados,
+    errores,
+    warnings,
+  };
 }
