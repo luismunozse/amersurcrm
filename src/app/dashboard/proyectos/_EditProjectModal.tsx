@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from 'react';
-import { X as XMarkIcon, ImageIcon as PhotoIcon, Trash2 as TrashIcon } from 'lucide-react';
+import { X as XMarkIcon, ImageIcon as PhotoIcon, Trash2 as TrashIcon, GripVertical } from 'lucide-react';
 import { actualizarProyecto } from './_actions';
 import toast from 'react-hot-toast';
 import type { ProyectoMediaItem } from "@/types/proyectos";
@@ -10,6 +10,51 @@ import {
   uploadProyectoAsset,
   removeProyectoAssets,
 } from "@/lib/storage/proyectoUpload.client";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+type GalleryDraftItem =
+  | {
+      kind: "existing";
+      id: string;
+      url: string;
+      path: string | null;
+      nombre: string | null;
+      created_at: string | null;
+    }
+  | {
+      kind: "pending";
+      id: string;
+      file: File;
+      preview: string;
+    };
+
+function toDraft(items: ProyectoMediaItem[]): GalleryDraftItem[] {
+  return items.map((item, idx) => ({
+    kind: "existing" as const,
+    id: item.path ?? item.url ?? `existing-${idx}`,
+    url: item.url,
+    path: item.path ?? null,
+    nombre: item.nombre ?? null,
+    created_at: item.created_at ?? null,
+  }));
+}
 
 interface EditProjectModalProps {
   proyecto: {
@@ -32,11 +77,6 @@ interface EditProjectModalProps {
 const MAX_GALERIA_ITEMS = 6;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-type PendingGalleryFile = {
-  file: File;
-  preview: string;
-};
 
 function validateClientImage(file: File, label: string) {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -69,16 +109,33 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(proyecto.logo_url || null);
   const [eliminarLogo, setEliminarLogo] = useState(false);
-  const [galleryItems, setGalleryItems] = useState<ProyectoMediaItem[]>(
-    Array.isArray(proyecto.galeria_imagenes) ? proyecto.galeria_imagenes : [],
+  const [galleryDraft, setGalleryDraft] = useState<GalleryDraftItem[]>(() =>
+    toDraft(Array.isArray(proyecto.galeria_imagenes) ? proyecto.galeria_imagenes : []),
   );
-  const [galleryRemoved, setGalleryRemoved] = useState<string[]>([]);
-  const [newGalleryFiles, setNewGalleryFiles] = useState<PendingGalleryFile[]>([]);
-  const galleryLimitReached = galleryItems.length + newGalleryFiles.length >= MAX_GALERIA_ITEMS;
+  const galleryLimitReached = galleryDraft.length >= MAX_GALERIA_ITEMS;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setGalleryDraft((prev) => {
+      const oldIdx = prev.findIndex((i) => i.id === active.id);
+      const newIdx = prev.findIndex((i) => i.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      return arrayMove(prev, oldIdx, newIdx);
+    });
+  };
 
   const clearGalleryPreviews = () => {
-    setNewGalleryFiles((prev) => {
-      prev.forEach(({ preview }) => URL.revokeObjectURL(preview));
+    setGalleryDraft((prev) => {
+      prev.forEach((item) => {
+        if (item.kind === "pending") URL.revokeObjectURL(item.preview);
+      });
       return [];
     });
   };
@@ -99,9 +156,10 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
     setLogoFile(null);
     setLogoPreview(proyecto.logo_url || null);
     setEliminarLogo(false);
-    setGalleryItems(Array.isArray(proyecto.galeria_imagenes) ? proyecto.galeria_imagenes : []);
-    setGalleryRemoved([]);
     clearGalleryPreviews();
+    setGalleryDraft(
+      toDraft(Array.isArray(proyecto.galeria_imagenes) ? proyecto.galeria_imagenes : []),
+    );
   };
 
   useEffect(() => {
@@ -168,40 +226,36 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
 
-    const remainingSlots = MAX_GALERIA_ITEMS - (galleryItems.length + newGalleryFiles.length);
+    const remainingSlots = MAX_GALERIA_ITEMS - galleryDraft.length;
     if (remainingSlots <= 0) {
       toast.error(`La galería ya tiene ${MAX_GALERIA_ITEMS} imágenes.`);
       return;
     }
 
-    const nextEntries: PendingGalleryFile[] = [];
+    const nextEntries: GalleryDraftItem[] = [];
     for (const file of files.slice(0, remainingSlots)) {
       if (!validateClientImage(file, "Imagen de la galería")) {
         continue;
       }
-      nextEntries.push({ file, preview: URL.createObjectURL(file) });
+      const preview = URL.createObjectURL(file);
+      const id = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      nextEntries.push({ kind: "pending", id, file, preview });
     }
 
     if (nextEntries.length === 0) return;
-    setNewGalleryFiles((prev) => [...prev, ...nextEntries]);
+    setGalleryDraft((prev) => [...prev, ...nextEntries]);
+    e.target.value = "";
   };
 
-  const handleRemoveNewGalleryFile = (index: number) => {
-    setNewGalleryFiles((prev) => {
-      const next = [...prev];
-      const [removed] = next.splice(index, 1);
-      if (removed) {
-        URL.revokeObjectURL(removed.preview);
-      }
+  const handleRemoveGalleryItem = (id: string) => {
+    setGalleryDraft((prev) => {
+      const next = prev.filter((item) => {
+        if (item.id !== id) return true;
+        if (item.kind === "pending") URL.revokeObjectURL(item.preview);
+        return false;
+      });
       return next;
     });
-  };
-
-  const handleRemoveExistingGalleryItem = (item: ProyectoMediaItem) => {
-    const identifier = item.path ?? item.url;
-    if (!identifier) return;
-    setGalleryRemoved((prev) => (prev.includes(identifier) ? prev : [...prev, identifier]));
-    setGalleryItems((prev) => prev.filter((entry) => (entry.path ?? entry.url) !== identifier));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -219,7 +273,6 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
       try {
         let imagenUpload: { publicUrl: string; path: string } | null = null;
         let logoUpload: { publicUrl: string; path: string } | null = null;
-        const galeriaUploads: Array<{ url: string; path: string; nombre: string }> = [];
 
         if (imagenFile) {
           const result = await uploadProyectoAsset(supabase, proyecto.id, imagenFile, "portada");
@@ -233,10 +286,25 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
           logoUpload = { publicUrl: result.publicUrl, path: result.path };
         }
 
-        for (const entry of newGalleryFiles) {
-          const result = await uploadProyectoAsset(supabase, proyecto.id, entry.file, "galeria");
-          uploadedPaths.push(result.path);
-          galeriaUploads.push({ url: result.publicUrl, path: result.path, nombre: result.nombre });
+        const galeriaFinal: Array<{ url: string; path: string | null; nombre: string | null; created_at: string | null }> = [];
+        for (const item of galleryDraft) {
+          if (item.kind === "existing") {
+            galeriaFinal.push({
+              url: item.url,
+              path: item.path,
+              nombre: item.nombre,
+              created_at: item.created_at,
+            });
+          } else {
+            const result = await uploadProyectoAsset(supabase, proyecto.id, item.file, "galeria");
+            uploadedPaths.push(result.path);
+            galeriaFinal.push({
+              url: result.publicUrl,
+              path: result.path,
+              nombre: result.nombre,
+              created_at: new Date().toISOString(),
+            });
+          }
         }
 
         const fd = new FormData();
@@ -258,10 +326,7 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
           fd.append('logo_url', logoUpload.publicUrl);
           fd.append('logo_path', logoUpload.path);
         }
-        if (galeriaUploads.length > 0) {
-          fd.append('galeria_new', JSON.stringify(galeriaUploads));
-        }
-        galleryRemoved.forEach((identifier) => fd.append('galeria_remove', identifier));
+        fd.append('galeria_final', JSON.stringify(galeriaFinal));
 
         const result = await actualizarProyecto(proyecto.id, fd);
 
@@ -574,64 +639,36 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Galería de imágenes ({galleryItems.length + newGalleryFiles.length}/{MAX_GALERIA_ITEMS})
+                Galería de imágenes ({galleryDraft.length}/{MAX_GALERIA_ITEMS})
               </label>
               <span className="text-xs text-gray-500">
-                Renders, vistas interiores o planimetrías
+                Arrastre para reordenar
               </span>
             </div>
 
-            {(galleryItems.length > 0 || newGalleryFiles.length > 0) ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-                {galleryItems.map((item) => {
-                  const key = item.path ?? item.url;
-                  return (
-                    <div
-                      key={key}
-                      className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600"
-                    >
-                      <img
-                        src={item.url}
-                        alt={item.nombre ?? "Imagen de la galería"}
-                        className="h-24 w-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExistingGalleryItem(item)}
+            {galleryDraft.length > 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={galleryDraft.map((i) => i.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+                    {galleryDraft.map((item, idx) => (
+                      <SortableGalleryItem
+                        key={item.id}
+                        item={item}
+                        index={idx}
                         disabled={isPending}
-                        className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
-                        title="Eliminar de la galería"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-                {newGalleryFiles.map((entry, index) => (
-                  <div
-                    key={entry.preview}
-                    className="relative rounded-lg overflow-hidden border border-dashed border-gray-300 dark:border-gray-600"
-                  >
-                    <img
-                      src={entry.preview}
-                      alt={`Nueva imagen ${index + 1}`}
-                      className="h-24 w-full object-cover opacity-90"
-                    />
-                    <span className="absolute bottom-1 left-1 text-[10px] font-semibold px-2 py-0.5 bg-white/80 rounded-full text-gray-700">
-                      Nuevo
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveNewGalleryFile(index)}
-                      disabled={isPending}
-                      className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
-                      title="Quitar imagen nueva"
-                    >
-                      <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
+                        onRemove={() => handleRemoveGalleryItem(item.id)}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
                 Aún no se agregaron imágenes adicionales.
@@ -663,11 +700,11 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
                   className="hidden"
                 />
                 <span className="text-xs text-gray-500">
-                  {Math.max(0, MAX_GALERIA_ITEMS - (galleryItems.length + newGalleryFiles.length))} espacios disponibles
+                  {Math.max(0, MAX_GALERIA_ITEMS - galleryDraft.length)} espacios disponibles
                 </span>
               </div>
               <p className="text-xs text-gray-500">
-                Máximo {MAX_GALERIA_ITEMS} imágenes, 5MB cada una.
+                Máximo {MAX_GALERIA_ITEMS} imágenes, 5MB cada una. Arrastre las miniaturas para cambiar el orden.
               </p>
             </div>
           </div>
@@ -692,6 +729,79 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function SortableGalleryItem({
+  item,
+  index,
+  disabled,
+  onRemove,
+}: {
+  item: GalleryDraftItem;
+  index: number;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : "auto",
+  };
+
+  const url = item.kind === "existing" ? item.url : item.preview;
+  const isPending = item.kind === "pending";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative rounded-lg overflow-hidden border ${
+        isPending
+          ? "border-dashed border-gray-300 dark:border-gray-600"
+          : "border-gray-200 dark:border-gray-600"
+      } ${isDragging ? "ring-2 ring-crm-primary" : ""} bg-crm-card`}
+    >
+      <img
+        src={url}
+        alt={item.kind === "existing" ? item.nombre ?? `Imagen ${index + 1}` : `Nueva imagen ${index + 1}`}
+        className={`h-24 w-full object-cover ${isPending ? "opacity-90" : ""}`}
+        draggable={false}
+      />
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        disabled={disabled}
+        className="absolute top-1 left-1 p-1 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors cursor-grab active:cursor-grabbing"
+        title="Arrastrar para reordenar"
+        aria-label="Reordenar imagen"
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+      <span className="absolute bottom-1 left-1 text-[10px] font-semibold px-2 py-0.5 bg-white/80 rounded-full text-gray-700">
+        {isPending ? "Nuevo" : `#${index + 1}`}
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
+        title="Eliminar de la galería"
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }

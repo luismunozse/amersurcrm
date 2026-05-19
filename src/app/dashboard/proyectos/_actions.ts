@@ -215,6 +215,47 @@ function parseGaleriaNew(raw: string | null, proyectoId: string): ProyectoMediaI
   });
 }
 
+function parseGaleriaFinal(
+  raw: string,
+  proyectoId: string,
+  galeriaActualPaths: Set<string>,
+): ProyectoMediaItem[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Galería final inválida (JSON malformado)");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Galería final inválida (debe ser arreglo)");
+  }
+  return parsed.map((item, idx) => {
+    if (!item || typeof item !== "object") {
+      throw new Error(`Galería final inválida en posición ${idx}`);
+    }
+    const obj = item as {
+      url?: unknown;
+      path?: unknown;
+      nombre?: unknown;
+      created_at?: unknown;
+    };
+    if (typeof obj.url !== "string") {
+      throw new Error(`Galería final inválida en posición ${idx}: falta url`);
+    }
+    const path = typeof obj.path === "string" ? obj.path : null;
+    // Items pre-existentes ya validados en DB; nuevos deben pertenecer al proyecto
+    if (path && !galeriaActualPaths.has(path) && !asegurarPathPertenece(path, proyectoId)) {
+      throw new Error(`Path no pertenece al proyecto en posición ${idx}`);
+    }
+    return {
+      url: obj.url,
+      path,
+      nombre: typeof obj.nombre === "string" ? obj.nombre : null,
+      created_at: typeof obj.created_at === "string" ? obj.created_at : new Date().toISOString(),
+    };
+  });
+}
+
 export async function actualizarProyecto(proyectoId: string, formData: FormData) {
   if (!UUID_REGEX.test(proyectoId)) {
     throw new Error("ID de proyecto inválido");
@@ -242,8 +283,9 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
     const logoUrlNueva = (formData.get("logo_url") as string | null) || null;
     const logoPathNueva = (formData.get("logo_path") as string | null) || null;
     const eliminarLogo = formData.get("eliminar_logo") === "true";
-    const galeriaNewRaw = (formData.get("galeria_new") as string | null) || null;
-    const galeriaRemove = formData
+    const galeriaFinalRaw = formData.get("galeria_final") as string | null;
+    const galeriaNewRawLegacy = (formData.get("galeria_new") as string | null) || null;
+    const galeriaRemoveLegacy = formData
       .getAll("galeria_remove")
       .map((value) => String(value).trim())
       .filter(Boolean);
@@ -259,8 +301,6 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       throw new Error("Path de logo no pertenece al proyecto");
     }
 
-    const galeriaNueva = parseGaleriaNew(galeriaNewRaw, proyectoId);
-
     const { data: proyectoActual, error: proyectoError } = await supabase
       .from("proyecto")
       .select("imagen_url,logo_url,galeria_imagenes")
@@ -274,26 +314,44 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
     let imagenUrl = proyectoActual?.imagen_url ?? null;
     let logoUrl = proyectoActual?.logo_url ?? null;
     const galeriaActual = sanitizeGaleriaPayload(proyectoActual?.galeria_imagenes ?? []);
-    const galeriaRemovalSet = new Set(galeriaRemove);
-    const galeriaKeep = galeriaActual.filter(
-      (item) => !galeriaRemovalSet.has(item.path ?? item.url),
+    const galeriaActualPaths = new Set<string>(
+      galeriaActual.map((item) => item.path).filter((p): p is string => !!p),
     );
 
-    if (galeriaKeep.length + galeriaNueva.length > MAX_GALERIA_ITEMS) {
+    let galeriaFinal: ProyectoMediaItem[];
+
+    if (galeriaFinalRaw !== null) {
+      // Modo nuevo: cliente envía orden completo (drag-and-drop reorder + add/remove)
+      galeriaFinal = parseGaleriaFinal(galeriaFinalRaw, proyectoId, galeriaActualPaths);
+    } else {
+      // Modo legacy: galeria_new + galeria_remove
+      const galeriaNueva = parseGaleriaNew(galeriaNewRawLegacy, proyectoId);
+      const galeriaRemovalSet = new Set(galeriaRemoveLegacy);
+      const galeriaKeep = galeriaActual.filter(
+        (item) => !galeriaRemovalSet.has(item.path ?? item.url),
+      );
+      galeriaFinal = [...galeriaKeep, ...galeriaNueva];
+    }
+
+    if (galeriaFinal.length > MAX_GALERIA_ITEMS) {
       throw new Error(`La galería admite máximo ${MAX_GALERIA_ITEMS} imágenes`);
     }
 
+    // Calcular paths obsoletos: presentes en actual pero no en final
+    const finalPaths = new Set<string>(
+      galeriaFinal.map((item) => item.path).filter((p): p is string => !!p),
+    );
     const obsoletePaths: string[] = [];
-
-    if (galeriaRemovalSet.size > 0) {
-      galeriaActual
-        .filter((item) => galeriaRemovalSet.has(item.path ?? item.url))
-        .forEach((item) => {
-          const storagePath = item.path ?? buildStoragePathFromUrl(item.url, proyectoId);
-          if (storagePath) {
-            obsoletePaths.push(storagePath);
-          }
-        });
+    for (const item of galeriaActual) {
+      const id = item.path ?? buildStoragePathFromUrl(item.url, proyectoId);
+      if (!id) continue;
+      if (item.path && !finalPaths.has(item.path)) {
+        obsoletePaths.push(item.path);
+      } else if (!item.path) {
+        // Item sin path: comparar por URL
+        const stillPresent = galeriaFinal.some((f) => f.url === item.url);
+        if (!stillPresent) obsoletePaths.push(id);
+      }
     }
 
     if (eliminarImagen && imagenUrl) {
@@ -323,8 +381,6 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       }
       logoUrl = logoUrlNueva;
     }
-
-    const galeriaFinal: ProyectoMediaItem[] = [...galeriaKeep, ...galeriaNueva];
 
     const { error: updateError } = await supabase
       .from("proyecto")
