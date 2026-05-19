@@ -24,7 +24,7 @@ const overlayBoundsSchema = z.object({
 // PROYECTO SCHEMAS
 // ============================================================================
 
-export const proyectoFormSchema = z.object({
+const proyectoBaseSchema = z.object({
   nombre: z
     .string()
     .min(1, 'El nombre del proyecto es requerido')
@@ -77,39 +77,48 @@ export const proyectoFormSchema = z.object({
   overlay_image_url: z.string().url('Debe ser una URL válida').optional().nullable(),
   overlay_bounds: overlayBoundsSchema.optional().nullable(),
   overlay_rotation: z.number().min(0).max(360).optional().nullable(),
-}).refine(
-  (data) => {
-    // Si se proporciona precio_desde y precio_hasta, validar que precio_desde <= precio_hasta
-    if (data.precio_desde !== null && data.precio_desde !== undefined &&
-        data.precio_hasta !== null && data.precio_hasta !== undefined) {
-      return data.precio_desde <= data.precio_hasta;
-    }
-    return true;
-  },
-  {
+});
+
+const precioRangeRefine = <T extends { precio_desde?: number | null; precio_hasta?: number | null }>(data: T) => {
+  if (data.precio_desde !== null && data.precio_desde !== undefined &&
+      data.precio_hasta !== null && data.precio_hasta !== undefined) {
+    return data.precio_desde <= data.precio_hasta;
+  }
+  return true;
+};
+
+const coordsRefine = <T extends { latitud?: number | null; longitud?: number | null }>(data: T) => {
+  const hasLat = data.latitud !== null && data.latitud !== undefined;
+  const hasLng = data.longitud !== null && data.longitud !== undefined;
+  return hasLat === hasLng;
+};
+
+export const proyectoFormSchema = proyectoBaseSchema
+  .refine(precioRangeRefine, {
     message: 'El precio mínimo debe ser menor o igual al precio máximo',
     path: ['precio_hasta'],
-  }
-).refine(
-  (data) => {
-    // Si se proporciona latitud, también debe proporcionarse longitud y viceversa
-    const hasLat = data.latitud !== null && data.latitud !== undefined;
-    const hasLng = data.longitud !== null && data.longitud !== undefined;
-    return hasLat === hasLng;
-  },
-  {
+  })
+  .refine(coordsRefine, {
     message: 'Debe proporcionar latitud y longitud juntas',
     path: ['latitud'],
-  }
-);
+  });
 
-export const proyectoUpdateSchema = proyectoFormSchema.partial();
+export const proyectoUpdateSchema = proyectoBaseSchema
+  .partial()
+  .refine(precioRangeRefine, {
+    message: 'El precio mínimo debe ser menor o igual al precio máximo',
+    path: ['precio_hasta'],
+  })
+  .refine(coordsRefine, {
+    message: 'Debe proporcionar latitud y longitud juntas',
+    path: ['latitud'],
+  });
 
 // ============================================================================
 // LOTE SCHEMAS
 // ============================================================================
 
-export const loteFormSchema = z.object({
+const loteBaseSchema = z.object({
   numero_lote: z
     .string()
     .min(1, 'El número de lote es requerido')
@@ -150,22 +159,25 @@ export const loteFormSchema = z.object({
     .nullable(),
   caracteristicas: z.record(z.string(), z.any()).optional().nullable(),
   coordenadas: coordenadasSchema.optional().nullable(),
-}).refine(
-  (data) => {
-    // Si se proporciona precio_venta, debe ser menor o igual al precio_lista
-    if (data.precio_lista !== null && data.precio_lista !== undefined &&
-        data.precio_venta !== null && data.precio_venta !== undefined) {
-      return data.precio_venta <= data.precio_lista;
-    }
-    return true;
-  },
-  {
-    message: 'El precio de venta debe ser menor o igual al precio de lista',
-    path: ['precio_venta'],
-  }
-);
+});
 
-export const loteUpdateSchema = loteFormSchema.partial();
+const loteVentaRefine = <T extends { precio_lista?: number | null; precio_venta?: number | null }>(data: T) => {
+  if (data.precio_lista !== null && data.precio_lista !== undefined &&
+      data.precio_venta !== null && data.precio_venta !== undefined) {
+    return data.precio_venta <= data.precio_lista;
+  }
+  return true;
+};
+
+export const loteFormSchema = loteBaseSchema.refine(loteVentaRefine, {
+  message: 'El precio de venta debe ser menor o igual al precio de lista',
+  path: ['precio_venta'],
+});
+
+export const loteUpdateSchema = loteBaseSchema.partial().refine(loteVentaRefine, {
+  message: 'El precio de venta debe ser menor o igual al precio de lista',
+  path: ['precio_venta'],
+});
 
 export const loteCoordinatesSchema = z.object({
   lote_id: z.string().uuid('Debe ser un UUID válido'),
@@ -180,7 +192,7 @@ export const batchCoordinatesSchema = z.object({
 // RESERVA SCHEMAS
 // ============================================================================
 
-export const reservaFormSchema = z.object({
+const reservaBaseSchema = z.object({
   cliente_id: z.string().uuid('Debe seleccionar un cliente válido'),
   lote_id: z.string().uuid('Debe seleccionar un lote válido'),
   monto_reserva: z
@@ -199,30 +211,36 @@ export const reservaFormSchema = z.object({
     .max(1000, 'Las notas no pueden exceder 1000 caracteres')
     .optional()
     .nullable(),
-}).refine(
-  (data) => {
-    // Si se proporciona fecha_vencimiento, debe ser futura
-    if (data.fecha_vencimiento) {
-      const vencimiento = typeof data.fecha_vencimiento === 'string'
-        ? new Date(data.fecha_vencimiento)
-        : data.fecha_vencimiento;
-      return vencimiento > new Date();
-    }
-    return true;
-  },
-  {
+});
+
+const fechaVencimientoRefine = <T extends { fecha_vencimiento?: string | Date | null }>(data: T) => {
+  if (data.fecha_vencimiento) {
+    const vencimiento = typeof data.fecha_vencimiento === 'string'
+      ? new Date(data.fecha_vencimiento)
+      : data.fecha_vencimiento;
+    return vencimiento > new Date();
+  }
+  return true;
+};
+
+export const reservaFormSchema = reservaBaseSchema.refine(fechaVencimientoRefine, {
+  message: 'La fecha de vencimiento debe ser futura',
+  path: ['fecha_vencimiento'],
+});
+
+export const reservaUpdateSchema = reservaBaseSchema
+  .omit({ cliente_id: true, lote_id: true })
+  .partial()
+  .refine(fechaVencimientoRefine, {
     message: 'La fecha de vencimiento debe ser futura',
     path: ['fecha_vencimiento'],
-  }
-);
-
-export const reservaUpdateSchema = reservaFormSchema.partial().omit({ cliente_id: true, lote_id: true });
+  });
 
 // ============================================================================
 // VENTA SCHEMAS
 // ============================================================================
 
-export const ventaFormSchema = z.object({
+const ventaBaseSchema = z.object({
   cliente_id: z.string().uuid('Debe seleccionar un cliente válido'),
   lote_id: z.string().uuid('Debe seleccionar un lote válido'),
   precio_venta: z
@@ -255,62 +273,84 @@ export const ventaFormSchema = z.object({
     .max(1000, 'Las notas no pueden exceder 1000 caracteres')
     .optional()
     .nullable(),
-}).refine(
-  (data) => {
-    // Si la modalidad es financiado, debe proporcionar cuota_inicial, numero_cuotas y monto_cuota
-    if (data.modalidad_pago === 'financiado') {
-      return (
-        data.cuota_inicial !== null &&
-        data.cuota_inicial !== undefined &&
-        data.numero_cuotas !== null &&
-        data.numero_cuotas !== undefined &&
-        data.monto_cuota !== null &&
-        data.monto_cuota !== undefined
-      );
-    }
-    return true;
-  },
-  {
-    message: 'Para venta financiada debe proporcionar cuota inicial, número de cuotas y monto de cuota',
-    path: ['modalidad_pago'],
-  }
-).refine(
-  (data) => {
-    // Si la modalidad es contado, cuota_inicial debe ser igual a precio_venta
-    if (data.modalidad_pago === 'contado' && data.cuota_inicial !== null && data.cuota_inicial !== undefined) {
-      return data.cuota_inicial === data.precio_venta;
-    }
-    return true;
-  },
-  {
-    message: 'Para venta al contado, la cuota inicial debe ser igual al precio de venta',
-    path: ['cuota_inicial'],
-  }
-).refine(
-  (data) => {
-    // Validar que cuota_inicial + (numero_cuotas * monto_cuota) = precio_venta (con margen de error por redondeo)
-    if (
-      data.modalidad_pago === 'financiado' &&
+});
+
+type VentaPayload = {
+  modalidad_pago?: 'contado' | 'financiado' | 'mixto';
+  cuota_inicial?: number | null;
+  numero_cuotas?: number | null;
+  monto_cuota?: number | null;
+  precio_venta?: number;
+};
+
+const ventaFinanciadaRefine = <T extends VentaPayload>(data: T) => {
+  if (data.modalidad_pago === 'financiado') {
+    return (
       data.cuota_inicial !== null &&
       data.cuota_inicial !== undefined &&
       data.numero_cuotas !== null &&
       data.numero_cuotas !== undefined &&
       data.monto_cuota !== null &&
       data.monto_cuota !== undefined
-    ) {
-      const totalCalculado = data.cuota_inicial + (data.numero_cuotas * data.monto_cuota);
-      const diferencia = Math.abs(totalCalculado - data.precio_venta);
-      return diferencia < 1; // Margen de error de 1 peso/dólar por redondeo
-    }
-    return true;
-  },
-  {
+    );
+  }
+  return true;
+};
+
+const ventaContadoRefine = <T extends VentaPayload>(data: T) => {
+  if (data.modalidad_pago === 'contado' && data.cuota_inicial !== null && data.cuota_inicial !== undefined) {
+    return data.cuota_inicial === data.precio_venta;
+  }
+  return true;
+};
+
+const ventaTotalRefine = <T extends VentaPayload>(data: T) => {
+  if (
+    data.modalidad_pago === 'financiado' &&
+    data.cuota_inicial !== null &&
+    data.cuota_inicial !== undefined &&
+    data.numero_cuotas !== null &&
+    data.numero_cuotas !== undefined &&
+    data.monto_cuota !== null &&
+    data.monto_cuota !== undefined &&
+    data.precio_venta !== undefined
+  ) {
+    const totalCalculado = data.cuota_inicial + (data.numero_cuotas * data.monto_cuota);
+    const diferencia = Math.abs(totalCalculado - data.precio_venta);
+    return diferencia < 1;
+  }
+  return true;
+};
+
+export const ventaFormSchema = ventaBaseSchema
+  .refine(ventaFinanciadaRefine, {
+    message: 'Para venta financiada debe proporcionar cuota inicial, número de cuotas y monto de cuota',
+    path: ['modalidad_pago'],
+  })
+  .refine(ventaContadoRefine, {
+    message: 'Para venta al contado, la cuota inicial debe ser igual al precio de venta',
+    path: ['cuota_inicial'],
+  })
+  .refine(ventaTotalRefine, {
     message: 'La suma de cuota inicial y cuotas debe ser igual al precio de venta',
     path: ['monto_cuota'],
-  }
-);
+  });
 
-export const ventaUpdateSchema = ventaFormSchema.partial().omit({ cliente_id: true, lote_id: true });
+export const ventaUpdateSchema = ventaBaseSchema
+  .omit({ cliente_id: true, lote_id: true })
+  .partial()
+  .refine(ventaFinanciadaRefine, {
+    message: 'Para venta financiada debe proporcionar cuota inicial, número de cuotas y monto de cuota',
+    path: ['modalidad_pago'],
+  })
+  .refine(ventaContadoRefine, {
+    message: 'Para venta al contado, la cuota inicial debe ser igual al precio de venta',
+    path: ['cuota_inicial'],
+  })
+  .refine(ventaTotalRefine, {
+    message: 'La suma de cuota inicial y cuotas debe ser igual al precio de venta',
+    path: ['monto_cuota'],
+  });
 
 // ============================================================================
 // FILTER SCHEMAS

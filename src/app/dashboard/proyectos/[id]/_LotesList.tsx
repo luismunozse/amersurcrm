@@ -143,7 +143,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   };
 
   const formatFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-AR', {
+    return new Date(fecha).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'

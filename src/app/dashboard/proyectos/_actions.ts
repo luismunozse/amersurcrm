@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso, esAdmin } from "@/lib/permissions/server";
+import { requierePermiso } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import type { ProyectoMediaItem } from "@/types/proyectos";
 
@@ -48,6 +48,7 @@ function buildStoragePathFromUrl(url: string | null, proyectoId: string): string
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 const MAX_GALERIA_ITEMS = 6;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function validateImageFile(file: File, label: string) {
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
@@ -274,15 +275,17 @@ export async function crearProyecto(formData: FormData) {
 }
 
 export async function actualizarProyecto(proyectoId: string, formData: FormData) {
+  if (!UUID_REGEX.test(proyectoId)) {
+    throw new Error("ID de proyecto inválido");
+  }
+
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  const isAdmin = await esAdmin();
-  if (!isAdmin) {
-    throw new Error("No tienes permisos para actualizar proyectos. Solo los administradores pueden realizar esta acción.");
-  }
+  await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
+
+  const newUploadedPaths: string[] = [];
 
   try {
     const nombre = String(formData.get("nombre") || "").trim();
@@ -343,7 +346,6 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
     }
 
     const obsoletePaths: string[] = [];
-    const newUploadedPaths: string[] = [];
 
     if (galeriaRemovalSet.size > 0) {
       galeriaActual
@@ -407,13 +409,13 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
           file,
           "galeria",
         );
+        newUploadedPaths.push(filePath);
         galeriaFinal.push({
           url: publicUrl,
           path: filePath,
           nombre: file.name,
           created_at: new Date().toISOString(),
         });
-        newUploadedPaths.push(filePath);
       }
     }
 
@@ -430,17 +432,10 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
         imagen_url: imagenUrl,
         logo_url: logoUrl,
         galeria_imagenes: galeriaFinal,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", proyectoId);
 
     if (updateError) {
-      if (newUploadedPaths.length > 0) {
-        await supabase.storage
-          .from("imagenes")
-          .remove(newUploadedPaths)
-          .catch((cleanupError) => console.warn("Error limpiando archivos nuevos:", cleanupError));
-      }
       throw new Error(`Error actualizando proyecto: ${updateError.message}`);
     }
 
@@ -457,21 +452,27 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
 
     return { success: true, message: `Proyecto "${nombre}" actualizado correctamente` };
   } catch (error) {
+    if (newUploadedPaths.length > 0) {
+      await supabase.storage
+        .from("imagenes")
+        .remove(newUploadedPaths)
+        .catch((cleanupError) => console.warn("Error limpiando archivos nuevos:", cleanupError));
+    }
     console.error("Error actualizando proyecto:", error);
     throw new Error(error instanceof Error ? error.message : "Error actualizando proyecto");
   }
 }
 
 export async function eliminarProyecto(proyectoId: string) {
+  if (!UUID_REGEX.test(proyectoId)) {
+    throw new Error("ID de proyecto inválido");
+  }
+
   const supabase = await createServerActionClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verificar permisos de administrador
-  const isAdmin = await esAdmin();
-  if (!isAdmin) {
-    throw new Error("No tienes permisos para eliminar proyectos. Solo los administradores pueden realizar esta acción.");
-  }
+  await requierePermiso(PERMISOS.PROYECTOS.ELIMINAR);
 
   try {
     // 1. Obtener información del proyecto para eliminar archivos relacionados
