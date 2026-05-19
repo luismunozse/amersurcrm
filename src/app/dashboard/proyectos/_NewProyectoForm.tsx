@@ -8,6 +8,11 @@ import { useRouter } from "next/navigation";
 import UbicacionSelector from "@/components/UbicacionSelector";
 import { compressImage, compressImages, formatFileSize } from "@/lib/imageCompression";
 import { Plus, Minus, ChevronDown } from "lucide-react";
+import { createClient } from "@/lib/supabase.client";
+import {
+  uploadProyectoAsset,
+  removeProyectoAssets,
+} from "@/lib/storage/proyectoUpload.client";
 
 export default function NewProyectoForm() {
   const [pending, start] = useTransition();
@@ -88,52 +93,87 @@ export default function NewProyectoForm() {
             const form = e.currentTarget;
             const originalFormData = new FormData(form);
 
+            const supabase = createClient();
+            const proyectoId = crypto.randomUUID();
+            const uploadedPaths: string[] = [];
+
             try {
               setIsCompressing(true);
 
-              // Obtener archivos originales
               const imagenFile = originalFormData.get("imagen") as File | null;
               const logoFile = originalFormData.get("logo") as File | null;
-              const galeriaFiles = originalFormData.getAll("galeria").filter((f): f is File => f instanceof File && f.size > 0);
+              const galeriaFiles = originalFormData
+                .getAll("galeria")
+                .filter((f): f is File => f instanceof File && f.size > 0);
 
-              // Comprimir imagen principal si existe
+              let imagenComprimida: File | null = null;
+              let logoComprimido: File | null = null;
+              let galeriaComprimida: File[] = [];
+
               if (imagenFile && imagenFile.size > 0) {
                 setCompressionProgress("Comprimiendo imagen principal...");
-                const compressed = await compressImage(imagenFile, 'portada');
-                originalFormData.set("imagen", compressed);
-                console.log(`Imagen comprimida: ${formatFileSize(imagenFile.size)} → ${formatFileSize(compressed.size)}`);
+                imagenComprimida = await compressImage(imagenFile, "portada");
+                console.log(
+                  `Imagen comprimida: ${formatFileSize(imagenFile.size)} → ${formatFileSize(imagenComprimida.size)}`,
+                );
               }
 
-              // Comprimir logo si existe
               if (logoFile && logoFile.size > 0) {
                 setCompressionProgress("Comprimiendo logo...");
-                const compressed = await compressImage(logoFile, 'logo');
-                originalFormData.set("logo", compressed);
-                console.log(`Logo comprimido: ${formatFileSize(logoFile.size)} → ${formatFileSize(compressed.size)}`);
+                logoComprimido = await compressImage(logoFile, "logo");
+                console.log(
+                  `Logo comprimido: ${formatFileSize(logoFile.size)} → ${formatFileSize(logoComprimido.size)}`,
+                );
               }
 
-              // Comprimir galería si existe
               if (galeriaFiles.length > 0) {
-                setCompressionProgress(`Comprimiendo galería (${galeriaFiles.length} imágenes)...`);
-                const compressedGaleria = await compressImages(galeriaFiles, 'galeria');
-
-                // Remover archivos originales de galería
-                originalFormData.delete("galeria");
-
-                // Agregar archivos comprimidos
-                compressedGaleria.forEach(file => {
-                  originalFormData.append("galeria", file);
-                });
-
-                galeriaFiles.forEach((original, i) => {
-                  console.log(`Galería [${i + 1}]: ${formatFileSize(original.size)} → ${formatFileSize(compressedGaleria[i].size)}`);
-                });
+                setCompressionProgress(
+                  `Comprimiendo galería (${galeriaFiles.length} imágenes)...`,
+                );
+                galeriaComprimida = await compressImages(galeriaFiles, "galeria");
               }
 
               setIsCompressing(false);
+              setCompressionProgress("Subiendo archivos...");
+
+              let imagenUpload: { publicUrl: string; path: string } | null = null;
+              let logoUpload: { publicUrl: string; path: string } | null = null;
+              const galeriaUploads: Array<{ url: string; path: string; nombre: string }> = [];
+
+              if (imagenComprimida) {
+                const r = await uploadProyectoAsset(supabase, proyectoId, imagenComprimida, "portada");
+                uploadedPaths.push(r.path);
+                imagenUpload = { publicUrl: r.publicUrl, path: r.path };
+              }
+              if (logoComprimido) {
+                const r = await uploadProyectoAsset(supabase, proyectoId, logoComprimido, "logo");
+                uploadedPaths.push(r.path);
+                logoUpload = { publicUrl: r.publicUrl, path: r.path };
+              }
+              for (const file of galeriaComprimida) {
+                const r = await uploadProyectoAsset(supabase, proyectoId, file, "galeria");
+                uploadedPaths.push(r.path);
+                galeriaUploads.push({ url: r.publicUrl, path: r.path, nombre: r.nombre });
+              }
+
               setCompressionProgress("");
 
-              // Enviar formulario con imágenes comprimidas
+              originalFormData.delete("imagen");
+              originalFormData.delete("logo");
+              originalFormData.delete("galeria");
+              originalFormData.append("proyecto_id", proyectoId);
+              if (imagenUpload) {
+                originalFormData.append("imagen_url", imagenUpload.publicUrl);
+                originalFormData.append("imagen_path", imagenUpload.path);
+              }
+              if (logoUpload) {
+                originalFormData.append("logo_url", logoUpload.publicUrl);
+                originalFormData.append("logo_path", logoUpload.path);
+              }
+              if (galeriaUploads.length > 0) {
+                originalFormData.append("galeria_new", JSON.stringify(galeriaUploads));
+              }
+
               start(async () => {
                 try {
                   const result = await crearProyecto(originalFormData);
@@ -146,13 +186,23 @@ export default function NewProyectoForm() {
                 } catch (error) {
                   console.error("Error creando proyecto:", error);
                   toast.error(error instanceof Error ? error.message : "Error al crear el proyecto");
+                  if (uploadedPaths.length > 0) {
+                    await removeProyectoAssets(supabase, uploadedPaths);
+                  }
                 }
               });
-            } catch (compressionError) {
+            } catch (preError) {
               setIsCompressing(false);
               setCompressionProgress("");
-              console.error("Error comprimiendo imágenes:", compressionError);
-              toast.error("Error al comprimir las imágenes. Intenta con imágenes más pequeñas.");
+              console.error("Error preparando archivos:", preError);
+              toast.error(
+                preError instanceof Error
+                  ? preError.message
+                  : "Error preparando archivos. Intenta con imágenes más pequeñas.",
+              );
+              if (uploadedPaths.length > 0) {
+                await removeProyectoAssets(supabase, uploadedPaths);
+              }
             }
           }}
           className="mt-6 space-y-4"

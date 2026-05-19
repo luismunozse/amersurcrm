@@ -5,6 +5,11 @@ import { X as XMarkIcon, ImageIcon as PhotoIcon, Trash2 as TrashIcon } from 'luc
 import { actualizarProyecto } from './_actions';
 import toast from 'react-hot-toast';
 import type { ProyectoMediaItem } from "@/types/proyectos";
+import { createClient } from "@/lib/supabase.client";
+import {
+  uploadProyectoAsset,
+  removeProyectoAssets,
+} from "@/lib/storage/proyectoUpload.client";
 
 interface EditProjectModalProps {
   proyecto: {
@@ -201,14 +206,39 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nombre.trim()) {
       toast.error('El nombre del proyecto es requerido');
       return;
     }
 
     startTransition(async () => {
+      const supabase = createClient();
+      const uploadedPaths: string[] = [];
+
       try {
+        let imagenUpload: { publicUrl: string; path: string } | null = null;
+        let logoUpload: { publicUrl: string; path: string } | null = null;
+        const galeriaUploads: Array<{ url: string; path: string; nombre: string }> = [];
+
+        if (imagenFile) {
+          const result = await uploadProyectoAsset(supabase, proyecto.id, imagenFile, "portada");
+          uploadedPaths.push(result.path);
+          imagenUpload = { publicUrl: result.publicUrl, path: result.path };
+        }
+
+        if (logoFile) {
+          const result = await uploadProyectoAsset(supabase, proyecto.id, logoFile, "logo");
+          uploadedPaths.push(result.path);
+          logoUpload = { publicUrl: result.publicUrl, path: result.path };
+        }
+
+        for (const entry of newGalleryFiles) {
+          const result = await uploadProyectoAsset(supabase, proyecto.id, entry.file, "galeria");
+          uploadedPaths.push(result.path);
+          galeriaUploads.push({ url: result.publicUrl, path: result.path, nombre: result.nombre });
+        }
+
         const fd = new FormData();
         fd.append('nombre', formData.nombre);
         fd.append('tipo', formData.tipo);
@@ -219,20 +249,22 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
         fd.append('descripcion', formData.descripcion);
         fd.append('eliminar_imagen', eliminarImagen.toString());
         fd.append('eliminar_logo', eliminarLogo.toString());
-        
-        if (imagenFile) {
-          fd.append('imagen', imagenFile);
+
+        if (imagenUpload) {
+          fd.append('imagen_url', imagenUpload.publicUrl);
+          fd.append('imagen_path', imagenUpload.path);
         }
-        if (logoFile) {
-          fd.append('logo', logoFile);
+        if (logoUpload) {
+          fd.append('logo_url', logoUpload.publicUrl);
+          fd.append('logo_path', logoUpload.path);
         }
-        newGalleryFiles.forEach(({ file }) => {
-          fd.append('galeria', file);
-        });
+        if (galeriaUploads.length > 0) {
+          fd.append('galeria_new', JSON.stringify(galeriaUploads));
+        }
         galleryRemoved.forEach((identifier) => fd.append('galeria_remove', identifier));
 
         const result = await actualizarProyecto(proyecto.id, fd);
-        
+
         if (result.success) {
           toast.success(result.message);
           resetToProjectValues();
@@ -241,6 +273,9 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
       } catch (error) {
         console.error('Error actualizando proyecto:', error);
         toast.error(error instanceof Error ? error.message : 'Error actualizando proyecto');
+        if (uploadedPaths.length > 0) {
+          await removeProyectoAssets(supabase, uploadedPaths);
+        }
       }
     });
   };

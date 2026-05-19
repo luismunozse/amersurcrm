@@ -7,8 +7,6 @@ import { requierePermiso } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import type { ProyectoMediaItem } from "@/types/proyectos";
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createServerActionClient>>;
-
 function buildStoragePathFromUrl(url: string | null, proyectoId: string): string | null {
   if (!url) return null;
 
@@ -45,45 +43,8 @@ function buildStoragePathFromUrl(url: string | null, proyectoId: string): string
   }
 }
 
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 const MAX_GALERIA_ITEMS = 6;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function validateImageFile(file: File, label: string) {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    throw new Error(`Formato de ${label} no válido. Use JPG, PNG o WEBP`);
-  }
-
-  if (file.size > MAX_IMAGE_SIZE_BYTES) {
-    throw new Error(`El archivo de ${label} es muy grande. Máximo 5MB`);
-  }
-}
-
-async function uploadProyectoAsset(
-  supabase: SupabaseServerClient,
-  proyectoId: string,
-  file: File,
-  prefix: string,
-) {
-  const fileExt = file.name.split(".").pop() || "jpg";
-  const fileName = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-  const filePath = `proyectos/${proyectoId}/${fileName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("imagenes")
-    .upload(filePath, file, { upsert: true });
-
-  if (uploadError) {
-    throw new Error(`Error subiendo ${prefix}: ${uploadError.message}`);
-  }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("imagenes").getPublicUrl(filePath);
-
-  return { publicUrl, filePath };
-}
 
 function sanitizeGaleriaPayload(value: unknown): ProyectoMediaItem[] {
   if (!Array.isArray(value)) return [];
@@ -110,28 +71,31 @@ export async function crearProyecto(formData: FormData) {
   await requierePermiso(PERMISOS.PROYECTOS.CREAR);
 
   try {
+    const proyectoIdRaw = String(formData.get("proyecto_id") || "").trim();
+    if (!proyectoIdRaw || !UUID_REGEX.test(proyectoIdRaw)) {
+      throw new Error("ID de proyecto inválido");
+    }
+    const proyectoId = proyectoIdRaw;
+
     const nombre = String(formData.get("nombre") || "").trim();
-    const tipo = String(formData.get("tipo") || "propio"); // Tipo: propio o corretaje
+    const tipo = String(formData.get("tipo") || "propio");
     const estado = String(formData.get("estado") || "activo");
     const descripcion = String(formData.get("descripcion") || "").trim();
-    const imagenFile = formData.get("imagen") as File | null;
-    const logoFile = formData.get("logo") as File | null;
-    const galeriaFiles = formData
-      .getAll("galeria")
-      .filter((file): file is File => file instanceof File && file.size > 0);
+    const imagenUrl = (formData.get("imagen_url") as string | null) || null;
+    const imagenPath = (formData.get("imagen_path") as string | null) || null;
+    const logoUrl = (formData.get("logo_url") as string | null) || null;
+    const logoPath = (formData.get("logo_path") as string | null) || null;
+    const galeriaNewRaw = (formData.get("galeria_new") as string | null) || null;
 
-    // Datos de ubigeo
     const departamento = String(formData.get("departamento") || "").trim();
     const provincia = String(formData.get("provincia") || "").trim();
     const distrito = String(formData.get("distrito") || "").trim();
 
-    // Coordenadas GPS (opcional)
     const latitudStr = String(formData.get("latitud") || "").trim();
     const longitudStr = String(formData.get("longitud") || "").trim();
     const latitud = latitudStr ? parseFloat(latitudStr) : null;
     const longitud = longitudStr ? parseFloat(longitudStr) : null;
 
-    // Validaciones
     if (!nombre) {
       throw new Error("El nombre del proyecto es requerido");
     }
@@ -140,19 +104,17 @@ export async function crearProyecto(formData: FormData) {
       throw new Error("Debe seleccionar al menos el distrito para la ubicación del proyecto");
     }
 
-    if (imagenFile && imagenFile.size > 0) {
-      validateImageFile(imagenFile, "imagen del proyecto");
+    if (imagenPath && !asegurarPathPertenece(imagenPath, proyectoId)) {
+      throw new Error("Path de imagen no pertenece al proyecto");
+    }
+    if (logoPath && !asegurarPathPertenece(logoPath, proyectoId)) {
+      throw new Error("Path de logo no pertenece al proyecto");
     }
 
-    if (logoFile && logoFile.size > 0) {
-      validateImageFile(logoFile, "logo del proyecto");
-    }
-
-    if (galeriaFiles.length > MAX_GALERIA_ITEMS) {
+    const galeriaItems = parseGaleriaNew(galeriaNewRaw, proyectoId);
+    if (galeriaItems.length > MAX_GALERIA_ITEMS) {
       throw new Error(`Selecciona como máximo ${MAX_GALERIA_ITEMS} imágenes para la galería`);
     }
-
-    galeriaFiles.forEach((file) => validateImageFile(file, "galería"));
 
     const ubicacionFinal = [distrito, provincia, departamento]
       .filter(Boolean)
@@ -161,6 +123,7 @@ export async function crearProyecto(formData: FormData) {
     const { data: proyecto, error: insertError } = await supabase
       .from("proyecto")
       .insert({
+        id: proyectoId,
         nombre,
         tipo: tipo as "propio" | "corretaje",
         estado: estado as "activo" | "pausado" | "cerrado",
@@ -168,7 +131,9 @@ export async function crearProyecto(formData: FormData) {
         descripcion: descripcion || null,
         latitud,
         longitud,
-        imagen_url: null,
+        imagen_url: imagenUrl,
+        logo_url: logoUrl,
+        galeria_imagenes: galeriaItems,
         created_by: user.id,
       })
       .select()
@@ -178,66 +143,7 @@ export async function crearProyecto(formData: FormData) {
       throw new Error(`Error creando proyecto: ${insertError?.message || "Desconocido"}`);
     }
 
-    let proyectoFinal = proyecto;
-
-    const uploadedPaths: string[] = [];
-    const updates: Record<string, unknown> = {};
-    const galeriaPayload: ProyectoMediaItem[] = [];
-
-    try {
-      if (imagenFile && imagenFile.size > 0) {
-        const { publicUrl, filePath } = await uploadProyectoAsset(supabase, proyecto.id, imagenFile, "portada");
-        updates.imagen_url = publicUrl;
-        uploadedPaths.push(filePath);
-      }
-
-      if (logoFile && logoFile.size > 0) {
-        const { publicUrl, filePath } = await uploadProyectoAsset(supabase, proyecto.id, logoFile, "logo");
-        updates.logo_url = publicUrl;
-        uploadedPaths.push(filePath);
-      }
-
-      if (galeriaFiles.length > 0) {
-        for (const file of galeriaFiles) {
-          const { publicUrl, filePath } = await uploadProyectoAsset(supabase, proyecto.id, file, "galeria");
-          galeriaPayload.push({
-            url: publicUrl,
-            path: filePath,
-            nombre: file.name,
-            created_at: new Date().toISOString(),
-          });
-          uploadedPaths.push(filePath);
-        }
-        updates.galeria_imagenes = galeriaPayload;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        const { data: updatedProject, error: updateError } = await supabase
-          .from("proyecto")
-          .update(updates)
-          .eq("id", proyecto.id)
-          .select()
-          .single();
-
-        if (updateError) {
-          throw new Error(`Error asignando archivos al proyecto: ${updateError.message}`);
-        }
-
-        if (updatedProject) {
-          proyectoFinal = updatedProject;
-        }
-      }
-    } catch (imageError) {
-      if (uploadedPaths.length > 0) {
-        try {
-          await supabase.storage.from("imagenes").remove(uploadedPaths);
-        } catch (cleanupError) {
-          console.warn("Error limpiando archivos tras fallo:", cleanupError);
-        }
-      }
-      console.warn("Error procesando archivos del proyecto:", imageError);
-      throw imageError instanceof Error ? imageError : new Error("Error procesando archivos multimedia");
-    }
+    const proyectoFinal = proyecto;
 
     revalidatePath("/dashboard/proyectos");
     revalidatePath("/dashboard");
@@ -274,6 +180,41 @@ export async function crearProyecto(formData: FormData) {
   }
 }
 
+function asegurarPathPertenece(path: string, proyectoId: string): boolean {
+  return path.startsWith(`proyectos/${proyectoId}/`);
+}
+
+function parseGaleriaNew(raw: string | null, proyectoId: string): ProyectoMediaItem[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Galería nueva inválida (JSON malformado)");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Galería nueva inválida (debe ser arreglo)");
+  }
+  return parsed.map((item, idx) => {
+    if (!item || typeof item !== "object") {
+      throw new Error(`Galería nueva inválida en posición ${idx}`);
+    }
+    const obj = item as { url?: unknown; path?: unknown; nombre?: unknown };
+    if (typeof obj.url !== "string" || typeof obj.path !== "string") {
+      throw new Error(`Galería nueva inválida en posición ${idx}: faltan url/path`);
+    }
+    if (!asegurarPathPertenece(obj.path, proyectoId)) {
+      throw new Error(`Path no pertenece al proyecto en posición ${idx}`);
+    }
+    return {
+      url: obj.url,
+      path: obj.path,
+      nombre: typeof obj.nombre === "string" ? obj.nombre : null,
+      created_at: new Date().toISOString(),
+    };
+  });
+}
+
 export async function actualizarProyecto(proyectoId: string, formData: FormData) {
   if (!UUID_REGEX.test(proyectoId)) {
     throw new Error("ID de proyecto inválido");
@@ -285,8 +226,6 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
 
   await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
 
-  const newUploadedPaths: string[] = [];
-
   try {
     const nombre = String(formData.get("nombre") || "").trim();
     const tipo = String(formData.get("tipo") || "propio");
@@ -297,13 +236,13 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
     const latitud = latitudStr ? parseFloat(latitudStr) : null;
     const longitud = longitudStr ? parseFloat(longitudStr) : null;
     const descripcion = String(formData.get("descripcion") || "").trim();
-    const imagenFile = formData.get("imagen") as File | null;
+    const imagenUrlNueva = (formData.get("imagen_url") as string | null) || null;
+    const imagenPathNueva = (formData.get("imagen_path") as string | null) || null;
     const eliminarImagen = formData.get("eliminar_imagen") === "true";
-    const logoFile = formData.get("logo") as File | null;
+    const logoUrlNueva = (formData.get("logo_url") as string | null) || null;
+    const logoPathNueva = (formData.get("logo_path") as string | null) || null;
     const eliminarLogo = formData.get("eliminar_logo") === "true";
-    const galeriaFiles = formData
-      .getAll("galeria")
-      .filter((file): file is File => file instanceof File && file.size > 0);
+    const galeriaNewRaw = (formData.get("galeria_new") as string | null) || null;
     const galeriaRemove = formData
       .getAll("galeria_remove")
       .map((value) => String(value).trim())
@@ -313,15 +252,14 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       throw new Error("El nombre del proyecto es requerido");
     }
 
-    if (imagenFile && imagenFile.size > 0) {
-      validateImageFile(imagenFile, "imagen del proyecto");
+    if (imagenPathNueva && !asegurarPathPertenece(imagenPathNueva, proyectoId)) {
+      throw new Error("Path de imagen no pertenece al proyecto");
+    }
+    if (logoPathNueva && !asegurarPathPertenece(logoPathNueva, proyectoId)) {
+      throw new Error("Path de logo no pertenece al proyecto");
     }
 
-    if (logoFile && logoFile.size > 0) {
-      validateImageFile(logoFile, "logo del proyecto");
-    }
-
-    galeriaFiles.forEach((file) => validateImageFile(file, "galería"));
+    const galeriaNueva = parseGaleriaNew(galeriaNewRaw, proyectoId);
 
     const { data: proyectoActual, error: proyectoError } = await supabase
       .from("proyecto")
@@ -341,7 +279,7 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
       (item) => !galeriaRemovalSet.has(item.path ?? item.url),
     );
 
-    if (galeriaKeep.length + galeriaFiles.length > MAX_GALERIA_ITEMS) {
+    if (galeriaKeep.length + galeriaNueva.length > MAX_GALERIA_ITEMS) {
       throw new Error(`La galería admite máximo ${MAX_GALERIA_ITEMS} imágenes`);
     }
 
@@ -364,19 +302,12 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
         obsoletePaths.push(storagePath);
       }
       imagenUrl = null;
-    } else if (imagenFile && imagenFile.size > 0) {
-      const { publicUrl, filePath } = await uploadProyectoAsset(
-        supabase,
-        proyectoId,
-        imagenFile,
-        "portada",
-      );
-      newUploadedPaths.push(filePath);
+    } else if (imagenUrlNueva) {
       const storagePath = buildStoragePathFromUrl(imagenUrl, proyectoId);
       if (storagePath) {
         obsoletePaths.push(storagePath);
       }
-      imagenUrl = publicUrl;
+      imagenUrl = imagenUrlNueva;
     }
 
     if (eliminarLogo && logoUrl) {
@@ -385,39 +316,15 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
         obsoletePaths.push(storagePath);
       }
       logoUrl = null;
-    } else if (logoFile && logoFile.size > 0) {
-      const { publicUrl, filePath } = await uploadProyectoAsset(
-        supabase,
-        proyectoId,
-        logoFile,
-        "logo",
-      );
-      newUploadedPaths.push(filePath);
+    } else if (logoUrlNueva) {
       const storagePath = buildStoragePathFromUrl(logoUrl, proyectoId);
       if (storagePath) {
         obsoletePaths.push(storagePath);
       }
-      logoUrl = publicUrl;
+      logoUrl = logoUrlNueva;
     }
 
-    const galeriaFinal: ProyectoMediaItem[] = [...galeriaKeep];
-    if (galeriaFiles.length > 0) {
-      for (const file of galeriaFiles) {
-        const { publicUrl, filePath } = await uploadProyectoAsset(
-          supabase,
-          proyectoId,
-          file,
-          "galeria",
-        );
-        newUploadedPaths.push(filePath);
-        galeriaFinal.push({
-          url: publicUrl,
-          path: filePath,
-          nombre: file.name,
-          created_at: new Date().toISOString(),
-        });
-      }
-    }
+    const galeriaFinal: ProyectoMediaItem[] = [...galeriaKeep, ...galeriaNueva];
 
     const { error: updateError } = await supabase
       .from("proyecto")
@@ -452,12 +359,6 @@ export async function actualizarProyecto(proyectoId: string, formData: FormData)
 
     return { success: true, message: `Proyecto "${nombre}" actualizado correctamente` };
   } catch (error) {
-    if (newUploadedPaths.length > 0) {
-      await supabase.storage
-        .from("imagenes")
-        .remove(newUploadedPaths)
-        .catch((cleanupError) => console.warn("Error limpiando archivos nuevos:", cleanupError));
-    }
     console.error("Error actualizando proyecto:", error);
     throw new Error(error instanceof Error ? error.message : "Error actualizando proyecto");
   }
