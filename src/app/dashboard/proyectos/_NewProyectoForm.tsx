@@ -7,12 +7,18 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useRouter } from "next/navigation";
 import UbicacionSelector from "@/components/UbicacionSelector";
 import { compressImage, compressImages, formatFileSize } from "@/lib/imageCompression";
-import { Plus, Minus, ChevronDown } from "lucide-react";
+import { Plus, Minus, ChevronDown, Image as PhotoIcon, X } from "lucide-react";
 import { createClient } from "@/lib/supabase.client";
 import {
   uploadProyectoAsset,
   removeProyectoAssets,
 } from "@/lib/storage/proyectoUpload.client";
+
+const MAX_GALERIA_ITEMS_NEW = 6;
+const ALLOWED_IMAGE_TYPES_NEW = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_BYTES_NEW = 5 * 1024 * 1024;
+
+type PendingGalleryEntry = { id: string; file: File; preview: string };
 
 export default function NewProyectoForm() {
   const [pending, start] = useTransition();
@@ -21,6 +27,61 @@ export default function NewProyectoForm() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [compressionProgress, setCompressionProgress] = useState<string>("");
+  const [galleryEntries, setGalleryEntries] = useState<PendingGalleryEntry[]>([]);
+  const [galleryDragOver, setGalleryDragOver] = useState(false);
+
+  const galleryLimitReached = galleryEntries.length >= MAX_GALERIA_ITEMS_NEW;
+
+  const clearGalleryEntries = useCallback(() => {
+    setGalleryEntries((prev) => {
+      prev.forEach((e) => URL.revokeObjectURL(e.preview));
+      return [];
+    });
+  }, []);
+
+  const addGalleryFiles = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+      const remaining = MAX_GALERIA_ITEMS_NEW - galleryEntries.length;
+      if (remaining <= 0) {
+        toast.error(`La galería ya tiene ${MAX_GALERIA_ITEMS_NEW} imágenes.`);
+        return;
+      }
+      if (files.length > remaining) {
+        toast(`Solo se agregaron ${remaining} de ${files.length} imágenes (límite ${MAX_GALERIA_ITEMS_NEW}).`);
+      }
+      const next: PendingGalleryEntry[] = [];
+      for (const file of files.slice(0, remaining)) {
+        if (!ALLOWED_IMAGE_TYPES_NEW.has(file.type)) {
+          toast.error(`${file.name}: formato no permitido`);
+          continue;
+        }
+        if (file.size > MAX_IMAGE_BYTES_NEW) {
+          toast.error(`${file.name}: supera 5MB`);
+          continue;
+        }
+        next.push({
+          id: `gn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          preview: URL.createObjectURL(file),
+        });
+      }
+      if (next.length === 0) return;
+      setGalleryEntries((prev) => [...prev, ...next]);
+    },
+    [galleryEntries.length],
+  );
+
+  const removeGalleryEntry = (id: string) => {
+    setGalleryEntries((prev) => {
+      const next = prev.filter((e) => {
+        if (e.id !== id) return true;
+        URL.revokeObjectURL(e.preview);
+        return false;
+      });
+      return next;
+    });
+  };
 
   // Estado para ubigeo
   const [ubigeoData, setUbigeoData] = useState({
@@ -102,9 +163,7 @@ export default function NewProyectoForm() {
 
               const imagenFile = originalFormData.get("imagen") as File | null;
               const logoFile = originalFormData.get("logo") as File | null;
-              const galeriaFiles = originalFormData
-                .getAll("galeria")
-                .filter((f): f is File => f instanceof File && f.size > 0);
+              const galeriaFiles = galleryEntries.map((e) => e.file);
 
               let imagenComprimida: File | null = null;
               let logoComprimido: File | null = null;
@@ -181,6 +240,7 @@ export default function NewProyectoForm() {
                     toast.success("Proyecto creado correctamente");
                     setIsExpanded(false);
                     form.reset();
+                    clearGalleryEntries();
                     router.push(`/dashboard/proyectos/${result.proyecto.id}`);
                   }
                 } catch (error) {
@@ -361,18 +421,115 @@ export default function NewProyectoForm() {
 
         {/* Galería de Imágenes */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-crm-text-primary">Galería de imágenes adicionales</label>
-          <input
-            type="file"
-            name="galeria"
-            accept="image/png,image/jpeg,image/webp"
-            multiple
-            className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20"
-            disabled={pending || isCompressing}
-          />
-          <p className="text-[10px] text-crm-text-muted">
-            Hasta 6 imágenes. Se comprimen automáticamente para optimizar la carga.
-          </p>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-medium text-crm-text-primary">
+              Galería de imágenes adicionales ({galleryEntries.length}/{MAX_GALERIA_ITEMS_NEW})
+            </label>
+            <span className="text-[10px] text-crm-text-muted">
+              {Math.max(0, MAX_GALERIA_ITEMS_NEW - galleryEntries.length)} espacios disponibles
+            </span>
+          </div>
+
+          {galleryEntries.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {galleryEntries.map((entry, idx) => (
+                <div
+                  key={entry.id}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-crm-border"
+                >
+                  <img
+                    src={entry.preview}
+                    alt={`Nueva ${idx + 1}`}
+                    className="h-full w-full object-cover opacity-90"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeGalleryEntry(entry.id)}
+                    disabled={pending || isCompressing}
+                    className="absolute top-1 right-1 p-0.5 bg-black/60 text-white rounded-full hover:bg-black/80"
+                    title="Quitar"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  <span className="absolute bottom-0.5 left-0.5 text-[9px] font-semibold px-1 py-px bg-white/80 rounded text-gray-700">
+                    #{idx + 1}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <label
+            htmlFor="galeria-new"
+            tabIndex={pending || isCompressing || galleryLimitReached ? -1 : 0}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setGalleryDragOver(false);
+              if (pending || isCompressing || galleryLimitReached) return;
+              const files = Array.from(e.dataTransfer.files).filter((f) =>
+                f.type.startsWith("image/"),
+              );
+              addGalleryFiles(files);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (pending || isCompressing || galleryLimitReached) return;
+              if (!galleryDragOver) setGalleryDragOver(true);
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (pending || isCompressing || galleryLimitReached) return;
+              if (!galleryDragOver) setGalleryDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setGalleryDragOver(false);
+            }}
+            onPaste={(e) => {
+              if (pending || isCompressing || galleryLimitReached) return;
+              const files = Array.from(e.clipboardData.files).filter((f) =>
+                f.type.startsWith("image/"),
+              );
+              if (files.length === 0) return;
+              e.preventDefault();
+              addGalleryFiles(files);
+            }}
+            className={`flex flex-col items-center justify-center gap-1 px-4 py-5 border-2 border-dashed rounded-lg text-center transition-colors ${
+              pending || isCompressing || galleryLimitReached
+                ? "opacity-50 cursor-not-allowed border-crm-border"
+                : galleryDragOver
+                  ? "border-crm-primary bg-crm-primary/10 cursor-copy"
+                  : "border-crm-border cursor-pointer hover:border-crm-primary/60 hover:bg-crm-card-hover/50"
+            }`}
+          >
+            <PhotoIcon
+              className={`w-6 h-6 ${galleryDragOver ? "text-crm-primary" : "text-crm-text-muted"}`}
+            />
+            <p className="text-xs font-medium text-crm-text-primary">
+              {galleryDragOver
+                ? "Suelte para agregar"
+                : "Arrastre imágenes aquí o haga clic para seleccionar"}
+            </p>
+            <p className="text-[10px] text-crm-text-muted">
+              Hasta {MAX_GALERIA_ITEMS_NEW} · 5MB c/u · También Ctrl+V para pegar
+            </p>
+            <input
+              type="file"
+              id="galeria-new"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              disabled={pending || isCompressing || galleryLimitReached}
+              onChange={(e) => {
+                addGalleryFiles(Array.from(e.target.files ?? []));
+                e.target.value = "";
+              }}
+              className="hidden"
+            />
+          </label>
         </div>
 
           {/* Botones de acción */}

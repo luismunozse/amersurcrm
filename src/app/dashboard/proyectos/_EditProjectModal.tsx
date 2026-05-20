@@ -112,6 +112,7 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
   const [galleryDraft, setGalleryDraft] = useState<GalleryDraftItem[]>(() =>
     toDraft(Array.isArray(proyecto.galeria_imagenes) ? proyecto.galeria_imagenes : []),
   );
+  const [galleryDragOver, setGalleryDragOver] = useState(false);
   const galleryLimitReached = galleryDraft.length >= MAX_GALERIA_ITEMS;
 
   const sensors = useSensors(
@@ -222,14 +223,17 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
     setEliminarLogo(true);
   };
 
-  const handleGalleryFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
+  const addGalleryFiles = (files: File[]) => {
     if (files.length === 0) return;
 
     const remainingSlots = MAX_GALERIA_ITEMS - galleryDraft.length;
     if (remainingSlots <= 0) {
       toast.error(`La galería ya tiene ${MAX_GALERIA_ITEMS} imágenes.`);
       return;
+    }
+
+    if (files.length > remainingSlots) {
+      toast(`Solo se agregaron ${remainingSlots} de ${files.length} imágenes (límite ${MAX_GALERIA_ITEMS}).`);
     }
 
     const nextEntries: GalleryDraftItem[] = [];
@@ -244,7 +248,41 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
 
     if (nextEntries.length === 0) return;
     setGalleryDraft((prev) => [...prev, ...nextEntries]);
+  };
+
+  const handleGalleryFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addGalleryFiles(Array.from(e.target.files ?? []));
     e.target.value = "";
+  };
+
+  const handleGalleryDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGalleryDragOver(false);
+    if (isPending || galleryLimitReached) return;
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    addGalleryFiles(files);
+  };
+
+  const handleGalleryDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isPending || galleryLimitReached) return;
+    if (!galleryDragOver) setGalleryDragOver(true);
+  };
+
+  const handleGalleryDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGalleryDragOver(false);
+  };
+
+  const handleGalleryPaste = (e: React.ClipboardEvent<HTMLLabelElement>) => {
+    if (isPending || galleryLimitReached) return;
+    const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+    e.preventDefault();
+    addGalleryFiles(files);
   };
 
   const handleRemoveGalleryItem = (id: string) => {
@@ -676,20 +714,36 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
             )}
 
             <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-4">
-                <label
-                  htmlFor="galeria"
-                  className={`flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${
-                    galleryLimitReached
-                      ? "opacity-50 cursor-not-allowed"
-                      : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <PhotoIcon className="w-5 h-5" />
-                  <span className="text-sm font-medium">
-                    Agregar imágenes
-                  </span>
-                </label>
+              <label
+                htmlFor="galeria"
+                tabIndex={galleryLimitReached || isPending ? -1 : 0}
+                onDrop={handleGalleryDrop}
+                onDragOver={handleGalleryDragOver}
+                onDragEnter={handleGalleryDragOver}
+                onDragLeave={handleGalleryDragLeave}
+                onPaste={handleGalleryPaste}
+                className={`relative flex flex-col items-center justify-center gap-2 px-4 py-6 border-2 border-dashed rounded-lg transition-colors text-center ${
+                  galleryLimitReached || isPending
+                    ? "opacity-50 cursor-not-allowed border-gray-300 dark:border-gray-600"
+                    : galleryDragOver
+                      ? "border-crm-primary bg-crm-primary/10 cursor-copy"
+                      : "border-gray-300 dark:border-gray-600 cursor-pointer hover:border-crm-primary/60 hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                }`}
+              >
+                <PhotoIcon className={`w-8 h-8 ${galleryDragOver ? "text-crm-primary" : "text-gray-400"}`} />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {galleryDragOver
+                      ? "Suelte para agregar"
+                      : "Arrastre imágenes aquí o haga clic para seleccionar"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Puede seleccionar varias a la vez · También pegar con Ctrl+V
+                  </p>
+                </div>
+                <span className="text-xs text-crm-text-muted">
+                  {Math.max(0, MAX_GALERIA_ITEMS - galleryDraft.length)} espacios disponibles · Máx {MAX_GALERIA_ITEMS} imágenes · 5MB c/u
+                </span>
                 <input
                   type="file"
                   id="galeria"
@@ -699,12 +753,9 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
                   disabled={isPending || galleryLimitReached}
                   className="hidden"
                 />
-                <span className="text-xs text-gray-500">
-                  {Math.max(0, MAX_GALERIA_ITEMS - galleryDraft.length)} espacios disponibles
-                </span>
-              </div>
+              </label>
               <p className="text-xs text-gray-500">
-                Máximo {MAX_GALERIA_ITEMS} imágenes, 5MB cada una. Arrastre las miniaturas para cambiar el orden.
+                Arrastre las miniaturas existentes para cambiar el orden.
               </p>
             </div>
           </div>
