@@ -14,6 +14,7 @@ import {
   Pause as PauseIcon,
 } from 'lucide-react';
 import QuickActions from './QuickActions';
+import StatsPopover from './_StatsPopover';
 import type { ProyectoMediaItem } from '@/types/proyectos';
 
 type ProyectoConStats = {
@@ -31,7 +32,10 @@ type ProyectoConStats = {
   stats: {
     total: number;
     vendidos: number;
+    reservados: number;
     disponibles: number;
+    ingresosVendidosPEN: number;
+    ingresosProyectadosPEN: number;
   };
 };
 
@@ -238,8 +242,8 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
           const galeriaCount = galeriaItems.length;
 
           return (
+            <StatsPopover key={p.id} stats={stats} nombreProyecto={p.nombre}>
             <div
-              key={p.id}
               className="crm-card rounded-xl md:rounded-2xl overflow-hidden hover:shadow-crm-xl transition-all duration-300 group relative flex flex-row md:flex-col"
             >
               {/* Imagen */}
@@ -332,40 +336,67 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
                 {/* Stats inline en mobile */}
                 <div className="flex items-center gap-3 text-[11px] md:hidden mb-2">
                   <span className="text-crm-text-muted">
-                    <span className="font-semibold text-crm-accent">{stats.disponibles}</span> disp.
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{stats.disponibles}</span> disp.
                   </span>
+                  {stats.reservados > 0 && (
+                    <span className="text-crm-text-muted">
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">{stats.reservados}</span> res.
+                    </span>
+                  )}
                   <span className="text-crm-text-muted">
-                    <span className="font-semibold text-crm-primary">{stats.vendidos}</span>/{stats.total} vendidos
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">{stats.vendidos}</span>/{stats.total} vend.
                   </span>
                 </div>
 
                 {/* Estadísticas grid en desktop */}
-                <div className="hidden md:grid grid-cols-3 gap-3 py-4 border-y border-crm-border mb-3">
+                <div className="hidden md:grid grid-cols-4 gap-3 py-4 border-y border-crm-border mb-3">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-crm-text-primary">{stats.total}</p>
-                    <p className="text-xs text-crm-text-muted font-medium mt-1">Total Lotes</p>
+                    <p className="text-xs text-crm-text-muted font-medium mt-1">Total</p>
                   </div>
-                  <div className="text-center border-x border-crm-border">
-                    <p className="text-2xl font-bold text-crm-primary">{stats.vendidos}</p>
-                    <p className="text-xs text-crm-text-muted font-medium mt-1">Vendidos</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-crm-accent">{stats.disponibles}</p>
+                  <div className="text-center border-l border-crm-border">
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.disponibles}</p>
                     <p className="text-xs text-crm-text-muted font-medium mt-1">Disponibles</p>
+                  </div>
+                  <div className="text-center border-l border-crm-border">
+                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.reservados}</p>
+                    <p className="text-xs text-crm-text-muted font-medium mt-1">Reservados</p>
+                  </div>
+                  <div className="text-center border-l border-crm-border">
+                    <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{stats.vendidos}</p>
+                    <p className="text-xs text-crm-text-muted font-medium mt-1">Vendidos</p>
                   </div>
                 </div>
 
-                {/* Barra de progreso */}
+                {/* Barra de progreso stacked: disponibles | reservados | vendidos */}
                 <div className="mb-2 md:mb-3">
                   <div className="flex items-center justify-between text-[10px] md:text-xs mb-1">
-                    <span className="text-crm-text-muted font-medium hidden md:inline">Progreso</span>
-                    <span className="text-crm-primary font-bold">{vendidoPct}%</span>
+                    <span className="text-crm-text-muted font-medium hidden md:inline">Avance</span>
+                    <span className="text-crm-text-primary font-bold">{vendidoPct}% vendido</span>
                   </div>
-                  <div className="h-1.5 md:h-2.5 rounded-full bg-crm-border/30 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-crm-primary to-crm-accent transition-all duration-500"
-                      style={{ width: `${vendidoPct}%` }}
-                    />
+                  <div
+                    className="flex h-1.5 md:h-2.5 rounded-full bg-crm-border/30 overflow-hidden"
+                    title={`Disponibles: ${stats.disponibles} · Reservados: ${stats.reservados} · Vendidos: ${stats.vendidos}`}
+                  >
+                    {stats.total > 0 && (
+                      <>
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-500"
+                          style={{ width: `${(stats.disponibles / stats.total) * 100}%` }}
+                          title={`Disponibles: ${stats.disponibles}`}
+                        />
+                        <div
+                          className="h-full bg-amber-500 transition-all duration-500"
+                          style={{ width: `${(stats.reservados / stats.total) * 100}%` }}
+                          title={`Reservados: ${stats.reservados}`}
+                        />
+                        <div
+                          className="h-full bg-rose-500 transition-all duration-500"
+                          style={{ width: `${(stats.vendidos / stats.total) * 100}%` }}
+                          title={`Vendidos: ${stats.vendidos}`}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -402,6 +433,7 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
                 </Link>
               </div>
             </div>
+            </StatsPopover>
           );
         })}
       </div>

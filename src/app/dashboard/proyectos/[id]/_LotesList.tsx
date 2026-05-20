@@ -78,6 +78,8 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
   const [vendedoresList, setVendedoresList] = useState<Array<{ username: string; nombre_completo: string; rol: string }>>([]);
+  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   useEffect(() => {
     if (puedeAsignarVendedor) {
@@ -100,6 +102,122 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       return next;
     });
   };
+
+  // Atajos de teclado - solo activos cuando no hay input focused ni modales abiertos
+  useEffect(() => {
+    const isTypingInField = () => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        (el as HTMLElement).isContentEditable
+      );
+    };
+
+    const isModalOpen = () =>
+      !!editingLote ||
+      !!selectedLote ||
+      !!reservandoLoteId ||
+      showDeleteAllModal ||
+      showBulkImportModal ||
+      !!confirmDeleteLote ||
+      showShortcutsHelp;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (isTypingInField()) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const list = lotesState;
+      if (list.length === 0) return;
+
+      switch (e.key) {
+        case "?":
+          if (!isModalOpen()) {
+            e.preventDefault();
+            setShowShortcutsHelp(true);
+          }
+          break;
+        case "j":
+        case "J":
+        case "ArrowDown":
+          if (isModalOpen()) return;
+          e.preventDefault();
+          setFocusedIdx((idx) => Math.min(list.length - 1, (idx < 0 ? -1 : idx) + 1));
+          break;
+        case "k":
+        case "K":
+        case "ArrowUp":
+          if (isModalOpen()) return;
+          e.preventDefault();
+          setFocusedIdx((idx) => Math.max(0, idx - 1));
+          break;
+        case " ":
+        case "Space":
+          if (isModalOpen() || !puedeBulk || focusedIdx < 0) return;
+          e.preventDefault();
+          toggleSelected(list[focusedIdx].id);
+          break;
+        case "Enter":
+          if (isModalOpen() || focusedIdx < 0) return;
+          e.preventDefault();
+          setSelectedLote(list[focusedIdx]);
+          break;
+        case "e":
+        case "E":
+          if (isModalOpen() || !puedeEditarLotes || focusedIdx < 0) return;
+          e.preventDefault();
+          setEditingLote(list[focusedIdx].id);
+          break;
+        case "r":
+        case "R":
+          if (isModalOpen() || focusedIdx < 0) return;
+          if (list[focusedIdx].estado !== "disponible") return;
+          e.preventDefault();
+          setReservandoLoteId(list[focusedIdx].id);
+          break;
+        case "Delete":
+        case "Backspace":
+          if (isModalOpen() || !puedeEliminarLotes || focusedIdx < 0) return;
+          e.preventDefault();
+          setConfirmDeleteLote({ id: list[focusedIdx].id, codigo: list[focusedIdx].codigo });
+          break;
+        case "Escape":
+          if (showShortcutsHelp) {
+            setShowShortcutsHelp(false);
+          } else if (selectedIds.size > 0) {
+            setSelectedIds(new Set());
+          } else if (focusedIdx >= 0) {
+            setFocusedIdx(-1);
+          }
+          break;
+      }
+    };
+
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [
+    lotesState,
+    focusedIdx,
+    selectedIds,
+    editingLote,
+    selectedLote,
+    reservandoLoteId,
+    showDeleteAllModal,
+    showBulkImportModal,
+    confirmDeleteLote,
+    showShortcutsHelp,
+    puedeEditarLotes,
+    puedeEliminarLotes,
+    puedeBulk,
+  ]);
+
+  // Reset focus si el índice queda fuera de rango (lotes filtrados, eliminados, etc)
+  useEffect(() => {
+    if (focusedIdx >= lotesState.length) setFocusedIdx(lotesState.length - 1);
+  }, [lotesState.length, focusedIdx]);
 
   const toggleSelectAll = (lotes: Lote[]) => {
     setSelectedIds((prev) => {
@@ -256,19 +374,53 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
     setConfirmDeleteLote({ id: loteId, codigo });
   };
 
-  const confirmarDeleteLote = async () => {
+  const confirmarDeleteLote = () => {
     if (!confirmDeleteLote) return;
     const { id: loteId, codigo } = confirmDeleteLote;
     setConfirmDeleteLote(null);
 
-    try {
-      setLotesState(prevLotes => prevLotes.filter(lote => lote.id !== loteId));
-      await eliminarLote(loteId, proyectoId);
-      toast.success(`Lote ${codigo} eliminado exitosamente`);
-    } catch (error) {
-      setLotesState(lotes);
-      toast.error(`Error eliminando lote: ${(error as Error).message}`);
-    }
+    // Snapshot del lote completo antes de removerlo (para restore en undo)
+    const loteSnapshot = lotesState.find((l) => l.id === loteId);
+    const idxOriginal = lotesState.findIndex((l) => l.id === loteId);
+    if (!loteSnapshot) return;
+
+    // Optimistic UI: remover inmediato
+    setLotesState((prev) => prev.filter((l) => l.id !== loteId));
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      if (cancelled) return;
+      try {
+        await eliminarLote(loteId, proyectoId);
+      } catch (err) {
+        // Si falla el delete real, restaurar en su posición original
+        setLotesState((prev) => {
+          if (prev.some((l) => l.id === loteId)) return prev;
+          const next = [...prev];
+          next.splice(Math.min(idxOriginal, next.length), 0, loteSnapshot);
+          return next;
+        });
+        toast.error(`Error eliminando lote: ${(err as Error).message}`);
+      }
+    }, 5000);
+
+    toast(`Lote ${codigo} eliminado`, {
+      duration: 5000,
+      action: {
+        label: "Deshacer",
+        onClick: () => {
+          cancelled = true;
+          window.clearTimeout(timeoutId);
+          setLotesState((prev) => {
+            if (prev.some((l) => l.id === loteId)) return prev;
+            const next = [...prev];
+            next.splice(Math.min(idxOriginal, next.length), 0, loteSnapshot);
+            return next;
+          });
+          toast.success(`Lote ${codigo} restaurado`);
+        },
+      },
+    });
   };
 
   const handleDeleteAll = () => {
@@ -555,6 +707,19 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
               )}
               {/* Vista de escritorio - Tabla completa */}
               <div className="hidden lg:block space-y-3">
+              {/* Atajos de teclado hint */}
+              <div className="hidden lg:flex justify-end -mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowShortcutsHelp(true)}
+                  className="text-[11px] text-crm-text-muted hover:text-crm-text-primary inline-flex items-center gap-1"
+                  title="Ver atajos de teclado"
+                >
+                  Atajos
+                  <kbd className="px-1.5 py-0.5 rounded border border-crm-border bg-crm-card text-[10px] font-mono">?</kbd>
+                </button>
+              </div>
+
               {/* Header de la tabla */}
               <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-crm-card-hover rounded-lg text-sm font-medium text-crm-text-muted">
                 <div className="col-span-2 flex items-center gap-2">
@@ -582,12 +747,17 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
               </div>
 
                 {/* Lista de lotes - Vista de escritorio */}
-                {lotesAMostrar.map((lote) => (
+                {lotesAMostrar.map((lote, idx) => (
                   <div
                     key={lote.id}
+                    ref={(el) => {
+                      if (el && idx === focusedIdx) {
+                        el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                      }
+                    }}
                     className={`grid grid-cols-12 gap-3 px-4 py-4 bg-crm-card border rounded-lg hover:bg-crm-card-hover transition-colors ${
                       selectedIds.has(lote.id) ? "border-crm-primary" : "border-crm-border"
-                    }`}
+                    } ${idx === focusedIdx ? "ring-2 ring-crm-primary ring-offset-1" : ""}`}
                   >
                     {/* Código */}
                     <div className="col-span-2 flex items-center gap-2">
@@ -1021,6 +1191,59 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       onConfirm={confirmarDeleteLote}
       onClose={() => setConfirmDeleteLote(null)}
     />
+    {showShortcutsHelp && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        onClick={() => setShowShortcutsHelp(false)}
+      >
+        <div
+          className="w-full max-w-md rounded-xl bg-crm-card border border-crm-border shadow-2xl p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-crm-text-primary">Atajos de teclado</h3>
+            <button
+              type="button"
+              onClick={() => setShowShortcutsHelp(false)}
+              className="text-crm-text-muted hover:text-crm-text-primary"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+          <ul className="space-y-2 text-sm text-crm-text-secondary">
+            {[
+              { keys: ["J", "↓"], desc: "Siguiente lote" },
+              { keys: ["K", "↑"], desc: "Lote anterior" },
+              { keys: ["Enter"], desc: "Ver detalle" },
+              { keys: ["E"], desc: "Editar (admin)" },
+              { keys: ["R"], desc: "Reservar (si disponible)" },
+              { keys: ["Space"], desc: "Seleccionar para bulk" },
+              { keys: ["Del", "⌫"], desc: "Eliminar (admin)" },
+              { keys: ["Esc"], desc: "Limpiar selección / quitar foco" },
+              { keys: ["?"], desc: "Mostrar esta ayuda" },
+            ].map((row) => (
+              <li key={row.desc} className="flex items-center justify-between gap-3">
+                <span>{row.desc}</span>
+                <span className="flex gap-1">
+                  {row.keys.map((k) => (
+                    <kbd
+                      key={k}
+                      className="px-2 py-0.5 rounded border border-crm-border bg-crm-card-hover text-[11px] font-mono text-crm-text-primary"
+                    >
+                      {k}
+                    </kbd>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-[11px] text-crm-text-muted">
+            Atajos inactivos mientras escribe en un campo o modal abierto.
+          </p>
+        </div>
+      </div>
+    )}
     </>
   );
 }

@@ -10,6 +10,14 @@ import { Plus, AlertTriangle } from "lucide-react";
 type LoteRow = {
   proyecto_id: string;
   estado: "disponible" | "reservado" | "vendido";
+  precio: number | null;
+  moneda: string | null;
+};
+
+const USD_PEN_RATE = 3.8;
+const toPEN = (precio: number | null, moneda: string | null): number => {
+  if (!precio) return 0;
+  return moneda === "USD" ? precio * USD_PEN_RATE : precio;
 };
 
 const parseGaleria = (value: unknown): ProyectoMediaItem[] => {
@@ -36,13 +44,20 @@ export default async function ProyectosPage() {
     const ids = proyectos.map((p) => p.id);
     const lotesByProyecto: Record<
       string,
-      { total: number; vendidos: number; disponibles: number }
+      {
+        total: number;
+        vendidos: number;
+        reservados: number;
+        disponibles: number;
+        ingresosVendidosPEN: number;
+        ingresosProyectadosPEN: number;
+      }
     > = {};
 
     if (ids.length > 0) {
       const { data: lotes, error: lotesErr } = await supabase
         .from("lote")
-        .select("proyecto_id,estado")
+        .select("proyecto_id,estado,precio,moneda")
         .in("proyecto_id", ids);
 
       if (lotesErr) throw lotesErr;
@@ -51,10 +66,19 @@ export default async function ProyectosPage() {
         const acc = (lotesByProyecto[l.proyecto_id] ??= {
           total: 0,
           vendidos: 0,
+          reservados: 0,
           disponibles: 0,
+          ingresosVendidosPEN: 0,
+          ingresosProyectadosPEN: 0,
         });
         acc.total += 1;
-        if (l.estado === "vendido") acc.vendidos += 1;
+        const enPEN = toPEN(l.precio, l.moneda);
+        acc.ingresosProyectadosPEN += enPEN;
+        if (l.estado === "vendido") {
+          acc.vendidos += 1;
+          acc.ingresosVendidosPEN += enPEN;
+        }
+        if (l.estado === "reservado") acc.reservados += 1;
         if (l.estado === "disponible") acc.disponibles += 1;
       });
     }
@@ -72,7 +96,14 @@ export default async function ProyectosPage() {
       longitud: p.longitud ?? null,
       descripcion: p.descripcion ?? null,
       galeria_imagenes: parseGaleria((p as { galeria_imagenes?: unknown }).galeria_imagenes),
-      stats: lotesByProyecto[p.id] ?? { total: 0, vendidos: 0, disponibles: 0 },
+      stats: lotesByProyecto[p.id] ?? {
+        total: 0,
+        vendidos: 0,
+        reservados: 0,
+        disponibles: 0,
+        ingresosVendidosPEN: 0,
+        ingresosProyectadosPEN: 0,
+      },
     }));
 
     return (

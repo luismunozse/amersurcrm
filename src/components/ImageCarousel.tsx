@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 5;
+const ZOOM_STEP = 0.25;
 
 interface ImageCarouselProps {
   images: Array<{
@@ -22,22 +26,46 @@ export default function ImageCarousel({
 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isLoading, setIsLoading] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ active: boolean; startX: number; startY: number; baseX: number; baseY: number }>({
+    active: false,
+    startX: 0,
+    startY: 0,
+    baseX: 0,
+    baseY: 0,
+  });
+
+  const resetZoom = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
   // Resetear índice cuando se abre
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(initialIndex);
+      resetZoom();
     }
-  }, [isOpen, initialIndex]);
+  }, [isOpen, initialIndex, resetZoom]);
 
-  // Navegación con teclado
+  // Reset zoom al cambiar de imagen
+  useEffect(() => {
+    resetZoom();
+  }, [currentIndex, resetZoom]);
+
+  // Navegación con teclado + zoom
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isOpen) return;
 
       switch (e.key) {
         case "Escape":
-          onClose();
+          if (zoom > 1) {
+            resetZoom();
+          } else {
+            onClose();
+          }
           break;
         case "ArrowLeft":
           setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
@@ -45,9 +73,24 @@ export default function ImageCarousel({
         case "ArrowRight":
           setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
           break;
+        case "+":
+        case "=":
+          setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP));
+          break;
+        case "-":
+        case "_":
+          setZoom((z) => {
+            const next = Math.max(MIN_ZOOM, z - ZOOM_STEP);
+            if (next === 1) setPan({ x: 0, y: 0 });
+            return next;
+          });
+          break;
+        case "0":
+          resetZoom();
+          break;
       }
     },
-    [isOpen, onClose, images.length]
+    [isOpen, onClose, images.length, zoom, resetZoom]
   );
 
   useEffect(() => {
@@ -69,6 +112,51 @@ export default function ImageCarousel({
   const goToNext = () => {
     setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
     setIsLoading(true);
+  };
+
+  const handleWheel = (e: WheelEvent<HTMLDivElement>) => {
+    if (!isOpen) return;
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    setZoom((z) => {
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z + delta));
+      if (next === 1) setPan({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const handleImageClick = (e: MouseEvent<HTMLImageElement>) => {
+    e.stopPropagation();
+    if (zoom > 1) {
+      resetZoom();
+    } else {
+      setZoom(2);
+    }
+  };
+
+  const handlePointerDown = (e: MouseEvent<HTMLDivElement>) => {
+    if (zoom <= 1) return;
+    e.stopPropagation();
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: pan.x,
+      baseY: pan.y,
+    };
+  };
+
+  const handlePointerMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!dragRef.current.active) return;
+    e.stopPropagation();
+    setPan({
+      x: dragRef.current.baseX + (e.clientX - dragRef.current.startX),
+      y: dragRef.current.baseY + (e.clientY - dragRef.current.startY),
+    });
+  };
+
+  const handlePointerUp = () => {
+    dragRef.current.active = false;
   };
 
   if (!isOpen) return null;
@@ -120,8 +208,14 @@ export default function ImageCarousel({
 
       {/* Main Image Container */}
       <div
-        className="relative max-w-7xl max-h-[90vh] mx-auto px-4 sm:px-8 lg:px-20"
+        className="relative max-w-7xl max-h-[90vh] mx-auto px-4 sm:px-8 lg:px-20 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        onWheel={handleWheel}
+        onMouseDown={handlePointerDown}
+        onMouseMove={handlePointerMove}
+        onMouseUp={handlePointerUp}
+        onMouseLeave={handlePointerUp}
+        style={{ cursor: zoom > 1 ? (dragRef.current.active ? "grabbing" : "grab") : "zoom-in" }}
       >
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -132,19 +226,75 @@ export default function ImageCarousel({
         <img
           src={currentImage.url}
           alt={currentImage.nombre || `Imagen ${currentIndex + 1}`}
-          className="max-w-full max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+          className="max-w-full max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl select-none transition-transform duration-150"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "center center",
+          }}
           onLoad={() => setIsLoading(false)}
           onError={() => setIsLoading(false)}
+          onClick={handleImageClick}
+          draggable={false}
         />
 
         {/* Image Caption */}
-        {currentImage.nombre && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-6 py-4 rounded-b-lg">
+        {currentImage.nombre && zoom === 1 && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-6 py-4 rounded-b-lg pointer-events-none">
             <p className="text-white text-sm font-medium text-center">
               {currentImage.nombre}
             </p>
           </div>
         )}
+      </div>
+
+      {/* Zoom controls */}
+      <div
+        className="absolute z-10 flex items-center gap-1 bg-white/10 backdrop-blur-sm rounded-full p-1"
+        style={{ top: 'calc(env(safe-area-inset-top) + 1rem)', right: 'calc(env(safe-area-inset-right) + 4.5rem)' }}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setZoom((z) => {
+              const next = Math.max(MIN_ZOOM, z - ZOOM_STEP);
+              if (next === 1) setPan({ x: 0, y: 0 });
+              return next;
+            });
+          }}
+          disabled={zoom <= MIN_ZOOM}
+          className="w-9 h-9 flex items-center justify-center hover:bg-white/20 rounded-full transition-all disabled:opacity-40"
+          title="Alejar (-)"
+          aria-label="Alejar"
+        >
+          <ZoomOut className="w-4 h-4 text-white" />
+        </button>
+        <span className="text-white text-xs font-medium w-12 text-center tabular-nums">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP));
+          }}
+          disabled={zoom >= MAX_ZOOM}
+          className="w-9 h-9 flex items-center justify-center hover:bg-white/20 rounded-full transition-all disabled:opacity-40"
+          title="Acercar (+)"
+          aria-label="Acercar"
+        >
+          <ZoomIn className="w-4 h-4 text-white" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            resetZoom();
+          }}
+          disabled={zoom === 1 && pan.x === 0 && pan.y === 0}
+          className="w-9 h-9 flex items-center justify-center hover:bg-white/20 rounded-full transition-all disabled:opacity-40"
+          title="Ajustar a pantalla (0)"
+          aria-label="Ajustar"
+        >
+          <Maximize2 className="w-4 h-4 text-white" />
+        </button>
       </div>
 
       {/* Next Button */}
@@ -190,7 +340,7 @@ export default function ImageCarousel({
 
       {/* Instructions - hidden on mobile (touch gestures instead) */}
       <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white/60 text-xs hidden sm:block">
-        <p>Usa &larr; &rarr; para navegar &bull; ESC para cerrar</p>
+        <p>← → navegar · +/− zoom · 0 reset · clic = zoom · ESC cerrar</p>
       </div>
     </div>,
     document.body

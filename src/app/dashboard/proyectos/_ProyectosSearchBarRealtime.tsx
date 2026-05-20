@@ -2,7 +2,7 @@
 
 import { useRealtimeSearch } from '@/hooks/useRealtimeSearch';
 import { Spinner } from '@/components/ui/Spinner';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Search, X, Clock, Trash2, TrendingUp, Filter } from 'lucide-react';
 
@@ -34,8 +34,15 @@ export default function ProyectosSearchBarRealtime({
   resultCount,
 }: ProyectosSearchBarRealtimeProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [showHistory, setShowHistory] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+
+  const pushParams = (params: URLSearchParams) => {
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
 
@@ -216,7 +223,7 @@ export default function ProyectosSearchBarRealtime({
                   } else {
                     params.delete('estado');
                   }
-                  window.location.href = `/dashboard/proyectos?${params.toString()}`;
+                  pushParams(params);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
@@ -241,7 +248,7 @@ export default function ProyectosSearchBarRealtime({
                   } else {
                     params.delete('tipo');
                   }
-                  window.location.href = `/dashboard/proyectos?${params.toString()}`;
+                  pushParams(params);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
@@ -265,7 +272,7 @@ export default function ProyectosSearchBarRealtime({
                   } else {
                     params.delete('sort');
                   }
-                  window.location.href = `/dashboard/proyectos?${params.toString()}`;
+                  pushParams(params);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
@@ -285,7 +292,7 @@ export default function ProyectosSearchBarRealtime({
               <button
                 onClick={() => {
                   setSearchValue('');
-                  window.location.href = '/dashboard/proyectos';
+                  router.push('/dashboard/proyectos');
                 }}
                 className="text-sm text-gray-600 hover:text-gray-800 underline"
               >

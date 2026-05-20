@@ -2,7 +2,7 @@
 
 import { useRealtimeSearch } from '@/hooks/useRealtimeSearch';
 import { Spinner } from '@/components/ui/Spinner';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Search, X, Clock, Trash2, TrendingUp, Filter, ChevronDown } from 'lucide-react';
 
@@ -37,6 +37,8 @@ export default function LotesSearchBarRealtime({
   lotesCount,
 }: LotesSearchBarRealtimeProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [showHistory, setShowHistory] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,12 +110,11 @@ export default function LotesSearchBarRealtime({
 
   const handleClearAllFilters = () => {
     setSearchValue('');
-    window.location.href = `/dashboard/proyectos/${proyectoId}`;
+    router.push(`/dashboard/proyectos/${proyectoId}`);
   };
 
-  const buildFilterUrl = (updates: Record<string, string>) => {
+  const applyFilters = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
-
     Object.entries(updates).forEach(([key, value]) => {
       if (value) {
         params.set(key, value);
@@ -121,8 +122,8 @@ export default function LotesSearchBarRealtime({
         params.delete(key);
       }
     });
-
-    return `/dashboard/proyectos/${proyectoId}?${params.toString()}`;
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   return (
@@ -218,7 +219,7 @@ export default function LotesSearchBarRealtime({
           <select
             value={estado}
             onChange={(e) => {
-              window.location.href = buildFilterUrl({ estado: e.target.value });
+              applyFilters({ estado: e.target.value });
             }}
             className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
           >
@@ -232,7 +233,7 @@ export default function LotesSearchBarRealtime({
           <select
             value={sort}
             onChange={(e) => {
-              window.location.href = buildFilterUrl({ sort: e.target.value });
+              applyFilters({ sort: e.target.value });
             }}
             className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
           >
@@ -282,7 +283,7 @@ export default function LotesSearchBarRealtime({
                   placeholder="Mínimo"
                   value={precioMin}
                   onChange={(e) => {
-                    window.location.href = buildFilterUrl({ precio_min: e.target.value });
+                    applyFilters({ precio_min: e.target.value });
                   }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -292,7 +293,7 @@ export default function LotesSearchBarRealtime({
                   placeholder="Máximo"
                   value={precioMax}
                   onChange={(e) => {
-                    window.location.href = buildFilterUrl({ precio_max: e.target.value });
+                    applyFilters({ precio_max: e.target.value });
                   }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -310,7 +311,7 @@ export default function LotesSearchBarRealtime({
                   placeholder="Mínimo"
                   value={areaMin}
                   onChange={(e) => {
-                    window.location.href = buildFilterUrl({ area_min: e.target.value });
+                    applyFilters({ area_min: e.target.value });
                   }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -320,7 +321,7 @@ export default function LotesSearchBarRealtime({
                   placeholder="Máximo"
                   value={areaMax}
                   onChange={(e) => {
-                    window.location.href = buildFilterUrl({ area_max: e.target.value });
+                    applyFilters({ area_max: e.target.value });
                   }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -333,7 +334,7 @@ export default function LotesSearchBarRealtime({
             <div className="flex justify-end">
               <button
                 onClick={() => {
-                  window.location.href = buildFilterUrl({
+                  applyFilters({
                     precio_min: '',
                     precio_max: '',
                     area_min: '',

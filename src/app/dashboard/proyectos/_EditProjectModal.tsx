@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { X as XMarkIcon, ImageIcon as PhotoIcon, Trash2 as TrashIcon, GripVertical } from 'lucide-react';
 import { actualizarProyecto } from './_actions';
 import toast from 'react-hot-toast';
@@ -383,11 +383,39 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
     });
   };
 
-  const handleClose = () => {
-    if (!isPending) {
-      resetToProjectValues();
-      onClose();
+  const isDirty = useMemo(() => {
+    if (formData.nombre !== proyecto.nombre) return true;
+    if (formData.tipo !== proyecto.tipo) return true;
+    if (formData.estado !== proyecto.estado) return true;
+    if (formData.ubicacion !== (proyecto.ubicacion || "")) return true;
+    if (formData.latitud !== (proyecto.latitud?.toString() || "")) return true;
+    if (formData.longitud !== (proyecto.longitud?.toString() || "")) return true;
+    if (formData.descripcion !== (proyecto.descripcion || "")) return true;
+    if (imagenFile || eliminarImagen) return true;
+    if (logoFile || eliminarLogo) return true;
+
+    const originalGaleria = Array.isArray(proyecto.galeria_imagenes) ? proyecto.galeria_imagenes : [];
+    if (galleryDraft.some((i) => i.kind === "pending")) return true;
+    if (galleryDraft.length !== originalGaleria.length) return true;
+    for (let i = 0; i < galleryDraft.length; i++) {
+      const draft = galleryDraft[i];
+      const original = originalGaleria[i];
+      if (draft.kind === "pending") return true;
+      const draftKey = draft.path ?? draft.url;
+      const originalKey = original?.path ?? original?.url ?? null;
+      if (draftKey !== originalKey) return true;
     }
+    return false;
+  }, [formData, imagenFile, eliminarImagen, logoFile, eliminarLogo, galleryDraft, proyecto]);
+
+  const handleClose = () => {
+    if (isPending) return;
+    if (isDirty) {
+      const ok = window.confirm("Tiene cambios sin guardar. ¿Descartarlos y cerrar?");
+      if (!ok) return;
+    }
+    resetToProjectValues();
+    onClose();
   };
 
   if (!isOpen) return null;
