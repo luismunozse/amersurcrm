@@ -107,9 +107,8 @@ export default function ClienteForm({
     cargarVendedores();
   }, []);
 
-  // Sugerencia round-robin (solo al crear, no al editar)
+  // Sugerencia round-robin (carga en crear y editar)
   useEffect(() => {
-    if (isEditing) return;
     if (permisosLoading || !puedeGestionarVendedor) return;
     let cancelled = false;
     obtenerProximoVendedorSugerido()
@@ -127,10 +126,11 @@ export default function ClienteForm({
     return () => {
       cancelled = true;
     };
-  }, [isEditing, permisosLoading, puedeGestionarVendedor]);
+  }, [permisosLoading, puedeGestionarVendedor]);
 
-  // Aplicar sugerencia al select cuando vendedores y sugerencia esten cargados
+  // Auto-aplicar sugerencia solo en creación (no sobreescribir vendedor existente al editar)
   useEffect(() => {
+    if (isEditing) return;
     if (!sugerencia) return;
     if (loadingVendedores) return;
     if (vendedorSeleccionado !== "") return;
@@ -142,7 +142,19 @@ export default function ClienteForm({
       return;
     }
     setVendedorSeleccionado(sugerencia.username);
-  }, [sugerencia, loadingVendedores, vendedores, vendedorSeleccionado]);
+  }, [isEditing, sugerencia, loadingVendedores, vendedores, vendedorSeleccionado]);
+
+  const aplicarSugerencia = () => {
+    if (!sugerencia) return;
+    if (!vendedores.some((v) => v.username === sugerencia.username)) {
+      console.warn(
+        "[ClienteForm] sugerencia username no encontrada en lista de vendedores:",
+        sugerencia.username
+      );
+      return;
+    }
+    setVendedorSeleccionado(sugerencia.username);
+  };
 
   // Debounced duplicate check
   useEffect(() => {
@@ -514,7 +526,7 @@ export default function ClienteForm({
                         Solo coordinadores/admin
                       </span>
                     )}
-                    {!isEditing && sugerencia && vendedorSeleccionado === sugerencia.username && (
+                    {sugerencia && vendedorSeleccionado === sugerencia.username && (
                       <span
                         className="text-[10px] px-2 py-0.5 rounded-full bg-crm-primary/10 text-crm-primary font-semibold uppercase tracking-wide"
                         title={`Vendedor sugerido: ${sugerencia.nombre_completo}`}
@@ -523,6 +535,21 @@ export default function ClienteForm({
                       </span>
                     )}
                   </div>
+                  {isEditing && puedeGestionarVendedor && sugerencia && vendedorSeleccionado !== sugerencia.username && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-crm-primary/30 bg-crm-primary/5">
+                      <span className="text-[11px] text-crm-text-secondary">
+                        Sugerido (round-robin): <strong className="text-crm-text-primary">{sugerencia.nombre_completo}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={aplicarSugerencia}
+                        disabled={pending || loadingVendedores}
+                        className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-md bg-crm-primary text-white hover:bg-crm-primary/90 disabled:opacity-50"
+                      >
+                        Reasignar
+                      </button>
+                    </div>
+                  )}
                   {permisosLoading ? (
                     <>
                       {/* Preservar vendedor mientras cargan permisos */}
