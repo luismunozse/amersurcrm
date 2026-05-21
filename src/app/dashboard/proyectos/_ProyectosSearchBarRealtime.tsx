@@ -40,8 +40,10 @@ export default function ProyectosSearchBarRealtime({
   const [showFilters, setShowFilters] = useState(false);
 
   const pushParams = (params: URLSearchParams) => {
+    // Resetear paginación cuando cambian filtros / orden
+    params.delete('page');
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
   const inputRef = useRef<HTMLInputElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -292,7 +294,7 @@ export default function ProyectosSearchBarRealtime({
               <button
                 onClick={() => {
                   setSearchValue('');
-                  router.push('/dashboard/proyectos');
+                  router.push('/dashboard/proyectos', { scroll: false });
                 }}
                 className="text-sm text-gray-600 hover:text-gray-800 underline"
               >

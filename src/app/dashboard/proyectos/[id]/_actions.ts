@@ -1772,3 +1772,121 @@ export async function importarLotesMasivo(
     warnings,
   };
 }
+
+// ============================================================================
+// APLICAR DESCUENTO MASIVO — multiplica precio por (1 - %/100) en N lotes
+// ============================================================================
+export async function aplicarDescuentoMasivoLotes(
+  proyectoId: string,
+  loteIds: string[],
+  porcentaje: number,
+): Promise<{ success: boolean; actualizados: number; error?: string }> {
+  if (!proyectoId || !loteIds || loteIds.length === 0) {
+    return { success: false, actualizados: 0, error: "Parámetros inválidos" };
+  }
+  if (!Number.isFinite(porcentaje) || porcentaje <= 0 || porcentaje >= 100) {
+    return { success: false, actualizados: 0, error: "Porcentaje fuera de rango (0-100, excluyentes)" };
+  }
+
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, actualizados: 0, error: "No autenticado" };
+
+    await requierePermiso(PERMISOS.PRECIOS.MODIFICAR);
+    const puede = await esAdminOCoordinador();
+    if (!puede) {
+      return {
+        success: false,
+        actualizados: 0,
+        error: "Solo administradores o coordinadores pueden modificar precios",
+      };
+    }
+
+    const factor = 1 - porcentaje / 100;
+
+    // Multi-row update con factor uniforme: fetch + update per id (max ~100 ids razonable)
+    const { data: lotes, error: fetchError } = await supabase
+      .schema("crm")
+      .from("lote")
+      .select("id, precio")
+      .eq("proyecto_id", proyectoId)
+      .in("id", loteIds);
+
+    if (fetchError) return { success: false, actualizados: 0, error: fetchError.message };
+
+    let actualizados = 0;
+    for (const lote of lotes ?? []) {
+      if (lote.precio == null) continue;
+      const nuevoPrecio = Math.round(Number(lote.precio) * factor * 100) / 100;
+      const { error } = await supabase
+        .schema("crm")
+        .from("lote")
+        .update({ precio: nuevoPrecio })
+        .eq("id", lote.id);
+      if (!error) actualizados += 1;
+    }
+
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    return { success: true, actualizados };
+  } catch (error) {
+    console.error("Error en aplicarDescuentoMasivoLotes:", error);
+    return {
+      success: false,
+      actualizados: 0,
+      error: error instanceof Error ? error.message : "Error aplicando descuento",
+    };
+  }
+}
+
+// ============================================================================
+// CAMBIAR MONEDA MASIVO — actualiza columna moneda en N lotes
+// ============================================================================
+export async function cambiarMonedaMasivoLotes(
+  proyectoId: string,
+  loteIds: string[],
+  nuevaMoneda: "PEN" | "USD" | "ARS",
+): Promise<{ success: boolean; actualizados: number; error?: string }> {
+  if (!proyectoId || !loteIds || loteIds.length === 0) {
+    return { success: false, actualizados: 0, error: "Parámetros inválidos" };
+  }
+  if (!["PEN", "USD", "ARS"].includes(nuevaMoneda)) {
+    return { success: false, actualizados: 0, error: "Moneda inválida" };
+  }
+
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, actualizados: 0, error: "No autenticado" };
+
+    await requierePermiso(PERMISOS.LOTES.EDITAR);
+    const puede = await esAdminOCoordinador();
+    if (!puede) {
+      return {
+        success: false,
+        actualizados: 0,
+        error: "Solo administradores o coordinadores pueden cambiar moneda",
+      };
+    }
+
+    const { data: updated, error } = await supabase
+      .schema("crm")
+      .from("lote")
+      .update({ moneda: nuevaMoneda })
+      .eq("proyecto_id", proyectoId)
+      .in("id", loteIds)
+      .select("id");
+
+    if (error) return { success: false, actualizados: 0, error: error.message };
+
+    revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+    return { success: true, actualizados: updated?.length ?? 0 };
+  } catch (error) {
+    console.error("Error en cambiarMonedaMasivoLotes:", error);
+    return {
+      success: false,
+      actualizados: 0,
+      error: error instanceof Error ? error.message : "Error cambiando moneda",
+    };
+  }
+}

@@ -1,20 +1,22 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   Building2 as BuildingOffice2Icon,
   MapPin as MapPinIcon,
   ArrowRight as ArrowRightIcon,
   ImageIcon as PhotoIcon,
   Search as MagnifyingGlassIcon,
-  Filter as FunnelIcon,
   X as XMarkIcon,
   Circle as CircleIcon,
   Pause as PauseIcon,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import QuickActions from './QuickActions';
 import StatsPopover from './_StatsPopover';
+import ExportButton from '@/components/export/ExportButton';
 import type { ProyectoMediaItem } from '@/types/proyectos';
 
 type ProyectoConStats = {
@@ -40,168 +42,107 @@ type ProyectoConStats = {
 };
 
 interface ProyectosGridProps {
-  proyectos: ProyectoConStats[];
-  totalProyectos: number;
+  data: ProyectoConStats[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
-export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGridProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState('');
-  const [tipoFilter, setTipoFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+const PAGE_SIZE_OPTIONS = [12, 24, 48];
 
-  // Filtrado en vivo
-  const proyectosFiltrados = useMemo(() => {
-    let resultado = proyectos;
+/**
+ * NOTA: La exportación funciona sobre la página actual (ya filtrada server-side).
+ * Para exportar todos los proyectos que coinciden con los filtros sería necesaria
+ * otra consulta sin paginación.
+ */
+export default function ProyectosGrid({ data, total, page, pageSize }: ProyectosGridProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-    // Filtro por búsqueda de texto
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      resultado = resultado.filter(
-        (p) =>
-          p.nombre.toLowerCase().includes(query) ||
-          p.ubicacion?.toLowerCase().includes(query)
-      );
+  const q = searchParams.get('q') || '';
+  const estado = searchParams.get('estado') || '';
+  const tipo = searchParams.get('tipo') || '';
+
+  const hasActiveFilters = Boolean(q || estado || tipo);
+  const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
+  const desde = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const hasta = Math.min(page * pageSize, total);
+
+  const buildHref = (overrides: Record<string, string | number | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === null || value === '' || value === undefined) {
+        params.delete(key);
+      } else {
+        params.set(key, String(value));
+      }
     }
+    const qs = params.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
 
-    // Filtro por estado
-    if (estadoFilter) {
-      resultado = resultado.filter((p) => p.estado === estadoFilter);
-    }
+  const goToPage = (next: number) => {
+    const target = Math.min(Math.max(1, next), totalPaginas);
+    if (target === page) return;
+    router.push(buildHref({ page: target === 1 ? null : target }), { scroll: false });
+  };
 
-    // Filtro por tipo
-    if (tipoFilter) {
-      resultado = resultado.filter((p) => p.tipo === tipoFilter);
-    }
-
-    return resultado;
-  }, [proyectos, searchQuery, estadoFilter, tipoFilter]);
-
-  const hasActiveFilters = searchQuery || estadoFilter || tipoFilter;
+  const changePageSize = (next: number) => {
+    if (next === pageSize) return;
+    // Al cambiar pageSize, reseteamos a página 1
+    router.push(buildHref({ pageSize: next === 12 ? null : next, page: null }), { scroll: false });
+  };
 
   const clearFilters = () => {
-    setSearchQuery('');
-    setEstadoFilter('');
-    setTipoFilter('');
+    router.push(pathname, { scroll: false });
   };
 
   return (
     <>
-      {/* Barra de búsqueda y filtros */}
-      <div className="crm-card p-3 md:p-5 space-y-3" data-tour="search-filter">
-        {/* Búsqueda principal */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-4 w-4 md:h-5 md:w-5 text-crm-text-muted" />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar proyecto..."
-              className="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 border border-crm-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary placeholder-crm-text-muted transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-crm-text-muted hover:text-crm-text-primary"
-              >
-                <XMarkIcon className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-2 md:px-4 md:py-2.5 border rounded-lg text-sm font-medium transition-colors flex items-center gap-2 relative ${
-              showFilters
-                ? 'bg-crm-primary text-white border-crm-primary'
-                : 'bg-crm-card border-crm-border text-crm-text-primary hover:bg-crm-card-hover'
-            }`}
-            aria-label="Filtros"
-          >
-            <FunnelIcon className="h-4 w-4" />
-            <span className="hidden md:inline">Filtros</span>
-            {(estadoFilter || tipoFilter) && !showFilters && (
-              <span className="absolute -top-1 -right-1 bg-crm-accent text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-                !
+      {/* Resumen + Export */}
+      <div className="crm-card p-3 md:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="text-xs md:text-sm text-crm-text-muted flex items-center gap-2 flex-wrap">
+          {hasActiveFilters ? (
+            <>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-crm-primary/10 text-crm-primary rounded-full text-[10px] md:text-xs font-medium">
+                {total} resultado{total === 1 ? '' : 's'}
               </span>
-            )}
-          </button>
-        </div>
-
-        {/* Panel de filtros */}
-        {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 pt-3 border-t border-crm-border">
-            <div>
-              <label className="block text-[10px] md:text-xs font-medium text-crm-text-muted mb-1">
-                Estado
-              </label>
-              <select
-                value={estadoFilter}
-                onChange={(e) => setEstadoFilter(e.target.value)}
-                className="w-full px-2 md:px-3 py-1.5 md:py-2 border border-crm-border rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-              >
-                <option value="">Todos</option>
-                <option value="activo">Activo</option>
-                <option value="pausado">Pausado</option>
-                <option value="cerrado">Cerrado</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] md:text-xs font-medium text-crm-text-muted mb-1">
-                Tipo
-              </label>
-              <select
-                value={tipoFilter}
-                onChange={(e) => setTipoFilter(e.target.value)}
-                className="w-full px-2 md:px-3 py-1.5 md:py-2 border border-crm-border rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary"
-              >
-                <option value="">Todos</option>
-                <option value="propio">Propio</option>
-                <option value="corretaje">Corretaje</option>
-              </select>
-            </div>
-
-            <div className="flex items-end col-span-2 md:col-span-1">
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="w-full px-2 md:px-4 py-1.5 md:py-2 border border-crm-border rounded-lg text-xs md:text-sm font-medium text-crm-text-secondary hover:bg-crm-card-hover transition-colors flex items-center justify-center gap-1"
-                >
-                  <XMarkIcon className="h-3.5 w-3.5" />
-                  Limpiar
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Indicador de resultados */}
-        {hasActiveFilters && (
-          <div className="flex items-center justify-between text-xs pt-2 border-t border-crm-border">
-            <div className="text-crm-text-muted flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-crm-primary/10 text-crm-primary rounded-full text-[10px] font-medium">
-                {proyectosFiltrados.length} de {totalProyectos}
-              </span>
-              {searchQuery && (
-                <span className="text-crm-text-secondary truncate max-w-[150px]">
-                  "{searchQuery}"
+              {q && (
+                <span className="text-crm-text-secondary truncate max-w-[160px] md:max-w-[240px]">
+                  &quot;{q}&quot;
                 </span>
               )}
-            </div>
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 text-crm-text-secondary hover:text-crm-text-primary underline text-[11px] md:text-xs"
+              >
+                <XMarkIcon className="h-3 w-3" />
+                Limpiar filtros
+              </button>
+            </>
+          ) : (
+            <span>
+              Total: <strong className="text-crm-text-primary">{total}</strong> proyectos
+            </span>
+          )}
+        </div>
+        <div className="hidden md:block">
+          <ExportButton
+            type="proyectos"
+            data={data}
+            filters={{ q, estado, tipo }}
+            fileName={hasActiveFilters ? 'proyectos-filtrados' : 'proyectos'}
+            label={hasActiveFilters ? `Exportar página (${data.length})` : `Exportar página (${data.length})`}
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* Grid de proyectos */}
       <div className="flex flex-col gap-4 md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-6">
-        {proyectosFiltrados.length === 0 && hasActiveFilters && (
+        {data.length === 0 && hasActiveFilters && (
           <div className="col-span-full crm-card text-center py-10 md:py-16 rounded-xl md:rounded-2xl border-2 border-dashed border-crm-border">
             <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-br from-crm-primary/10 to-crm-primary/5 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6">
               <MagnifyingGlassIcon className="w-7 h-7 md:w-10 md:h-10 text-crm-primary" />
@@ -210,7 +151,7 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
               Sin resultados
             </h4>
             <p className="text-xs md:text-base text-crm-text-secondary max-w-md mx-auto mb-3 md:mb-4 px-4">
-              No hay proyectos que coincidan con tu búsqueda.
+              No hay proyectos que coincidan con su búsqueda.
             </p>
             <button
               onClick={clearFilters}
@@ -221,7 +162,7 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
           </div>
         )}
 
-        {proyectosFiltrados.length === 0 && !hasActiveFilters && (
+        {data.length === 0 && !hasActiveFilters && (
           <div className="col-span-full crm-card text-center py-10 md:py-16 rounded-xl md:rounded-2xl border-2 border-dashed border-crm-border">
             <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-br from-crm-primary/10 to-crm-primary/5 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6">
               <BuildingOffice2Icon className="w-7 h-7 md:w-10 md:h-10 text-crm-primary" />
@@ -230,12 +171,12 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
               Sin proyectos
             </h4>
             <p className="text-xs md:text-base text-crm-text-secondary max-w-md mx-auto px-4">
-              Crea tu primer proyecto inmobiliario.
+              Cree su primer proyecto inmobiliario.
             </p>
           </div>
         )}
 
-        {proyectosFiltrados.map((p) => {
+        {data.map((p) => {
           const { stats } = p;
           const vendidoPct = stats.total > 0 ? Math.round((stats.vendidos / stats.total) * 100) : 0;
           const galeriaItems = p.galeria_imagenes || [];
@@ -312,7 +253,7 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
                       : 'bg-purple-500/90 text-white border-purple-400'
                   }`}
                 >
-                  {p.tipo === 'propio' ? '📋 Propio' : '🤝 Corretaje'}
+                  {p.tipo === 'propio' ? 'Propio' : 'Corretaje'}
                 </span>
               </Link>
 
@@ -368,7 +309,7 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
                   </div>
                 </div>
 
-                {/* Barra de progreso stacked: disponibles | reservados | vendidos */}
+                {/* Barra de progreso stacked */}
                 <div className="mb-2 md:mb-3">
                   <div className="flex items-center justify-between text-[10px] md:text-xs mb-1">
                     <span className="text-crm-text-muted font-medium hidden md:inline">Avance</span>
@@ -437,7 +378,67 @@ export default function ProyectosGrid({ proyectos, totalProyectos }: ProyectosGr
           );
         })}
       </div>
+
+      {/* Controles de paginación */}
+      {total > 0 && (
+        <div className="crm-card p-3 md:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="text-xs md:text-sm text-crm-text-secondary">
+            {total === 0 ? (
+              'Sin resultados'
+            ) : (
+              <>
+                Mostrando <strong className="text-crm-text-primary">{desde}-{hasta}</strong> de{' '}
+                <strong className="text-crm-text-primary">{total}</strong> · Página{' '}
+                <strong className="text-crm-text-primary">{page}</strong> de{' '}
+                <strong className="text-crm-text-primary">{totalPaginas}</strong>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Selector de tamaño de página */}
+            <label className="flex items-center gap-1.5 text-xs md:text-sm text-crm-text-secondary">
+              <span className="hidden md:inline">Por página:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => changePageSize(Number(e.target.value))}
+                className="px-2 py-1 border border-crm-border rounded-md bg-crm-card text-crm-text-primary text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary"
+                aria-label="Tamaño de página"
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Botones anterior / siguiente */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => goToPage(page - 1)}
+                disabled={page <= 1}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-crm-border rounded-md text-xs md:text-sm font-medium text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Página anterior"
+              >
+                <ChevronLeft className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="hidden md:inline">Anterior</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => goToPage(page + 1)}
+                disabled={page >= totalPaginas}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-crm-border rounded-md text-xs md:text-sm font-medium text-crm-text-primary hover:bg-crm-card-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Página siguiente"
+              >
+                <span className="hidden md:inline">Siguiente</span>
+                <ChevronRight className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-

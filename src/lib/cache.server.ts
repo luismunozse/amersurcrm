@@ -592,6 +592,111 @@ export const getCachedProyectos = cache(async (): Promise<ProyectoCached[]> => {
   return (data ?? []) as ProyectoCached[];
 });
 
+/* ========= Proyectos paginados (server-side search + filters) ========= */
+export interface GetProyectosParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  estado?: string;
+  tipo?: string;
+  sort?: string;
+}
+
+export type ProyectosPaginadosResult = {
+  data: ProyectoCached[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+const PROYECTOS_SORT_FIELDS: Record<string, string> = {
+  nombre: 'nombre',
+  ubicacion: 'ubicacion',
+  created_at: 'created_at',
+  estado: 'estado',
+};
+
+const PROYECTOS_MAX_PAGE_SIZE = 50;
+const PROYECTOS_DEFAULT_PAGE_SIZE = 12;
+
+export const getCachedProyectosPaginados = cache(async (
+  params: GetProyectosParams = {}
+): Promise<ProyectosPaginadosResult> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+
+  const rawPage = Number(params.page);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+
+  const rawPageSize = Number(params.pageSize);
+  const pageSize = Number.isFinite(rawPageSize) && rawPageSize > 0
+    ? Math.min(Math.floor(rawPageSize), PROYECTOS_MAX_PAGE_SIZE)
+    : PROYECTOS_DEFAULT_PAGE_SIZE;
+
+  if (!userId) {
+    return { data: [], total: 0, page, pageSize };
+  }
+
+  const q = (params.q ?? '').trim();
+  const estado = (params.estado ?? '').trim();
+  const tipo = (params.tipo ?? '').trim();
+
+  // Parsear sort: formato "campo-asc" o "campo-desc"
+  const sortParam = (params.sort ?? 'nombre-asc').trim();
+  const [sortFieldRaw, sortOrderRaw] = sortParam.split('-');
+  const sortField = PROYECTOS_SORT_FIELDS[sortFieldRaw] ?? 'nombre';
+  const sortAscending = sortOrderRaw !== 'desc';
+
+  const SELECT_COLS = "id,nombre,estado,tipo,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,created_at";
+
+  const buildBaseQuery = (selectExpr: string, options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
+    let query = supabase.schema('crm').from('proyecto').select(selectExpr, options);
+
+    if (q) {
+      // Escape % y , para evitar romper sintaxis de .or()
+      const safe = q.replace(/[%,]/g, ' ');
+      query = query.or(`nombre.ilike.%${safe}%,ubicacion.ilike.%${safe}%`);
+    }
+
+    if (estado) {
+      query = query.eq('estado', estado);
+    }
+
+    if (tipo) {
+      query = query.eq('tipo', tipo);
+    }
+
+    return query;
+  };
+
+  const offset = (page - 1) * pageSize;
+
+  const dataQuery = buildBaseQuery(SELECT_COLS)
+    .order(sortField, { ascending: sortAscending })
+    .range(offset, offset + pageSize - 1);
+
+  const countQuery = buildBaseQuery('id', { count: 'exact', head: true });
+
+  const [dataResult, countResult] = await Promise.all([dataQuery, countQuery]);
+
+  if (dataResult.error) {
+    console.error('Error en getCachedProyectosPaginados:', {
+      message: dataResult.error.message,
+      details: dataResult.error.details,
+      hint: dataResult.error.hint,
+      code: dataResult.error.code,
+    });
+    throw dataResult.error;
+  }
+
+  return {
+    data: ((dataResult.data ?? []) as unknown) as ProyectoCached[],
+    total: countResult.count ?? 0,
+    page,
+    pageSize,
+  };
+});
+
 /* ========= Lotes por proyecto ========= */
 export const getCachedLotes = cache(async (proyectoId: string): Promise<LoteCached[]> => {
   const supabase = await createOptimizedServerClient();

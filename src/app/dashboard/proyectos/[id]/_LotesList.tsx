@@ -1,6 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { ArrowUp, ArrowDown, ArrowUpDown, Rows3, Rows2, AlignJustify } from "lucide-react";
+
+type Density = "compact" | "normal" | "relaxed";
+const DENSITY_KEY = "lotes-list-density";
+const DENSITY_PADDING: Record<Density, string> = {
+  compact: "py-1.5",
+  normal: "py-4",
+  relaxed: "py-6",
+};
+const DENSITY_TEXT: Record<Density, string> = {
+  compact: "text-xs",
+  normal: "text-sm",
+  relaxed: "text-sm",
+};
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Lock, Building2, Info, Copy, Upload } from "lucide-react";
@@ -11,12 +26,16 @@ import {
   duplicarLote,
   eliminarTodosLosLotes,
   cambiarEstadoMasivoLotes,
+  aplicarDescuentoMasivoLotes,
+  cambiarMonedaMasivoLotes,
   asignarVendedorMasivoLotes,
   listarVendedoresActivos,
 } from "./_actions";
 import LoteEditModal from "./LoteEditModal";
 import LoteDetailModal from "./LoteDetailModal";
+import EstadoBadgeAuditoria from "./_EstadoBadgeAuditoria";
 import ModalReservaLote from "./ModalReservaLote";
+import { useLoteLocks } from "@/hooks/useLoteLocks";
 import DeleteAllLotesModal from "./_DeleteAllLotesModal";
 import BulkImportLotesModal from "./_BulkImportLotesModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -80,6 +99,56 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [vendedoresList, setVendedoresList] = useState<Array<{ username: string; nombre_completo: string; rol: string }>>([]);
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [density, setDensity] = useState<Density>("normal");
+  const lockedLotes = useLoteLocks(proyectoId);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(DENSITY_KEY) as Density | null;
+      if (saved && ["compact", "normal", "relaxed"].includes(saved)) {
+        setDensity(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const changeDensity = (d: Density) => {
+    setDensity(d);
+    try {
+      window.localStorage.setItem(DENSITY_KEY, d);
+    } catch {
+      // ignore
+    }
+  };
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentSort = searchParams.get("sort") || "codigo-asc";
+  const [sortField, sortDir] = currentSort.split("-") as [string, "asc" | "desc"];
+
+  const toggleSort = (field: "codigo" | "sup_m2" | "precio" | "created_at") => {
+    const nextDir: "asc" | "desc" =
+      sortField === field && sortDir === "asc" ? "desc" : "asc";
+    const params = new URLSearchParams(searchParams.toString());
+    const value = `${field}-${nextDir}`;
+    if (value === "codigo-asc") {
+      params.delete("sort");
+    } else {
+      params.set("sort", value);
+    }
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-40" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="w-3 h-3 inline ml-1 text-crm-primary" />
+    ) : (
+      <ArrowDown className="w-3 h-3 inline ml-1 text-crm-primary" />
+    );
+  };
 
   useEffect(() => {
     if (puedeAsignarVendedor) {
@@ -251,6 +320,56 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error en cambio masivo");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkDescuento = async () => {
+    if (selectedIds.size === 0) return;
+    const raw = window.prompt(
+      `Aplicar descuento % a ${selectedIds.size} lote(s).\nIngrese porcentaje (1-99):`,
+      "10",
+    );
+    if (raw === null) return;
+    const pct = parseFloat(raw.replace(",", "."));
+    if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) {
+      toast.error("Porcentaje inválido (debe ser entre 1 y 99)");
+      return;
+    }
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await aplicarDescuentoMasivoLotes(proyectoId, ids, pct);
+      if (res.success) {
+        toast.success(`${res.actualizados} lote(s) con ${pct}% de descuento`);
+        clearSelection();
+        window.location.reload();
+      } else {
+        toast.error(res.error || "No se pudo aplicar descuento");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error aplicando descuento");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkMoneda = async (moneda: "PEN" | "USD" | "ARS") => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await cambiarMonedaMasivoLotes(proyectoId, ids, moneda);
+      if (res.success) {
+        toast.success(`${res.actualizados} lote(s) cambiados a ${moneda}`);
+        clearSelection();
+        window.location.reload();
+      } else {
+        toast.error(res.error || "No se pudo cambiar moneda");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error cambiando moneda");
     } finally {
       setBulkLoading(false);
     }
@@ -694,6 +813,34 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                         ))}
                       </select>
                     )}
+                    <select
+                      disabled={bulkLoading}
+                      defaultValue=""
+                      onChange={(e) => {
+                        const val = e.target.value as "PEN" | "USD" | "ARS" | "";
+                        if (val) {
+                          handleBulkMoneda(val);
+                          e.target.value = "";
+                        }
+                      }}
+                      className="rounded-md border border-crm-border bg-crm-card px-3 py-1.5 text-sm text-crm-text-primary"
+                    >
+                      <option value="" disabled>
+                        Moneda…
+                      </option>
+                      <option value="PEN">PEN</option>
+                      <option value="USD">USD</option>
+                      <option value="ARS">ARS</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleBulkDescuento}
+                      disabled={bulkLoading}
+                      className="rounded-md border border-crm-border bg-crm-card px-3 py-1.5 text-sm text-crm-text-primary hover:bg-crm-card-hover"
+                      title="Aplicar descuento porcentual a precios"
+                    >
+                      Descuento %
+                    </button>
                     <button
                       type="button"
                       onClick={clearSelection}
@@ -707,8 +854,37 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
               )}
               {/* Vista de escritorio - Tabla completa */}
               <div className="hidden lg:block space-y-3">
-              {/* Atajos de teclado hint */}
-              <div className="hidden lg:flex justify-end -mt-2">
+              {/* Atajos + densidad */}
+              <div className="hidden lg:flex justify-end items-center gap-3 -mt-2">
+                <div className="flex items-center gap-1 bg-crm-card-hover rounded-md p-0.5 border border-crm-border">
+                  <button
+                    type="button"
+                    onClick={() => changeDensity("compact")}
+                    className={`p-1 rounded ${density === "compact" ? "bg-crm-primary text-white" : "text-crm-text-muted hover:text-crm-text-primary"}`}
+                    title="Compacto"
+                    aria-label="Densidad compacta"
+                  >
+                    <Rows3 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeDensity("normal")}
+                    className={`p-1 rounded ${density === "normal" ? "bg-crm-primary text-white" : "text-crm-text-muted hover:text-crm-text-primary"}`}
+                    title="Normal"
+                    aria-label="Densidad normal"
+                  >
+                    <Rows2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeDensity("relaxed")}
+                    className={`p-1 rounded ${density === "relaxed" ? "bg-crm-primary text-white" : "text-crm-text-muted hover:text-crm-text-primary"}`}
+                    title="Espaciado"
+                    aria-label="Densidad espaciada"
+                  >
+                    <AlignJustify className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowShortcutsHelp(true)}
@@ -735,14 +911,52 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                       title="Seleccionar todos"
                     />
                   )}
-                  <span>Código</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("codigo")}
+                    className="hover:text-crm-text-primary transition-colors flex items-center"
+                    title="Ordenar por código"
+                  >
+                    Código
+                    <SortIcon field="codigo" />
+                  </button>
                 </div>
                 <div className="col-span-2">Tipo de Unidad</div>
                 <div className="col-span-2">Proyecto</div>
                 <div className="col-span-1">Estado</div>
-                <div className="col-span-1">Superficie</div>
-                <div className="col-span-1">Precio</div>
-                <div className="col-span-1">Fecha</div>
+                <div className="col-span-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("sup_m2")}
+                    className="hover:text-crm-text-primary transition-colors flex items-center"
+                    title="Ordenar por superficie"
+                  >
+                    Superficie
+                    <SortIcon field="sup_m2" />
+                  </button>
+                </div>
+                <div className="col-span-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("precio")}
+                    className="hover:text-crm-text-primary transition-colors flex items-center"
+                    title="Ordenar por precio"
+                  >
+                    Precio
+                    <SortIcon field="precio" />
+                  </button>
+                </div>
+                <div className="col-span-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("created_at")}
+                    className="hover:text-crm-text-primary transition-colors flex items-center"
+                    title="Ordenar por fecha"
+                  >
+                    Fecha
+                    <SortIcon field="created_at" />
+                  </button>
+                </div>
                 <div className="col-span-2 text-center">Acciones</div>
               </div>
 
@@ -755,7 +969,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                         el.scrollIntoView({ block: "nearest", behavior: "smooth" });
                       }
                     }}
-                    className={`grid grid-cols-12 gap-3 px-4 py-4 bg-crm-card border rounded-lg hover:bg-crm-card-hover transition-colors ${
+                    className={`grid grid-cols-12 gap-3 px-4 ${DENSITY_PADDING[density]} ${DENSITY_TEXT[density]} bg-crm-card border rounded-lg hover:bg-crm-card-hover transition-colors ${
                       selectedIds.has(lote.id) ? "border-crm-primary" : "border-crm-border"
                     } ${idx === focusedIdx ? "ring-2 ring-crm-primary ring-offset-1" : ""}`}
                   >
@@ -813,10 +1027,23 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
                     </div>
 
                     {/* Estado */}
-                    <div className="col-span-1 flex items-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getEstadoColor(lote.estado)}`}>
-                        {getEstadoText(lote.estado)}
-                      </span>
+                    <div className="col-span-1 flex items-center gap-1.5">
+                      <EstadoBadgeAuditoria loteId={lote.id} enabled={esAdminOCoordinador()}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getEstadoColor(lote.estado)}`}>
+                          {getEstadoText(lote.estado)}
+                        </span>
+                      </EstadoBadgeAuditoria>
+                      {lockedLotes[lote.id] && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 font-semibold"
+                          title={`Editando: ${lockedLotes[lote.id].nombre_completo ?? lockedLotes[lote.id].username}`}
+                        >
+                          <Lock className="w-3 h-3" />
+                          <span className="hidden xl:inline truncate max-w-[80px]">
+                            {lockedLotes[lote.id].username}
+                          </span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Superficie */}
@@ -1076,6 +1303,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
       open={!!editingLote}
       onClose={() => setEditingLote(null)}
       lote={lotesAMostrar.find(l => l.id === editingLote) || null}
+      proyectoId={proyectoId}
       onSave={async (payload) => {
         try {
           const fd = new FormData();

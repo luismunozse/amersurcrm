@@ -112,3 +112,47 @@ export async function obtenerAuditoriaProyecto(
     };
   }
 }
+
+export interface UltimoCambioLote {
+  accion: AuditoriaAccion;
+  usuario_username: string | null;
+  created_at: string;
+  cambios: AuditoriaCambios | null;
+}
+
+export async function obtenerUltimoCambioLote(
+  loteId: string,
+): Promise<{ data: UltimoCambioLote | null; error: string | null }> {
+  if (!loteId || !UUID_REGEX.test(loteId)) {
+    return { data: null, error: "ID de lote inválido" };
+  }
+
+  try {
+    const supabase = await createServerActionClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autenticado" };
+
+    const puede = await esAdminOCoordinador();
+    if (!puede) {
+      return { data: null, error: "Sin acceso" };
+    }
+
+    const { data, error } = await supabase
+      .schema("crm")
+      .from("auditoria_proyecto_lote")
+      .select("accion, usuario_username, created_at, cambios")
+      .eq("entidad_tipo", "lote")
+      .eq("entidad_id", loteId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return { data: null, error: error.message };
+    return { data: (data as UltimoCambioLote | null) ?? null, error: null };
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : "Error desconocido",
+    };
+  }
+}

@@ -247,8 +247,19 @@ export async function actualizarCliente(formData: FormData) {
     }
   }
 
+  // Detectar cambio de asesor para bumpear timestamps y reordenar la lista
+  const nuevoVendedor = parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== ""
+    ? parsed.data.vendedor_asignado
+    : null;
+  const { data: clienteActual } = await supabase
+    .from("cliente")
+    .select("vendedor_username")
+    .eq("id", clienteId)
+    .maybeSingle();
+  const asesorCambio = (clienteActual?.vendedor_username ?? null) !== nuevoVendedor;
+
   // Preparar datos para actualización
-  const updateData = {
+  const updateData: Record<string, unknown> = {
     ...parsed.data,
     email: parsed.data.email || null,
     telefono: parsed.data.telefono || null,
@@ -257,14 +268,20 @@ export async function actualizarCliente(formData: FormData) {
     documento_identidad: parsed.data.documento_identidad || null,
     estado_civil: parsed.data.estado_civil || null,
     origen_lead: parsed.data.origen_lead || null,
-    vendedor_asignado: parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== "" ? parsed.data.vendedor_asignado : null,
-    vendedor_username: parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== "" ? parsed.data.vendedor_asignado : null,
+    vendedor_asignado: nuevoVendedor,
+    vendedor_username: nuevoVendedor,
     proxima_accion: parsed.data.proxima_accion || null,
     interes_principal: parsed.data.interes_principal || null,
     capacidad_compra_estimada: parsed.data.capacidad_compra_estimada || null,
     forma_pago_preferida: parsed.data.forma_pago_preferida || null,
     notas: parsed.data.notas || null,
   };
+
+  if (asesorCambio) {
+    const ahora = new Date().toISOString();
+    updateData.updated_at = ahora;
+    updateData.fecha_alta = ahora;
+  }
 
   const { error } = await supabase
     .from("cliente")
@@ -351,15 +368,14 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
     .eq("id", clienteId)
     .maybeSingle();
 
+  const ahora = new Date().toISOString();
   const payload: Record<string, string | null> = {
     vendedor_username: vendedorUsername || null,
     vendedor_asignado: vendedorUsername || null,
+    // Bumpear timestamps para que el cliente reordene al tope de la lista
+    updated_at: ahora,
+    fecha_alta: ahora,
   };
-
-  // Al asignar vendedor, actualizar fecha_alta para que aparezca primero en la lista
-  if (vendedorUsername) {
-    payload.fecha_alta = new Date().toISOString();
-  }
 
   const { error } = await supabase
     .from("cliente")

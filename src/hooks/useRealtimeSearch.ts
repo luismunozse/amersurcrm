@@ -166,11 +166,18 @@ export function useRealtimeSearch(options: UseRealtimeSearchOptions): UseRealtim
       saveToHistory(trimmedQuery);
     }
 
-    // Navegar a la nueva URL
     const queryString = params.toString();
     const newPath = queryString ? `${basePath}?${queryString}` : basePath;
 
-    router.push(newPath);
+    // Construir URL actual para comparar (evita loop de router.push con misma URL)
+    const currentQuery = (typeof window !== 'undefined' ? window.location.search : '').replace(/^\?/, '');
+    const currentPath = `${basePath}${currentQuery ? `?${currentQuery}` : ''}`;
+    if (newPath === currentPath) {
+      setIsSearching(false);
+      return;
+    }
+
+    router.push(newPath, { scroll: false });
     setIsSearching(false);
 
     // Callback opcional
@@ -196,18 +203,19 @@ export function useRealtimeSearch(options: UseRealtimeSearchOptions): UseRealtim
    * Effect para manejar el debouncing de la búsqueda
    */
   useEffect(() => {
-    // Limpiar timeout anterior
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Si el valor está vacío, ejecutar inmediatamente
+    // Si está vacío, solo limpiar si ya había query en URL (evita loop al mount)
     if (searchValue === '') {
-      executeSearch('');
+      const currentQ = searchParams.get('q') || '';
+      if (currentQ !== '') {
+        executeSearch('');
+      }
       return;
     }
 
-    // Si cumple con el mínimo de caracteres, iniciar el debounce
     if (searchValue.length >= minChars) {
       setIsSearching(true);
       debounceTimerRef.current = setTimeout(() => {
@@ -215,13 +223,12 @@ export function useRealtimeSearch(options: UseRealtimeSearchOptions): UseRealtim
       }, debounceMs);
     }
 
-    // Cleanup
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [searchValue, debounceMs, minChars, executeSearch]);
+  }, [searchValue, debounceMs, minChars, executeSearch, searchParams]);
 
   return {
     searchValue,

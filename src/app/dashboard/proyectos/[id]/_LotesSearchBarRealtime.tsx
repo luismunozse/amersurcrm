@@ -110,7 +110,7 @@ export default function LotesSearchBarRealtime({
 
   const handleClearAllFilters = () => {
     setSearchValue('');
-    router.push(`/dashboard/proyectos/${proyectoId}`);
+    router.push(`/dashboard/proyectos/${proyectoId}`, { scroll: false });
   };
 
   const applyFilters = (updates: Record<string, string>) => {
@@ -123,7 +123,7 @@ export default function LotesSearchBarRealtime({
       }
     });
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
 
   return (

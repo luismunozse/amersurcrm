@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
+import { useLoteLockBroadcaster } from "@/hooks/useLoteLocks";
+import { usePermissions } from "@/lib/permissions";
 
 type Lote = {
   id: string;
@@ -16,6 +18,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   lote: Lote | null;
+  proyectoId?: string;
   onSave: (payload: {
     id: string;
     codigo?: string;
@@ -26,7 +29,17 @@ interface Props {
   }) => Promise<boolean>;
 }
 
-export default function LoteEditModal({ open, onClose, lote, onSave }: Props) {
+export default function LoteEditModal({ open, onClose, lote, proyectoId, onSave }: Props) {
+  const permsCtx = usePermissions() as unknown as {
+    usuario?: { username?: string | null; nombre_completo?: string | null } | null;
+  };
+  const usuario = permsCtx.usuario ?? null;
+  useLoteLockBroadcaster(
+    open && proyectoId ? proyectoId : null,
+    open && lote ? lote.id : null,
+    usuario?.username ?? null,
+    usuario?.nombre_completo ?? null,
+  );
   const [codigo, setCodigo] = useState("");
   const [sup, setSup] = useState("");
   const [precio, setPrecio] = useState("");

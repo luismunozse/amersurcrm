@@ -83,6 +83,54 @@ export default function NewProyectoForm() {
     });
   };
 
+  // Imagen principal + logo
+  const [imagenFile, setImagenFile] = useState<File | null>(null);
+  const [imagenPreview, setImagenPreview] = useState<string | null>(null);
+  const [imagenDragOver, setImagenDragOver] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoDragOver, setLogoDragOver] = useState(false);
+
+  const setImagen = (file: File | null) => {
+    setImagenFile((prev) => {
+      if (prev && imagenPreview) URL.revokeObjectURL(imagenPreview);
+      return file;
+    });
+    if (file) {
+      if (!ALLOWED_IMAGE_TYPES_NEW.has(file.type)) {
+        toast.error(`${file.name}: formato no permitido`);
+        return;
+      }
+      if (file.size > MAX_IMAGE_BYTES_NEW) {
+        toast.error(`${file.name}: supera 5MB`);
+        return;
+      }
+      setImagenPreview(URL.createObjectURL(file));
+    } else {
+      setImagenPreview(null);
+    }
+  };
+
+  const setLogo = (file: File | null) => {
+    setLogoFile((prev) => {
+      if (prev && logoPreview) URL.revokeObjectURL(logoPreview);
+      return file;
+    });
+    if (file) {
+      if (!ALLOWED_IMAGE_TYPES_NEW.has(file.type)) {
+        toast.error(`${file.name}: formato no permitido`);
+        return;
+      }
+      if (file.size > MAX_IMAGE_BYTES_NEW) {
+        toast.error(`${file.name}: supera 5MB`);
+        return;
+      }
+      setLogoPreview(URL.createObjectURL(file));
+    } else {
+      setLogoPreview(null);
+    }
+  };
+
   // Estado para ubigeo
   const [ubigeoData, setUbigeoData] = useState({
     departamento: "",
@@ -161,8 +209,7 @@ export default function NewProyectoForm() {
             try {
               setIsCompressing(true);
 
-              const imagenFile = originalFormData.get("imagen") as File | null;
-              const logoFile = originalFormData.get("logo") as File | null;
+              // imagenFile y logoFile vienen del estado controlled (dropzones)
               const galeriaFiles = galleryEntries.map((e) => e.file);
 
               let imagenComprimida: File | null = null;
@@ -241,6 +288,8 @@ export default function NewProyectoForm() {
                     setIsExpanded(false);
                     form.reset();
                     clearGalleryEntries();
+                    setImagen(null);
+                    setLogo(null);
                     router.push(`/dashboard/proyectos/${result.proyecto.id}`);
                   }
                 } catch (error) {
@@ -392,30 +441,178 @@ export default function NewProyectoForm() {
         {/* Imagen del Proyecto */}
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-crm-text-primary">Imagen del Proyecto</label>
-          <input
-            type="file"
-            name="imagen"
-            accept="image/*"
-            className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20"
-            disabled={pending}
-          />
+          {imagenPreview && (
+            <div className="relative inline-block">
+              <img
+                src={imagenPreview}
+                alt="Preview imagen principal"
+                className="w-32 h-32 object-cover rounded-lg border border-crm-border"
+              />
+              <button
+                type="button"
+                onClick={() => setImagen(null)}
+                disabled={pending || isCompressing}
+                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                title="Quitar"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {!imagenPreview && (
+            <label
+              htmlFor="imagen-portada"
+              tabIndex={pending || isCompressing ? -1 : 0}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setImagenDragOver(false);
+                if (pending || isCompressing) return;
+                const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"));
+                if (file) setImagen(file);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (pending || isCompressing) return;
+                if (!imagenDragOver) setImagenDragOver(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (pending || isCompressing) return;
+                if (!imagenDragOver) setImagenDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setImagenDragOver(false);
+              }}
+              onPaste={(e) => {
+                if (pending || isCompressing) return;
+                const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+                if (!file) return;
+                e.preventDefault();
+                setImagen(file);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 px-4 py-5 border-2 border-dashed rounded-lg text-center transition-colors ${
+                pending || isCompressing
+                  ? "opacity-50 cursor-not-allowed border-crm-border"
+                  : imagenDragOver
+                    ? "border-crm-primary bg-crm-primary/10 cursor-copy"
+                    : "border-crm-border cursor-pointer hover:border-crm-primary/60 hover:bg-crm-card-hover/50"
+              }`}
+            >
+              <PhotoIcon className={`w-6 h-6 ${imagenDragOver ? "text-crm-primary" : "text-crm-text-muted"}`} />
+              <p className="text-xs font-medium text-crm-text-primary">
+                {imagenDragOver ? "Suelte para usar" : "Arrastre o haga clic para seleccionar"}
+              </p>
+              <p className="text-[10px] text-crm-text-muted">JPG/PNG/WEBP · máx 5MB · Ctrl+V</p>
+              <input
+                type="file"
+                id="imagen-portada"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={pending || isCompressing}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setImagen(f);
+                  e.target.value = "";
+                }}
+                className="hidden"
+              />
+            </label>
+          )}
           <p className="text-[10px] text-crm-text-muted">
-            Formatos: JPG, PNG, WEBP. Las imágenes se comprimen automáticamente.
+            Se comprime automáticamente al guardar.
           </p>
         </div>
 
         {/* Logo del Proyecto */}
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-crm-text-primary">Logo del Proyecto</label>
-          <input
-            type="file"
-            name="logo"
-            accept="image/png,image/jpeg,image/webp"
-            className="w-full px-3 py-2 border border-crm-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent bg-crm-card text-crm-text-primary disabled:opacity-50 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-crm-primary/10 file:text-crm-primary hover:file:bg-crm-primary/20"
-            disabled={pending || isCompressing}
-          />
+          {logoPreview && (
+            <div className="relative inline-block">
+              <img
+                src={logoPreview}
+                alt="Preview logo"
+                className="w-28 h-28 object-contain rounded-lg border border-crm-border bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => setLogo(null)}
+                disabled={pending || isCompressing}
+                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                title="Quitar"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {!logoPreview && (
+            <label
+              htmlFor="logo-proyecto"
+              tabIndex={pending || isCompressing ? -1 : 0}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setLogoDragOver(false);
+                if (pending || isCompressing) return;
+                const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"));
+                if (file) setLogo(file);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (pending || isCompressing) return;
+                if (!logoDragOver) setLogoDragOver(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (pending || isCompressing) return;
+                if (!logoDragOver) setLogoDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setLogoDragOver(false);
+              }}
+              onPaste={(e) => {
+                if (pending || isCompressing) return;
+                const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+                if (!file) return;
+                e.preventDefault();
+                setLogo(file);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 px-4 py-5 border-2 border-dashed rounded-lg text-center transition-colors ${
+                pending || isCompressing
+                  ? "opacity-50 cursor-not-allowed border-crm-border"
+                  : logoDragOver
+                    ? "border-crm-primary bg-crm-primary/10 cursor-copy"
+                    : "border-crm-border cursor-pointer hover:border-crm-primary/60 hover:bg-crm-card-hover/50"
+              }`}
+            >
+              <PhotoIcon className={`w-6 h-6 ${logoDragOver ? "text-crm-primary" : "text-crm-text-muted"}`} />
+              <p className="text-xs font-medium text-crm-text-primary">
+                {logoDragOver ? "Suelte para usar" : "Arrastre o haga clic para seleccionar"}
+              </p>
+              <p className="text-[10px] text-crm-text-muted">PNG transparente recomendado · máx 5MB</p>
+              <input
+                type="file"
+                id="logo-proyecto"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={pending || isCompressing}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setLogo(f);
+                  e.target.value = "";
+                }}
+                className="hidden"
+              />
+            </label>
+          )}
           <p className="text-[10px] text-crm-text-muted">
-            PNG recomendado. Se comprime automáticamente a 500KB.
+            Se comprime automáticamente al guardar.
           </p>
         </div>
 

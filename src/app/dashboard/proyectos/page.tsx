@@ -1,9 +1,9 @@
 // src/app/dashboard/proyectos/page.tsx
-import { getCachedProyectos } from "@/lib/cache.server";
+import { getCachedProyectosPaginados } from "@/lib/cache.server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import NewProyectoForm from "./_NewProyectoForm";
 import ProyectosGrid from "./_ProyectosGrid";
-import ExportButton from "@/components/export/ExportButton";
+import ProyectosSearchBarRealtime from "./_ProyectosSearchBarRealtime";
 import type { ProyectoMediaItem } from "@/types/proyectos";
 import { Plus, AlertTriangle } from "lucide-react";
 
@@ -30,16 +30,41 @@ const parseGaleria = (value: unknown): ProyectoMediaItem[] => {
   );
 };
 
-export default async function ProyectosPage() {
+type SearchParams = {
+  page?: string;
+  pageSize?: string;
+  q?: string;
+  estado?: string;
+  tipo?: string;
+  sort?: string;
+};
+
+interface ProyectosPageProps {
+  searchParams: Promise<SearchParams>;
+}
+
+export default async function ProyectosPage({ searchParams }: ProyectosPageProps) {
   try {
-    // Obtener todos los proyectos (sin filtros del servidor - el filtrado es en cliente)
-    const proyectos = await getCachedProyectos();
-    const totalProyectos = proyectos.length;
+    const sp = (await searchParams) ?? {};
 
-    // Ordenar por nombre por defecto
-    proyectos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const pageParam = Number(sp.page);
+    const pageRequested = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
 
-    // --- Métricas de lotes por proyecto (1 sola consulta) ---
+    const pageSizeParam = Number(sp.pageSize);
+    const pageSizeRequested = Number.isFinite(pageSizeParam) && pageSizeParam > 0
+      ? Math.floor(pageSizeParam)
+      : 12;
+
+    const { data: proyectos, total, page, pageSize } = await getCachedProyectosPaginados({
+      page: pageRequested,
+      pageSize: pageSizeRequested,
+      q: sp.q,
+      estado: sp.estado,
+      tipo: sp.tipo,
+      sort: sp.sort,
+    });
+
+    // --- Métricas de lotes SOLO para los proyectos de la página actual ---
     const supabase = await createServerOnlyClient();
     const ids = proyectos.map((p) => p.id);
     const lotesByProyecto: Record<
@@ -83,7 +108,6 @@ export default async function ProyectosPage() {
       });
     }
 
-    // Preparar datos para el componente cliente
     const proyectosConStats = proyectos.map((p) => ({
       id: p.id,
       nombre: p.nombre,
@@ -121,21 +145,10 @@ export default async function ProyectosPage() {
           <div className="flex items-center gap-2 shrink-0">
             {/* Badge contador - siempre visible */}
             <div className="crm-card px-3 py-1.5 md:px-4 md:py-2 bg-crm-primary/5 border-crm-primary/20">
-              <span className="text-sm md:text-base font-bold text-crm-primary">{totalProyectos}</span>
+              <span className="text-sm md:text-base font-bold text-crm-primary">{total}</span>
               <span className="text-xs text-crm-text-muted ml-1 hidden sm:inline">
-                {totalProyectos === 1 ? "proyecto" : "proyectos"}
+                {total === 1 ? "proyecto" : "proyectos"}
               </span>
-            </div>
-            {/* Export solo en desktop */}
-            <div className="hidden md:block">
-              <ExportButton
-                type="proyectos"
-                data={proyectos}
-                filters={{}}
-                fileName="proyectos"
-                label="Exportar"
-                size="sm"
-              />
             </div>
           </div>
         </div>
@@ -159,10 +172,18 @@ export default async function ProyectosPage() {
           </div>
         </details>
 
-        {/* Grid con búsqueda en vivo */}
-        <ProyectosGrid 
-          proyectos={proyectosConStats} 
-          totalProyectos={totalProyectos} 
+        {/* Barra de búsqueda + filtros (server-side via URL params) */}
+        <ProyectosSearchBarRealtime
+          totalProyectos={total}
+          resultCount={proyectosConStats.length}
+        />
+
+        {/* Grid con paginación */}
+        <ProyectosGrid
+          data={proyectosConStats}
+          total={total}
+          page={page}
+          pageSize={pageSize}
         />
       </div>
     );
