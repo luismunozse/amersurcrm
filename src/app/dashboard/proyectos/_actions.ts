@@ -5,7 +5,8 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
-import type { ProyectoMediaItem } from "@/types/proyectos";
+import type { ProyectoMediaItem, Masterplan, Poligono } from "@/types/proyectos";
+import { mergeLotePoly } from "@/lib/masterplan/geometry";
 
 function buildStoragePathFromUrl(url: string | null, proyectoId: string): string | null {
   if (!url) return null;
@@ -528,4 +529,49 @@ export async function eliminarProyecto(proyectoId: string) {
     console.error("Error eliminando proyecto:", error);
     throw new Error(error instanceof Error ? error.message : "Error eliminando proyecto");
   }
+}
+
+export async function guardarMasterplanProyecto(
+  proyectoId: string,
+  masterplan: Masterplan,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado" };
+  await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
+
+  const { error } = await supabase.from("proyecto").update({ masterplan }).eq("id", proyectoId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/dashboard/proyectos/${proyectoId}`);
+  return { ok: true };
+}
+
+async function setPoligonoLote(
+  loteId: string,
+  poly: Poligono | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createServerActionClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado" };
+  await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
+
+  const { data: lote, error: readErr } = await supabase
+    .from("lote").select("data").eq("id", loteId).maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
+
+  const nuevaData = mergeLotePoly(lote?.data, poly);
+  const { error } = await supabase.from("lote").update({ data: nuevaData }).eq("id", loteId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/dashboard/proyectos");
+  return { ok: true };
+}
+
+export async function guardarPoligonoLote(loteId: string, poly: Poligono) {
+  return setPoligonoLote(loteId, poly);
+}
+
+export async function eliminarPoligonoLote(loteId: string) {
+  return setPoligonoLote(loteId, null);
 }
