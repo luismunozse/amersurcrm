@@ -18,7 +18,7 @@ const DENSITY_TEXT: Record<Density, string> = {
 };
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Lock, Building2, Info, Copy, Upload } from "lucide-react";
+import { Edit, Trash2, Eye, Ruler, Calendar, CheckCircle, Clock, XCircle, MoreVertical, Lock, Building2, Info, Copy, Upload, Map, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import {
   actualizarLote,
@@ -40,6 +40,8 @@ import DeleteAllLotesModal from "./_DeleteAllLotesModal";
 import BulkImportLotesModal from "./_BulkImportLotesModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
+import { MasterplanViewer, type LoteMarcado } from "@/components/masterplan/MasterplanViewer";
+import type { Masterplan } from "@/types/proyectos";
 
 type Lote = {
   id: string;
@@ -76,9 +78,10 @@ interface LotesListProps {
   proyectoId: string;
   lotes: Lote[];
   totalLotes?: number;
+  masterplan?: Masterplan | null;
 }
 
-export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListProps) {
+export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }: LotesListProps) {
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -100,6 +103,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [density, setDensity] = useState<Density>("normal");
+  const [showMasterplan, setShowMasterplan] = useState<boolean>(!!masterplan?.url);
   const lockedLotes = useLoteLocks(proyectoId);
 
   useEffect(() => {
@@ -440,6 +444,18 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   const lotesAMostrar = lotesState;
   const totalListado = typeof totalLotes === "number" ? totalLotes : lotesAMostrar.length;
 
+  const lotesMarcados: LoteMarcado[] = lotesAMostrar.map((l) => ({
+    id: l.id,
+    codigo: l.codigo,
+    estado: l.estado,
+    precio: l.precio ?? null,
+    moneda: l.moneda ?? null,
+    poly:
+      l.data && typeof l.data === "object" && Array.isArray((l.data as any).masterplan_poly)
+        ? ((l.data as any).masterplan_poly as [number, number][])
+        : null,
+  }));
+
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'disponible':
@@ -701,6 +717,47 @@ export default function LotesList({ proyectoId, lotes, totalLotes }: LotesListPr
   return (
     <>
     <div className="space-y-6">
+      {/* Sección Masterplan interactivo */}
+      <Card>
+        <CardHeader>
+          <button
+            type="button"
+            onClick={() => setShowMasterplan((v) => !v)}
+            className="flex items-center justify-between w-full gap-3 text-left"
+            aria-expanded={showMasterplan}
+          >
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
+                <Map className="w-4 h-4 text-crm-primary" />
+              </div>
+              Masterplan
+            </CardTitle>
+            {showMasterplan ? (
+              <ChevronUp className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
+            )}
+          </button>
+        </CardHeader>
+        {showMasterplan && (
+          <CardContent>
+            {masterplan?.url ? (
+              <MasterplanViewer
+                imageUrl={masterplan.url}
+                lotes={lotesMarcados}
+                onLoteClick={(id) =>
+                  setSelectedLote(lotesAMostrar.find((l) => l.id === id) ?? null)
+                }
+              />
+            ) : (
+              <div className="p-6 text-center text-sm text-crm-text-muted dark:text-gray-400">
+                Aún no hay masterplan cargado para este proyecto.
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

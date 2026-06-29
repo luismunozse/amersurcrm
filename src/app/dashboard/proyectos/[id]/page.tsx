@@ -9,7 +9,7 @@ import DeleteProjectButton from "./_DeleteProjectButton";
 import { PaginationClient } from "./_PaginationClient";
 import ProjectTabs from "./_ProjectTabs";
 import ProyectoGaleria from "./_ProyectoGaleria";
-import type { ProyectoMediaItem } from "@/types/proyectos";
+import type { ProyectoMediaItem, Masterplan } from "@/types/proyectos";
 import type { OverlayLayerConfig } from "@/types/overlay-layers";
 import { ChevronLeft, MapPin, Search, Circle } from "lucide-react";
 
@@ -67,7 +67,7 @@ export default async function ProyLotesPage({
   const puedeVerAuditoria = user ? await esAdminOCoordinador() : false;
 
   // Proyecto (para título/404)
-  const proyectoSelectBase = "id,nombre,estado,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,overlay_layers,created_at,tipo";
+  const proyectoSelectBase = "id,nombre,estado,ubicacion,latitud,longitud,descripcion,imagen_url,logo_url,galeria_imagenes,planos_url,overlay_bounds,overlay_rotation,overlay_opacity,overlay_layers,masterplan,created_at,tipo";
   const { data: proyectoWithPolygon, error: eProyectoWithPolygon } = await supabase
     .from("proyecto")
     .select(`${proyectoSelectBase},poligono`)
@@ -467,6 +467,7 @@ export default async function ProyLotesPage({
               proyectoId={proyecto.id}
               lotes={lotesConProyecto}
               totalLotes={total}
+              masterplan={(proyecto as { masterplan?: Masterplan | null }).masterplan ?? null}
             />
 
             {/* Paginación mejorada */}
