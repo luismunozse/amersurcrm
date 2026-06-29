@@ -408,3 +408,17 @@ export interface ToastMessage {
   message: string;
   duration?: number;
 }
+
+// ============================================================================
+// MASTERPLAN TYPES
+// ============================================================================
+
+export type Punto = [number, number];
+export type Poligono = Punto[];
+
+export interface Masterplan {
+  url: string;
+  path: string;
+  width: number;
+  height: number;
+}
