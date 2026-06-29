@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { uploadProyectoAsset, validateProyectoImage } from "@/lib/storage/proyectoUpload.client";
+import { uploadProyectoAsset, validateProyectoImage, removeProyectoAssets } from "@/lib/storage/proyectoUpload.client";
 import { guardarMasterplanProyecto } from "@/app/dashboard/proyectos/_actions";
 import { MasterplanEditor } from "@/components/masterplan/MasterplanEditor";
 import type { LoteMarcado } from "@/components/masterplan/MasterplanViewer";
@@ -9,16 +9,17 @@ import { createClient } from "@/lib/supabase.client";
 
 export function MasterplanEditorPanel({
   proyectoId,
-  masterplanUrl,
+  masterplan,
   lotes,
   onSaved,
 }: {
   proyectoId: string;
-  masterplanUrl: string | null;
+  masterplan: { url: string; path: string } | null;
   lotes: LoteMarcado[];
   onSaved: () => void;
 }) {
-  const [url, setUrl] = useState<string | null>(masterplanUrl);
+  const [url, setUrl] = useState<string | null>(masterplan?.url ?? null);
+  const [pathActual, setPathActual] = useState<string | null>(masterplan?.path ?? null);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,11 +34,14 @@ export function MasterplanEditorPanel({
     setError(null);
     setSubiendo(true);
     try {
-      const dims = await new Promise<{ w: number; h: number }>((res) => {
+      const objectUrl = URL.createObjectURL(file);
+      const dims = await new Promise<{ w: number; h: number }>((res, rej) => {
         const img = new Image();
         img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight });
-        img.src = URL.createObjectURL(file);
-      });
+        img.onerror = () => rej(new Error("No se pudo leer la imagen."));
+        img.src = objectUrl;
+      }).finally(() => URL.revokeObjectURL(objectUrl));
+
       const supabase = createClient();
       const { publicUrl, path } = await uploadProyectoAsset(supabase, proyectoId, file, "masterplan");
       const guardado = await guardarMasterplanProyecto(proyectoId, {
@@ -50,6 +54,10 @@ export function MasterplanEditorPanel({
         setError(guardado.error);
         return;
       }
+      if (pathActual && pathActual !== path) {
+        await removeProyectoAssets(supabase, [pathActual]).catch(() => {});
+      }
+      setPathActual(path);
       setUrl(publicUrl);
       onSaved();
     } catch (err) {
@@ -74,7 +82,6 @@ export function MasterplanEditorPanel({
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       {url && (
         <MasterplanEditor
-          proyectoId={proyectoId}
           imageUrl={url}
           lotes={lotes}
           onSaved={onSaved}

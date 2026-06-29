@@ -20,13 +20,13 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("MasterplanEditor", () => {
   it("lista los lotes marcando cuáles ya tienen polígono", () => {
-    render(<MasterplanEditor proyectoId="p1" imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
+    render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
     expect(screen.getByText("A1")).toBeInTheDocument();
     expect(screen.getByTestId("borrar-poly-B2")).toBeInTheDocument();
   });
 
   it("borra el polígono de un lote llamando a la action", async () => {
-    render(<MasterplanEditor proyectoId="p1" imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
+    render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
     fireEvent.click(screen.getByTestId("borrar-poly-B2"));
     expect(eliminarPoligonoLote).toHaveBeenCalledWith("b");
   });

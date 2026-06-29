@@ -57,6 +57,23 @@ describe("guardarPoligonoLote", () => {
     expect(payload.data.fotos).toEqual(["a.jpg"]);
     expect(payload.data.masterplan_poly).toEqual([[0, 0], [0.1, 0], [0.1, 0.1]]);
   });
+
+  it("rechaza un polígono con menos de 3 puntos", async () => {
+    const chain = createChainMock({ data: { data: {} }, error: null });
+    mockServerActionClient.__setChain("lote", chain);
+    const res = await guardarPoligonoLote("lote-1", [[0, 0], [0.1, 0.1]]);
+    expect(res.ok).toBe(false);
+    expect(chain.update).not.toHaveBeenCalled();
+  });
+
+  it("clampa coordenadas fuera de [0,1] antes de guardar", async () => {
+    const chain = createChainMock({ data: { data: {} }, error: null });
+    mockServerActionClient.__setChain("lote", chain);
+    const res = await guardarPoligonoLote("lote-1", [[-0.5, 2], [0.5, 0.5], [1.5, -1]]);
+    expect(res.ok).toBe(true);
+    const payload = chain.update.mock.calls[0][0];
+    expect(payload.data.masterplan_poly).toEqual([[0, 1], [0.5, 0.5], [1, 0]]);
+  });
 });
 
 describe("eliminarPoligonoLote", () => {

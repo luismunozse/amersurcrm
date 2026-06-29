@@ -6,7 +6,7 @@ import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import type { ProyectoMediaItem, Masterplan, Poligono } from "@/types/proyectos";
-import { mergeLotePoly } from "@/lib/masterplan/geometry";
+import { clampUnidad, mergeLotePoly } from "@/lib/masterplan/geometry";
 
 function buildStoragePathFromUrl(url: string | null, proyectoId: string): string | null {
   if (!url) return null;
@@ -555,6 +555,13 @@ async function setPoligonoLote(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "No autenticado" };
   await requierePermiso(PERMISOS.PROYECTOS.EDITAR);
+
+  if (poly !== null) {
+    if (!Array.isArray(poly) || poly.length < 3) {
+      return { ok: false, error: "El polígono necesita al menos 3 puntos." };
+    }
+    poly = poly.map(([x, y]) => [clampUnidad(x), clampUnidad(y)]) as typeof poly;
+  }
 
   const { data: lote, error: readErr } = await supabase
     .from("lote").select("data").eq("id", loteId).maybeSingle();

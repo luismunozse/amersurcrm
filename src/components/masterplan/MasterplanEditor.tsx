@@ -7,7 +7,6 @@ import type { LoteMarcado } from "./MasterplanViewer";
 import type { Poligono } from "@/types/proyectos";
 
 interface MasterplanEditorProps {
-  proyectoId: string;
   imageUrl: string;
   lotes: LoteMarcado[];
   onSaved: () => void;
