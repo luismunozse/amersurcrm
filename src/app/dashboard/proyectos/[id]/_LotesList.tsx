@@ -41,6 +41,7 @@ import BulkImportLotesModal from "./_BulkImportLotesModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 import { MasterplanViewer, type LoteMarcado } from "@/components/masterplan/MasterplanViewer";
+import { MasterplanEditorPanel } from "@/components/masterplan/MasterplanEditorPanel";
 import type { Masterplan } from "@/types/proyectos";
 
 type Lote = {
@@ -104,6 +105,8 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [density, setDensity] = useState<Density>("normal");
   const [showMasterplan, setShowMasterplan] = useState<boolean>(!!masterplan?.url);
+  const [editandoMp, setEditandoMp] = useState(false);
+  const puedeEditarMasterplan = esAdminOCoordinador();
   const lockedLotes = useLoteLocks(proyectoId);
 
   useEffect(() => {
@@ -753,6 +756,23 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
               <div className="p-6 text-center text-sm text-crm-text-muted dark:text-gray-400">
                 Aún no hay masterplan cargado para este proyecto.
               </div>
+            )}
+            {puedeEditarMasterplan && (
+              <button
+                type="button"
+                onClick={() => setEditandoMp((v) => !v)}
+                className="mt-3 px-3 py-2 border border-crm-border rounded-md text-sm active:scale-[0.98] transition ease-out-strong"
+              >
+                {editandoMp ? "Cerrar editor" : "Editar masterplan"}
+              </button>
+            )}
+            {editandoMp && (
+              <MasterplanEditorPanel
+                proyectoId={proyectoId}
+                masterplanUrl={masterplan?.url ?? null}
+                lotes={lotesMarcados}
+                onSaved={() => router.refresh()}
+              />
             )}
           </CardContent>
         )}
