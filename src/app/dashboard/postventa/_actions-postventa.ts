@@ -2,8 +2,8 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
-import { revalidarCliente } from "../clientes/_actions-crm-helpers";
+import { requierePermiso, tienePermiso } from "@/lib/permissions/server";
+import { obtenerUsernameActual, revalidarCliente } from "../clientes/_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
 
 // ============================================================
@@ -140,9 +140,32 @@ export async function obtenerSolicitudesPostVenta(filtros?: {
   const supabase = await createServerActionClient();
 
   try {
+    // FIX C (secure-authz-p1): global roles see all; vendors are scoped to
+    // their own clients. RLS is the primary control; this guard shapes the
+    // query for defense-in-depth (belt-and-suspenders).
+    const puedeVerTodas = await tienePermiso(PERMISOS.VENTAS.VER_TODAS);
+    let clientIds: string[] | null = null;
+
+    if (!puedeVerTodas) {
+      const auth = await obtenerUsernameActual(supabase);
+      if (!auth.success) return auth;
+
+      const { data: myClients } = await supabase
+        .from('cliente')
+        .select('id')
+        .eq('vendedor_username', auth.username);
+
+      clientIds = (myClients || []).map((c: any) => c.id);
+      if (clientIds.length === 0) return { success: true, data: [] };
+    }
+
     let query = supabase
       .from('solicitud_postventa')
       .select('*, cliente:cliente!cliente_id(nombre), venta:venta!venta_id(codigo_venta)');
+
+    if (clientIds !== null) {
+      query = query.in('cliente_id', clientIds);
+    }
 
     if (filtros?.estado) query = query.eq('estado', filtros.estado);
     if (filtros?.tipo) query = query.eq('tipo', filtros.tipo);

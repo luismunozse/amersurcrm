@@ -82,7 +82,7 @@ export async function validateBearerAndEnsureGlobalRole(
     return { ok: false, status: 403, error: "Permiso insuficiente" };
   }
 
-  const username = (perfil as { username: string | null; rol: { nombre: string } }).username;
+  const username = (perfil as { username: string | null }).username;
   if (!username) {
     return { ok: false, status: 403, error: "Perfil incompleto" };
   }

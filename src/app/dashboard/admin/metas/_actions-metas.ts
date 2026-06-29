@@ -2,7 +2,8 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso } from "@/lib/permissions/server";
+import { requierePermiso, tienePermiso } from "@/lib/permissions/server";
+import { obtenerUsernameActual } from "../../clientes/_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
 
 // ============================================================
@@ -64,11 +65,23 @@ export async function obtenerMetas(filtros?: {
   const supabase = await createServerActionClient();
 
   try {
+    // FIX C (secure-authz-p1): global roles see all metas; vendors see only own.
+    const puedeVerTodas = await tienePermiso(PERMISOS.METAS.ASIGNAR);
+
     let query = supabase
       .from('meta_vendedor')
       .select('*');
 
-    if (filtros?.vendedorUsername) query = query.eq('vendedor_username', filtros.vendedorUsername);
+    if (!puedeVerTodas) {
+      // Vendor: scope to own vendedor_username regardless of caller-provided filters.
+      const auth = await obtenerUsernameActual(supabase);
+      if (!auth.success) return auth;
+      query = query.eq('vendedor_username', auth.username);
+    } else {
+      // Global role: apply optional caller filter if provided.
+      if (filtros?.vendedorUsername) query = query.eq('vendedor_username', filtros.vendedorUsername);
+    }
+
     if (filtros?.periodoAnio) query = query.eq('periodo_anio', filtros.periodoAnio);
     if (filtros?.periodoMes) query = query.eq('periodo_mes', filtros.periodoMes);
 
@@ -91,11 +104,21 @@ export async function obtenerKPIs(filtros?: {
   const supabase = await createServerActionClient();
 
   try {
+    // FIX C (secure-authz-p1): global roles see all KPIs; vendors see only own.
+    const puedeVerTodas = await tienePermiso(PERMISOS.METAS.ASIGNAR);
+
     let query = supabase
       .from('v_kpi_vendedor')
       .select('*');
 
-    if (filtros?.vendedorUsername) query = query.eq('vendedor_username', filtros.vendedorUsername);
+    if (!puedeVerTodas) {
+      const auth = await obtenerUsernameActual(supabase);
+      if (!auth.success) return auth;
+      query = query.eq('vendedor_username', auth.username);
+    } else {
+      if (filtros?.vendedorUsername) query = query.eq('vendedor_username', filtros.vendedorUsername);
+    }
+
     if (filtros?.periodoAnio) query = query.eq('periodo_anio', filtros.periodoAnio);
     if (filtros?.periodoMes) query = query.eq('periodo_mes', filtros.periodoMes);
 

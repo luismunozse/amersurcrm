@@ -33,6 +33,9 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
   revalidarCliente: vi.fn(),
 }));
 
+import { tienePermiso } from "@/lib/permissions/server";
+import { obtenerUsernameActual } from "@/app/dashboard/clientes/_actions-crm-helpers";
+
 import {
   guardarMeta,
   obtenerMetas,
@@ -78,6 +81,7 @@ describe("obtenerMetas", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it("llama a from('meta_vendedor') para obtener metas", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
     const chain = createChainMock();
     chain.order.mockImplementation(() => Promise.resolve({ data: [{ id: "m-1" }], error: null }));
     mockServerActionClient.from.mockReturnValue(chain);
@@ -87,6 +91,7 @@ describe("obtenerMetas", () => {
   });
 
   it("maneja error al obtener metas", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
     const chain = createChainMock();
     chain.order.mockImplementation(() => { throw { message: "DB error" }; });
     mockServerActionClient.from.mockReturnValue(chain);
@@ -94,12 +99,45 @@ describe("obtenerMetas", () => {
     const result = await obtenerMetas();
     expect(result.success).toBe(false);
   });
+
+  // global role must return all metas without a vendedor_username ownership filter
+  // Note: use mockReturnValue(chain) for order so the two chained .order() calls work.
+  it("global role — returns all metas without vendedor_username filter", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
+    const chain = createChainMock();
+    chain.order.mockReturnValue(chain); // allow .order().order() chaining
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    await obtenerMetas();
+
+    // The key assertion: no own-vendor scope filter applied for global role
+    expect(chain.eq).not.toHaveBeenCalledWith("vendedor_username", "admin1");
+  });
+
+  // vendor role must scope metas query to own vendedor_username
+  it("vendor role — scopes query to own vendedor_username", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(false); // vendor
+    vi.mocked(obtenerUsernameActual).mockResolvedValueOnce({
+      success: true,
+      username: "vendedor1",
+      userId: "uid-v1",
+    } as any);
+
+    const chain = createChainMock();
+    chain.order.mockReturnValue(chain); // allow .order().order() chaining
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    await obtenerMetas();
+
+    expect(chain.eq).toHaveBeenCalledWith("vendedor_username", "vendedor1");
+  });
 });
 
 describe("obtenerKPIs", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it("obtiene KPIs de vendedor", async () => {
+  it("obtiene KPIs de vendedor (global role)", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
     const kpiData = [{
       meta_id: "m-1",
       vendedor_username: "vendedor1",
@@ -114,6 +152,35 @@ describe("obtenerKPIs", () => {
 
     const result = await obtenerKPIs({ vendedorUsername: "vendedor1" });
     expect(result.success).toBe(true);
+  });
+
+  // global role must return all KPIs without a vendedor_username ownership filter
+  it("global role — returns all KPIs without own-vendor filter", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
+    const chain = createChainMock();
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    await obtenerKPIs();
+
+    // The key assertion: no own-vendor scope filter applied for global role
+    expect(chain.eq).not.toHaveBeenCalledWith("vendedor_username", "admin1");
+  });
+
+  // vendor role must scope KPIs query to own vendedor_username
+  it("vendor role — scopes query to own vendedor_username", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(false); // vendor
+    vi.mocked(obtenerUsernameActual).mockResolvedValueOnce({
+      success: true,
+      username: "vendedor1",
+      userId: "uid-v1",
+    } as any);
+
+    const chain = createChainMock();
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    await obtenerKPIs();
+
+    expect(chain.eq).toHaveBeenCalledWith("vendedor_username", "vendedor1");
   });
 });
 

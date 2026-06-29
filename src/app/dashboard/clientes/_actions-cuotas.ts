@@ -2,7 +2,7 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { requierePermiso, esAdmin } from "@/lib/permissions/server";
+import { requierePermiso, esAdmin, tienePermiso } from "@/lib/permissions/server";
 import { obtenerUsernameActual, validarMonto, revalidarCliente } from "./_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
 
@@ -50,12 +50,34 @@ export async function obtenerCronogramaVenta(ventaId: string) {
 }
 
 export async function obtenerCuotasCliente(clienteId: string) {
+  if (!clienteId) return { success: false, error: 'ID de cliente requerido' };
+
   const supabase = await createServerActionClient();
 
   try {
+    // FIX C (secure-authz-p1): verify caller can see the target client.
+    // Global roles bypass; vendors must own the client.
+    const puedeVerTodas = await tienePermiso(PERMISOS.VENTAS.VER_TODAS);
+
+    if (!puedeVerTodas) {
+      const auth = await obtenerUsernameActual(supabase);
+      if (!auth.success) return auth;
+
+      const { data: clienteAcceso } = await supabase
+        .from('cliente')
+        .select('id')
+        .eq('id', clienteId)
+        .eq('vendedor_username', auth.username)
+        .maybeSingle();
+
+      if (!clienteAcceso) {
+        return { success: false, error: 'Permiso insuficiente para ver las cuotas de este cliente' };
+      }
+    }
+
     const { data, error } = await supabase
       .from('cuota')
-      .select('*, venta:venta!venta_id(codigo_venta, cliente_id, lote_id)')
+      .select('*, venta:venta!inner(codigo_venta, cliente_id, lote_id)')
       .eq('venta.cliente_id', clienteId)
       .order('fecha_vencimiento', { ascending: true });
 

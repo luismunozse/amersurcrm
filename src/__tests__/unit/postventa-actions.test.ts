@@ -23,6 +23,7 @@ vi.mock("@/lib/supabase.server-actions", () => ({
 }));
 vi.mock("@/lib/permissions/server", () => ({
   requierePermiso: vi.fn().mockResolvedValue(undefined),
+  tienePermiso: vi.fn().mockResolvedValue(true),
 }));
 vi.mock("@/lib/permissions", () => ({
   PERMISOS: { VENTAS: { CREAR: "ventas.crear" } },
@@ -31,6 +32,8 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
   obtenerUsernameActual: vi.fn().mockResolvedValue({ success: true, username: "vendedor1", userId: "uid-1" }),
   revalidarCliente: vi.fn(),
 }));
+
+import { tienePermiso } from "@/lib/permissions/server";
 
 import {
   crearSolicitudPostVenta,
@@ -132,6 +135,7 @@ describe("obtenerSolicitudesPostVenta", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it("llama a supabase from('solicitud_postventa') para listar", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
     const chain = createChainMock();
     chain.range.mockImplementation(() => Promise.resolve({ data: [], error: null }));
     chain.order.mockReturnValue(chain);
@@ -142,6 +146,7 @@ describe("obtenerSolicitudesPostVenta", () => {
   });
 
   it("maneja error al listar solicitudes", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
     const chain = createChainMock();
     chain.range.mockImplementation(() => Promise.resolve({ data: null, error: { message: "DB error" } }));
     chain.order.mockReturnValue(chain);
@@ -149,5 +154,44 @@ describe("obtenerSolicitudesPostVenta", () => {
 
     const result = await obtenerSolicitudesPostVenta();
     expect(result.success).toBe(false);
+  });
+
+  // global role must bypass client ownership check and return all post-sale requests
+  it("global role — returns all without fetching vendor clients", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(true);
+    const chain = createChainMock();
+    chain.range.mockImplementation(() => Promise.resolve({ data: [{ id: "spv-1" }], error: null }));
+    chain.order.mockReturnValue(chain);
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    const result = await obtenerSolicitudesPostVenta();
+
+    expect(result.success).toBe(true);
+    const fromTables = mockServerActionClient.from.mock.calls.map((c: any[]) => c[0]);
+    expect(fromTables).not.toContain("cliente");
+  });
+
+  // vendor role must scope solicitudes to own clients via cliente lookup and .in(cliente_id) filter
+  it("vendor role — fetches own clients and scopes query via .in(cliente_id)", async () => {
+    vi.mocked(tienePermiso).mockResolvedValueOnce(false); // vendor
+
+    const clienteChain = createChainMock();
+    clienteChain.eq.mockImplementation(() =>
+      Promise.resolve({ data: [{ id: "c-1" }], error: null })
+    );
+
+    const mainChain = createChainMock();
+    mainChain.range.mockImplementation(() => Promise.resolve({ data: [{ id: "spv-1" }], error: null }));
+    mainChain.order.mockReturnValue(mainChain);
+
+    mockServerActionClient.from
+      .mockReturnValueOnce(clienteChain) // for 'cliente' scope lookup
+      .mockReturnValue(mainChain);       // for 'solicitud_postventa' main query
+
+    const result = await obtenerSolicitudesPostVenta();
+
+    expect(result.success).toBe(true);
+    expect(mockServerActionClient.from).toHaveBeenCalledWith("cliente");
+    expect(mainChain.in).toHaveBeenCalledWith("cliente_id", expect.any(Array));
   });
 });

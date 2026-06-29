@@ -70,8 +70,8 @@ _(Added to PR1 scope per user decision after adversarial review.)_
 
 ### Phase 5: SQL Migration
 
-- [ ] 5.1 Confirm `supabase/migrations/20260412000000_proceso_adquisicion.sql` lacks `cancelado_por`, `fecha_cancelacion`, `motivo_cancelacion` columns (already verified absent — proceed to migration).
-- [ ] 5.2 Create `supabase/migrations/20260629000000_secure_authz_p1.sql`:
+- [x] 5.1 Confirm `supabase/migrations/20260412000000_proceso_adquisicion.sql` lacks `cancelado_por`, `fecha_cancelacion`, `motivo_cancelacion` columns (already verified absent — proceed to migration).
+- [x] 5.2 Create `supabase/migrations/20260629000000_secure_authz_p1.sql`:
   - `ALTER TABLE crm.proceso_adquisicion ADD COLUMN IF NOT EXISTS cancelado_por uuid, ADD COLUMN IF NOT EXISTS fecha_cancelacion timestamptz, ADD COLUMN IF NOT EXISTS motivo_cancelacion text`.
   - `CREATE OR REPLACE FUNCTION crm.es_visibilidad_global()` (SECURITY DEFINER STABLE, joins `usuario_perfil → rol`, checks GLOBAL_ROLES).
   - `DROP POLICY IF EXISTS` + `CREATE POLICY` for SELECT on all 13 tables per scoping map in `design.md §FIX B` (tables 1–13). Tables with `cliente_id`: use `crm.usuario_puede_ver_cliente(cliente_id)`. Tables without (`comision`, `meta_vendedor`): `crm.es_visibilidad_global() OR {username_col} = crm.get_current_username()`. Indirect FK tables: EXISTS subquery via parent.
@@ -82,21 +82,21 @@ _(Added to PR1 scope per user decision after adversarial review.)_
 
 ### Phase 6: RED — Write Failing Tests (6 guards)
 
-- [ ] 6.1 `src/__tests__/unit/proceso-actions.test.ts` — add: `cancelarProceso` with non-admin role → returns `{ error }`, no DB write; with admin role → writes `cancelado_por`/`fecha_cancelacion`/`motivo_cancelacion` on `proceso_adquisicion`.
-- [ ] 6.2 `src/__tests__/unit/postventa-actions.test.ts` — add: `obtenerSolicitudesPostVenta` global role → no `.eq` scope filter applied; vendor role → `.eq` own-username filter applied.
-- [ ] 6.3 `src/__tests__/unit/entregas-actions.test.ts` — add: `obtenerEntregas` global role → full set; vendor → scoped to own clients.
-- [ ] 6.4 `src/__tests__/unit/cuotas-actions.test.ts` — add: `obtenerCuotasCliente` caller cannot see target client → returns auth error; authorized caller → returns data.
-- [ ] 6.5 `src/__tests__/unit/metas-actions.test.ts` — add: `obtenerMetas` global → all rows; vendor → own `vendedor_username` only. `obtenerKPIs` same pattern.
+- [x] 6.1 `src/__tests__/unit/proceso-actions.test.ts` — add: `cancelarProceso` with non-admin role → returns `{ error }`, no DB write; with admin role → writes `cancelado_por`/`fecha_cancelacion`/`motivo_cancelacion` on `proceso_adquisicion`.
+- [x] 6.2 `src/__tests__/unit/postventa-actions.test.ts` — add: `obtenerSolicitudesPostVenta` global role → no `.eq` scope filter applied; vendor role → `.eq` own-username filter applied.
+- [x] 6.3 `src/__tests__/unit/entregas-actions.test.ts` — add: `obtenerEntregas` global role → full set; vendor → scoped to own clients.
+- [x] 6.4 `src/__tests__/unit/cuotas-actions.test.ts` — add: `obtenerCuotasCliente` caller cannot see target client → returns auth error; authorized caller → returns data.
+- [x] 6.5 `src/__tests__/unit/metas-actions.test.ts` — add: `obtenerMetas` global → all rows; vendor → own `vendedor_username` only. `obtenerKPIs` same pattern.
 
 ### Phase 7: GREEN — Implement 6 Server-Action Guards
 
-- [ ] 7.1 `src/app/dashboard/adquisicion/_actions-proceso.ts` — `cancelarProceso`: add `if (!await esAdminOGerente()) return { error: 'Permiso insuficiente' }`. On authorized cancel: update `cancelado_por = user.id`, `fecha_cancelacion = now()`, `motivo_cancelacion = motivo`.
-- [ ] 7.2 `src/app/dashboard/postventa/_actions-postventa.ts` — `obtenerSolicitudesPostVenta`: `tienePermiso(VER_TODAS)` → no extra filter; else apply vendor-username scope on `cliente_id IN (own clients)`.
-- [ ] 7.3 `src/app/dashboard/entregas/_actions-entregas.ts` — `obtenerEntregas`: same scope guard pattern.
-- [ ] 7.4 `src/app/dashboard/clientes/_actions-cuotas.ts` — `obtenerCuotasCliente`: verify caller can access the target `cliente` (RPC ownership check or `tienePermiso`) before returning; return auth error if not.
-- [ ] 7.5 `src/app/dashboard/admin/metas/_actions-metas.ts` — `obtenerMetas`: global role → no extra filter; vendor → `.eq('vendedor_username', ownUsername)`.
-- [ ] 7.6 `src/app/dashboard/admin/metas/_actions-metas.ts` — `obtenerKPIs`: same scope guard.
-- [ ] 7.7 Run `npm test` — all new guard tests green; no regressions across full suite.
+- [x] 7.1 `src/app/dashboard/adquisicion/_actions-proceso.ts` — `cancelarProceso`: add `if (!await esAdminOGerente()) return { error: 'Permiso insuficiente' }`. On authorized cancel: update `cancelado_por = user.id`, `fecha_cancelacion = now()`, `motivo_cancelacion = motivo`.
+- [x] 7.2 `src/app/dashboard/postventa/_actions-postventa.ts` — `obtenerSolicitudesPostVenta`: `tienePermiso(VER_TODAS)` → no extra filter; else apply vendor-username scope on `cliente_id IN (own clients)`.
+- [x] 7.3 `src/app/dashboard/entregas/_actions-entregas.ts` — `obtenerEntregas`: same scope guard pattern.
+- [x] 7.4 `src/app/dashboard/clientes/_actions-cuotas.ts` — `obtenerCuotasCliente`: verify caller can access the target `cliente` (RPC ownership check or `tienePermiso`) before returning; return auth error if not.
+- [x] 7.5 `src/app/dashboard/admin/metas/_actions-metas.ts` — `obtenerMetas`: global role → no extra filter; vendor → `.eq('vendedor_username', ownUsername)`.
+- [x] 7.6 `src/app/dashboard/admin/metas/_actions-metas.ts` — `obtenerKPIs`: same scope guard.
+- [x] 7.7 Run `npm test` — all new guard tests green; no regressions across full suite. (892/892 passed)
 
 ### Phase 8: Manual Per-Role RLS Verification
 

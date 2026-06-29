@@ -26,6 +26,9 @@ vi.mock("@/lib/supabase.server-actions", () => ({
 vi.mock("@/lib/permissions/server", () => ({
   requierePermiso: vi.fn().mockResolvedValue(undefined),
   tienePermiso: vi.fn().mockResolvedValue(true),
+  esAdminOCoordinador: vi.fn().mockResolvedValue(false),
+  esAdmin: vi.fn().mockResolvedValue(false),
+  esAdminOGerente: vi.fn().mockResolvedValue(false),
 }));
 vi.mock("@/lib/permissions", () => ({
   PERMISOS: { VENTAS: { VER_TODAS: "ventas.ver_todas", CREAR: "ventas.crear" } },
@@ -34,6 +37,8 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
   obtenerUsernameActual: vi.fn().mockResolvedValue({ success: true, username: "vendedor1", userId: "uid-1" }),
   revalidarCliente: vi.fn(),
 }));
+
+import { esAdminOGerente } from "@/lib/permissions/server";
 
 import {
   obtenerProcesos,
@@ -156,11 +161,46 @@ describe("avanzarEtapa", () => {
 describe("cancelarProceso", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it("cancela proceso con motivo", async () => {
-    const chain = createChainMock({ data: { id: "p-1", estado: "cancelado" }, error: null });
+  // Updated: cancellation now requires ROL_ADMIN or ROL_GERENTE.
+  it("cancela proceso con motivo (admin/gerente authorized)", async () => {
+    vi.mocked(esAdminOGerente).mockResolvedValueOnce(true);
+    const chain = createChainMock({ data: null, error: null });
+    // FIX 7: cancelarProceso now calls .select('id') as terminal — mock it to return a row
+    chain.select.mockImplementation(() => Promise.resolve({ data: [{ id: "p-1" }], error: null }));
     mockServerActionClient.from.mockReturnValue(chain);
 
     const result = await cancelarProceso("p-1", "Cliente desistió");
     expect(result.success).toBe(true);
+  });
+
+  // vendor/coordinator without ROL_ADMIN or ROL_GERENTE must be rejected before any DB write
+  it("rejects non-admin/gerente callers without any DB write", async () => {
+    vi.mocked(esAdminOGerente).mockResolvedValueOnce(false);
+
+    const result = await cancelarProceso("p-1", "motivo");
+
+    expect(result.success).toBe(false);
+    expect((result as any).error).toBeTruthy();
+    expect(mockServerActionClient.from).not.toHaveBeenCalled();
+  });
+
+  // authorized cancel must persist audit columns: cancelado_por, fecha_cancelacion, motivo_cancelacion
+  it("authorized cancel writes cancelado_por, fecha_cancelacion, motivo_cancelacion", async () => {
+    vi.mocked(esAdminOGerente).mockResolvedValueOnce(true);
+    const chain = createChainMock({ data: null, error: null });
+    // FIX 7: cancelarProceso now calls .select('id') as terminal — mock it to return a row
+    chain.select.mockImplementation(() => Promise.resolve({ data: [{ id: "p-1" }], error: null }));
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    const result = await cancelarProceso("p-1", "test motivo");
+
+    expect(result.success).toBe(true);
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cancelado_por: "uid-1",
+        fecha_cancelacion: expect.any(String),
+        motivo_cancelacion: "test motivo",
+      })
+    );
   });
 });

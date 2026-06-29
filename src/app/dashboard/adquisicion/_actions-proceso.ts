@@ -2,7 +2,7 @@
 
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
-import { tienePermiso, esAdminOCoordinador, esAdmin } from "@/lib/permissions/server";
+import { tienePermiso, esAdminOCoordinador, esAdmin, esAdminOGerente } from "@/lib/permissions/server";
 import { obtenerUsernameActual, revalidarCliente } from "../clientes/_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
 import type { EstadoRevision } from "@/lib/types/proceso-adquisicion";
@@ -360,21 +360,45 @@ export async function eliminarProceso(procesoId: string): Promise<{
   return { success: true };
 }
 
+// Intentional behavior change (secure-authz-p1): vendors can no longer cancel
+// their own processes. Cancel is now restricted to ROL_ADMIN and ROL_GERENTE.
+// See spec §proceso_adquisicion Write Restrictions and design §FIX C.
 export async function cancelarProceso(procesoId: string, motivo?: string) {
+  if (!procesoId) return { success: false, error: 'ID de proceso requerido' };
+
+  if (!(await esAdminOGerente())) {
+    return {
+      success: false,
+      error: 'Solo administradores o gerentes pueden cancelar procesos',
+    };
+  }
+
   const supabase = await createServerActionClient();
 
   try {
-    const { error } = await supabase
+    const auth = await obtenerUsernameActual(supabase);
+    if (!auth.success) return auth;
+
+    const { data: updated, error } = await supabase
       .from('proceso_adquisicion')
       .update({
         estado: 'cancelado',
         notas: motivo,
         fecha_cierre: new Date().toISOString().split('T')[0],
         updated_at: new Date().toISOString(),
+        // Audit columns — added by migration 20260629000000_secure_authz_p1.sql
+        cancelado_por: auth.userId,
+        fecha_cancelacion: new Date().toISOString(),
+        motivo_cancelacion: motivo ?? null,
       })
-      .eq('id', procesoId);
+      .eq('id', procesoId)
+      .select('id');
 
     if (error) throw error;
+
+    if (!updated || updated.length === 0) {
+      return { success: false, error: 'Proceso no encontrado' };
+    }
 
     revalidatePath('/dashboard/adquisicion');
     return { success: true };
