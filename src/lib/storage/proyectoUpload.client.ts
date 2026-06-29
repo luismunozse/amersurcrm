@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ProyectoAssetPrefix = "portada" | "logo" | "galeria";
+export type ProyectoAssetPrefix = "portada" | "logo" | "galeria" | "masterplan";
 
 export type UploadedProyectoAsset = {
   publicUrl: string;
