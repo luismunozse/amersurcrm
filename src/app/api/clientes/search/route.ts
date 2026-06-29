@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { GLOBAL_ROLES } from "@/lib/auth/extension-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -75,8 +76,32 @@ export async function GET(request: NextRequest) {
     const perfil = perfilData as { username: string; rol: { nombre: string } | { nombre: string }[] | null } | null;
     const rolData = perfil?.rol;
     const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-    const esAdmin = rolNombre === "admin" || rolNombre === "ROL_ADMIN";
-    const vendedorUsername = perfil?.username;
+
+    // Guard: reject callers with no resolvable CRM profile or role.
+    // Without this, a null profile falls through to vendor-scoped queries
+    // with an undefined username — causing the service-role client to skip
+    // the vendor filter and return ALL clients to any authenticated user.
+    if (!perfil || !rolNombre) {
+      return NextResponse.json(
+        { error: "Permiso insuficiente" },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    // Single source of truth for global-visibility roles — imported from extension-auth.
+    // Previously this was `rolNombre === "admin" || rolNombre === "ROL_ADMIN"`,
+    // which wrongly scoped ROL_GERENTE and ROL_COORDINADOR_VENTAS to vendor view.
+    const esGlobalRole = (GLOBAL_ROLES as readonly string[]).includes(rolNombre);
+    const vendedorUsername = perfil.username ?? undefined;
+
+    // Additional guard: a vendor with no username cannot be safely scoped.
+    if (!esGlobalRole && !vendedorUsername) {
+      console.error("[ClienteSearch] vendor profile has no username — rejecting");
+      return NextResponse.json(
+        { error: "Permiso insuficiente" },
+        { status: 403, headers: corsHeaders }
+      );
+    }
 
     // Obtener parámetro de búsqueda
     const searchParams = request.nextUrl.searchParams;
@@ -122,7 +147,7 @@ export async function GET(request: NextRequest) {
       .select(`${camposCliente}, vendedor:usuario_perfil!cliente_vendedor_asignado_fkey(nombre_completo)`)
       .or(orFilter);
 
-    if (!esAdmin && vendedorUsername) {
+    if (!esGlobalRole && vendedorUsername) {
       queryWithJoin = queryWithJoin.eq("vendedor_asignado", vendedorUsername);
     }
 
@@ -142,7 +167,7 @@ export async function GET(request: NextRequest) {
         .select(camposCliente)
         .or(orFilter);
 
-      if (!esAdmin && vendedorUsername) {
+      if (!esGlobalRole && vendedorUsername) {
         queryBasic = queryBasic.eq("vendedor_asignado", vendedorUsername);
       }
 
@@ -169,7 +194,7 @@ export async function GET(request: NextRequest) {
 
     if (!cliente) {
       // Si es vendedor y no encontró cliente, verificar si existe pero está asignado a otro
-      if (!esAdmin && vendedorUsername) {
+      if (!esGlobalRole && vendedorUsername) {
         const { data: clienteExiste } = await supabase
           .schema("crm")
           .from("cliente")
@@ -179,10 +204,11 @@ export async function GET(request: NextRequest) {
           .maybeSingle();
 
         if (clienteExiste) {
+          // Do not expose which vendor owns the record — that leaks username enumeration.
           return NextResponse.json({
             cliente: null,
             asignadoAOtro: true,
-            mensaje: `Este cliente está asignado a otro vendedor (${clienteExiste.vendedor_asignado || 'sin asignar'})`,
+            mensaje: "Este cliente está asignado a otro vendedor",
           }, { headers: corsHeaders });
         }
       }

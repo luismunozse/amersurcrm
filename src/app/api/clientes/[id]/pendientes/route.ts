@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { createServerOnlyClient } from "@/lib/supabase.server";
+import { validateBearerAndEnsureGlobalRole } from "@/lib/auth/extension-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,18 +22,13 @@ export async function GET(
     let supabase;
 
     if (authHeader?.startsWith("Bearer ")) {
-      // Token desde header (extensión de Chrome)
-      const token = authHeader.substring(7);
-      const supabaseAdmin = createServiceRoleClient();
-
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-      if (authError || !authUser) {
-        console.error("[GetPendientes] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      // Token desde header (extensión de Chrome) — role-checked via shared helper
+      const token = authHeader.slice(7);
+      const auth = await validateBearerAndEnsureGlobalRole(token);
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
       }
-
-      supabase = supabaseAdmin;
+      supabase = auth.supabase;
     } else {
       // Token desde cookies (sesión web normal)
       supabase = await createServerOnlyClient();

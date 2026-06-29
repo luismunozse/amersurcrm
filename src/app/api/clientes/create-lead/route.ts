@@ -61,6 +61,30 @@ export async function POST(request: NextRequest) {
       user = sessionUser;
     }
 
+    // Guard: verify the caller has a valid CRM profile/role before any privileged write.
+    // Any authenticated Supabase user (including service accounts with no CRM profile)
+    // could otherwise reach the service-role DB writes below. This check is intentionally
+    // lightweight — it does NOT require a global-visibility role; any CRM-profiled user
+    // (including vendors) may create leads via this endpoint.
+    const { data: callerPerfil } = await supabase
+      .schema("crm")
+      .from("usuario_perfil")
+      .select("username, rol:rol!rol_id(nombre)")
+      .eq("id", user.id)
+      .single();
+
+    // PostgREST may return the joined rol as an array or as a plain object depending
+    // on the relationship cardinality hint it resolves at query time. Normalize both.
+    const callerRolData = (callerPerfil as any)?.rol;
+    const callerRol = Array.isArray(callerRolData) ? callerRolData[0]?.nombre : callerRolData?.nombre;
+
+    if (!callerPerfil || !callerRol) {
+      return NextResponse.json(
+        { error: "Permiso insuficiente" },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     // Parsear body
     const body = await request.json();
     const { telefono, nombre, mensaje_inicial, origen_lead } = body;
@@ -72,6 +96,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Service-role is used for all DB ops in this route:
+    // (1) The dedup phone lookup must scan ALL clients across vendors to prevent duplicates.
+    // (2) create_whatsapp_lead RPC performs round-robin vendor assignment and requires
+    //     full table visibility that RLS would deny to a per-user session.
+    // The CRM profile gate above guarantees only known CRM users reach this point.
     const supabaseAdmin = createServiceRoleClient();
 
     // Verificar si ya existe un cliente con este teléfono
@@ -147,14 +176,9 @@ export async function POST(request: NextRequest) {
         }, { headers: corsHeaders });
       }
 
+      // DB internals already logged above — do not expose them to the client.
       return NextResponse.json(
-        {
-          error: "Error creando lead en base de datos",
-          message: insertError.message || "Error desconocido en RPC",
-          code: insertError.code,
-          details: insertError.details,
-          hint: insertError.hint,
-        },
+        { error: "Error creando lead en base de datos" },
         { status: 500, headers: corsHeaders }
       );
     }
@@ -227,15 +251,10 @@ export async function POST(request: NextRequest) {
       (typeof error === "string" ? error : null) ||
       "Error desconocido";
 
+    // Full error (including message, code, details, hint, stack) already logged above.
+    // Do not expose DB internals to the client.
     return NextResponse.json(
-      {
-        error: "Error interno del servidor",
-        message: resolvedMessage,
-        code: err?.code,
-        details: err?.details,
-        hint: err?.hint,
-        stack: process.env.NODE_ENV === "development" ? err?.stack : undefined,
-      },
+      { error: "Error interno del servidor" },
       { status: 500, headers: corsHeaders }
     );
   }

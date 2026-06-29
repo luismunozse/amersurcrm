@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
+import { createServerOnlyClient } from "@/lib/supabase.server";
+import { validateBearerAndEnsureGlobalRole } from "@/lib/auth/extension-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -20,19 +21,13 @@ export async function GET(
     let supabase;
 
     if (authHeader?.startsWith("Bearer ")) {
-      // Token desde header (extensión de Chrome)
-      const token = authHeader.substring(7);
-      const supabaseAuth = createServiceRoleClient();
-
-      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-      if (authError || !authUser) {
-        console.error("[Interacciones] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      // Token desde header (extensión de Chrome) — role-checked via shared helper
+      const token = authHeader.slice(7);
+      const auth = await validateBearerAndEnsureGlobalRole(token);
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
       }
-
-      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
-      supabase = createServiceRoleClient();
+      supabase = auth.supabase;
     } else {
       // Token desde cookies (sesión web normal)
       supabase = await createServerOnlyClient();
@@ -101,20 +96,14 @@ export async function POST(
     let user;
 
     if (authHeader?.startsWith("Bearer ")) {
-      // Token desde header (extensión de Chrome)
-      const token = authHeader.substring(7);
-      const supabaseAuth = createServiceRoleClient();
-
-      const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-      if (authError || !authUser) {
-        console.error("[CreateInteraccion] Error de autenticación con token:", authError);
-        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      // Token desde header (extensión de Chrome) — role-checked via shared helper
+      const token = authHeader.slice(7);
+      const auth = await validateBearerAndEnsureGlobalRole(token);
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
       }
-
-      user = authUser;
-      // Crear un nuevo cliente service role limpio para queries (sin contexto de usuario)
-      supabase = createServiceRoleClient();
+      user = auth.user;
+      supabase = auth.supabase;
     } else {
       // Token desde cookies (sesión web normal)
       supabase = await createServerOnlyClient();
@@ -169,7 +158,7 @@ export async function POST(
     if (error) {
       console.error("[CreateInteraccion] Error creando interacción:", error);
       return NextResponse.json(
-        { error: "Error creando interacción", details: error.message },
+        { error: "Error creando interacción" },
         { status: 500 }
       );
     }
