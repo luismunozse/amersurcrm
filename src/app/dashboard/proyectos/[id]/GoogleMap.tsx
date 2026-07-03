@@ -509,7 +509,9 @@ export default function GoogleMap({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,drawing,places&v=weekly`;
+    // v=3.64: última versión con google.maps.drawing.DrawingManager (removido en v3.65).
+    // Parche temporal — Google lo retirará; migrar a dibujo manual de polígonos.
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,drawing,places&v=3.64`;
     script.async = true;
     script.defer = true;
     script.onload = initialize;
@@ -558,20 +560,28 @@ export default function GoogleMap({
 
     mapInstanceRef.current = map;
 
-    const drawingManager = new google.maps.drawing.DrawingManager({
-      drawingControl: false,
-      polygonOptions: {
-        fillColor: '#2563EB',
-        fillOpacity: 0.1,
-        strokeColor: '#1D4ED8',
-        strokeOpacity: 0.9,
-        strokeWeight: 2,
-        editable: true,
-        draggable: true,
-      },
-    });
-    drawingManager.setMap(map);
-    drawingManagerRef.current = drawingManager;
+    // DrawingManager fue removido de la Maps JS API en v3.65. Guardamos la
+    // creación: si no está disponible, el mapa carga en modo solo-lectura en
+    // vez de crashear toda la sección (los useEffects de dibujo ya chequean
+    // `if (!drawingManager) return`). La versión se fija en el loader (v=3.64).
+    const drawingManager = google.maps.drawing?.DrawingManager
+      ? new google.maps.drawing.DrawingManager({
+          drawingControl: false,
+          polygonOptions: {
+            fillColor: '#2563EB',
+            fillOpacity: 0.1,
+            strokeColor: '#1D4ED8',
+            strokeOpacity: 0.9,
+            strokeWeight: 2,
+            editable: true,
+            draggable: true,
+          },
+        })
+      : null;
+    if (drawingManager) {
+      drawingManager.setMap(map);
+      drawingManagerRef.current = drawingManager;
+    }
 
     // Listener para informar cambios de centro del mapa
     const centerChangedListener = map.addListener('center_changed', () => {
@@ -590,7 +600,7 @@ export default function GoogleMap({
     return () => {
       centerChangedListener.remove();
       mapClickListener.remove();
-      drawingManager.setMap(null);
+      drawingManager?.setMap(null);
       google.maps.event.clearInstanceListeners(map);
       mapInstanceRef.current = null;
     };
