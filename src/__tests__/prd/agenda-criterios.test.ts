@@ -184,10 +184,11 @@ describe('PRD 3.3.3 - Sistema de Agenda y Recordatorios', () => {
       'visita_propiedad',
       'reunion_equipo',
       'personalizado',
+      'envio_template_whatsapp',
     ];
 
-    it('tiene los 6 tipos de recordatorio definidos', () => {
-      expect(TIPOS_RECORDATORIO_OPTIONS).toHaveLength(6);
+    it('tiene los 7 tipos de recordatorio definidos', () => {
+      expect(TIPOS_RECORDATORIO_OPTIONS).toHaveLength(7);
     });
 
     it.each(tiposValidos)('acepta tipo de recordatorio "%s"', (tipo) => {
