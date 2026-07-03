@@ -18,6 +18,7 @@ import { getCachedClientes } from "@/lib/cache.server";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
 import { parseOptionalNumber } from "@/lib/utils/numeric";
+import { normalizePhoneE164 } from "@/lib/utils/phone";
 import {
   TipoCliente,
   TipoDocumento,
@@ -44,7 +45,84 @@ function mapTipoDocumentoToDb(tipo?: TipoDocumento | null): string | null {
   return map[tipo] ?? 'otro';
 }
 
-export async function crearCliente(formData: FormData) {
+// Resultado de las acciones de upsert de cliente.
+// Se usa retorno (no throw) para los errores de negocio porque Next.js
+// censura los Error lanzados desde Server Actions en producción.
+export type ResultadoUpsertCliente = { ok: true } | { ok: false; error: string };
+
+// Normaliza un teléfono opcional a su forma canónica (E.164 sin "+").
+// Devuelve { error } si el usuario ingresó algo que no es un número posible.
+function normalizarTelefonoCliente(
+  raw: string | null | undefined,
+  label: string,
+): { telefono: string | null } | { error: string } {
+  const original = (raw ?? "").trim();
+  if (!original) return { telefono: null };
+  const norm = normalizePhoneE164(original);
+  if (!norm) {
+    return { error: `El ${label} no es un número válido. Revisá el número y el código de país.` };
+  }
+  return { telefono: norm };
+}
+
+// Traduce una violación de unicidad (23505) a un mensaje legible.
+// Para el choque de teléfono, identifica al cliente que ya lo tiene.
+async function mensajeUnicidadCliente(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  error: { code?: string; message: string; details?: string | null },
+  telefono: string | null,
+  excludeId?: string,
+): Promise<string> {
+  if (error.code !== "23505") return error.message;
+
+  const objetivo = `${error.message} ${error.details ?? ""}`.toLowerCase();
+
+  if (objetivo.includes("telefono")) {
+    if (telefono) {
+      let query = supabase
+        .from("cliente")
+        .select("nombre, codigo_cliente")
+        .eq("telefono", telefono);
+      if (excludeId) query = query.neq("id", excludeId);
+      const { data: existente } = await query.maybeSingle();
+      if (existente?.nombre) {
+        const codigo = existente.codigo_cliente ? ` (${existente.codigo_cliente})` : "";
+        return `El teléfono ${telefono} ya está registrado en el cliente "${existente.nombre}"${codigo}. Usá otro número o editá ese cliente.`;
+      }
+    }
+    return "Ya existe otro cliente con este número de teléfono.";
+  }
+
+  if (objetivo.includes("documento")) {
+    return "Ya existe un cliente con este número de documento.";
+  }
+
+  return "Ya existe un cliente con estos datos.";
+}
+
+// Avanza el puntero round-robin de forma ATÓMICA cuando una asignación manual
+// (alta o reasignación) apunta a un vendedor activo. La RPC toma FOR UPDATE
+// sobre asignacion_config, serializando contra obtener_siguiente_vendedor() y
+// otras asignaciones concurrentes, y alinea el índice al vendedor elegido
+// (sí consume turno). Best-effort: nunca rompe la operación principal.
+async function avanzarRoundRobinManual(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  vendedorUsername: string | null | undefined,
+): Promise<void> {
+  if (!vendedorUsername) return;
+  try {
+    const { error } = await supabase
+      .schema("crm")
+      .rpc("registrar_asignacion_manual", { p_vendedor_username: vendedorUsername });
+    if (error) {
+      console.warn("[round-robin] No se pudo avanzar el puntero:", error);
+    }
+  } catch (err) {
+    console.warn("[round-robin] No se pudo avanzar el puntero:", err);
+  }
+}
+
+export async function crearCliente(formData: FormData): Promise<ResultadoUpsertCliente> {
   // Extraer datos del formulario
   const clienteData = {
     tipo_cliente: String(formData.get("tipo_cliente") || "persona") as TipoCliente,
@@ -101,12 +179,18 @@ export async function crearCliente(formData: FormData) {
     }
   }
 
+  // Normalizar teléfonos a formato canónico (E.164 sin "+")
+  const telRes = normalizarTelefonoCliente(parsed.data.telefono, "teléfono");
+  if ("error" in telRes) return { ok: false, error: telRes.error };
+  const waRes = normalizarTelefonoCliente(parsed.data.telefono_whatsapp, "número de WhatsApp");
+  if ("error" in waRes) return { ok: false, error: waRes.error };
+
   // Preparar datos para inserción
   const insertData = {
     ...parsed.data,
     email: parsed.data.email || null,
-    telefono: parsed.data.telefono || null,
-    telefono_whatsapp: parsed.data.telefono_whatsapp || null,
+    telefono: telRes.telefono,
+    telefono_whatsapp: waRes.telefono,
     // Alinear con constraint cliente_tipo_documento_check
     tipo_documento: mapTipoDocumentoToDb(parsed.data.tipo_documento),
     documento_identidad: parsed.data.documento_identidad || null,
@@ -127,48 +211,14 @@ export async function crearCliente(formData: FormData) {
     .insert(insertData)
     .select("id, nombre")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    return { ok: false, error: await mensajeUnicidadCliente(supabase, error, insertData.telefono, undefined) };
+  }
 
   revalidatePath("/dashboard/clientes");
 
-  // Avanzar puntero round-robin si se asignó un vendedor activo.
-  // Garantiza que el próximo cliente sugiera al siguiente vendedor de la lista.
-  if (insertData.vendedor_username) {
-    try {
-      const { data: perfilVend } = await supabase
-        .schema("crm")
-        .from("usuario_perfil")
-        .select("id")
-        .eq("username", insertData.vendedor_username)
-        .maybeSingle();
-
-      if (perfilVend?.id) {
-        const { data: enLista } = await supabase
-          .schema("crm")
-          .from("vendedor_activo")
-          .select("vendedor_id")
-          .eq("vendedor_id", perfilVend.id)
-          .eq("activo", true)
-          .maybeSingle();
-
-        if (enLista) {
-          const { data: cfg } = await supabase
-            .schema("crm")
-            .from("asignacion_config")
-            .select("ultimo_indice")
-            .eq("id", 1)
-            .maybeSingle();
-          const nuevo = (cfg?.ultimo_indice ?? 0) + 1;
-          await supabase
-            .schema("crm")
-            .from("asignacion_config")
-            .upsert({ id: 1, ultimo_indice: nuevo });
-        }
-      }
-    } catch (err) {
-      console.warn("[crearCliente] No se pudo avanzar índice round-robin:", err);
-    }
-  }
+  // El alta manual con vendedor asignado consume turno de la rotación.
+  await avanzarRoundRobinManual(supabase, insertData.vendedor_username);
 
   // Notificación y automatizaciones no-bloqueantes (se ejecutan después de enviar la respuesta)
   after(async () => {
@@ -184,9 +234,11 @@ export async function crearCliente(formData: FormData) {
       console.warn("No se pudo crear notificación:", error);
     }
   });
+
+  return { ok: true };
 }
 
-export async function actualizarCliente(formData: FormData) {
+export async function actualizarCliente(formData: FormData): Promise<ResultadoUpsertCliente> {
   const clienteId = String(formData.get("id") || "");
   if (!clienteId) throw new Error("ID de cliente requerido");
 
@@ -247,6 +299,12 @@ export async function actualizarCliente(formData: FormData) {
     }
   }
 
+  // Normalizar teléfonos a formato canónico (E.164 sin "+")
+  const telRes = normalizarTelefonoCliente(parsed.data.telefono, "teléfono");
+  if ("error" in telRes) return { ok: false, error: telRes.error };
+  const waRes = normalizarTelefonoCliente(parsed.data.telefono_whatsapp, "número de WhatsApp");
+  if ("error" in waRes) return { ok: false, error: waRes.error };
+
   // Detectar cambio de asesor para bumpear timestamps y reordenar la lista
   const nuevoVendedor = parsed.data.vendedor_asignado && parsed.data.vendedor_asignado !== ""
     ? parsed.data.vendedor_asignado
@@ -262,8 +320,8 @@ export async function actualizarCliente(formData: FormData) {
   const updateData: Record<string, unknown> = {
     ...parsed.data,
     email: parsed.data.email || null,
-    telefono: parsed.data.telefono || null,
-    telefono_whatsapp: parsed.data.telefono_whatsapp || null,
+    telefono: telRes.telefono,
+    telefono_whatsapp: waRes.telefono,
     tipo_documento: mapTipoDocumentoToDb(parsed.data.tipo_documento),
     documento_identidad: parsed.data.documento_identidad || null,
     estado_civil: parsed.data.estado_civil || null,
@@ -288,7 +346,14 @@ export async function actualizarCliente(formData: FormData) {
     .update(updateData)
     .eq("id", clienteId);
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    return { ok: false, error: await mensajeUnicidadCliente(supabase, error, telRes.telefono, clienteId) };
+  }
+
+  // Si la reasignación apunta a un vendedor nuevo, consume turno de la rotación.
+  if (asesorCambio) {
+    await avanzarRoundRobinManual(supabase, nuevoVendedor);
+  }
 
   revalidatePath("/dashboard/clientes");
   revalidatePath(`/dashboard/clientes/${clienteId}`);
@@ -307,6 +372,8 @@ export async function actualizarCliente(formData: FormData) {
       console.warn("No se pudo crear notificación:", error);
     }
   });
+
+  return { ok: true };
 }
 
 export async function actualizarEstadoCliente(clienteId: string, nuevoEstado: string) {
@@ -364,9 +431,12 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
 
   const { data: cliente } = await supabase
     .from("cliente")
-    .select("nombre")
+    .select("nombre, vendedor_username")
     .eq("id", clienteId)
     .maybeSingle();
+
+  // Solo consume turno si la asignación realmente cambia el asesor.
+  const asesorCambio = (cliente?.vendedor_username ?? null) !== (vendedorUsername || null);
 
   const ahora = new Date().toISOString();
   const payload: Record<string, string | null> = {
@@ -384,6 +454,11 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  // La asignación directa consume turno solo si el asesor realmente cambió.
+  if (asesorCambio) {
+    await avanzarRoundRobinManual(supabase, vendedorUsername);
   }
 
   revalidatePath(`/dashboard/clientes/${clienteId}`);

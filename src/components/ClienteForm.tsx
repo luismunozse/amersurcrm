@@ -211,13 +211,21 @@ export default function ClienteForm({
     try {
       if (isEditing && cliente?.id) {
         fd.set("id", cliente.id);
-        await actualizarCliente(fd);
+        const res = await actualizarCliente(fd);
+        if (res && !res.ok) {
+          toast.error(res.error);
+          return;
+        }
         toast.success("Cliente actualizado exitosamente");
       } else {
-        await crearCliente(fd);
+        const res = await crearCliente(fd);
+        if (res && !res.ok) {
+          toast.error(res.error);
+          return;
+        }
         toast.success("Cliente creado exitosamente");
       }
-      
+
       form.reset();
       onSuccess?.();
     } catch (err: unknown) {
