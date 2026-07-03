@@ -25,7 +25,8 @@ export function validateProyectoImage(file: File, label: string): string | null 
 }
 
 export async function uploadProyectoAsset(
-  supabase: SupabaseClient,
+  // Solo usa supabase.storage, que es agnóstico al schema (public/crm).
+  supabase: SupabaseClient<any, any, any>,
   proyectoId: string,
   file: File,
   prefix: ProyectoAssetPrefix,
@@ -50,7 +51,8 @@ export async function uploadProyectoAsset(
 }
 
 export async function removeProyectoAssets(
-  supabase: SupabaseClient,
+  // Solo usa supabase.storage, que es agnóstico al schema (public/crm).
+  supabase: SupabaseClient<any, any, any>,
   paths: string[],
 ): Promise<void> {
   if (paths.length === 0) return;
