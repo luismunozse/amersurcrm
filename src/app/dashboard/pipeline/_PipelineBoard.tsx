@@ -432,6 +432,7 @@ export default function PipelineBoard({
         <FiltrosSinResultados totalGlobal={totalGlobal} onLimpiar={limpiarFiltrosClient} />
       ) : (
         <DndContext
+          id="pipeline-board"
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}

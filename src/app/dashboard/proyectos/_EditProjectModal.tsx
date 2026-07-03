@@ -714,6 +714,7 @@ export default function EditProjectModal({ proyecto, isOpen, onClose }: EditProj
 
             {galleryDraft.length > 0 ? (
               <DndContext
+                id="proyecto-galeria"
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}

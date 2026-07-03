@@ -138,13 +138,25 @@ export default function PipelineCard({ cliente, urgencia, asLink = true }: Props
 
   if (!asLink) return inner;
 
+  // Card opens a QuickView (not a navigation). It can't be a real <button>
+  // because it contains interactive children (e.g. the WhatsApp button),
+  // which is invalid HTML and breaks hydration. Use a role="button" div
+  // with keyboard support instead.
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => open(cliente.id)}
-      className="block w-full text-left"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          open(cliente.id);
+        }
+      }}
+      className="block w-full text-left cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary"
     >
       {inner}
-    </button>
+    </div>
   );
 }
