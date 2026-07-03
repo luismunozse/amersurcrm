@@ -54,6 +54,21 @@ const SELECTORS = {
     'span.selectable-text span',
     'span[dir="ltr"]',
   ],
+  /**
+   * Metadata del mensaje: atributo con "[hora, fecha] Remitente: ".
+   * Estable y semántico: sobrevive a la ofuscación de clases de WhatsApp
+   * (jun 2026 eliminó .message-in/.message-out). Permite extraer el texto y
+   * detectar la dirección comparando el remitente con el contacto abierto.
+   */
+  messageMeta: [
+    '[data-pre-plain-text]',
+  ],
+  /** Texto seleccionable dentro de un bloque de mensaje */
+  selectableText: [
+    'span.selectable-text',
+    'span.selectable-text span',
+    '.selectable-text',
+  ],
   /** Input de texto de WhatsApp */
   chatInput: [
     '[data-testid="conversation-compose-box-input"]',
@@ -153,25 +168,37 @@ function findPhoneInHeaderSpans(): string | null {
 }
 
 /**
+ * Normaliza un texto a un nombre válido: quita el prefijo "~" del push name,
+ * descarta teléfonos puros y textos sin letras (horas, fechas, previews vacíos).
+ * Devuelve el nombre limpio o null si no es un nombre.
+ */
+function normalizarNombre(text: string | null | undefined): string | null {
+  const limpio = (text || '').replace(/^~\s*/, '').trim();
+  if (!limpio) return null;
+  if (/^\+?[\d\s()-]+$/.test(limpio)) return null;        // teléfono puro
+  if (!/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(limpio)) return null;   // sin letras (hora/fecha)
+  return limpio;
+}
+
+/**
  * Extrae el nombre del contacto activo.
+ *
+ * Prioridad: nombre guardado (título del header) > push name de WhatsApp
+ * (título de la fila activa en la lista, expuesto como "~Nombre") > null.
+ * Para un no guardado el header solo trae el número; el push name vive en la
+ * fila de la lista de chats.
  */
 export function extractContactName(): string | null {
-  const spans = queryAll(SELECTORS.headerContactSpan);
+  // Nombre GUARDADO: el título es el PRIMER span del header (no iterar: los
+  // siguientes pueden ser el estado "en línea"/"escribiendo..."). Para un
+  // contacto no agendado el título es el número y devolvemos null. El push name
+  // de un no agendado solo vive en el panel "información de contacto", que no
+  // leemos a propósito (obligaría a abrirlo): el form usa su nombre por defecto.
+  const headerSpans = queryAll(SELECTORS.headerContactSpan);
+  const nombre = normalizarNombre(headerSpans[0]?.textContent);
+  if (nombre) return nombre;
 
-  for (const span of spans) {
-    const text = span.textContent?.trim();
-    if (!text) continue;
-
-    // Saltar si es solo un número de teléfono
-    if (/^\+?[\d\s()-]+$/.test(text)) continue;
-
-    // Si tiene letras, es probablemente un nombre
-    if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(text) && text.length > 0) {
-      return text;
-    }
-  }
-
-  logger.debug('No se pudo extraer nombre del contacto');
+  logger.debug('No se pudo extraer nombre del contacto (solo teléfono disponible)');
   return null;
 }
 
@@ -191,23 +218,73 @@ export function extractChatId(): string | null {
   return null;
 }
 
+/** Solo los dígitos de un string (para comparar teléfonos sin importar formato). */
+function soloDigitos(s: string | null | undefined): string {
+  return (s || '').replace(/\D/g, '');
+}
+
+/** Extrae el remitente de un data-pre-plain-text: "[hora, fecha] Remitente: " → "Remitente". */
+function parseRemitentePrePlain(pre: string | null): string {
+  const m = (pre || '').match(/\]\s*(.*?):\s*$/);
+  return m ? m[1].trim() : '';
+}
+
 /**
- * Obtiene el último mensaje recibido del contacto.
- * Busca dentro de los contenedores .message-in y filtra timestamps/estados.
+ * Determina si un remitente corresponde al contacto abierto (mensaje entrante).
+ * Primario: últimos 8 dígitos del teléfono (tolera prefijos/formato distinto).
+ * Fallback: igualdad de nombre para contactos guardados (sin teléfono visible).
+ */
+function esRemitenteDelContacto(
+  remitente: string,
+  contactoDigits: string,
+  contactoNombre: string,
+): boolean {
+  if (!remitente) return false;
+  const rd = soloDigitos(remitente);
+  if (contactoDigits && rd.length >= 8) {
+    return rd.slice(-8) === contactoDigits.slice(-8);
+  }
+  return !!contactoNombre && remitente === contactoNombre;
+}
+
+/** Quita un timestamp final tipo "2:17 p. m." que WhatsApp anexa al texto. */
+function limpiarTextoMensaje(texto: string): string {
+  return texto
+    .replace(/\s*\d{1,2}:\d{2}\s*(a\.?\s*m\.?|p\.?\s*m\.?|AM|PM)?\s*$/i, '')
+    .trim();
+}
+
+/**
+ * Obtiene el último mensaje recibido del contacto activo.
+ *
+ * Estrategia (jun 2026): WhatsApp Web ofusca las clases y eliminó
+ * .message-in/.message-out y el prefijo false_/true_ del data-id. Lo estable
+ * que queda es [data-pre-plain-text] ("[hora, fecha] Remitente: ") + el texto
+ * en span.selectable-text. La dirección se detecta comparando el remitente con
+ * el teléfono/nombre del contacto abierto. Se mantiene el camino legacy
+ * (.message-in) como fallback por si WhatsApp revierte.
  */
 export function getLastReceivedMessage(): string | null {
-  const incomingMessages = queryAll(SELECTORS.incomingMessage);
+  const contactoDigits = soloDigitos(extractPhoneNumber());
+  const contactoNombre = (extractContactName() || '').trim();
 
-  if (incomingMessages.length === 0) {
-    logger.debug('No se encontraron mensajes entrantes');
-    return null;
+  // Camino actual: bloques con data-pre-plain-text, de más reciente a más viejo.
+  const bloques = queryAll(SELECTORS.messageMeta);
+  for (let i = bloques.length - 1; i >= 0; i--) {
+    const remitente = parseRemitentePrePlain(bloques[i].getAttribute('data-pre-plain-text'));
+    if (!esRemitenteDelContacto(remitente, contactoDigits, contactoNombre)) continue;
+
+    const textEl = queryFirst(SELECTORS.selectableText, bloques[i]) || bloques[i];
+    const texto = limpiarTextoMensaje((textEl.textContent || '').trim());
+    if (texto && isRealMessageText(texto)) {
+      return texto;
+    }
   }
 
-  // Recorrer desde el último (más reciente) hacia atrás
+  // Fallback legacy: contenedores .message-in (por si WhatsApp revierte el DOM).
+  const incomingMessages = queryAll(SELECTORS.incomingMessage);
   for (let i = incomingMessages.length - 1; i >= Math.max(0, incomingMessages.length - 5); i--) {
-    const container = incomingMessages[i];
-    const textElements = queryAll(SELECTORS.messageText, container);
-
+    const textElements = queryAll(SELECTORS.messageText, incomingMessages[i]);
     for (const el of textElements) {
       const text = el.textContent?.trim();
       if (text && isRealMessageText(text)) {
@@ -216,7 +293,11 @@ export function getLastReceivedMessage(): string | null {
     }
   }
 
-  logger.debug('No se encontró mensaje válido en los últimos mensajes entrantes');
+  logger.warn(
+    'getLastReceivedMessage: no se encontró mensaje entrante. ' +
+    `Bloques data-pre-plain-text: ${bloques.length}, contacto: ${contactoDigits || contactoNombre || 'desconocido'}. ` +
+    '¿Cambió el DOM de WhatsApp Web? Revisar SELECTORS.messageMeta/selectableText.',
+  );
   return null;
 }
 

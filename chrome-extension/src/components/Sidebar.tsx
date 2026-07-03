@@ -10,6 +10,7 @@ import { UpdateLeadStatus } from './UpdateLeadStatus';
 import { ProjectInterest } from './ProjectInterest';
 import { QuickNotes } from './QuickNotes';
 import { ConnectionStatus } from './ConnectionStatus';
+import { InlineAlert } from './InlineAlert';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
 import { createLogger } from '@/lib/logger';
 
@@ -24,6 +25,8 @@ export function Sidebar() {
   const [apiClient, setApiClient] = useState<CRMApiClient | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [clienteAsignadoAOtro, setClienteAsignadoAOtro] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [sesionExpirada, setSesionExpirada] = useState(false);
 
   // Ref para tracking de último teléfono procesado (evita re-renders innecesarios)
   const lastProcessedPhoneRef = useRef<string | null>(null);
@@ -133,12 +136,17 @@ export function Sidebar() {
     logger.info('Buscando cliente', { phone });
     setSearchingCliente(true);
     setClienteAsignadoAOtro(null);
+    setSearchError(null);
 
     try {
       const result = await apiClient.searchClienteByPhone(phone);
       if (!mountedRef.current) return;
 
-      if (result.cliente) {
+      if (result.error) {
+        logger.error('Error buscando cliente (API)', undefined, { phone, error: result.error });
+        setCliente(null);
+        setSearchError(result.error);
+      } else if (result.cliente) {
         setCliente(result.cliente);
         logger.info('Cliente encontrado en CRM', { clienteId: result.cliente.id, nombre: result.cliente.nombre });
 
@@ -185,7 +193,20 @@ export function Sidebar() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Sesión expirada (refresh token falló): volver al login con aviso claro.
+  useEffect(() => {
+    function handleSessionExpired() {
+      logger.warn('Sesión expirada: volviendo al login');
+      setIsAuthenticated(false);
+      setApiClient(null);
+      setSesionExpirada(true);
+    }
+    window.addEventListener('amersurchat:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('amersurchat:session-expired', handleSessionExpired);
+  }, []);
+
   async function handleLogin(crmUrl: string, token: string) {
+    setSesionExpirada(false);
     const client = new CRMApiClient(crmUrl, token);
 
     try {
@@ -261,7 +282,7 @@ export function Sidebar() {
   }
 
   if (!isAuthenticated) {
-    return <LoginForm onLogin={handleLogin} />;
+    return <LoginForm onLogin={handleLogin} sessionExpired={sesionExpirada} />;
   }
 
   return (
@@ -307,6 +328,15 @@ export function Sidebar() {
               apiClient={apiClient!}
             />
 
+            {/* Error de búsqueda en el CRM (red/timeout): no falla mudo y permite reintentar */}
+            {searchError && !searchingCliente && (
+              <InlineAlert
+                variant="error"
+                message={searchError}
+                onRetry={() => searchCliente(contact.phone)}
+              />
+            )}
+
             {/* Cliente asignado a otro vendedor */}
             {clienteAsignadoAOtro && (
               <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg p-4">
@@ -326,9 +356,13 @@ export function Sidebar() {
               </div>
             )}
 
-            {/* Formulario para crear lead (solo si no existe y no está asignado a otro) */}
-            {!cliente && !clienteAsignadoAOtro && (
+            {/* Formulario para crear lead (solo si no existe, no está asignado a
+                otro, y la búsqueda en el CRM no falló — así no creamos duplicados
+                a ciegas). key por chatId: fuerza un form FRESCO al cambiar de
+                contacto, así nombre/mensaje/proyecto no quedan pegados. */}
+            {!cliente && !clienteAsignadoAOtro && !searchError && (
               <CreateLeadForm
+                key={contact.chatId}
                 contact={contact}
                 apiClient={apiClient!}
                 onLeadCreated={handleLeadCreated}

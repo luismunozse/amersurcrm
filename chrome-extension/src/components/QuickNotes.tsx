@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CRMApiClient } from '@/lib/api';
+import { InlineAlert } from './InlineAlert';
 
 interface QuickNotesProps {
   clienteId: string;
@@ -11,11 +12,13 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
   const [nota, setNota] = useState('');
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleAddNota() {
     if (!nota.trim() || saving) return;
 
     setSaving(true);
+    setError(null);
     try {
       const timestamp = new Date().toLocaleString('es-PE', {
         day: '2-digit',
@@ -36,9 +39,9 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
       if (onNotaAdded) {
         onNotaAdded();
       }
-    } catch (error) {
-      console.error('[QuickNotes] Error agregando nota:', error);
-      alert('Error al agregar nota. Intenta de nuevo.');
+    } catch (err) {
+      console.error('[QuickNotes] Error agregando nota:', err);
+      setError('No se pudo agregar la nota. Intentá de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -77,7 +80,7 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
         <button
           onClick={handleAddNota}
           disabled={!nota.trim() || saving || nota.length > 200}
-          className="px-4 py-2 bg-crm-primary text-white text-sm rounded-lg hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 bg-crm-primary text-white text-sm rounded-lg hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition ease-out-strong active:scale-[0.98]"
         >
           {saving ? 'Guardando...' : 'Agregar'}
         </button>
@@ -87,6 +90,12 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
         <div className="mt-2 p-2 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded text-xs text-green-800 dark:text-green-300 flex items-center gap-2">
           <span>✓</span>
           <span>Nota agregada exitosamente</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-2">
+          <InlineAlert variant="error" message={error} onRetry={handleAddNota} onDismiss={() => setError(null)} />
         </div>
       )}
     </div>

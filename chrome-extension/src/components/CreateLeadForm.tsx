@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
+import { InlineAlert } from './InlineAlert';
 
 interface Proyecto {
   id: string;
@@ -27,6 +28,9 @@ interface CreateLeadFormProps {
 export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLeadFormProps) {
   const [nombre, setNombre] = useState(contact.name);
   const [mensaje, setMensaje] = useState('');
+  // True cuando el mensaje se autocompletó desde el chat (para mostrar un check).
+  const [mensajeAutoCapturado, setMensajeAutoCapturado] = useState(false);
+  const MENSAJE_MAX = 500;
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +61,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   const [selectedLote, setSelectedLote] = useState<string>('');
   const [loadingProyectos, setLoadingProyectos] = useState(false);
   const [loadingLotes, setLoadingLotes] = useState(false);
+  const [proyectosError, setProyectosError] = useState<string | null>(null);
 
   // Ref para controlar que solo se capture el mensaje una vez por contacto
   const mensajeCapturedRef = useRef(false);
@@ -67,9 +72,9 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
     loadProyectos();
   }, []);
 
-  // Cargar lotes cuando cambia el proyecto
+  // Cargar lotes cuando cambia el proyecto (no aplica a consulta general)
   useEffect(() => {
-    if (selectedProyecto) {
+    if (selectedProyecto && selectedProyecto !== '__general__') {
       loadLotes(selectedProyecto);
     } else {
       setLotes([]);
@@ -90,32 +95,54 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
       return;
     }
 
-    // Solicitar al content script el último mensaje
-    window.parent.postMessage({ type: 'AMERSURCHAT_GET_LAST_MESSAGE' }, WHATSAPP_WEB_ORIGIN);
-
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== WHATSAPP_WEB_ORIGIN) return;
       if (!event.data || typeof event.data !== 'object') return;
       if (event.data.type === 'AMERSURCHAT_LAST_MESSAGE') {
         // Solo setear si aún no hemos capturado el mensaje
         if (!mensajeCapturedRef.current && event.data.message) {
-          setMensaje(event.data.message.substring(0, 500));
+          setMensaje(event.data.message.substring(0, MENSAJE_MAX));
+          setMensajeAutoCapturado(true);
           mensajeCapturedRef.current = true; // Marcar como capturado
         }
       }
     };
-
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+
+    // Reintentar el handshake con el content script. WhatsApp Web puede no
+    // haber renderizado todavía los mensajes del chat cuando se abre el
+    // formulario, y un único postMessage se pierde por timing. Reintentar
+    // hasta capturar (o agotar intentos) cubre ese ~3% de fallos silenciosos.
+    const MAX_INTENTOS = 6;
+    let intentos = 0;
+    const pedirUltimoMensaje = () =>
+      window.parent.postMessage({ type: 'AMERSURCHAT_GET_LAST_MESSAGE' }, WHATSAPP_WEB_ORIGIN);
+
+    pedirUltimoMensaje();
+    const intervalo = window.setInterval(() => {
+      intentos += 1;
+      if (mensajeCapturedRef.current || intentos >= MAX_INTENTOS) {
+        window.clearInterval(intervalo);
+        return;
+      }
+      pedirUltimoMensaje();
+    }, 700);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.clearInterval(intervalo);
+    };
   }, [contact.chatId]);
 
   async function loadProyectos() {
     setLoadingProyectos(true);
+    setProyectosError(null);
     try {
       const data = await apiClient.getProyectos();
-      setProyectos(data);
+      setProyectos(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('[CreateLeadForm] Error cargando proyectos:', err);
+      setProyectosError('No se pudieron cargar los proyectos.');
     } finally {
       setLoadingProyectos(false);
     }
@@ -132,6 +159,10 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
       setLoadingLotes(false);
     }
   }
+
+  // Consulta general = interés registrado sin proyecto/lote específico,
+  // igual que en el CRM (AgregarPropiedadInteresModal).
+  const esConsultaGeneral = selectedProyecto === '__general__';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -154,8 +185,18 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         console.log('[CreateLeadForm] Cliente del servidor:', result.cliente);
         console.log('[CreateLeadForm] Vendedor del servidor:', result.vendedor);
 
-        // Si se seleccionó un lote, agregarlo como proyecto de interés
-        if (selectedLote && result.clienteId) {
+        // Registrar el interés del cliente:
+        // - Consulta general → interés sin proyecto/lote específico.
+        // - Lote seleccionado → interés en ese lote.
+        if (esConsultaGeneral && result.clienteId) {
+          try {
+            const interesResult = await apiClient.addConsultaGeneral(result.clienteId);
+            console.log('[CreateLeadForm] Consulta general registrada:', interesResult);
+          } catch (err) {
+            console.error('[CreateLeadForm] Error registrando consulta general:', err);
+            setWarning('Lead creado, pero hubo un error al guardar la consulta general. Puedes agregarla manualmente.');
+          }
+        } else if (selectedLote && result.clienteId) {
           try {
             console.log('[CreateLeadForm] Agregando proyecto de interés:', {
               clienteId: result.clienteId,
@@ -253,12 +294,22 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 animate-fade-in">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         Crear nuevo lead
       </h3>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          // Ctrl/Cmd + Enter crea el lead desde cualquier campo (incluido el textarea).
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.requestSubmit();
+          }
+        }}
+        className="space-y-4"
+      >
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Nombre del contacto
@@ -269,6 +320,8 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
             onChange={(e) => setNombre(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
             placeholder="Nombre del lead"
+            autoFocus
+            minLength={2}
             required
           />
         </div>
@@ -280,8 +333,9 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           <input
             type="text"
             value={contact.phone}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-sm cursor-not-allowed opacity-70"
             disabled
+            aria-readonly="true"
           />
         </div>
 
@@ -315,6 +369,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
             disabled={loadingProyectos}
           >
             <option value="">-- Seleccionar proyecto --</option>
+            <option value="__general__">Consulta General (sin proyecto específico)</option>
             {proyectos.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nombre}
@@ -324,10 +379,24 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           {loadingProyectos && (
             <p className="text-xs text-gray-500 mt-1">Cargando proyectos...</p>
           )}
+          {proyectosError && (
+            <div className="mt-2">
+              <InlineAlert variant="error" message={proyectosError} onRetry={loadProyectos} />
+            </div>
+          )}
         </div>
 
+        {/* Aviso de consulta general */}
+        {esConsultaGeneral && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Se registrará como consulta general. El cliente aún no tiene un proyecto específico de interés.
+            </p>
+          </div>
+        )}
+
         {/* Selector de Lote */}
-        {selectedProyecto && (
+        {selectedProyecto && !esConsultaGeneral && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Lote de interés
@@ -355,34 +424,40 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Mensaje inicial (opcional)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Mensaje inicial (opcional)
+            </label>
+            {mensajeAutoCapturado && mensaje && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Capturado del chat
+              </span>
+            )}
+          </div>
           <textarea
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
             rows={3}
+            maxLength={MENSAJE_MAX}
             placeholder="Primer mensaje del contacto..."
           />
+          <p className="text-xs text-gray-400 dark:text-gray-500 text-right mt-1">
+            {mensaje.length}/{MENSAJE_MAX}
+          </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-          </div>
-        )}
+        {error && <InlineAlert variant="error" message={error} onDismiss={() => setError(null)} />}
 
-        {warning && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-md p-3">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>
-          </div>
-        )}
+        {warning && <InlineAlert variant="warning" message={warning} onDismiss={() => setWarning(null)} />}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium text-sm"
+          className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition ease-out-strong active:scale-[0.98] font-medium text-sm"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">

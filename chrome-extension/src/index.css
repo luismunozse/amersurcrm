@@ -65,7 +65,35 @@ code {
   box-sizing: border-box;
 }
 
+/* ── Design polish: easing + animaciones suaves (estilo Emil) ─────────── */
+@keyframes amersur-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
+@layer utilities {
+  /* Easing "out-strong" para microinteracciones */
+  .ease-out-strong {
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* Aparición suave de cards/secciones al montar */
+  .animate-fade-in {
+    animation: amersur-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* Accesibilidad: respetar a quien pide menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
 
 @layer base {
   :root {

@@ -2,8 +2,40 @@ import { useEffect, useState } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { createLogger } from '@/lib/logger';
+import { Skeleton } from './Skeleton';
 
 const logger = createLogger('ContactInfo');
+
+// El mensaje que el cliente dejó en WhatsApp se guarda en `notas` con el formato:
+//   'Lead capturado automáticamente desde WhatsApp Web\n\nMensaje inicial: "<msg>"'
+// Lo separamos del boilerplate para mostrarlo como bloque propio y prominente,
+// dejando en "Notas" solo lo que el asesor haya agregado a mano.
+const AUTO_CAPTURE_PREFIX = 'Lead capturado automáticamente desde WhatsApp Web';
+
+export function parseNotasCliente(notas?: string | null): {
+  mensajeInicial: string | null;
+  notasAdicionales: string | null;
+} {
+  if (!notas) return { mensajeInicial: null, notasAdicionales: null };
+
+  // Lazy hasta la comilla de cierre seguida de fin de línea o de string. Así
+  // soporta notas manuales agregadas DESPUÉS del bloque auto-capturado (el
+  // asesor puede editar `notas`) y comillas dentro del propio mensaje.
+  const match = notas.match(/Mensaje inicial:\s*"([\s\S]*?)"\s*(?:\n|$)/);
+  const mensajeInicial = match ? match[1].trim() : null;
+
+  // Quitar el bloque de mensaje conservando lo que haya antes y después de él.
+  let resto = notas;
+  if (match && typeof match.index === 'number') {
+    resto = `${notas.slice(0, match.index)}\n${notas.slice(match.index + match[0].length)}`;
+  }
+  resto = resto.replace(AUTO_CAPTURE_PREFIX, '').trim();
+
+  return {
+    mensajeInicial: mensajeInicial && mensajeInicial.length > 0 ? mensajeInicial : null,
+    notasAdicionales: resto.length > 0 ? resto : null,
+  };
+}
 
 interface ContactInfoProps {
   contact: WhatsAppContact;
@@ -89,14 +121,18 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
       {/* Estado del Cliente */}
       <div className="p-4">
         {loading && (
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-crm-primary"></div>
-            <span className="text-sm">Buscando en CRM...</span>
+          <div className="space-y-3" aria-busy="true" aria-label="Buscando en CRM">
+            <Skeleton className="h-16 w-full" />
+            <div className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+            <Skeleton className="h-4 w-2/3" />
           </div>
         )}
 
         {!loading && cliente && (
-          <div className="space-y-3">
+          <div className="space-y-3 animate-fade-in">
             {/* Estado destacado */}
             <div className={`p-3 rounded-lg border-2 ${estadoColors[cliente.estado_cliente]}`}>
               <div className="flex items-center gap-2">
@@ -183,14 +219,32 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
               </span>
             </div>
 
-            {cliente.notas && (
-              <div className="pt-2">
-                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">💬 Notas:</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded max-h-20 overflow-y-auto">
-                  {cliente.notas}
-                </p>
-              </div>
-            )}
+            {(() => {
+              const { mensajeInicial, notasAdicionales } = parseNotasCliente(cliente.notas);
+              const notasMostrar = notasAdicionales || (!mensajeInicial ? cliente.notas : null);
+              return (
+                <>
+                  {mensajeInicial && (
+                    <div className="pt-2">
+                      <p className="text-xs font-medium text-crm-primary dark:text-crm-secondary mb-1">
+                        💬 Mensaje del cliente:
+                      </p>
+                      <p className="text-sm text-gray-800 dark:text-gray-100 bg-crm-accent/10 dark:bg-crm-secondary/20 border border-crm-accent/30 p-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
+                        {mensajeInicial}
+                      </p>
+                    </div>
+                  )}
+                  {notasMostrar && (
+                    <div className="pt-2">
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">📝 Notas:</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded max-h-20 overflow-y-auto whitespace-pre-wrap">
+                        {notasMostrar}
+                      </p>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 

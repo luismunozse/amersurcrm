@@ -148,6 +148,9 @@ export function ClientHistory({ clienteId, apiClient }: ClientHistoryProps) {
                 />
               </svg>
               <p className="text-sm text-gray-600 dark:text-gray-400">No hay interacciones registradas</p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                Las interacciones que registres en el CRM aparecerán acá.
+              </p>
             </div>
           )}
 

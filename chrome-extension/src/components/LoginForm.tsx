@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { CRMApiClient, saveCRMConfig, getCRMConfig } from '@/lib/api';
+import { InlineAlert } from './InlineAlert';
 
 // URL de producción por defecto
 const PRODUCTION_URL = 'https://crm.amersursac.com';
 const LOCAL_URL = 'http://localhost:3000';
 
+// Logo de la empresa (mismo asset que el botón flotante y la cabecera).
+const LOGO_URL =
+  typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL('icons/icon128.png')
+    : 'icons/icon128.png';
+
 interface LoginFormProps {
   onLogin: (crmUrl: string, token: string) => void;
+  /** Muestra un aviso de "tu sesión expiró" arriba del formulario. */
+  sessionExpired?: boolean;
 }
 
-export function LoginForm({ onLogin }: LoginFormProps) {
+export function LoginForm({ onLogin, sessionExpired = false }: LoginFormProps) {
   const [crmUrl, setCrmUrl] = useState(PRODUCTION_URL);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -62,9 +71,20 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-crm-bg-primary to-crm-accent/20 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">AmersurChat</h1>
+          <img
+            src={LOGO_URL}
+            alt="Amersur"
+            className="w-20 h-20 mx-auto mb-3 object-contain rounded-2xl shadow-sm animate-fade-in"
+          />
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">AmersurChat</h1>
           <p className="text-gray-600 dark:text-gray-300">Iniciar sesión en el CRM</p>
         </div>
+
+        {sessionExpired && (
+          <div className="mb-4">
+            <InlineAlert variant="warning" message="Tu sesión expiró. Iniciá sesión de nuevo para continuar." />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Toggle para modo desarrollo */}
@@ -148,7 +168,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium"
+            className="w-full bg-crm-primary text-white py-2 px-4 rounded-md hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition ease-out-strong active:scale-[0.98] font-medium"
           >
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>

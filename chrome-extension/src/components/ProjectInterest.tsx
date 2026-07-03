@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CRMApiClient } from '@/lib/api';
+import { InlineAlert } from './InlineAlert';
+import { Skeleton } from './Skeleton';
 
 interface Proyecto {
   id: string;
@@ -25,6 +27,8 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
   const [selectedLote, setSelectedLote] = useState<string>('');
   const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
+  // ID del interés que está pendiente de confirmación de borrado (confirm inline).
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isExpanded) {
@@ -129,14 +133,13 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
     }
   }
 
-  async function handleRemoveProyecto(interesId: string) {
-    if (!confirm('¿Eliminar este proyecto de interés?')) return;
-
+  async function doRemoveProyecto(interesId: string) {
+    setConfirmandoId(null);
     try {
       await apiClient.removeProyectoInteres(clienteId, interesId);
       await loadData();
     } catch (err) {
-      setError('Error eliminando proyecto');
+      setError('No se pudo eliminar el proyecto de interés.');
     }
   }
 
@@ -178,17 +181,17 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
       </button>
 
       {isExpanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
+        <div className="border-t border-gray-200 dark:border-gray-700 animate-fade-in">
           {loading && (
-            <div className="p-6 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-crm-primary mx-auto"></div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Cargando proyectos...</p>
+            <div className="p-4 space-y-2" aria-busy="true">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
             </div>
           )}
 
           {error && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-700">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="p-4">
+              <InlineAlert variant="error" message={error} onRetry={loadData} onDismiss={() => setError(null)} />
             </div>
           )}
 
@@ -218,15 +221,32 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{interes.notas}</p>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleRemoveProyecto(interes.id)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 ml-3"
-                        title="Eliminar"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      {confirmandoId === interes.id ? (
+                        <div className="flex items-center gap-2 ml-3 shrink-0">
+                          <button
+                            onClick={() => doRemoveProyecto(interes.id)}
+                            className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 active:scale-95 transition-transform"
+                          >
+                            Eliminar
+                          </button>
+                          <button
+                            onClick={() => setConfirmandoId(null)}
+                            className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmandoId(interes.id)}
+                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 ml-3 active:scale-95 transition-transform"
+                          title="Eliminar"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -280,7 +300,7 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
                 <button
                   onClick={handleAddProyecto}
                   disabled={!selectedLote || saving}
-                  className="w-full py-2 px-4 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  className="w-full py-2 px-4 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition ease-out-strong active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                 >
                   {saving ? 'Guardando...' : 'Agregar lote'}
                 </button>

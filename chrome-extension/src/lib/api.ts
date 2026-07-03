@@ -97,6 +97,10 @@ export class CRMApiClient {
           return this.request<T>(endpoint, options, true);
         } else {
           logger.error('No se pudo renovar el token', undefined, { requestId });
+          // Avisar a la UI que la sesión expiró para volver al login (no fallar mudo).
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('amersurchat:session-expired'));
+          }
         }
       }
 
@@ -253,7 +257,7 @@ export class CRMApiClient {
    * Buscar cliente por teléfono
    * @returns Cliente encontrado, null si no existe, o objeto con asignadoAOtro si está asignado a otro vendedor
    */
-  async searchClienteByPhone(phone: string): Promise<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string }> {
+  async searchClienteByPhone(phone: string): Promise<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string; error?: string }> {
     try {
       // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
       const cleanPhone = phone.replace(/[^\d]/g, '');
@@ -263,7 +267,8 @@ export class CRMApiClient {
       return response;
     } catch (error) {
       console.error('[CRMApiClient] Error buscando cliente:', error);
-      return { cliente: null };
+      // No tragarse el error: el caller lo muestra con opción de reintentar.
+      return { cliente: null, error: 'No se pudo buscar el cliente en el CRM.' };
     }
   }
 
@@ -366,6 +371,19 @@ export class CRMApiClient {
       method: 'POST',
       body: JSON.stringify({
         loteId: loteId,
+        notas,
+      }),
+    });
+  }
+
+  /**
+   * Registrar consulta general (interés sin proyecto/lote específico)
+   */
+  async addConsultaGeneral(clienteId: string, notas?: string): Promise<any> {
+    return this.request(`/api/clientes/${clienteId}/proyecto-interes`, {
+      method: 'POST',
+      body: JSON.stringify({
+        consultaGeneral: true,
         notas,
       }),
     });
