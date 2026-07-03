@@ -1,0 +1,100 @@
+project: amersurcrm
+version: "1.0"
+initialized: "2026-06-29"
+artifact_store: openspec
+planning_home: ./openspec
+
+# --- Project Context ---
+context: |
+  Next.js 15 (App Router, Turbopack) + React 19 + Supabase + TypeScript.
+  CRM platform for real-estate sales (lotes/proyectos). Kanban pipeline,
+  reports/funnel, marketing (WhatsApp), PDF/Excel exports, bulk import.
+  Uses Supabase SSR client (schema: crm). Deployed on Vercel.
+
+stack:
+  framework: next@15 (App Router)
+  runtime: react@19
+  language: typescript@5
+  database: supabase (supabase-js@2 + @supabase/ssr)
+  styling: tailwindcss@3
+  package_manager: npm@10
+  dev_server: turbopack
+
+# --- Testing ---
+testing:
+  strict_tdd: true
+  primary_runner: vitest
+  test_command: "npm test"
+  coverage_command: "npm run test:coverage"
+  type_check_command: "npm run type-check"
+  lint_command: "npm run lint"
+
+  layers:
+    unit:
+      available: true
+      tool: vitest
+      command: "npm test"
+      environment: jsdom
+      framework: "@testing-library/react"
+      config: vitest.config.ts
+    integration:
+      available: true
+      tool: "@testing-library/react + jest-dom"
+      command: "npm run test:jest"
+      config: jest.config.mjs
+    smoke:
+      available: true
+      tool: jest
+      command: "npm run test:smoke"
+      path: "src/__tests__/smoke"
+    e2e:
+      available: true
+      tool: playwright
+      command: "npm run test:e2e"
+      config: playwright.config.*
+
+  coverage:
+    available: true
+    provider: v8
+    command: "npm run test:coverage"
+    reporters: [text, json, html]
+    thresholds:
+      branches: 70
+      functions: 70
+      lines: 70
+      statements: 70
+
+  quality:
+    linter: eslint@9
+    type_checker: "tsc --noEmit"
+    formatter: null
+
+# --- SDD Phase Rules ---
+phases:
+  proposal:
+    mode: openspec
+    path: openspec/changes/{change-name}/proposal.md
+  spec:
+    mode: openspec
+    path: openspec/changes/{change-name}/spec.md
+  design:
+    mode: openspec
+    path: openspec/changes/{change-name}/design.md
+  tasks:
+    mode: openspec
+    path: openspec/changes/{change-name}/tasks.md
+  apply_progress:
+    mode: openspec
+    path: openspec/changes/{change-name}/apply-progress.md
+  verify_report:
+    mode: openspec
+    path: openspec/changes/{change-name}/verify-report.md
+  archive_report:
+    mode: openspec
+    path: openspec/changes/archive/{change-name}/archive-report.md
+  state:
+    mode: openspec
+    path: openspec/changes/{change-name}/state.yaml
+
+# --- Skill Registry ---
+skill_registry: .atl/skill-registry.md

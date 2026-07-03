@@ -43,3 +43,8 @@ next-env.d.ts
 
 # superpowers scratch files
 .superpowers/
+docs/superpowers/
+
+# AI tooling local state
+.atl/
+.claude/worktrees/
