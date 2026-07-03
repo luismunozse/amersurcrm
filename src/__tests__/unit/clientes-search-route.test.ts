@@ -130,7 +130,7 @@ describe("GET /api/clientes/search — authorization hardening", () => {
 
       // Core invariant: vendor callers MUST have their query scoped to their own clients.
       const vendedorFilterApplied = mockClienteEq.mock.calls.some(
-        ([col, val]: [string, string]) => col === "vendedor_asignado" && val === "vendor1"
+        (call: any[]) => call[0] === "vendedor_asignado" && call[1] === "vendor1"
       );
       expect(vendedorFilterApplied).toBe(true);
     });
@@ -150,7 +150,7 @@ describe("GET /api/clientes/search — authorization hardening", () => {
       // The vendor-scoping bug: before fix, eq("vendedor_asignado") was called
       // because esAdmin was false for ROL_GERENTE. After fix, it must NOT be called.
       const vendedorFilterApplied = mockClienteEq.mock.calls.some(
-        ([col]: [string]) => col === "vendedor_asignado"
+        (call: any[]) => call[0] === "vendedor_asignado"
       );
       expect(vendedorFilterApplied).toBe(false);
     });
@@ -166,7 +166,7 @@ describe("GET /api/clientes/search — authorization hardening", () => {
       expect(res.status).toBe(200);
 
       const vendedorFilterApplied = mockClienteEq.mock.calls.some(
-        ([col]: [string]) => col === "vendedor_asignado"
+        (call: any[]) => call[0] === "vendedor_asignado"
       );
       expect(vendedorFilterApplied).toBe(false);
     });

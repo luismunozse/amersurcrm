@@ -1193,20 +1193,36 @@ export default function ClientesTable({
           </div>
         </div>
 
-        {clientes.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
-              <Users className="w-8 h-8 text-crm-text-muted" />
+        {clientes.length === 0 && (() => {
+          const hayFiltros = Boolean(
+            searchQuery || searchTelefono || searchDni || estado || tipo ||
+            vendedor || origen || proyectoInteres || fechaDesde || fechaHasta
+          );
+          return (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-crm-card-hover rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-crm-text-muted" />
+              </div>
+              <h4 className="text-lg font-medium text-crm-text-primary mb-2">
+                {hayFiltros ? "Sin resultados" : "No hay clientes"}
+              </h4>
+              <p className="text-crm-text-muted">
+                {hayFiltros
+                  ? "Ningún cliente coincide con los filtros aplicados."
+                  : "Comience agregando su primer cliente."}
+              </p>
+              {hayFiltros && (
+                <Link
+                  href="/dashboard/clientes"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg border border-crm-border px-4 py-2 text-sm font-medium text-crm-text-primary hover:bg-crm-card-hover transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Limpiar filtros
+                </Link>
+              )}
             </div>
-            <h4 className="text-lg font-medium text-crm-text-primary mb-2">No hay clientes</h4>
-            <p className="text-crm-text-muted">
-              {searchQuery || estado || tipo || vendedor
-                ? "No se encontraron clientes con los filtros aplicados"
-                : "Comience agregando su primer cliente"
-              }
-            </p>
-          </div>
-        )}
+          );
+        })()}
 
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-crm-border">
