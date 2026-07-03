@@ -45,7 +45,7 @@ export function OverlayLoader({ text, className }: OverlayLoaderProps) {
             src="/ISOTIPOOO.png"
             alt=""
             width={40}
-            height={40}
+            height={32}
             className="drop-shadow-md"
             priority
             onError={() => setImgError(true)}

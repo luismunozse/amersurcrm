@@ -141,7 +141,7 @@ export default function NewClienteForm() {
           aria-hidden="true"
         />
         <div
-          className={`relative ml-auto flex h-full w-full max-w-lg transform transition-transform duration-300 ease-in-out ${slideOpen ? "translate-x-0" : "translate-x-full"}`}
+          className={`relative ml-auto flex h-full w-full max-w-lg transform transition-transform duration-300 ease-drawer ${slideOpen ? "translate-x-0" : "translate-x-full"}`}
           role="dialog"
           aria-modal="true"
         >

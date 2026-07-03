@@ -23,7 +23,7 @@ type SkeletonBoxProps = {
 export function SkeletonBox({ className = '', style }: SkeletonBoxProps) {
   return (
     <div
-      className={`animate-pulse bg-gray-200 rounded ${className}`}
+      className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`}
       style={style}
       aria-hidden="true"
     />
@@ -50,7 +50,7 @@ export function SkeletonText({
 
   return (
     <div
-      className={`h-4 bg-gray-200 rounded animate-pulse ${widthClass} ${className}`}
+      className={`h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ${widthClass} ${className}`}
       aria-hidden="true"
     />
   );
@@ -68,7 +68,7 @@ export function SkeletonCircle({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
 
   return (
     <div
-      className={`bg-gray-200 rounded-full animate-pulse ${sizeClass}`}
+      className={`bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse ${sizeClass}`}
       aria-hidden="true"
     />
   );

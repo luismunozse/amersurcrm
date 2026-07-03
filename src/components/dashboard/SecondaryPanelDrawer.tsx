@@ -77,7 +77,7 @@ export default function SecondaryPanelDrawer({
         />
 
         <aside
-          className={`absolute left-0 top-0 h-full w-full max-w-lg transform bg-white shadow-2xl transition-transform duration-300 dark:bg-crm-card ${
+          className={`absolute left-0 top-0 h-full w-full max-w-lg transform bg-white shadow-2xl transition-transform duration-300 ease-drawer dark:bg-crm-card ${
             open ? "translate-x-0" : "-translate-x-full"
           }`}
           role="dialog"

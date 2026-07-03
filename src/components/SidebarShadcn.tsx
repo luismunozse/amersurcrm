@@ -436,9 +436,9 @@ export function SidebarShadcn() {
           <Image
             src="/ISOTIPOOO.png"
             alt="AMERSUR"
-            width={28}
+            width={35}
             height={28}
-            className="hidden group-data-[collapsible=icon]:block h-7 w-7 object-contain mx-auto"
+            className="hidden group-data-[collapsible=icon]:block h-7 w-auto object-contain mx-auto"
             priority
           />
         </Link>

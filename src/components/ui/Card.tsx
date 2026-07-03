@@ -16,7 +16,7 @@ export function Card({
   hover = false,
   ...props 
 }: CardProps) {
-  const baseClasses = "rounded-xl transition-all duration-200";
+  const baseClasses = "rounded-xl transition-[background-color,box-shadow] duration-200 ease-out-strong";
   
   const variantClasses = {
     default: "bg-crm-card border border-crm-border",

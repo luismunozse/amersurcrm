@@ -65,7 +65,7 @@ export function PageLoader({
             src="/ISOTIPOOO.png"
             alt=""
             width={imgSize}
-            height={imgSize}
+            height={Math.round(imgSize * 0.8)}
             className="drop-shadow-md"
             priority
             onError={() => setImgError(true)}

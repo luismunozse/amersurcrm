@@ -22,7 +22,7 @@ export function Button({
   disabled,
   ...props 
 }: ButtonProps) {
-  const baseClasses = "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseClasses = "inline-flex items-center justify-center rounded-lg font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out-strong active:scale-[0.97] disabled:active:scale-100 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
   
   const variantClasses = {
     primary: "bg-crm-primary text-white hover:bg-crm-primary-hover focus:ring-crm-primary shadow-sm",
