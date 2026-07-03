@@ -31,6 +31,45 @@ GRANT EXECUTE ON FUNCTION crm.es_visibilidad_global() TO authenticated;
 GRANT EXECUTE ON FUNCTION crm.es_visibilidad_global() TO service_role;
 
 -- ============================================================
+-- 1b. Helper: crm.p1_puede_ver_cliente(uuid)
+-- Self-contained client-ownership check using ONLY primitives that
+-- exist in this database (es_visibilidad_global + get_current_username).
+-- Mirrors the production ownership semantics from 20260224100000
+-- (vendedor_username / vendedor_asignado hold the username; created_by
+-- holds auth.uid()). NOTE: crm.p1_puede_ver_cliente() is intentionally
+-- NOT used — it depends on the permission-matrix (20250326000008) which is
+-- not deployed on this DB.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION crm.p1_puede_ver_cliente(p_cliente_id uuid)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, crm
+AS $$
+  SELECT
+    auth.uid() IS NOT NULL
+    AND p_cliente_id IS NOT NULL
+    AND (
+      crm.es_visibilidad_global()
+      OR EXISTS (
+        SELECT 1
+        FROM crm.cliente c
+        WHERE c.id = p_cliente_id
+          AND (
+            c.vendedor_username = crm.get_current_username()
+            OR c.vendedor_asignado = crm.get_current_username()
+            OR c.created_by = auth.uid()
+          )
+      )
+    );
+$$;
+
+GRANT EXECUTE ON FUNCTION crm.p1_puede_ver_cliente(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION crm.p1_puede_ver_cliente(uuid) TO service_role;
+
+-- ============================================================
 -- 2. Audit columns on proceso_adquisicion (used by cancelarProceso)
 -- ============================================================
 
@@ -46,7 +85,7 @@ ALTER TABLE crm.proceso_adquisicion
 DROP POLICY IF EXISTS "Autenticados pueden ver solicitudes postventa" ON crm.solicitud_postventa;
 CREATE POLICY "solicitud_postventa_select" ON crm.solicitud_postventa
   FOR SELECT TO authenticated
-  USING (crm.usuario_puede_ver_cliente(cliente_id));
+  USING (crm.p1_puede_ver_cliente(cliente_id));
 
 -- ============================================================
 -- 4. TABLE: entrega (cliente_id direct FK)
@@ -55,7 +94,7 @@ CREATE POLICY "solicitud_postventa_select" ON crm.solicitud_postventa
 DROP POLICY IF EXISTS "Autenticados pueden ver entregas" ON crm.entrega;
 CREATE POLICY "entrega_select" ON crm.entrega
   FOR SELECT TO authenticated
-  USING (crm.usuario_puede_ver_cliente(cliente_id));
+  USING (crm.p1_puede_ver_cliente(cliente_id));
 
 -- ============================================================
 -- 5. TABLE: entrega_observacion (entrega_id → entrega.cliente_id)
@@ -68,7 +107,7 @@ CREATE POLICY "entrega_observacion_select" ON crm.entrega_observacion
     EXISTS (
       SELECT 1 FROM crm.entrega e
       WHERE e.id = entrega_id
-        AND crm.usuario_puede_ver_cliente(e.cliente_id)
+        AND crm.p1_puede_ver_cliente(e.cliente_id)
     )
   );
 
@@ -83,13 +122,13 @@ CREATE POLICY "entrega_checklist_item_select" ON crm.entrega_checklist_item
     EXISTS (
       SELECT 1 FROM crm.entrega e
       WHERE e.id = entrega_id
-        AND crm.usuario_puede_ver_cliente(e.cliente_id)
+        AND crm.p1_puede_ver_cliente(e.cliente_id)
     )
   );
 
 -- ============================================================
 -- 7. TABLE: proceso_adquisicion (cliente_id + vendedor_username)
--- SELECT: ownership via usuario_puede_ver_cliente
+-- SELECT: ownership via p1_puede_ver_cliente
 -- UPDATE: vendor owns or global role
 -- DELETE: global role only (was permissive)
 -- ============================================================
@@ -97,7 +136,7 @@ CREATE POLICY "entrega_checklist_item_select" ON crm.entrega_checklist_item
 DROP POLICY IF EXISTS "Autenticados ven procesos" ON crm.proceso_adquisicion;
 CREATE POLICY "proceso_select" ON crm.proceso_adquisicion
   FOR SELECT TO authenticated
-  USING (crm.usuario_puede_ver_cliente(cliente_id));
+  USING (crm.p1_puede_ver_cliente(cliente_id));
 
 DROP POLICY IF EXISTS "Autenticados actualizan procesos" ON crm.proceso_adquisicion;
 CREATE POLICY "proceso_update" ON crm.proceso_adquisicion
@@ -127,7 +166,7 @@ CREATE POLICY "proceso_etapa_select" ON crm.proceso_etapa
     EXISTS (
       SELECT 1 FROM crm.proceso_adquisicion p
       WHERE p.id = proceso_id
-        AND crm.usuario_puede_ver_cliente(p.cliente_id)
+        AND crm.p1_puede_ver_cliente(p.cliente_id)
     )
   );
 
@@ -168,7 +207,7 @@ CREATE POLICY "proceso_checklist_item_select" ON crm.proceso_checklist_item
       FROM crm.proceso_etapa e
       JOIN crm.proceso_adquisicion p ON p.id = e.proceso_id
       WHERE e.id = etapa_id
-        AND crm.usuario_puede_ver_cliente(p.cliente_id)
+        AND crm.p1_puede_ver_cliente(p.cliente_id)
     )
   );
 
@@ -211,7 +250,7 @@ CREATE POLICY "cuota_select" ON crm.cuota
     EXISTS (
       SELECT 1 FROM crm.venta v
       WHERE v.id = venta_id
-        AND crm.usuario_puede_ver_cliente(v.cliente_id)
+        AND crm.p1_puede_ver_cliente(v.cliente_id)
     )
   );
 
@@ -234,7 +273,7 @@ CREATE POLICY "comision_select" ON crm.comision
 DROP POLICY IF EXISTS "Autenticados pueden ver calificaciones" ON crm.calificacion_bancaria;
 CREATE POLICY "calificacion_bancaria_select" ON crm.calificacion_bancaria
   FOR SELECT TO authenticated
-  USING (crm.usuario_puede_ver_cliente(cliente_id));
+  USING (crm.p1_puede_ver_cliente(cliente_id));
 
 -- ============================================================
 -- 13. TABLE: calificacion_documento (calificacion_id → calificacion_bancaria.cliente_id)
@@ -247,7 +286,7 @@ CREATE POLICY "calificacion_documento_select" ON crm.calificacion_documento
     EXISTS (
       SELECT 1 FROM crm.calificacion_bancaria c
       WHERE c.id = calificacion_id
-        AND crm.usuario_puede_ver_cliente(c.cliente_id)
+        AND crm.p1_puede_ver_cliente(c.cliente_id)
     )
   );
 
@@ -258,7 +297,7 @@ CREATE POLICY "calificacion_documento_select" ON crm.calificacion_documento
 DROP POLICY IF EXISTS "Autenticados pueden ver contratos" ON crm.contrato;
 CREATE POLICY "contrato_select" ON crm.contrato
   FOR SELECT TO authenticated
-  USING (crm.usuario_puede_ver_cliente(cliente_id));
+  USING (crm.p1_puede_ver_cliente(cliente_id));
 
 -- ============================================================
 -- 15. TABLE: meta_vendedor (vendedor_username, no cliente_id)

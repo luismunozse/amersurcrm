@@ -61,7 +61,7 @@ export async function GET() {
         GOOGLE_DRIVE_CLIENT_ID: clientId ? `${clientId.substring(0, 20)}...` : "NO CONFIGURADO",
         GOOGLE_DRIVE_CLIENT_SECRET: clientSecret ? "GOCSPX-***" : "NO CONFIGURADO",
         GOOGLE_DRIVE_REDIRECT_URI: redirectUri || "NO CONFIGURADO",
-        SUPABASE_SERVICE_ROLE_KEY: serviceRole ? `${serviceRole.substring(0, 8)}...` : "NO CONFIGURADO",
+        SUPABASE_SERVICE_ROLE_KEY: serviceRole ? "CONFIGURADO" : "NO CONFIGURADO",
       },
       driveConfig: driveConfigSummary,
     });
