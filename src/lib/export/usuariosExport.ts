@@ -3,6 +3,7 @@
  */
 
 import type { ExportColumn, ExportFormat, ExportOptions } from './filteredExport';
+import type { ExcelSheetSpec } from '@/lib/excel/adapter';
 
 export interface UsuarioExportFilters {
   q?: string;
@@ -109,23 +110,29 @@ export async function exportFilteredUsuarios(
     { filtro: 'Registros Exportados', valor: String(usuarios.length) }
   );
 
-  // Use xlsx for excel/csv
+  // Use exceljs adapter for excel/csv
   if (format === 'excel' || format === 'csv') {
-    const XLSX = await import('xlsx');
+    const { downloadExcel, downloadCsv, objectsToCsv } =
+      await import('@/lib/excel/adapter');
 
     if (format === 'excel') {
-      const workbook = XLSX.utils.book_new();
-      const dataSheet = XLSX.utils.json_to_sheet(transformedData);
-      dataSheet['!cols'] = columns.map((col) => ({ wch: col.width || 15 }));
-      XLSX.utils.book_append_sheet(workbook, dataSheet, 'Usuarios');
+      const sheets: ExcelSheetSpec[] = [
+        {
+          name: 'Usuarios',
+          objects: transformedData,
+          columnWidths: columns.map((col) => col.width || 15),
+        },
+      ];
 
       if (includeFiltersSheet && filterMetadata.length > 0) {
-        const filtersSheet = XLSX.utils.json_to_sheet(filterMetadata);
-        filtersSheet['!cols'] = [{ wch: 25 }, { wch: 40 }];
-        XLSX.utils.book_append_sheet(workbook, filtersSheet, 'Filtros Aplicados');
+        sheets.push({
+          name: 'Filtros Aplicados',
+          objects: filterMetadata,
+          columnWidths: [25, 40],
+        });
       }
 
-      XLSX.writeFile(workbook, finalFileName);
+      await downloadExcel(sheets, finalFileName);
     } else {
       let csvContent = '';
       if (includeFiltersSheet && filterMetadata.length > 0) {
@@ -133,15 +140,9 @@ export async function exportFilteredUsuarios(
         filterMetadata.forEach((m) => { csvContent += `# ${m.filtro}: ${m.valor}\n`; });
         csvContent += '\n';
       }
-      const ws = XLSX.utils.json_to_sheet(transformedData);
-      csvContent += XLSX.utils.sheet_to_csv(ws);
+      csvContent += objectsToCsv(transformedData);
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = finalFileName;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      downloadCsv(csvContent, finalFileName);
     }
   } else {
     // PDF

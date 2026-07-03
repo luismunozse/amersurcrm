@@ -38,7 +38,7 @@ export default function ImportarLotesModal({
 
   // Preload xlsx on hover (~600KB cargado antes de necesitarlo)
   const handlePreloadXlsx = useCallback(() => {
-    import("xlsx").catch(() => {});
+    import("@/lib/excel/adapter").catch(() => {});
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,25 +145,19 @@ export default function ImportarLotesModal({
       },
     ];
 
-    // Crear workbook y worksheet (dynamic import)
-    const XLSX = await import("xlsx");
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Lotes");
-
-    // Ajustar ancho de columnas
-    worksheet["!cols"] = [
-      { wch: 15 }, // codigo
-      { wch: 12 }, // tipo_unidad
-      { wch: 10 }, // sup_m2
-      { wch: 12 }, // precio
-      { wch: 12 }, // precio_m2
-      { wch: 8 },  // moneda
-      { wch: 12 }, // estado
-    ];
-
-    // Descargar archivo
-    XLSX.writeFile(workbook, `plantilla_lotes_${proyectoNombre.replace(/\s+/g, "_")}.xlsx`);
+    // Crear y descargar workbook (dynamic import)
+    const { downloadExcel } = await import("@/lib/excel/adapter");
+    await downloadExcel(
+      [
+        {
+          name: "Lotes",
+          objects: data,
+          // codigo, tipo_unidad, sup_m2, precio, precio_m2, moneda, estado
+          columnWidths: [15, 12, 10, 12, 12, 8, 12],
+        },
+      ],
+      `plantilla_lotes_${proyectoNombre.replace(/\s+/g, "_")}.xlsx`,
+    );
     toast.success("Plantilla descargada correctamente");
   };
 

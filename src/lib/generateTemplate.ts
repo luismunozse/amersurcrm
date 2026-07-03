@@ -1,8 +1,5 @@
-import * as XLSX from "xlsx";
-
-export function generateClientesTemplate() {
-  // Crear workbook
-  const wb = XLSX.utils.book_new();
+export async function generateClientesTemplate() {
+  const { buildExcelBlob } = await import("@/lib/excel/adapter");
 
   // ==================== HOJA DE INSTRUCCIONES ====================
   const instrucciones = [
@@ -48,99 +45,37 @@ export function generateClientesTemplate() {
     ['Contacte al equipo de soporte técnico'],
   ];
 
-  const wsInstrucciones = XLSX.utils.aoa_to_sheet(instrucciones);
-
-  // Ajustar ancho de columnas para instrucciones
-  wsInstrucciones['!cols'] = [
-    { wch: 20 },  // Columna A
-    { wch: 12 },  // Columna B
-    { wch: 50 },  // Columna C
-    { wch: 40 }   // Columna D
-  ];
-
-  // Estilos para la hoja de instrucciones (si el formato lo soporta)
-  // Hacer el título en negrita (row 1)
-  if (wsInstrucciones['A1']) {
-    wsInstrucciones['A1'].s = {
-      font: { bold: true, sz: 14 }
-    };
-  }
-
   // ==================== HOJA DE PLANTILLA ====================
   const templateData = [
-    {
-      nombre: 'Juan Carlos',
-      apellido: 'Pérez García',
-      telefono: '51987654321',
-      proyecto_interes: 'Residencial Las Palmeras'
-    },
-    {
-      nombre: 'María Elena',
-      apellido: 'López Rodríguez',
-      telefono: '51912345678',
-      proyecto_interes: 'Condominio Vista Mar'
-    },
-    {
-      nombre: 'Carlos Alberto',
-      apellido: 'Martínez Silva',
-      telefono: '51987654322',
-      proyecto_interes: 'Torre Empresarial Centro'
-    },
-    {
-      nombre: 'Ana Lucía',
-      apellido: 'Gutiérrez Fernández',
-      telefono: '51912345679',
-      proyecto_interes: ''
-    },
-    {
-      nombre: 'Luis Fernando',
-      apellido: 'Hernández Morales',
-      telefono: '51987654323',
-      proyecto_interes: 'Lotes Campiña Verde'
-    },
+    { nombre: 'Juan Carlos', apellido: 'Pérez García', telefono: '51987654321', proyecto_interes: 'Residencial Las Palmeras' },
+    { nombre: 'María Elena', apellido: 'López Rodríguez', telefono: '51912345678', proyecto_interes: 'Condominio Vista Mar' },
+    { nombre: 'Carlos Alberto', apellido: 'Martínez Silva', telefono: '51987654322', proyecto_interes: 'Torre Empresarial Centro' },
+    { nombre: 'Ana Lucía', apellido: 'Gutiérrez Fernández', telefono: '51912345679', proyecto_interes: '' },
+    { nombre: 'Luis Fernando', apellido: 'Hernández Morales', telefono: '51987654323', proyecto_interes: 'Lotes Campiña Verde' },
     // Filas vacías para que el usuario pueda empezar a llenar
-    {
-      nombre: '',
-      apellido: '',
-      telefono: '',
-      proyecto_interes: ''
-    },
-    {
-      nombre: '',
-      apellido: '',
-      telefono: '',
-      proyecto_interes: ''
-    },
-    {
-      nombre: '',
-      apellido: '',
-      telefono: '',
-      proyecto_interes: ''
-    },
+    { nombre: '', apellido: '', telefono: '', proyecto_interes: '' },
+    { nombre: '', apellido: '', telefono: '', proyecto_interes: '' },
+    { nombre: '', apellido: '', telefono: '', proyecto_interes: '' },
   ];
 
-  const wsPlantilla = XLSX.utils.json_to_sheet(templateData);
-
-  // Ajustar ancho de columnas para plantilla
-  wsPlantilla['!cols'] = [
-    { wch: 20 }, // nombre
-    { wch: 25 }, // apellido
-    { wch: 18 }, // telefono
-    { wch: 35 }  // proyecto_interes
-  ];
-
-  // Agregar ambas hojas al workbook
-  XLSX.utils.book_append_sheet(wb, wsInstrucciones, "Instrucciones");
-  XLSX.utils.book_append_sheet(wb, wsPlantilla, "Plantilla");
-
-  // Generar archivo
-  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-
-  return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  return buildExcelBlob([
+    {
+      name: "Instrucciones",
+      rows: instrucciones,
+      columnWidths: [20, 12, 50, 40],
+      boldHeader: true,
+      headerFontSize: 14,
+    },
+    {
+      name: "Plantilla",
+      objects: templateData,
+      columnWidths: [20, 25, 18, 35], // nombre, apellido, telefono, proyecto_interes
+    },
+  ]);
 }
 
-export function downloadTemplate() {
-  const blob = generateClientesTemplate();
+export async function downloadTemplate() {
+  const blob = await generateClientesTemplate();
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

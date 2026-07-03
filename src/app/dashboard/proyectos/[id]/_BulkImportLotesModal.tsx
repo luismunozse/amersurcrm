@@ -282,12 +282,9 @@ export default function BulkImportLotesModal({
 
   const parseXlsxFile = async (selectedFile: File) => {
     try {
-      const XLSX = await import("xlsx");
+      const { parseExcelObjects } = await import("@/lib/excel/adapter");
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json<RawRow>(worksheet, { defval: "", raw: false });
+      const json = (await parseExcelObjects(arrayBuffer, { defaultValue: "" })) as RawRow[];
       if (json.length === 0) {
         throw new Error("La hoja está vacía");
       }

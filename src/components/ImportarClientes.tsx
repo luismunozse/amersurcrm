@@ -84,7 +84,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
 
   // Preload xlsx y papaparse on hover (~700KB cargados antes del click)
   const handlePreloadImportLibs = useCallback(() => {
-    import("xlsx").catch(() => {});
+    import("@/lib/excel/adapter").catch(() => {});
     import("papaparse").catch(() => {});
   }, []);
 
@@ -104,12 +104,9 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
 
       if (fileExtension === 'xlsx' || fileExtension === 'xls') {
         // Parsear Excel (dynamic import)
-        const XLSX = await import("xlsx");
+        const { parseExcelMatrix } = await import("@/lib/excel/adapter");
         const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const sheetData = XLSX.utils.sheet_to_json<RawCell[]>(worksheet, { header: 1 });
+        const sheetData = await parseExcelMatrix(arrayBuffer);
         rawData = sheetData.map((row) => row as RawRow);
       } else if (fileExtension === 'csv') {
         // Parsear CSV (dynamic import)
@@ -388,7 +385,7 @@ export default function ImportarClientes({ onClose }: ImportarClientesProps) {
       const response = await fetch('/api/clientes/check-phones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phones: phones.map(normalizePhoneE164) }),
+        body: JSON.stringify({ phones: phones.map((p) => normalizePhoneE164(p)) }),
       });
 
       if (!response.ok) return new Set();

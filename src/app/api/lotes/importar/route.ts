@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as XLSX from "xlsx";
+import { parseExcelObjects } from "@/lib/excel/adapter";
 import { createServerOnlyClient } from "@/lib/supabase.server";
 export const dynamic = 'force-dynamic';
 
@@ -164,17 +164,9 @@ export async function POST(request: NextRequest) {
     // Leer el archivo Excel
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const workbook = XLSX.read(buffer, { type: "buffer" });
 
-    // Obtener la primera hoja
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-
-    // Convertir a JSON
-    const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, {
-      raw: false,
-      defval: null
-    });
+    // Convertir a JSON (primera hoja, valores como texto, vacíos como null)
+    const rawData: any[] = await parseExcelObjects(buffer, { defaultValue: null });
 
     if (rawData.length === 0) {
       return NextResponse.json(

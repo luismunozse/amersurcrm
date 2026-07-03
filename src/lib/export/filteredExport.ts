@@ -25,11 +25,10 @@
  * ```
  */
 
-// Dynamic imports: xlsx (~600KB), jsPDF (~150KB), jspdf-autotable (~30KB)
-// Se cargan solo cuando el usuario realmente exporta, no al cargar la página
-async function getXLSX() {
-  return await import('xlsx');
-}
+// Dynamic imports: jsPDF (~150KB), jspdf-autotable (~30KB) y el adapter de Excel.
+// Se cargan solo cuando el usuario realmente exporta, no al cargar la página.
+import type { ExcelSheetSpec } from '@/lib/excel/adapter';
+
 async function getJsPDF() {
   const { jsPDF } = await import('jspdf');
   await import('jspdf-autotable');
@@ -431,27 +430,27 @@ async function exportToExcelWithFilters(
   columns: ExportColumn[],
   includeFiltersSheet: boolean
 ): Promise<void> {
-  const XLSX = await getXLSX();
-  const workbook = XLSX.utils.book_new();
+  const { downloadExcel } = await import('@/lib/excel/adapter');
 
-  // Hoja de datos
-  const dataSheet = XLSX.utils.json_to_sheet(data);
-
-  // Configurar anchos de columna
-  const columnWidths = columns.map((col) => ({ wch: col.width || 15 }));
-  dataSheet['!cols'] = columnWidths;
-
-  XLSX.utils.book_append_sheet(workbook, dataSheet, 'Datos');
+  const sheets: ExcelSheetSpec[] = [
+    {
+      name: 'Datos',
+      objects: data,
+      columnWidths: columns.map((col) => col.width || 15),
+    },
+  ];
 
   // Hoja de filtros (opcional)
   if (includeFiltersSheet && filterMetadata.length > 0) {
-    const filtersSheet = XLSX.utils.json_to_sheet(filterMetadata);
-    filtersSheet['!cols'] = [{ wch: 25 }, { wch: 40 }];
-    XLSX.utils.book_append_sheet(workbook, filtersSheet, 'Filtros Aplicados');
+    sheets.push({
+      name: 'Filtros Aplicados',
+      objects: filterMetadata,
+      columnWidths: [25, 40],
+    });
   }
 
   // Descargar archivo
-  XLSX.writeFile(workbook, fileName);
+  await downloadExcel(sheets, fileName);
 }
 
 /**
@@ -463,7 +462,7 @@ async function exportToCSVWithFilters(
   fileName: string,
   includeFiltersSheet: boolean
 ): Promise<void> {
-  const XLSX = await getXLSX();
+  const { downloadCsv, objectsToCsv } = await import('@/lib/excel/adapter');
   let csvContent = '';
 
   // Agregar metadatos de filtros al inicio (opcional)
@@ -475,18 +474,9 @@ async function exportToCSVWithFilters(
     csvContent += '\n';
   }
 
-  // Convertir datos a CSV
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const csv = XLSX.utils.sheet_to_csv(worksheet);
-  csvContent += csv;
-
-  // Crear blob y descargar
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(link.href);
+  // Convertir datos a CSV y descargar
+  csvContent += objectsToCsv(data);
+  downloadCsv(csvContent, fileName);
 }
 
 // ============================================================================

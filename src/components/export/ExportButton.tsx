@@ -87,7 +87,7 @@ export default function ExportButton({
 
   // Preload heavy export libraries on hover (~750KB cargados antes del click)
   const handlePreload = useCallback(() => {
-    import('xlsx').catch(() => {});
+    import('@/lib/excel/adapter').catch(() => {});
     import('jspdf').catch(() => {});
     import('jspdf-autotable').catch(() => {});
   }, []);
