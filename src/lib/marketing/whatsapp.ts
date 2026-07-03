@@ -7,6 +7,9 @@
 //   - Snippet:      {{>slug}}                  → expande contenido del snippet
 //   - Multimedia:   prepend de URL al mensaje  → WhatsApp Web genera preview
 
+import { normalizePhoneE164, DEFAULT_PHONE_COUNTRY } from "@/lib/utils/phone";
+import type { CountryCode } from "libphonenumber-js";
+
 const VAR_REGEX = /\{\{\s*([\w.-]+)\s*\}\}/g;
 const SNIPPET_REGEX = /\{\{\s*>\s*([a-z][a-z0-9_-]{1,40})\s*\}\}/g;
 const SECTION_REGEX = /\{\{\s*([#^])\s*([\w.-]+)\s*\}\}([\s\S]*?)\{\{\s*\/\s*\2\s*\}\}/g;
@@ -196,26 +199,32 @@ export function prependMedia(body: string, mediaUrl?: string | null): string {
 }
 
 /**
- * Normaliza un número telefónico a solo dígitos (formato wa.me).
+ * Para móviles argentinos, WhatsApp requiere el "9" tras el código de país
+ * (+54 9 ...). Si el número arranca con "54" pero no con "549", se inserta.
+ * No corrompe el dato guardado: esto se aplica SOLO al construir el link wa.me.
+ * Si el número fuera un fijo, únicamente fallará ese click-to-chat.
+ */
+function ensureArgentineMobile9(digits: string): string {
+  if (digits.startsWith("549")) return digits;
+  if (digits.startsWith("54")) return `549${digits.slice(2)}`;
+  return digits;
+}
+
+/**
+ * Normaliza un número telefónico a solo dígitos con código de país (formato wa.me).
+ * Usa libphonenumber (default Perú) y agrega el "9" de móvil argentino.
  * Acepta entradas con +, espacios, paréntesis, guiones.
- * Default countryCode 51 (Perú) si el número parece local.
  */
 export function normalizeWhatsAppPhone(
   telefono: string,
-  defaultCountryCode = "51",
+  defaultCountry: CountryCode = DEFAULT_PHONE_COUNTRY,
 ): string {
-  const digits = telefono.replace(/\D/g, "");
-  if (!digits) return "";
-  if (telefono.trim().startsWith("+")) return digits;
-  // Heurística: número peruano local 9 dígitos empezando con 9
-  if (digits.length === 9 && digits.startsWith("9")) {
-    return `${defaultCountryCode}${digits}`;
+  const e164 = normalizePhoneE164(telefono, defaultCountry); // dígitos, sin "+"
+  if (!e164) {
+    // Fallback: número no parseable → limpiar a dígitos para no perder el intento.
+    return (telefono || "").replace(/\D/g, "");
   }
-  // Heurística: número con 10 dígitos sin código país (otros países)
-  if (digits.length === 10 && !digits.startsWith(defaultCountryCode)) {
-    return digits;
-  }
-  return digits;
+  return ensureArgentineMobile9(e164);
 }
 
 /**
@@ -224,9 +233,9 @@ export function normalizeWhatsAppPhone(
 export function buildWhatsAppUrl(
   telefono: string,
   mensaje: string,
-  defaultCountryCode = "51",
+  defaultCountry: CountryCode = DEFAULT_PHONE_COUNTRY,
 ): string {
-  const tel = normalizeWhatsAppPhone(telefono, defaultCountryCode);
+  const tel = normalizeWhatsAppPhone(telefono, defaultCountry);
   if (!tel) {
     throw new Error("Teléfono inválido para WhatsApp");
   }

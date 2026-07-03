@@ -309,6 +309,25 @@ describe("normalizeWhatsAppPhone", () => {
   });
 });
 
+describe("normalizeWhatsAppPhone (país explícito Argentina)", () => {
+  it("móvil argentino local: agrega 54 y el 9 de WhatsApp", () => {
+    expect(normalizeWhatsAppPhone("3517734676", "AR")).toBe("5493517734676");
+  });
+
+  it("agrega el 9 de móvil cuando el número internacional no lo trae", () => {
+    expect(normalizeWhatsAppPhone("+5493517734676")).toBe("5493517734676");
+    expect(normalizeWhatsAppPhone("+543517734676")).toBe("5493517734676");
+  });
+
+  it("preserva el 9 cuando el número local ya lo trae", () => {
+    expect(normalizeWhatsAppPhone("09 351 773 4676", "AR")).toBe("5493517734676");
+  });
+
+  it("limpia caracteres no numéricos", () => {
+    expect(normalizeWhatsAppPhone("(351) 773-4676", "AR")).toBe("5493517734676");
+  });
+});
+
 describe("buildWhatsAppUrl", () => {
   it("genera URL wa.me con texto encoded", () => {
     const url = buildWhatsAppUrl("987654321", "Hola mundo");
@@ -318,6 +337,11 @@ describe("buildWhatsAppUrl", () => {
   it("encoda caracteres especiales en el mensaje", () => {
     const url = buildWhatsAppUrl("987654321", "Hola {{x}} & test");
     expect(url).toContain("Hola%20%7B%7Bx%7D%7D%20%26%20test");
+  });
+
+  it("genera URL wa.me para un número argentino explícito", () => {
+    const url = buildWhatsAppUrl("3517734676", "Hola mundo", "AR");
+    expect(url).toBe("https://wa.me/5493517734676?text=Hola%20mundo");
   });
 
   it("lanza error con teléfono vacío", () => {

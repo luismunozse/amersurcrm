@@ -1,46 +1,51 @@
 /**
- * Utilidades para validación y normalización de números telefónicos
- * Enfocado en números peruanos (código de país: 51)
+ * Utilidades para validación y normalización de números telefónicos.
+ * Usa libphonenumber-js para parsear/validar por país.
+ * País por defecto: Perú (cuando el número no trae código).
  */
+
+import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
+
+export const DEFAULT_PHONE_COUNTRY: CountryCode = 'PE';
 
 /**
- * Normaliza un número de teléfono al formato E.164
- * - Números peruanos: 51 + 9 dígitos = 11 dígitos total
- * - Números internacionales: 7-15 dígitos
+ * Normaliza un número telefónico a su forma canónica: dígitos con código de
+ * país, SIN el prefijo "+" (contrato usado por dedup de importación, perfil y
+ * los enlaces wa.me de marketing).
  *
- * @param value - Número de teléfono en cualquier formato
- * @returns Número normalizado sin espacios ni caracteres especiales, o cadena vacía si es inválido
+ * - Acepta entradas con "+", espacios, guiones, paréntesis y ceros internacionales.
+ * - Si no trae código de país, asume `defaultCountry`.
+ * - Si el número ya incluye código pero sin "+", se reintenta anteponiéndolo.
+ * - Devuelve "" si está vacío o no es un número telefónico posible.
+ *
+ * Se usa `isPossible()` (valida longitud) en lugar de `isValid()` (más estricto)
+ * para no rechazar números reales — el objetivo es normalizar, no filtrar.
+ *
+ * @returns Ej. "51987654321" (PE) o "" si es inválido.
  */
-export function normalizePhoneE164(value: string | null | undefined): string {
+export function normalizePhoneE164(
+  value: string | null | undefined,
+  defaultCountry: CountryCode = DEFAULT_PHONE_COUNTRY,
+): string {
   if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
 
-  // Eliminar todos los caracteres no numéricos
-  const digits = String(value).replace(/\D/g, '');
+  // Intento 1: parsear con el país por defecto (cubre números locales).
+  let parsed = parsePhoneNumberFromString(raw, defaultCountry);
 
-  if (!digits) return '';
-
-  // Caso 1: Número local peruano (9 dígitos) -> agregar código de país
-  if (digits.length === 9) {
-    return `51${digits}`;
+  // Intento 2: si trae código de país pero sin "+", reintentar con "+".
+  if ((!parsed || !parsed.isPossible()) && !raw.startsWith('+')) {
+    const onlyDigits = raw.replace(/\D/g, '');
+    if (onlyDigits) {
+      parsed = parsePhoneNumberFromString(`+${onlyDigits}`);
+    }
   }
 
-  // Caso 2: Ya tiene código de país peruano (11 dígitos empezando con 51)
-  if (digits.length === 11 && digits.startsWith('51')) {
-    return digits;
-  }
+  if (!parsed || !parsed.isPossible()) return '';
 
-  // Caso 3: Número con código 0051 (eliminamos el 00 inicial)
-  if (digits.startsWith('0051') && digits.length === 13) {
-    return digits.substring(2); // Eliminar '00'
-  }
-
-  // Caso 4: Otros formatos internacionales válidos (7-15 dígitos)
-  if (digits.length >= 7 && digits.length <= 15) {
-    return digits;
-  }
-
-  // Formato inválido
-  return '';
+  // E.164 sin el "+" para preservar el contrato histórico.
+  return parsed.number.replace('+', '');
 }
 
 /**
@@ -66,29 +71,18 @@ export function isValidPeruvianPhone(value: string | null | undefined): boolean 
 }
 
 /**
- * Formatea un número de teléfono para mostrar
- * Peruano: +51 987 654 321
- * Internacional: mantiene formato original
+ * Formatea un número de teléfono para mostrar en formato internacional
+ * según su país (ej. "+54 351 773-4676", "+56 9 1234 5678").
  *
- * @param value - Número de teléfono normalizado
- * @returns Número formateado para visualización
+ * @param value - Número de teléfono en cualquier formato
+ * @returns Número formateado para visualización, o '' si es inválido
  */
 export function formatPhoneDisplay(value: string | null | undefined): string {
   const normalized = normalizePhoneE164(value);
-
   if (!normalized) return '';
 
-  // Formato peruano: +51 987 654 321
-  if (normalized.length === 11 && normalized.startsWith('51')) {
-    const countryCode = normalized.substring(0, 2);
-    const part1 = normalized.substring(2, 5);
-    const part2 = normalized.substring(5, 8);
-    const part3 = normalized.substring(8, 11);
-    return `+${countryCode} ${part1} ${part2} ${part3}`;
-  }
-
-  // Para otros formatos, solo agregar el +
-  return `+${normalized}`;
+  const parsed = parsePhoneNumberFromString(`+${normalized}`);
+  return parsed ? parsed.formatInternational() : `+${normalized}`;
 }
 
 /**
