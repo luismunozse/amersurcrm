@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/reportes-alertas",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/cobranza-alertas",
+      "schedule": "0 13 * * *"
     }
   ],
   "env": {
