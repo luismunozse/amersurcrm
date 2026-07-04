@@ -9,11 +9,11 @@
 | Chained PRs recommended | Yes |
 | Suggested split | PR1 backend → PR2 UI |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Chain strategy | stacked-to-main |
 
-Decision needed before apply: Yes
+Decision needed before apply: No — resolved (stacked-to-main; PR2 is the final slice)
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -47,15 +47,20 @@ Chain strategy: pending
 ## PR2 — UI
 
 ### Phase 4: Server actions — TDD
-- [ ] 4.1 RED — `src/__tests__/unit/cobranza-gestion-action.test.ts`: `obtenerAlertasCobranza` scopes by `vendedor_username` unless `PERMISOS.PAGOS.VER_TODOS`; `registrarGestionCobranza` inserts, flips `alerta.gestionada=true`, revalidates; ownership gate rejects unauthorized writer (spec: Actionable alerts view, RLS invariants).
-- [ ] 4.2 GREEN — implement both actions in `src/app/dashboard/cobranza/_actions-cobranza.ts` (pattern: existing `obtenerCobranza`).
+- [x] 4.1 RED — `src/__tests__/unit/cobranza-gestion-action.test.ts`: `obtenerAlertasCobranza` scopes by `vendedor_username` unless `PERMISOS.PAGOS.VER_TODOS`; `registrarGestionCobranza` inserts, flips `alerta.gestionada=true`, revalidates; ownership gate rejects unauthorized writer (spec: Actionable alerts view, RLS invariants).
+- [x] 4.2 GREEN — implement both actions in `src/app/dashboard/cobranza/_actions-cobranza.ts` (pattern: existing `obtenerCobranza`).
 
 ### Phase 5: UI wiring
-- [ ] 5.1 `_ControlPagosHub.tsx`: add `alertas` to `ControlPagosTab`/`tabs`, grid-cols-2→3, accept `initialTab` prop.
-- [ ] 5.2 `page.tsx`: read `searchParams.tab`, pass as `initialTab`.
-- [ ] 5.3 New `_AlertasCobranzaList.tsx`: list with `tipo_alerta`/`fecha_alerta`/cuota-cliente context, `wa.me` button (`buildWhatsAppUrl` + `tiers.ts::buildReminderMessage`), gestionada badge.
-- [ ] 5.4 New `_GestionCobranzaModal.tsx`: form (fecha, medio, resultado, notas) → `registrarGestionCobranza`.
-- [ ] 5.5 `npx tsc --noEmit` clean; `npm test` full suite green.
+- [x] 5.1 `_ControlPagosHub.tsx`: add `alertas` to `ControlPagosTab`/`tabs`, grid-cols-2→3, accept `initialTab` prop.
+- [x] 5.2 `page.tsx`: read `searchParams.tab`, pass as `initialTab`.
+- [x] 5.3 New `_AlertasCobranzaList.tsx`: list with `tipo_alerta`/`fecha_alerta`/cuota-cliente context, `wa.me` button (`buildWhatsAppUrl` + `tiers.ts::buildReminderMessage`), gestionada badge.
+- [x] 5.4 New `_GestionCobranzaModal.tsx`: form (fecha, medio, resultado, notas) → `registrarGestionCobranza`.
+- [x] 5.5 `npx tsc --noEmit` clean; `npm test` full suite green.
+
+### Phase 6: PR1 review follow-ups (judgment-day, both judges) — in scope for PR2
+- [x] 6.1 New migration `supabase/migrations/20260705000000_cobranza_alertas_p2.sql`: harden `gestion_cobranza_insert` (alerta_id↔cuota consistency via `crm.p1_alerta_pertenece_a_cuota`, `vendedor_username = crm.get_current_username()`); add authenticated UPDATE policy `alerta_cobranza_update_gestion` scoped via the same ownership chain as `alerta_cobranza_select`. Manual Studio apply — not performed by this apply batch.
+- [x] 6.2 Humanize `tipo_alerta` everywhere it reaches the UI via `tiers.ts::tipoAlertaLabel` (TDD, `cobranza-tiers.test.ts`) — used in `_AlertasCobranzaList.tsx`, never the raw slug.
+- [x] 6.3 No `venta.estado` fixtures were touched in PR2's new tests (no venta context in `cobranza-gestion-action.test.ts`); confirmed real CHECK values (`en_proceso|finalizada|cancelada|suspendida`) for any future edit to `cobranza-alertas-route.test.ts`.
 
 ## Next Step
-Ready for `sdd-apply` after chain strategy is chosen (stacked-to-main vs feature-branch-chain).
+PR2 implemented — `sdd-verify` next. Manual step remaining: apply `20260705000000_cobranza_alertas_p2.sql` in Supabase Studio (mirrors PR1's manual-apply convention) before the gestión-recording flow works end-to-end in production.
