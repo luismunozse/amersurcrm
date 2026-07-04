@@ -1,9 +1,21 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso, tienePermiso } from "@/lib/permissions/server";
+import { handleSupabaseError } from "@/lib/errors";
 import { obtenerUsernameActual } from "../clientes/_actions-crm-helpers";
+import { limaToday } from "@/lib/cobranza/tiers";
+
+export type MedioGestionCobranza = "llamada" | "whatsapp" | "email" | "visita" | "mensaje";
+export type ResultadoGestionCobranza =
+  | "contactado"
+  | "no_contactado"
+  | "promesa_pago"
+  | "pago_parcial"
+  | "renegociacion"
+  | "ilocalizable";
 
 // ============================================================
 // COBRANZA
@@ -118,5 +130,172 @@ export async function ejecutarActualizacionMora() {
     return { success: true, data: { cuotas_actualizadas: data } };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+// ============================================================
+// ALERTAS DE COBRANZA (crm.alerta_cobranza + crm.gestion_cobranza)
+// See openspec/changes/cobranza-alertas/design.md D7 for the shape of
+// obtenerAlertasCobranza's response and registrarGestionCobranza's inputs.
+// ============================================================
+
+const ALERTA_COBRANZA_SELECT = `
+  id, tipo_alerta, fecha_alerta, canal, enviada, gestionada, gestionada_at,
+  cuota:cuota!cuota_id!inner(
+    id, numero_cuota, monto_programado, moneda, fecha_vencimiento,
+    venta:venta!venta_id!inner(
+      id, codigo_venta,
+      cliente:cliente!cliente_id!inner(id, nombre, telefono, telefono_whatsapp, vendedor_username)
+    )
+  )
+`;
+
+export async function obtenerAlertasCobranza() {
+  const supabase = await createServerActionClient();
+
+  try {
+    const puedeVerTodos = await tienePermiso(PERMISOS.PAGOS.VER_TODOS);
+
+    // Excluye deuda ya resuelta: cuota pagada o venta cancelada/suspendida —
+    // mismo filtro que el cron de cobranza-alertas
+    // (src/app/api/cron/cobranza-alertas/route.ts:140-141). `!inner` en cada
+    // relación embebida (ALERTA_COBRANZA_SELECT) es obligatorio para que
+    // estos filtros excluyan la fila padre y no solo el objeto anidado —
+    // mismo gotcha documentado en el cron route.
+    let query = supabase
+      .from('alerta_cobranza')
+      .select(ALERTA_COBRANZA_SELECT)
+      .neq('cuota.estado', 'pagada')
+      .not('cuota.venta.estado', 'in', '("cancelada","suspendida")');
+
+    // Sin PAGOS.VER_TODOS, solo alertas de clientes propios. `!inner` en cada
+    // relación embebida es obligatorio: sin él, PostgREST filtra el objeto
+    // anidado pero NO la fila padre (gotcha documentado en el cron route de
+    // cobranza-alertas — src/app/api/cron/cobranza-alertas/route.ts:129-134).
+    if (!puedeVerTodos) {
+      const authResult = await obtenerUsernameActual(supabase);
+      if (!authResult.success) return authResult;
+      query = query.eq('cuota.venta.cliente.vendedor_username', authResult.username);
+    }
+
+    const { data, error } = await query.order('fecha_alerta', { ascending: false });
+
+    if (error) throw error;
+    return { success: true, data: data || [] };
+  } catch (error: any) {
+    return (
+      handleSupabaseError(error, 'obtenerAlertasCobranza') ?? {
+        success: false,
+        error: error?.message || 'No se pudieron cargar las alertas de cobranza',
+      }
+    );
+  }
+}
+
+export interface RegistrarGestionCobranzaInput {
+  cuotaId: string;
+  clienteId: string;
+  alertaId?: string | null;
+  medio: MedioGestionCobranza;
+  resultado: ResultadoGestionCobranza;
+  notas?: string;
+  fechaGestion?: string;
+}
+
+const MEDIOS_GESTION_VALIDOS: MedioGestionCobranza[] = [
+  'llamada', 'whatsapp', 'email', 'visita', 'mensaje',
+];
+const RESULTADOS_GESTION_VALIDOS: ResultadoGestionCobranza[] = [
+  'contactado', 'no_contactado', 'promesa_pago', 'pago_parcial', 'renegociacion', 'ilocalizable',
+];
+
+/**
+ * Valida que la fecha de gestión sea parseable y no esté en el futuro.
+ * Compara por prefijo de fecha (YYYY-MM-DD) contra el día calendario de Lima
+ * (limaToday()) en vez de la fecha UTC del proceso servidor — evita rechazar
+ * una gestión de "hoy" cuando el instante UTC ya cruzó la medianoche pero en
+ * Lima (UTC-5) todavía es el día calendario anterior (mismo criterio que el
+ * <input type="date"> del modal, que también usa limaToday()).
+ */
+function validarFechaGestionNoFutura(fecha: string): { valid: boolean; error?: string } {
+  const fechaObj = new Date(fecha);
+  if (isNaN(fechaObj.getTime())) {
+    return { valid: false, error: 'Fecha de gestión no es válida' };
+  }
+  const hoySoloDia = limaToday();
+  const fechaSoloDia = fecha.slice(0, 10);
+  if (fechaSoloDia > hoySoloDia) {
+    return { valid: false, error: 'La fecha de gestión no puede ser en el futuro' };
+  }
+  return { valid: true };
+}
+
+export async function registrarGestionCobranza(input: RegistrarGestionCobranzaInput) {
+  if (!MEDIOS_GESTION_VALIDOS.includes(input.medio)) {
+    return { success: false, error: 'El medio de gestión no es válido' };
+  }
+  if (!RESULTADOS_GESTION_VALIDOS.includes(input.resultado)) {
+    return { success: false, error: 'El resultado de gestión no es válido' };
+  }
+
+  // Fallback also uses limaToday() (not new Date().toISOString()) so the
+  // omitted-fechaGestion path shares the same Lima-anchored date format as
+  // an explicit "YYYY-MM-DD" input, instead of a UTC-instant ISO string.
+  const fechaGestion = input.fechaGestion || limaToday();
+  const validacionFecha = validarFechaGestionNoFutura(fechaGestion);
+  if (!validacionFecha.valid) {
+    return { success: false, error: validacionFecha.error! };
+  }
+
+  const supabase = await createServerActionClient();
+
+  try {
+    const authResult = await obtenerUsernameActual(supabase);
+    if (!authResult.success) return authResult;
+
+    // p_fecha_gestion is timestamptz and the Postgres session TimeZone is
+    // UTC, so a bare "YYYY-MM-DD" string would parse as UTC midnight — 19:00
+    // the PREVIOUS day in América/Lima (UTC-5, no DST). Anchor date-only
+    // strings explicitly to Lima midnight before sending them to the RPC so
+    // the gestión is stored on the intended Lima calendar day.
+    const fechaGestionRpc = /^\d{4}-\d{2}-\d{2}$/.test(fechaGestion)
+      ? `${fechaGestion}T00:00:00-05:00`
+      : fechaGestion;
+
+    // RPC atómica: inserta la gestión y, si viene de una alerta real, marca
+    // gestionada = true en la MISMA transacción (crm.registrar_gestion_cobranza,
+    // 20260705000000_cobranza_alertas_p2.sql) — evita el gestión-huérfana que
+    // dejaba el insert+update en dos pasos si el update era filtrado por RLS.
+    const { data, error } = await supabase.schema('crm').rpc('registrar_gestion_cobranza', {
+      p_alerta_id: input.alertaId || null,
+      p_cuota_id: input.cuotaId,
+      p_cliente_id: input.clienteId,
+      p_medio: input.medio,
+      p_resultado: input.resultado,
+      p_notas: input.notas || null,
+      p_fecha_gestion: fechaGestionRpc,
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'Ya existe una gestión registrada para esta alerta' };
+      }
+      return (
+        handleSupabaseError(error, 'registrarGestionCobranza') ?? {
+          success: false,
+          error: 'No se pudo registrar la gestión',
+        }
+      );
+    }
+
+    revalidatePath('/dashboard/cobranza');
+    return { success: true, data: { id: data as string } };
+  } catch (error: any) {
+    return (
+      handleSupabaseError(error, 'registrarGestionCobranza') ?? {
+        success: false,
+        error: error?.message || 'No se pudo registrar la gestión',
+      }
+    );
   }
 }
