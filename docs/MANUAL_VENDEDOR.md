@@ -174,7 +174,7 @@ AmersurChat es una extensión para Chrome que añade un panel de CRM directament
 - Actualización de estado del cliente sin cambiar de pestaña.
 - Plantillas de mensajes predefinidos para respuestas rápidas.
 
-> **Versión actual:** v1.1.6 (actualizado enero 2026)
+> **Versión actual:** v1.2.2 (actualizado julio 2026)
 
 ---
 
