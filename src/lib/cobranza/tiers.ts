@@ -66,6 +66,24 @@ export function computeTier(input: ComputeTierInput): TipoAlertaCobranza | null 
   return null;
 }
 
+const TIPO_ALERTA_LABELS: Record<TipoAlertaCobranza, string> = {
+  por_vencer_15d: "Por vencer en 15 días",
+  por_vencer_7d: "Por vencer en 7 días",
+  por_vencer_3d: "Por vencer en 3 días",
+  vencida: "Vencida",
+  mora: "En mora",
+};
+
+/**
+ * Humanizes a `tipo_alerta` slug into formal Peruvian Spanish copy for the
+ * UI (design D7/D8 — never show the raw enum value to the user). Falls back
+ * to the raw value for an unrecognized tier instead of throwing, so a future
+ * tier addition degrades gracefully rather than crashing the alerts list.
+ */
+export function tipoAlertaLabel(tipo: TipoAlertaCobranza): string {
+  return TIPO_ALERTA_LABELS[tipo] ?? tipo;
+}
+
 export interface ReminderMessageInput {
   clienteNombre: string;
   numeroCuota: number;

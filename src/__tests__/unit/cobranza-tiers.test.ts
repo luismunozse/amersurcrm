@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { limaToday, computeTier, buildReminderMessage } from "@/lib/cobranza/tiers";
+import { limaToday, computeTier, buildReminderMessage, tipoAlertaLabel } from "@/lib/cobranza/tiers";
 
 describe("limaToday", () => {
   it("returns the Lima calendar date for a UTC afternoon instant on the same day", () => {
@@ -118,5 +118,19 @@ describe("buildReminderMessage", () => {
     expect(message).toContain("N.° 12");
     expect(message).toContain("USD 300.00");
     expect(message).not.toContain("Juan Pérez");
+  });
+});
+
+describe("tipoAlertaLabel", () => {
+  it("humanizes every tier into a formal Peruvian Spanish label, never the raw slug", () => {
+    expect(tipoAlertaLabel("por_vencer_15d")).toBe("Por vencer en 15 días");
+    expect(tipoAlertaLabel("por_vencer_7d")).toBe("Por vencer en 7 días");
+    expect(tipoAlertaLabel("por_vencer_3d")).toBe("Por vencer en 3 días");
+    expect(tipoAlertaLabel("vencida")).toBe("Vencida");
+    expect(tipoAlertaLabel("mora")).toBe("En mora");
+  });
+
+  it("falls back to the raw value for an unrecognized tier instead of throwing", () => {
+    expect(tipoAlertaLabel("desconocido" as any)).toBe("desconocido");
   });
 });
