@@ -30,8 +30,8 @@ Chain strategy: stacked-to-main
 
 ### Phase 1: Migration
 - [x] 1.1 Write `supabase/migrations/20260704000000_cobranza_alertas.sql`: unique index `(cuota_id, tipo_alerta)`; add `gestionada`/`gestionada_at`; create `crm.gestion_cobranza` + indexes; RLS via `p1_puede_ver_cliente` (authenticated), `ALL` for `service_role`.
-- [ ] 1.2 Apply manually in Supabase Studio (no `supabase db push` in this project). **Manual step — requires a human with Studio access; not performed by this apply batch.**
-- [ ] 1.3 Verify with `pg_indexes`/`pg_policies` queries: unique index present on `alerta_cobranza(cuota_id, tipo_alerta)`; `gestion_cobranza` RLS enabled with expected policies. **Manual step — depends on 1.2 being applied first.**
+- [x] 1.2 Apply manually in Supabase Studio (no `supabase db push` in this project). **Done 2026-07-04: applied by the user; pre-flight duplicate check returned 0 rows.**
+- [x] 1.3 Verify with `pg_indexes`/`pg_policies` queries: unique index present on `alerta_cobranza(cuota_id, tipo_alerta)`; `gestion_cobranza` RLS enabled with expected policies. **Done 2026-07-04: `idx_alerta_cobranza_cuota_tipo` present; 3 policies (insert/select/service_role); `p1_cuota_pertenece_a_cliente` exists.**
 
 ### Phase 2: `tiers.ts` — TDD
 - [x] 2.1 RED — `src/__tests__/unit/cobranza-tiers.test.ts`: `limaToday()` UTC-boundary; `computeTier()` at 15/7/3/0/overdue + `en_mora→mora`; 90-day cap; `buildReminderMessage()` placeholders (spec: Tier-based generation, 90-day cap).
@@ -63,4 +63,4 @@ Chain strategy: stacked-to-main
 - [x] 6.3 No `venta.estado` fixtures were touched in PR2's new tests (no venta context in `cobranza-gestion-action.test.ts`); confirmed real CHECK values (`en_proceso|finalizada|cancelada|suspendida`) for any future edit to `cobranza-alertas-route.test.ts`.
 
 ## Next Step
-PR2 implemented — `sdd-verify` next. Manual step remaining: apply `20260705000000_cobranza_alertas_p2.sql` in Supabase Studio (mirrors PR1's manual-apply convention) before the gestión-recording flow works end-to-end in production.
+DONE — both migrations applied and verified in production (2026-07-04): `20260705000000_cobranza_alertas_p2.sql` confirmed via pg_proc (`registrar_gestion_cobranza`, `p1_puede_ver_cuota`, `p1_puede_ver_venta`), `has_table_privilege('authenticated','crm.alerta_cobranza','UPDATE') = true`, and `cuota_select`/`alerta_cobranza_select` re-scoped to the SECURITY DEFINER helpers. `sdd-verify` passed (7/7 requirements satisfied). Ready for `sdd-archive`.
