@@ -1,7 +1,18 @@
 import { Clock } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { getCachedClientes, getCachedProyectos } from "@/lib/cache.server";
 import type { ClienteCached, ProyectoCached } from "@/types/crm";
+
+// Convierte una fecha ISO en un texto relativo en español ("hace 2 horas").
+// Si la fecha falta o es inválida, devuelve un texto neutro en vez de fallar.
+function formatActivityTime(fecha: string | null | undefined): string {
+  if (!fecha) return "Fecha no disponible";
+  const date = new Date(fecha);
+  if (Number.isNaN(date.getTime())) return "Fecha no disponible";
+  return formatDistanceToNow(date, { addSuffix: true, locale: es });
+}
 
 // ---- Tipos (discriminated union) ----
 type BaseActivity = {
@@ -58,7 +69,7 @@ export async function RecentActivities({ clientes: clientesProp, proyectos: proy
       id: `cliente-${index}-${cliente.id}`,
       type: "cliente" as const,
       message: `Cliente: ${cliente.nombre}`,
-      time: "Reciente",
+      time: formatActivityTime(cliente.created_at),
       icon: "👤",
       email: cliente.email,
     })),
@@ -66,7 +77,7 @@ export async function RecentActivities({ clientes: clientesProp, proyectos: proy
       id: `proyecto-${index}-${proyecto.id}`,
       type: "proyecto" as const,
       message: `Proyecto: ${proyecto.nombre}`,
-      time: "Reciente",
+      time: formatActivityTime(proyecto.created_at),
       icon: "🏢",
       descripcion: proyecto.descripcion,
     })),

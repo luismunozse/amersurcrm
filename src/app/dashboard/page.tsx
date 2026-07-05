@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { format, differenceInCalendarDays } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Users, Calendar, Package, Plus, Clock, BarChart3, Menu, Bell, ChevronRight, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -44,7 +44,7 @@ interface DashboardMetrics {
   hasError: boolean;
   puedeCrearProyectos: boolean;
   puedeEditarProyectos: boolean;
-  esAdminOGerente: boolean;
+  esVisibilidadGlobal: boolean;
   // Datos raw para pasar a componentes (evita re-fetch)
   clientes: ClienteCached[];
   proyectos: ProyectoCached[];
@@ -64,7 +64,7 @@ const initialMetrics: DashboardMetrics = {
   hasError: false,
   puedeCrearProyectos: false,
   puedeEditarProyectos: false,
-  esAdminOGerente: false,
+  esVisibilidadGlobal: false,
   clientes: [],
   proyectos: [],
 };
@@ -95,25 +95,6 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       : [];
     const notificaciones = Array.isArray(notificacionesData) ? notificacionesData : [];
 
-    const clienteMetrics = clientes.reduce(
-      (acc, cliente) => {
-        const ultimoContacto = cliente.ultimo_contacto ? new Date(cliente.ultimo_contacto) : null;
-
-        if (!ultimoContacto) {
-          acc.sinSeguimiento += 1;
-          acc.fueraDeRango += 1;
-        } else {
-          const dias = differenceInCalendarDays(new Date(), ultimoContacto);
-          if (dias >= 7) acc.fueraDeRango += 1;
-        }
-
-        if (cliente.proxima_accion) acc.conAccion += 1;
-
-        return acc;
-      },
-      { sinSeguimiento: 0, conAccion: 0, fueraDeRango: 0 },
-    );
-
     const proyectoMetrics = proyectos.reduce(
       (acc, proyecto) => {
         if (proyecto.estado === "activo") acc.activos += 1;
@@ -124,10 +105,10 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     );
 
     return {
-      totalClientes: clienteServerMetrics.total ?? clienteMetrics.sinSeguimiento + clienteMetrics.conAccion,
-      clientesSinSeguimiento: clienteServerMetrics.sinSeguimiento ?? clienteMetrics.sinSeguimiento,
-      clientesConAccion: clienteServerMetrics.conAccion ?? clienteMetrics.conAccion,
-      clientesFueraDeRango: clienteServerMetrics.fueraDeRango ?? clienteMetrics.fueraDeRango,
+      totalClientes: clienteServerMetrics.total,
+      clientesSinSeguimiento: clienteServerMetrics.sinSeguimiento,
+      clientesConAccion: clienteServerMetrics.conAccion,
+      clientesFueraDeRango: clienteServerMetrics.fueraDeRango,
       proyectosActivos: proyectoMetrics.activos,
       proyectosSinPlanos: proyectoMetrics.sinPlanos,
       notificacionesPendientes: notificaciones.length,
@@ -137,7 +118,10 @@ async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       hasError: false,
       puedeCrearProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.CREAR) ?? false,
       puedeEditarProyectos: permisosUsuario?.permisos?.includes(PERMISOS.PROYECTOS.EDITAR) ?? false,
-      esAdminOGerente: permisosUsuario?.rol === 'ROL_ADMIN' || permisosUsuario?.rol === 'ROL_GERENTE',
+      esVisibilidadGlobal:
+        permisosUsuario?.rol === 'ROL_ADMIN' ||
+        permisosUsuario?.rol === 'ROL_GERENTE' ||
+        permisosUsuario?.rol === 'ROL_COORDINADOR_VENTAS',
       // Pasar datos raw a componentes para evitar re-fetch
       clientes: clientes as ClienteCached[],
       proyectos: proyectos as ProyectoCached[],
@@ -208,8 +192,8 @@ function buildQuickActions(metrics: DashboardMetrics) {
     },
     {
       title: "Analizar reportes",
-      description: `${metrics.notificacionesPendientes} indicadores pendientes de revisar`,
-      href: metrics.esAdminOGerente ? "/dashboard/admin/reportes" : "/dashboard/vendedor/reportes",
+      description: "Revise los indicadores clave de su gestión.",
+      href: metrics.esVisibilidadGlobal ? "/dashboard/admin/reportes" : "/dashboard/vendedor/reportes",
       color: "warning" as const,
       icon: (
         <BarChart3 className="w-6 h-6" role="img" aria-label="Analizar reportes" focusable="false" />
@@ -346,8 +330,8 @@ async function DashboardContent() {
       ),
     },
     {
-      label: "Reportes disponibles",
-      value: `${metrics.notificacionesPendientes} alertas por revisar`,
+      label: "Notificaciones",
+      value: `${metrics.notificacionesPendientes} sin leer`,
       tone: "info" as const,
       icon: (
         <BarChart3 className="w-5 h-5" aria-hidden="true" />

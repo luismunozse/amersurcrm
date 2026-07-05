@@ -11,8 +11,8 @@ export type SidebarBadges = {
 
 /**
  * Conteos para badges del sidebar — se ejecuta por polling cada ~60s.
- * Todas las queries filtran por el usuario actual (vendedor).
- * Un admin ve sus propios datos (si los tiene), no globales.
+ * Agenda y cobranza son globales para admin/gerente/coordinador; el resto de
+ * roles y las demás queries filtran siempre por el usuario actual (vendedor).
  */
 export async function getSidebarBadges(): Promise<SidebarBadges> {
   try {
@@ -85,13 +85,15 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           return esPrivilegiado ? q : q.eq("vendedor_id", userId);
         })(),
 
-        // Cobranza — cuotas vencidas/en mora de ventas del vendedor
-        s
-          .schema("crm")
-          .from("v_cobranza")
-          .select("id", { count: "exact", head: true })
-          .eq("vendedor_username", username)
-          .in("estado_cobranza", ["vencida", "en_mora"]),
+        // Cobranza — cuotas vencidas/en mora. Admin/gerente/coordinador ven todas; vendedor solo las propias.
+        (() => {
+          const q = s
+            .schema("crm")
+            .from("v_cobranza")
+            .select("id", { count: "exact", head: true })
+            .in("estado_cobranza", ["vencida", "en_mora"]);
+          return esPrivilegiado ? q : q.eq("vendedor_username", username);
+        })(),
       ]);
 
     const pipelineClienteIds = new Set(
