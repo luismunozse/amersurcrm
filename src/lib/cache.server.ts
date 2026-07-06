@@ -985,6 +985,7 @@ export type SeguimientoHoy = {
   estado_cliente: string;
   ultimo_contacto: string | null;
   proxima_accion: string | null;
+  fecha_proxima_accion: string | null;
   telefono: string | null;
 };
 
@@ -1006,36 +1007,108 @@ export const getCachedSeguimientosHoy = cache(async (): Promise<SeguimientoHoy[]
   const esGerente = rolNombre === 'ROL_GERENTE';
   const username = perfil?.username;
 
-  // Clientes con proxima_accion para hoy o atrasados, o sin contacto reciente
-  const hoyInicio = new Date();
-  hoyInicio.setHours(0, 0, 0, 0);
   const hoyFin = new Date();
   hoyFin.setHours(23, 59, 59, 999);
   const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Buscar clientes con próxima acción para hoy o vencida
-  let query = supabase.schema('crm')
-    .from('cliente')
-    .select('id, nombre, estado_cliente, ultimo_contacto, proxima_accion, telefono')
-    .lte('proxima_accion', hoyFin.toISOString())
-    .not('estado_cliente', 'in', '("desestimado","transferido")')
-    .order('proxima_accion', { ascending: true })
-    .limit(8);
+  const SEGUIMIENTOS_DISPLAY_LIMIT = 8;
+  // The global (no ownership prefilter) branch has no natural bound on how
+  // many clientes it could match, and every past-due `cliente_interaccion`
+  // row keeps matching forever (inserts-only, never cleaned up) — so a
+  // handful of neglected clientes can otherwise fill the whole raw window
+  // before the per-client dedup below even runs. 200 is a generous multiple
+  // of the display cap; the FINAL size is still enforced after dedup, not by
+  // this raw cap.
+  const INTERACCION_RAW_LIMIT_GLOBAL = 200;
+  const INTERACCION_RAW_LIMIT_SCOPED = 20;
 
-  // Vendedores solo ven sus clientes
+  // Vencidas/para hoy: fuente de verdad = cliente_interaccion.fecha_proxima_accion
+  // (TIMESTAMPTZ). `cliente.proxima_accion` es solo la etiqueta de texto del
+  // enum (llamar/reunion/...), nunca una fecha — ver ADR-7 en design.md. Sin
+  // este fix, `.lte('proxima_accion', isoString)` comparaba texto contra una
+  // fecha y esta rama siempre devolvía vacío.
+  //
+  // Ownership scope: for non-privileged callers this MUST be the CLIENTE's
+  // own ownership (created_by/vendedor_username), never
+  // cliente_interaccion.vendedor_username — historical interacciones are
+  // never reassigned when a cliente changes owner, so filtering by the
+  // interaccion row's own vendedor_username both (a) keeps surfacing
+  // reassigned clientes to their former vendedor forever, and (b) hides
+  // follow-ups a covering coordinador logged from the client's true current
+  // owner. Mirrors the two-step + Map merge pattern already used by
+  // getCachedPipelineClientes and sidebar-badges: (1) resolve the caller's
+  // own cliente ids, (2) filter interacciones by `.in('cliente_id', ownIds)`.
+  let ownClienteIds: string[] | null = null;
   if (!esAdmin && !esGerente && username) {
-    query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+    const { data: ownClientes, error: errorOwnClientes } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .select('id')
+      .or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+
+    if (errorOwnClientes) {
+      console.error('Error obteniendo clientes propios (seguimientos):', errorOwnClientes);
+    }
+    ownClienteIds = (ownClientes ?? []).map((c: { id: string }) => c.id);
   }
 
-  const { data: conAccion, error: errorAccion } = await query;
+  const proximaPorCliente = new Map<string, string>();
 
-  if (errorAccion) {
-    console.error('Error obteniendo seguimientos del día:', errorAccion);
+  // Mirrors getCachedPipelineClientes's `if (unique.length === 0) return ...`
+  // guard: never issue `.in('cliente_id', [])` — a caller who owns no
+  // clientes has nothing due, full stop.
+  if (ownClienteIds === null || ownClienteIds.length > 0) {
+    let interaccionQuery = supabase
+      .schema('crm')
+      .from('cliente_interaccion')
+      .select('cliente_id, fecha_proxima_accion')
+      .not('fecha_proxima_accion', 'is', null)
+      .lte('fecha_proxima_accion', hoyFin.toISOString())
+      .order('fecha_proxima_accion', { ascending: true });
+
+    interaccionQuery = ownClienteIds !== null
+      ? interaccionQuery.in('cliente_id', ownClienteIds).limit(INTERACCION_RAW_LIMIT_SCOPED)
+      : interaccionQuery.limit(INTERACCION_RAW_LIMIT_GLOBAL);
+
+    const { data: interacciones, error: errorInteracciones } = await interaccionQuery;
+
+    if (errorInteracciones) {
+      console.error('Error obteniendo interacciones vencidas:', errorInteracciones);
+    }
+
+    // Newest-wins per client: several past interacciones can each carry
+    // their own (by-now past-due) fecha_proxima_accion, but only the most
+    // recently scheduled one is still the client's live next action — older
+    // ones were superseded by the interaction that followed them. This also
+    // keeps one repeat-heavy client from silently pinning a stale date.
+    for (const row of (interacciones ?? []) as { cliente_id: string; fecha_proxima_accion: string }[]) {
+      const actual = proximaPorCliente.get(row.cliente_id);
+      if (!actual || row.fecha_proxima_accion > actual) {
+        proximaPorCliente.set(row.cliente_id, row.fecha_proxima_accion);
+      }
+    }
   }
 
-  // Si hay pocos con acción programada, buscar también sin contacto reciente
-  const resultados = (conAccion ?? []) as SeguimientoHoy[];
+  let resultados: SeguimientoHoy[] = [];
+  if (proximaPorCliente.size > 0) {
+    const { data: clientesConAccion, error: errorClientes } = await supabase
+      .schema('crm')
+      .from('cliente')
+      .select('id, nombre, estado_cliente, ultimo_contacto, proxima_accion, telefono')
+      .in('id', Array.from(proximaPorCliente.keys()))
+      .not('estado_cliente', 'in', '("desestimado","transferido")');
 
+    if (errorClientes) {
+      console.error('Error obteniendo clientes con acción vencida:', errorClientes);
+    }
+
+    resultados = ((clientesConAccion ?? []) as Array<Omit<SeguimientoHoy, 'fecha_proxima_accion'>>)
+      .map((c) => ({ ...c, fecha_proxima_accion: proximaPorCliente.get(c.id) ?? null }))
+      .sort((a, b) => (a.fecha_proxima_accion ?? '').localeCompare(b.fecha_proxima_accion ?? ''))
+      .slice(0, SEGUIMIENTOS_DISPLAY_LIMIT);
+  }
+
+  // Si hay pocos con acción vencida, completar con clientes sin contacto reciente
   if (resultados.length < 5) {
     const idsExistentes = new Set(resultados.map(r => r.id));
     let queryFuera = supabase.schema('crm')
@@ -1044,21 +1117,21 @@ export const getCachedSeguimientosHoy = cache(async (): Promise<SeguimientoHoy[]
       .not('estado_cliente', 'in', '("desestimado","transferido")')
       .or(`ultimo_contacto.is.null,ultimo_contacto.lt.${hace7Dias}`)
       .order('ultimo_contacto', { ascending: true, nullsFirst: true })
-      .limit(8 - resultados.length);
+      .limit(SEGUIMIENTOS_DISPLAY_LIMIT - resultados.length);
 
     if (!esAdmin && !esGerente && username) {
       queryFuera = queryFuera.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
     }
 
     const { data: sinContacto } = await queryFuera;
-    for (const c of (sinContacto ?? []) as SeguimientoHoy[]) {
+    for (const c of (sinContacto ?? []) as Array<Omit<SeguimientoHoy, 'fecha_proxima_accion'>>) {
       if (!idsExistentes.has(c.id)) {
-        resultados.push(c);
+        resultados.push({ ...c, fecha_proxima_accion: null });
       }
     }
   }
 
-  return resultados.slice(0, 8);
+  return resultados.slice(0, SEGUIMIENTOS_DISPLAY_LIMIT);
 });
 
 export function invalidateCache() {

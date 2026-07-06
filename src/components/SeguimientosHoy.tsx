@@ -19,9 +19,12 @@ const estadoColors: Record<string, string> = {
   potencial: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
 };
 
-function getUrgencia(cliente: SeguimientoHoy): { label: string; color: string } {
-  if (cliente.proxima_accion) {
-    const dias = differenceInCalendarDays(new Date(cliente.proxima_accion), new Date());
+// Exported for direct unit testing (mirrors the `_PipelineCard.tsx` pattern).
+// Reads `fecha_proxima_accion` (cliente_interaccion, TIMESTAMPTZ) — never
+// `proxima_accion`, which is only the enum action label (see ADR-7).
+export function getUrgencia(cliente: SeguimientoHoy): { label: string; color: string } {
+  if (cliente.fecha_proxima_accion) {
+    const dias = differenceInCalendarDays(new Date(cliente.fecha_proxima_accion), new Date());
     if (dias < 0) return { label: `Vencido hace ${Math.abs(dias)}d`, color: "text-crm-danger" };
     if (dias === 0) return { label: "Para hoy", color: "text-crm-warning font-semibold" };
     return { label: `En ${dias}d`, color: "text-crm-text-muted" };
@@ -34,7 +37,25 @@ function getUrgencia(cliente: SeguimientoHoy): { label: string; color: string } 
 }
 
 export async function SeguimientosHoy() {
-  const seguimientos = await getCachedSeguimientosHoy();
+  let seguimientos: SeguimientoHoy[];
+  try {
+    seguimientos = await getCachedSeguimientosHoy();
+  } catch (error) {
+    console.error("Error cargando seguimientos de hoy:", error);
+    return (
+      <Card variant="elevated" className="h-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-crm-text-primary">
+            <ClipboardCheck className="w-5 h-5 text-crm-primary" aria-hidden="true" />
+            Seguimientos de hoy
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-crm-text-muted">No se pudo cargar esta sección. Intente nuevamente.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (seguimientos.length === 0) {
     return (
