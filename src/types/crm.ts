@@ -54,20 +54,6 @@ export type ClienteCached = {
     estado: "disponible" | "reservado" | "vendido";
   };
   
-  export type DashboardStats = {
-    totalClientes: number;
-    totalProyectos: number;
-    totalLotes: number;
-    // Enhanced stats
-    lotesVendidos: number;
-    lotesReservados: number;
-    lotesDisponibles: number;
-    ventasMesActual: number;
-    ventasMesAnterior: number;
-    clientesNuevosMes: number;
-    clientesNuevosMesAnterior: number;
-  };
-
   export type NotificacionTipoCliente =
     | 'cliente'
     | 'proyecto'

@@ -5,7 +5,6 @@ import type {
   ClienteCached,
   ProyectoCached,
   LoteCached,
-  DashboardStats,
   NotificacionNoLeida,
 } from "@/types/crm";
 
@@ -34,13 +33,6 @@ interface GetClientesParams {
   mode?: 'list' | 'dashboard';
   withTotal?: boolean;
 }
-
-type ClienteDashboardMetrics = {
-  total: number;
-  sinSeguimiento: number;
-  conAccion: number;
-  fueraDeRango: number;
-};
 
 const CLIENTE_LIST_COLUMNS = `
       id,
@@ -332,50 +324,6 @@ export const getCachedClientesTotal = cache(async (): Promise<number> => {
 
   if (error) throw error;
   return count ?? 0;
-});
-
-export const getCachedClientesDashboardMetrics = cache(async (): Promise<ClienteDashboardMetrics> => {
-  const supabase = await createOptimizedServerClient();
-  const userId = await getUserIdOrNull(supabase);
-  if (!userId) {
-    return { total: 0, sinSeguimiento: 0, conAccion: 0, fueraDeRango: 0 };
-  }
-
-  const { data: perfil } = await supabase
-    .schema('crm')
-    .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
-    .eq('id', userId)
-    .single();
-
-  const rolData = perfil?.rol as any;
-  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-  const esAdmin = rolNombre === 'ROL_ADMIN';
-  const esGerente = rolNombre === 'ROL_GERENTE';
-  const username = perfil?.username;
-
-  const { data, error } = await supabase
-    .schema('crm')
-    .rpc('obtener_metricas_dashboard_clientes', {
-      p_usuario_id: userId,
-      p_es_admin: esAdmin,
-      p_es_gerente: esGerente,
-      p_username: username ?? null,
-    })
-    .single();
-
-  if (error) {
-    console.error('Error obteniendo métricas del dashboard:', error);
-    throw error;
-  }
-
-  const metricas = data as any;
-  return {
-    total: metricas?.total ?? 0,
-    sinSeguimiento: metricas?.sin_seguimiento ?? 0,
-    conAccion: metricas?.con_accion ?? 0,
-    fueraDeRango: metricas?.fuera_de_rango ?? 0,
-  };
 });
 
 export const getCachedLeadsStatsByOrigen = cache(async (): Promise<{ origen: string; count: number }[]> => {
@@ -715,123 +663,6 @@ export const getCachedLotes = cache(async (proyectoId: string): Promise<LoteCach
   return (data ?? []) as LoteCached[];
 });
 
-/* ========= Estadísticas ========= */
-// NOTE (dashboard-rol, ADR-2): design.md conditionally proposed adding the
-// coordinador global-scope fix here too ("if consumed by the command
-// center"). Grep-verified at apply time: this fetcher has ZERO consumers
-// anywhere in src/ after PR1a deleted its only callers (LazyDashboardStats,
-// DashboardVentasChart, DashboardLotesDonut). The command center's inventory
-// block uses the NEW `getInventarioLotesPorProyecto` (ADR-4) instead — see
-// design.md §2's data-sourcing table. The condition resolves false, so the
-// coordinador fix was intentionally NOT applied here; re-verify before
-// reusing this fetcher for anything else.
-export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> => {
-  const supabase = await createOptimizedServerClient();
-  const userId = await getUserIdOrNull(supabase);
-  if (!userId) return {
-    totalClientes: 0, totalProyectos: 0, totalLotes: 0,
-    lotesVendidos: 0, lotesReservados: 0, lotesDisponibles: 0,
-    ventasMesActual: 0, ventasMesAnterior: 0,
-    clientesNuevosMes: 0, clientesNuevosMesAnterior: 0,
-  };
-
-  const { data: perfil } = await supabase
-    .schema('crm')
-    .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
-    .eq('id', userId)
-    .single();
-
-  const rolData = perfil?.rol as any;
-  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-  const esAdmin = rolNombre === 'ROL_ADMIN';
-  const esGerente = rolNombre === 'ROL_GERENTE';
-  const username = perfil?.username;
-
-  // Fechas para tendencias
-  const ahora = new Date();
-  const inicioMesActual = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
-  const inicioMesAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1).toISOString();
-  const finMesAnterior = new Date(ahora.getFullYear(), ahora.getMonth(), 0, 23, 59, 59).toISOString();
-
-  // Total de clientes según permisos (usa la misma lógica que el dashboard de clientes)
-  const { data: clienteMetrics, error: clienteMetricsError } = await supabase
-    .schema('crm')
-    .rpc('obtener_metricas_dashboard_clientes', {
-      p_usuario_id: userId,
-      p_es_admin: esAdmin,
-      p_es_gerente: esGerente,
-      p_username: username ?? null,
-    })
-    .single();
-
-  let totalClientes = (clienteMetrics as any)?.total ?? 0;
-
-  // Fallback: si la RPC falla, contar manualmente usando la vista accesible para vendedores
-  if (clienteMetricsError) {
-    console.error('Error obteniendo total de clientes vía RPC:', clienteMetricsError);
-
-    const usarVistaAccesible = !esAdmin && !esGerente && username;
-    const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
-
-    let clientesQuery = supabase.schema('crm').from(tablaClientes).select('id', { count: 'exact', head: true });
-
-    if (usarVistaAccesible) {
-      clientesQuery = clientesQuery.eq('usuario_id', userId);
-    } else if (!esAdmin && !esGerente && username) {
-      clientesQuery = clientesQuery.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
-    }
-
-    const { count, error } = await clientesQuery;
-    if (error) {
-      console.error('Error obteniendo total de clientes (fallback):', error);
-    } else if (typeof count === 'number') {
-      totalClientes = count;
-    }
-  }
-
-  const [pRes, lRes, lotesEstados, ventasMesActualRes, ventasMesAnteriorRes, clientesNuevosMesRes, clientesNuevosMesAnteriorRes] = await Promise.all([
-    supabase.schema('crm').from("proyecto").select("*", { count: "exact", head: true }),
-    supabase.schema('crm').from("lote").select("*", { count: "exact", head: true }),
-    // Lotes por estado (global)
-    supabase.schema('crm').from("lote").select("estado"),
-    // Ventas mes actual
-    supabase.schema('crm').from("venta").select("id", { count: "exact", head: true })
-      .eq("estado", "finalizada")
-      .gte("fecha_venta", inicioMesActual),
-    // Ventas mes anterior
-    supabase.schema('crm').from("venta").select("id", { count: "exact", head: true })
-      .eq("estado", "finalizada")
-      .gte("fecha_venta", inicioMesAnterior)
-      .lte("fecha_venta", finMesAnterior),
-    // Clientes nuevos mes actual
-    supabase.schema('crm').from("cliente").select("id", { count: "exact", head: true })
-      .gte("created_at", inicioMesActual),
-    // Clientes nuevos mes anterior
-    supabase.schema('crm').from("cliente").select("id", { count: "exact", head: true })
-      .gte("created_at", inicioMesAnterior)
-      .lte("created_at", finMesAnterior),
-  ]);
-
-  const lotes = (lotesEstados.data ?? []) as { estado: string }[];
-  const lotesVendidos = lotes.filter(l => l.estado === 'vendido').length;
-  const lotesReservados = lotes.filter(l => l.estado === 'reservado').length;
-  const lotesDisponibles = lotes.filter(l => l.estado === 'disponible').length;
-
-  return {
-    totalClientes,
-    totalProyectos: pRes.count ?? 0,
-    totalLotes: lRes.count ?? 0,
-    lotesVendidos,
-    lotesReservados,
-    lotesDisponibles,
-    ventasMesActual: ventasMesActualRes.count ?? 0,
-    ventasMesAnterior: ventasMesAnteriorRes.count ?? 0,
-    clientesNuevosMes: clientesNuevosMesRes.count ?? 0,
-    clientesNuevosMesAnterior: clientesNuevosMesAnteriorRes.count ?? 0,
-  };
-});
-
 /* ========= Un proyecto ========= */
 export const getCachedProyecto = cache(async (proyectoId: string): Promise<ProyectoCached | null> => {
   const supabase = await createOptimizedServerClient();
@@ -891,48 +722,6 @@ export const getCachedNotificacionesCount = cache(async (): Promise<number> => {
 
   if (error) throw error;
   return count ?? 0;
-});
-
-/* ========= Ventas mensuales (últimos 6 meses) ========= */
-export const getCachedVentasMensuales = cache(async (): Promise<Record<string, number>> => {
-  const supabase = await createOptimizedServerClient();
-  const userId = await getUserIdOrNull(supabase);
-  if (!userId) return {};
-
-  const ahora = new Date();
-  const hace6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1).toISOString();
-
-  const { data, error } = await supabase
-    .schema('crm')
-    .from('venta')
-    .select('fecha_venta')
-    .eq('estado', 'finalizada')
-    .gte('fecha_venta', hace6Meses)
-    .order('fecha_venta', { ascending: true });
-
-  if (error) {
-    console.error('Error obteniendo ventas mensuales:', error);
-    return {};
-  }
-
-  // Inicializar los 6 meses con 0
-  const resultado: Record<string, number> = {};
-  for (let i = 5; i >= 0; i--) {
-    const fecha = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
-    const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-    resultado[key] = 0;
-  }
-
-  // Agrupar ventas por mes
-  for (const venta of (data ?? []) as { fecha_venta: string }[]) {
-    const fecha = new Date(venta.fecha_venta);
-    const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-    if (key in resultado) {
-      resultado[key] += 1;
-    }
-  }
-
-  return resultado;
 });
 
 /* ========= Funnel de clientes por estado ========= */
