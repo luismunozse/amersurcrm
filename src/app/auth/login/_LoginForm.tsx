@@ -326,7 +326,7 @@ export default function LoginForm() {
         resetSensitiveData();
         setAttempts(0);
         void reportLoginAttempt(true);
-        router.replace("/dashboard/vendedor");
+        router.replace("/dashboard");
       }
     } catch (error) {
       console.error("Error inesperado durante el login:", error);
