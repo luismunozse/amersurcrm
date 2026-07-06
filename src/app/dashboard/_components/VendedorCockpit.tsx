@@ -1,10 +1,16 @@
 import { Suspense } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { SeguimientosHoy } from "@/components/SeguimientosHoy";
+import { CobranzaAlertasPropias } from "./CobranzaAlertasPropias";
+import { CobranzaAlertasPropiasSkeleton } from "./CobranzaAlertasPropias.Skeleton";
+import { LeadsSinContactar } from "./LeadsSinContactar";
+import { LeadsSinContactarSkeleton } from "./LeadsSinContactar.Skeleton";
+import { MetaDelMes } from "./MetaDelMes";
+import { MetaDelMesSkeleton } from "./MetaDelMes.Skeleton";
 
 function SeguimientosHoySkeleton() {
   return (
-    <Card className="animate-pulse">
+    <Card className="animate-pulse h-full">
       <CardContent className="space-y-4 p-6">
         <div className="h-5 w-40 rounded bg-crm-border" />
         {[...Array(4)].map((_, i) => (
@@ -24,16 +30,33 @@ function SeguimientosHoySkeleton() {
 /**
  * Vendedor cockpit — "¿qué hago hoy?" (design.md §1, §4).
  *
- * PR1a scope: only `SeguimientosHoy` survives the home rewrite so far — it is
- * the sole widget kept from the old page. PR1b adds `CobranzaAlertasPropias`,
- * `LeadsSinContactar` and `MetaDelMes` around it, each in its own `Suspense`.
+ * Row 1 (above the fold): `SeguimientosHoy` leads (left, tallest — the
+ * answer to the question), with `CobranzaAlertasPropias` and
+ * `LeadsSinContactar` stacked in the right column. Row 2 (below the fold):
+ * `MetaDelMes`. Each block streams independently via its own `Suspense`.
  */
 export function VendedorCockpit() {
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <h1 className="text-2xl font-semibold text-crm-text-primary">¿Qué hago hoy?</h1>
-      <Suspense fallback={<SeguimientosHoySkeleton />}>
-        <SeguimientosHoy />
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
+        <Suspense fallback={<SeguimientosHoySkeleton />}>
+          <SeguimientosHoy />
+        </Suspense>
+
+        <div className="space-y-4">
+          <Suspense fallback={<CobranzaAlertasPropiasSkeleton />}>
+            <CobranzaAlertasPropias />
+          </Suspense>
+          <Suspense fallback={<LeadsSinContactarSkeleton />}>
+            <LeadsSinContactar />
+          </Suspense>
+        </div>
+      </div>
+
+      <Suspense fallback={<MetaDelMesSkeleton />}>
+        <MetaDelMes />
       </Suspense>
     </div>
   );
