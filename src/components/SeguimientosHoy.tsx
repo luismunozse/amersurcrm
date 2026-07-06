@@ -122,11 +122,12 @@ export async function SeguimientosHoy() {
             </Link>
           );
         })}
+        {/* Block-level module link per spec (rows deep-link to the cliente record). */}
         <Link
-          href="/dashboard/clientes"
+          href="/dashboard/pipeline"
           className="flex items-center justify-center gap-1 pt-2 text-xs font-semibold text-crm-primary hover:text-crm-primary/80 transition"
         >
-          Ver todos los clientes
+          Ver pipeline de acciones
           <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
         </Link>
       </CardContent>

@@ -25,7 +25,7 @@ Above the fold, scoped to the caller's own clients (`created_by`/`vendedor_usern
 #### Scenario: Due/overdue sourced from the interaction date
 - GIVEN the caller owns a cliente with `fecha_proxima_accion` today or past
 - WHEN the cockpit loads
-- THEN it appears in block (a), linked to `/dashboard/pipeline`
+- THEN it appears in block (a); the block's module link points to `/dashboard/pipeline` (individual rows deep-link to the cliente record)
 
 #### Scenario: Uncontacted-leads block excludes other vendedores
 - GIVEN a `por_contactar` cliente owned by another vendedor
