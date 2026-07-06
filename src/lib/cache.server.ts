@@ -716,6 +716,15 @@ export const getCachedLotes = cache(async (proyectoId: string): Promise<LoteCach
 });
 
 /* ========= Estadísticas ========= */
+// NOTE (dashboard-rol, ADR-2): design.md conditionally proposed adding the
+// coordinador global-scope fix here too ("if consumed by the command
+// center"). Grep-verified at apply time: this fetcher has ZERO consumers
+// anywhere in src/ after PR1a deleted its only callers (LazyDashboardStats,
+// DashboardVentasChart, DashboardLotesDonut). The command center's inventory
+// block uses the NEW `getInventarioLotesPorProyecto` (ADR-4) instead — see
+// design.md §2's data-sourcing table. The condition resolves false, so the
+// coordinador fix was intentionally NOT applied here; re-verify before
+// reusing this fetcher for anything else.
 export const getCachedDashboardStats = cache(async (): Promise<DashboardStats> => {
   const supabase = await createOptimizedServerClient();
   const userId = await getUserIdOrNull(supabase);
@@ -943,12 +952,17 @@ export const getCachedFunnelClientes = cache(async (): Promise<Record<string, nu
   const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
   const esAdmin = rolNombre === 'ROL_ADMIN';
   const esGerente = rolNombre === 'ROL_GERENTE';
+  // ADR-2 (dashboard-rol): ROL_COORDINADOR_VENTAS has global visibility per
+  // crm.es_visibilidad_global() — getCachedPipelineClientes and
+  // sidebar-badges already treat coordinador as global. This fetcher backs
+  // the command-center funnel block, so it must match.
+  const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
   const username = perfil?.username;
 
   let query = supabase.schema('crm').from('cliente').select('estado_cliente');
 
   // Vendedores solo ven sus clientes
-  if (!esAdmin && !esGerente && username) {
+  if (!esAdmin && !esGerente && !esCoordinador && username) {
     query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
   }
 
