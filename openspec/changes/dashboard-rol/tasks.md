@@ -51,26 +51,26 @@ Chain strategy: stacked-to-main
 ## PR1b — Vendedor cockpit
 
 ### Phase 4: ADR-7 fetcher bugfix (TDD)
-- [ ] 4.1 RED — `src/__tests__/unit/seguimientos-hoy-fetcher.test.ts`: due/overdue branch queries `cliente_interaccion.fecha_proxima_accion <= endOfToday` (two-step + `Map` merge), not `cliente.proxima_accion`; `SeguimientoHoy` exposes `fecha_proxima_accion` (spec: due/overdue sourced from the interaction date).
-- [ ] 4.2 GREEN — fix `getCachedSeguimientosHoy` in `src/lib/cache.server.ts` (~line 1017); extend `SeguimientoHoy` type with `fecha_proxima_accion: string | null`.
-- [ ] 4.3 RED — extend the test: `getUrgencia` reads `fecha_proxima_accion`, never `new Date(proxima_accion)`.
-- [ ] 4.4 GREEN — update `getUrgencia` in `src/components/SeguimientosHoy.tsx`.
-- [ ] 4.5 PR description task: document that `SeguimientosHoy` now shows real due/overdue data (previously silently broken by a text/date comparison bug) — this is the intended fix, not a regression.
+- [x] 4.1 RED — `src/__tests__/unit/seguimientos-hoy-fetcher.test.ts`: due/overdue branch queries `cliente_interaccion.fecha_proxima_accion <= endOfToday` (two-step + `Map` merge), not `cliente.proxima_accion`; `SeguimientoHoy` exposes `fecha_proxima_accion` (spec: due/overdue sourced from the interaction date).
+- [x] 4.2 GREEN — fix `getCachedSeguimientosHoy` in `src/lib/cache.server.ts` (~line 1017); extend `SeguimientoHoy` type with `fecha_proxima_accion: string | null`.
+- [x] 4.3 RED — extend the test: `getUrgencia` reads `fecha_proxima_accion`, never `new Date(proxima_accion)`.
+- [x] 4.4 GREEN — update `getUrgencia` in `src/components/SeguimientosHoy.tsx` (also exported it, mirroring `_PipelineCard.tsx`'s `getUrgencia`, so it is directly unit-testable).
+- [x] 4.5 PR description task: `SeguimientosHoy` now shows real due/overdue data — previously the due/overdue branch always resolved empty because it compared an ISO date string against `cliente.proxima_accion` (a `VARCHAR(50)` action-label enum) instead of `cliente_interaccion.fecha_proxima_accion`. This is a bugfix, not a behavior regression; vendedores may now see more items in "Seguimientos de hoy" than before.
 
 ### Phase 5: Cockpit helpers (TDD)
-- [ ] 5.1 RED — `src/__tests__/unit/dashboard-meta.test.ts`: month-goal progress-% helper (0%, mid-range, >100% clamp).
-- [ ] 5.2 GREEN — implement `src/lib/dashboard/meta.ts`.
-- [ ] 5.3 Implement `src/lib/dashboard/scope.server.ts` (`getPerfilRol()` wrapped in `React.cache`).
+- [x] 5.1 RED — `src/__tests__/unit/dashboard-meta.test.ts`: month-goal progress-% helper (0%, mid-range, >100% clamp).
+- [x] 5.2 GREEN — implement `src/lib/dashboard/meta.ts`.
+- [x] 5.3 Implement `src/lib/dashboard/scope.server.ts` (`getPerfilRol()` wrapped in `React.cache`). Added `src/__tests__/unit/dashboard-scope.test.ts` (RED→GREEN) even though the task text didn't spell out a RED step, to keep Strict TDD evidence honest for this new shared helper — also verifies it closes the coordinador gap for future (PR2) consumers, per the spec's role-scope invariant. Not yet wired into any PR1b consumer (none of the reused cockpit fetchers need `esGlobal`); it is forward-looking infra for PR2's command-center fetchers per design ADR-1.
 
 ### Phase 6: Vendedor blocks
-- [ ] 6.1 `src/app/dashboard/_components/CobranzaAlertasPropias.tsx` + `.Skeleton.tsx`: wraps `obtenerAlertasCobranza()`, count + top overdue cuotas, empty state "Sin cobranzas vencidas", links `/dashboard/cobranza?tab=alertas`.
-- [ ] 6.2 `src/app/dashboard/_components/LeadsSinContactar.tsx` + `.Skeleton.tsx`: wraps `getCachedClientes({mode:'dashboard', estado:'por_contactar', pageSize:6, withTotal:true})`, empty state, links `/dashboard/clientes` (spec: uncontacted-leads block excludes other vendedores).
-- [ ] 6.3 `src/app/dashboard/_components/MetaDelMes.tsx` + `.Skeleton.tsx`: wraps `obtenerKPIs({periodoAnio, periodoMes})` + `meta.ts` helper, below the fold.
-- [ ] 6.4 `src/app/dashboard/_components/VendedorCockpit.tsx`: composes `<SeguimientosHoy/>` + the two above-fold blocks + `<MetaDelMes/>` below fold, each in its own `<Suspense>`.
+- [x] 6.1 `src/app/dashboard/_components/CobranzaAlertasPropias.tsx` + `.Skeleton.tsx`: wraps `obtenerAlertasCobranza()`, count + top overdue cuotas, empty state "Sin cobranzas vencidas", links `/dashboard/cobranza?tab=alertas`.
+- [x] 6.2 `src/app/dashboard/_components/LeadsSinContactar.tsx` + `.Skeleton.tsx`: wraps `getCachedClientes({mode:'dashboard', estado:'por_contactar', pageSize:6, withTotal:true})`, empty state, links `/dashboard/clientes` (spec: uncontacted-leads block excludes other vendedores). Deviation: design's visual-hierarchy prose suggested a "Ver pipeline" CTA label for this block, which would mismatch its own `/dashboard/clientes` href (and the spec's explicit link table); used "Ver todos los leads" → `/dashboard/clientes` instead so label and destination agree.
+- [x] 6.3 `src/app/dashboard/_components/MetaDelMes.tsx` + `.Skeleton.tsx`: wraps `obtenerKPIs({periodoAnio, periodoMes})` + `meta.ts` helper, below the fold. Links to `/dashboard/vendedor/reportes` ("Mis Reportes", the vendedor's own reports page that already surfaces `metaMensual`/`progreso`) rather than `/dashboard/admin/metas`, which sits under the Administración nav group and is not vendedor-accessible.
+- [x] 6.4 `src/app/dashboard/_components/VendedorCockpit.tsx`: composes `<SeguimientosHoy/>` + the two above-fold blocks + `<MetaDelMes/>` below fold, each in its own `<Suspense>`. Widened the container to `max-w-5xl` with a 2-up `lg:grid-cols-[1.4fr_1fr]` row for above-the-fold content (was `max-w-2xl` single column in the PR1a placeholder, which only hosted one block).
 
 ### Phase 7: Gates
-- [ ] 7.1 `npx vitest run src/__tests__/unit/dashboard-meta.test.ts src/__tests__/unit/seguimientos-hoy-fetcher.test.ts`.
-- [ ] 7.2 `npx tsc --noEmit` clean for the PR1b diff.
+- [x] 7.1 `npx vitest run src/__tests__/unit/dashboard-meta.test.ts src/__tests__/unit/seguimientos-hoy-fetcher.test.ts` — also ran `dashboard-scope.test.ts` and `dashboard-composition.test.ts` (PR1a) together: 22/22 passed.
+- [x] 7.2 `npx tsc --noEmit` clean for the PR1b diff.
 
 ---
 
