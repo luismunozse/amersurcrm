@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CRMApiClient, saveCRMConfig, getCRMConfig } from '@/lib/api';
+import { CRMApiClient, getCRMConfig } from '@/lib/api';
 import { InlineAlert } from './InlineAlert';
 
 // URL de producción por defecto
@@ -52,10 +52,8 @@ export function LoginForm({ onLogin, sessionExpired = false }: LoginFormProps) {
 
     try {
       const client = new CRMApiClient(crmUrl);
+      // login() ya persiste tokens (incluido el refresh token) y crmUrl
       const authState = await client.login(username, password);
-
-      // Guardar configuración
-      await saveCRMConfig(crmUrl, authState.token!);
 
       // Notificar login exitoso
       onLogin(crmUrl, authState.token!);

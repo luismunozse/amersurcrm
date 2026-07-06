@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
-import { CRMApiClient, getCRMConfig } from '@/lib/api';
+import { CRMApiClient, getCRMConfig, clearCRMConfig } from '@/lib/api';
 import { LoginForm } from './LoginForm';
 import { ContactInfo } from './ContactInfo';
 import { CreateLeadForm } from './CreateLeadForm';
@@ -224,6 +224,9 @@ export function Sidebar() {
   }
 
   async function handleLogout() {
+    // Ahora que los tokens persisten en local storage, hay que borrarlos
+    // explícitamente o el próximo mount re-autentica solo
+    await clearCRMConfig();
     setIsAuthenticated(false);
     setApiClient(null);
     setContact(null);

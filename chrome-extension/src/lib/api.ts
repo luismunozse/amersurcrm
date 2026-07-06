@@ -176,8 +176,7 @@ export class CRMApiClient {
         return false;
       }
 
-      const storage = getSecureStorage();
-      const stored = await storage.get(['refreshToken']);
+      const stored = await getTokenStorage().get(['refreshToken']);
       const localStored = await chrome.storage.local.get(['crmUrl']);
 
       if (!stored.refreshToken) {
@@ -231,11 +230,11 @@ export class CRMApiClient {
         hasRefreshToken: !!response.refreshToken,
       });
 
-      // Guardar tokens en session storage (se borra al cerrar navegador)
+      // Guardar tokens en local storage (persisten entre reinicios del navegador)
       if (typeof chrome !== 'undefined' && chrome.storage) {
         await saveTokens(response.token, response.refreshToken || null);
         await chrome.storage.local.set({ crmUrl: this.baseUrl });
-        logger.debug('Tokens guardados en session storage');
+        logger.debug('Tokens guardados en local storage');
       }
 
       // Actualizar token en el cliente
@@ -477,16 +476,11 @@ export class CRMApiClient {
 }
 
 // ─── Storage helpers ──────────────────────────────────────────────────
-// Tokens sensibles van en session storage (se borra al cerrar navegador).
-// crmUrl va en local storage (no es sensible, conviene que persista).
+// Tokens van en local storage para que la sesión sobreviva reinicios del
+// navegador (mismo nivel de persistencia que las cookies del CRM web).
+// El refresh token de Supabase renueva el access token mientras se use.
 
-/**
- * Retorna chrome.storage.session si disponible, sino fallback a local.
- */
-function getSecureStorage(): chrome.storage.StorageArea {
-  if (typeof chrome !== 'undefined' && chrome.storage?.session) {
-    return chrome.storage.session;
-  }
+function getTokenStorage(): chrome.storage.StorageArea {
   return chrome.storage.local;
 }
 
@@ -494,7 +488,7 @@ function getSecureStorage(): chrome.storage.StorageArea {
  * Guardar tokens en storage seguro
  */
 async function saveTokens(token: string, refreshToken: string | null): Promise<void> {
-  const storage = getSecureStorage();
+  const storage = getTokenStorage();
   return new Promise((resolve) => {
     storage.set({ authToken: token, refreshToken: refreshToken }, () => resolve());
   });
@@ -504,55 +498,43 @@ async function saveTokens(token: string, refreshToken: string | null): Promise<v
  * Obtener configuración de CRM desde storage
  */
 export async function getCRMConfig(): Promise<{ url: string; token: string | null }> {
-  const storage = getSecureStorage();
+  const result = await new Promise<any>((resolve) =>
+    chrome.storage.local.get(['crmUrl', 'authToken'], resolve)
+  );
 
-  // crmUrl está en local, tokens en session
-  const [localResult, secureResult] = await Promise.all([
-    new Promise<any>((resolve) => chrome.storage.local.get(['crmUrl'], resolve)),
-    new Promise<any>((resolve) => storage.get(['authToken'], resolve)),
-  ]);
-
-  // Migración: si hay token en local pero no en session, migrar
-  if (!secureResult.authToken && storage !== chrome.storage.local) {
+  // Migración: versiones previas guardaban tokens en session storage.
+  // Si no hay token en local pero sí en session, moverlo a local.
+  if (!result.authToken && chrome.storage.session) {
     const legacy = await new Promise<any>((resolve) =>
-      chrome.storage.local.get(['authToken', 'refreshToken'], resolve)
+      chrome.storage.session.get(['authToken', 'refreshToken'], resolve)
     );
     if (legacy.authToken) {
       await saveTokens(legacy.authToken, legacy.refreshToken || null);
-      chrome.storage.local.remove(['authToken', 'refreshToken']);
+      chrome.storage.session.remove(['authToken', 'refreshToken']);
       return {
-        url: localResult.crmUrl || 'https://crm.amersursac.com',
+        url: result.crmUrl || 'https://crm.amersursac.com',
         token: legacy.authToken,
       };
     }
   }
 
   return {
-    url: localResult.crmUrl || 'https://crm.amersursac.com',
-    token: secureResult.authToken || null,
+    url: result.crmUrl || 'https://crm.amersursac.com',
+    token: result.authToken || null,
   };
-}
-
-/**
- * Guardar configuración de CRM en storage
- */
-export async function saveCRMConfig(url: string, token: string): Promise<void> {
-  await saveTokens(token, null);
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ crmUrl: url }, () => resolve());
-  });
 }
 
 /**
  * Limpiar configuración de CRM (logout)
  */
 export async function clearCRMConfig(): Promise<void> {
-  const storage = getSecureStorage();
-  await new Promise<void>((resolve) => {
-    storage.remove(['authToken', 'refreshToken'], () => resolve());
-  });
-  // Limpiar legacy tokens de local si quedaron
   await new Promise<void>((resolve) => {
     chrome.storage.local.remove(['authToken', 'refreshToken', 'lastLogin'], () => resolve());
   });
+  // Limpiar tokens legacy de session storage si quedaron
+  if (chrome.storage.session) {
+    await new Promise<void>((resolve) => {
+      chrome.storage.session.remove(['authToken', 'refreshToken'], () => resolve());
+    });
+  }
 }
