@@ -213,11 +213,13 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
               </div>
             )}
 
-            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                📆 Registrado: {new Date(cliente.created_at).toLocaleDateString('es-PE')}
-              </span>
-            </div>
+            {cliente.created_at && (
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  📆 Registrado: {new Date(cliente.created_at).toLocaleDateString('es-PE')}
+                </span>
+              </div>
+            )}
 
             {(() => {
               const { mensajeInicial, notasAdicionales } = parseNotasCliente(cliente.notas);
