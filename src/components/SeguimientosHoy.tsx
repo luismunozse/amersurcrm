@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ClipboardCheck, Check, User, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription } from "@/components/ui/Card";
 import { getCachedSeguimientosHoy } from "@/lib/cache.server";
 import type { SeguimientoHoy } from "@/lib/cache.server";
 import { differenceInCalendarDays } from "date-fns";
@@ -36,6 +36,16 @@ export function getUrgencia(cliente: SeguimientoHoy): { label: string; color: st
   return { label: `${dias}d sin contacto`, color: dias >= 7 ? "text-crm-danger" : "text-crm-warning" };
 }
 
+// Presentation-only helper: maps `getUrgencia().color` (a text-color class,
+// asserted verbatim by unit tests) to a matching tinted chip background.
+// Never touches the color string itself, so existing `toContain` assertions
+// on `urgencia.color` stay valid.
+function urgenciaChipBg(color: string): string {
+  if (color.includes("crm-danger")) return "bg-crm-danger/10";
+  if (color.includes("crm-warning")) return "bg-crm-warning/10";
+  return "bg-crm-border/60";
+}
+
 export async function SeguimientosHoy() {
   let seguimientos: SeguimientoHoy[];
   try {
@@ -44,14 +54,14 @@ export async function SeguimientosHoy() {
     console.error("Error cargando seguimientos de hoy:", error);
     return (
       <Card variant="elevated" className="h-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-crm-text-primary">
-            <ClipboardCheck className="w-5 h-5 text-crm-primary" aria-hidden="true" />
-            Seguimientos de hoy
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">No se pudo cargar esta sección. Intente nuevamente.</p>
+        <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <ClipboardCheck className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">No se pudo cargar esta sección</p>
+            <p className="mt-1 text-xs text-crm-text-muted">Intente nuevamente en unos momentos.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -60,19 +70,13 @@ export async function SeguimientosHoy() {
   if (seguimientos.length === 0) {
     return (
       <Card variant="elevated" className="h-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-crm-text-primary">
-            <ClipboardCheck className="w-5 h-5 text-crm-primary" aria-hidden="true" />
-            Seguimientos de hoy
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="rounded-full bg-crm-success/10 p-3 mb-3">
-              <Check className="w-6 h-6 text-crm-success" aria-hidden="true" />
-            </div>
-            <p className="text-sm font-medium text-crm-text-primary">Todo al día</p>
-            <p className="text-xs text-crm-text-muted mt-1">No hay seguimientos pendientes</p>
+        <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 py-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-crm-success/10 text-crm-success">
+            <Check className="h-7 w-7" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-crm-text-primary">Todo al día</p>
+            <p className="mt-1 text-sm text-crm-text-muted">No hay seguimientos pendientes por hoy</p>
           </div>
         </CardContent>
       </Card>
@@ -81,51 +85,61 @@ export async function SeguimientosHoy() {
 
   return (
     <Card variant="elevated" className="h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-crm-text-primary">
-            <ClipboardCheck className="w-5 h-5 text-crm-primary" aria-hidden="true" />
-            Seguimientos de hoy
-          </CardTitle>
-          <span className="rounded-full bg-crm-danger/10 px-2.5 py-0.5 text-xs font-semibold text-crm-danger">
-            {seguimientos.length}
-          </span>
+      <CardContent className="space-y-5 p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-crm-primary/10 text-crm-primary">
+              <ClipboardCheck className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-3xl font-bold leading-none tabular-nums text-crm-text-primary">
+                {seguimientos.length}
+              </p>
+              <p className="mt-1.5 text-xs font-medium text-crm-text-muted">Seguimientos de hoy</p>
+            </div>
+          </div>
+          <CardDescription className="hidden text-sm sm:block">
+            Clientes que necesitan su atención hoy
+          </CardDescription>
         </div>
-        <CardDescription className="text-sm">Clientes que necesitan tu atención hoy</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {seguimientos.map((cliente) => {
-          const urgencia = getUrgencia(cliente);
-          return (
-            <Link
-              key={cliente.id}
-              href={`/dashboard/clientes/${cliente.id}`}
-              className="flex items-center gap-3 rounded-xl border border-crm-border/60 bg-crm-card p-3 transition hover:border-crm-primary/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-crm-primary/10 text-crm-primary">
-                <User className="w-4 h-4" aria-hidden="true" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-crm-text-primary truncate">{cliente.nombre}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${estadoColors[cliente.estado_cliente] ?? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`}>
-                    {estadoLabels[cliente.estado_cliente] ?? cliente.estado_cliente}
-                  </span>
-                  {cliente.telefono && (
-                    <span className="text-[11px] text-crm-text-muted truncate">{cliente.telefono}</span>
-                  )}
+
+        <div className="space-y-2">
+          {seguimientos.map((cliente) => {
+            const urgencia = getUrgencia(cliente);
+            return (
+              <Link
+                key={cliente.id}
+                href={`/dashboard/clientes/${cliente.id}`}
+                className="flex items-center gap-3 rounded-xl border border-crm-border/60 bg-crm-card p-3 transition-[border-color,box-shadow] duration-200 ease-out-strong hover:border-crm-primary/40 hover:shadow-crm active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-crm-primary/40"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-crm-primary/10 text-crm-primary">
+                  <User className="w-4 h-4" aria-hidden="true" />
                 </div>
-              </div>
-              <span className={`text-xs whitespace-nowrap ${urgencia.color}`}>
-                {urgencia.label}
-              </span>
-            </Link>
-          );
-        })}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-crm-text-primary truncate">{cliente.nombre}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${estadoColors[cliente.estado_cliente] ?? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`}>
+                      {estadoLabels[cliente.estado_cliente] ?? cliente.estado_cliente}
+                    </span>
+                    {cliente.telefono && (
+                      <span className="text-[11px] text-crm-text-muted truncate">{cliente.telefono}</span>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${urgencia.color} ${urgenciaChipBg(urgencia.color)}`}
+                >
+                  {urgencia.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
         {/* Block-level module link per spec (rows deep-link to the cliente record). */}
         <Link
           href="/dashboard/pipeline"
-          className="flex items-center justify-center gap-1 pt-2 text-xs font-semibold text-crm-primary hover:text-crm-primary/80 transition"
+          className="flex items-center justify-center gap-1 pt-1 text-xs font-semibold text-crm-primary transition-colors hover:text-crm-primary/80"
         >
           Ver pipeline de acciones
           <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />

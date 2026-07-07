@@ -1,13 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { isAgingLead, AGING_THRESHOLD_DAYS } from "@/lib/dashboard/aging";
+import { isAgingLead, AGING_THRESHOLD_DAYS, AGING_WINDOW_DAYS } from "@/lib/dashboard/aging";
 
 const NOW = new Date("2026-07-05T12:00:00.000Z");
 
-function cliente(overrides: Partial<{ estado_cliente: string; ultimo_contacto: string | null }> = {}) {
+function cliente(
+  overrides: Partial<{
+    estado_cliente: string;
+    ultimo_contacto: string | null;
+    fecha_alta: string | null;
+  }> = {},
+) {
   return {
     id: "c1",
     estado_cliente: "contactado",
     ultimo_contacto: null,
+    // Recent by default so pre-existing scenarios below (which don't care
+    // about the creation-date window) stay inside it.
+    fecha_alta: NOW.toISOString(),
     ...overrides,
   };
 }
@@ -15,6 +24,12 @@ function cliente(overrides: Partial<{ estado_cliente: string; ultimo_contacto: s
 describe("AGING_THRESHOLD_DAYS", () => {
   it("is 3 days (user-ratified threshold)", () => {
     expect(AGING_THRESHOLD_DAYS).toBe(3);
+  });
+});
+
+describe("AGING_WINDOW_DAYS", () => {
+  it("is 90 days (user-ratified recency window, mirrors the cobranza 90-day standing-cap decision)", () => {
+    expect(AGING_WINDOW_DAYS).toBe(90);
   });
 });
 
@@ -74,5 +89,30 @@ describe("isAgingLead", () => {
     const cincoDiasAtras = new Date(NOW.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
     expect(isAgingLead(cliente({ ultimo_contacto: cincoDiasAtras }), false, NOW, 7)).toBe(false);
     expect(isAgingLead(cliente({ ultimo_contacto: cincoDiasAtras }), false, NOW, 3)).toBe(true);
+  });
+
+  it("counts a lead created 89 days ago as a candidate when other conditions hold (inside the 90-day window)", () => {
+    const hace89Dias = new Date(NOW.getTime() - 89 * 24 * 60 * 60 * 1000).toISOString();
+    const resultado = isAgingLead(cliente({ fecha_alta: hace89Dias, ultimo_contacto: null }), false, NOW);
+    expect(resultado).toBe(true);
+  });
+
+  it("excludes a lead created 91 days ago regardless of other conditions (outside the 90-day window)", () => {
+    const hace91Dias = new Date(NOW.getTime() - 91 * 24 * 60 * 60 * 1000).toISOString();
+    // Otherwise-qualifying: no future action, null ultimo_contacto — only the
+    // creation-date window should be the reason this is excluded.
+    const resultado = isAgingLead(cliente({ fecha_alta: hace91Dias, ultimo_contacto: null }), false, NOW);
+    expect(resultado).toBe(false);
+  });
+
+  it("excludes a lead with a null fecha_alta (cannot confirm it's within the 90-day window — conservative default)", () => {
+    const resultado = isAgingLead(cliente({ fecha_alta: null, ultimo_contacto: null }), false, NOW);
+    expect(resultado).toBe(false);
+  });
+
+  it("respects a custom window override", () => {
+    const hace40Dias = new Date(NOW.getTime() - 40 * 24 * 60 * 60 * 1000).toISOString();
+    expect(isAgingLead(cliente({ fecha_alta: hace40Dias, ultimo_contacto: null }), false, NOW, AGING_THRESHOLD_DAYS, 30)).toBe(false);
+    expect(isAgingLead(cliente({ fecha_alta: hace40Dias, ultimo_contacto: null }), false, NOW, AGING_THRESHOLD_DAYS, 90)).toBe(true);
   });
 });

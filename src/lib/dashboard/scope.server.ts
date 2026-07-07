@@ -4,6 +4,7 @@ import { createOptimizedServerClient, getCachedUserId } from "@/lib/supabase.ser
 
 export type PerfilRol = {
   username: string | null;
+  nombreCompleto: string | null;
   rolNombre: string | null;
   esAdmin: boolean;
   esGerente: boolean;
@@ -14,6 +15,7 @@ export type PerfilRol = {
 
 const PERFIL_NEUTRO: PerfilRol = {
   username: null,
+  nombreCompleto: null,
   rolNombre: null,
   esAdmin: false,
   esGerente: false,
@@ -40,7 +42,7 @@ export const getPerfilRol = cache(async (): Promise<PerfilRol> => {
   const { data: perfil } = await supabase
     .schema('crm')
     .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+    .select('username, nombre_completo, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
     .eq('id', userId)
     .single();
 
@@ -54,6 +56,7 @@ export const getPerfilRol = cache(async (): Promise<PerfilRol> => {
 
   return {
     username: perfil.username ?? null,
+    nombreCompleto: perfil.nombre_completo ?? null,
     rolNombre,
     esAdmin,
     esGerente,

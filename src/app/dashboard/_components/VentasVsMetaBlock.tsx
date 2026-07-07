@@ -1,5 +1,5 @@
 import { Target, TrendingDown, TrendingUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { obtenerKPIs } from "@/app/dashboard/admin/metas/_actions-metas";
 import { calcularProgresoMeta, calcularDeltaMensual, calcularPeriodoAnterior } from "@/lib/dashboard/meta";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
@@ -38,14 +38,14 @@ export async function VentasVsMetaBlock() {
     console.error("Error cargando ventas vs. meta:", error);
     return (
       <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-            <Target className="h-4 w-4 text-crm-primary" aria-hidden="true" />
-            Ventas vs. meta del mes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">No se pudo cargar esta sección. Intente nuevamente.</p>
+        <CardContent className="flex items-center gap-3 p-6">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <Target className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">No se pudo cargar esta sección</p>
+            <p className="text-xs text-crm-text-muted">Intente nuevamente en unos momentos.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -59,15 +59,15 @@ export async function VentasVsMetaBlock() {
 
   if (actual.length === 0 || metaMonto <= 0) {
     return (
-      <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-            <Target className="h-4 w-4 text-crm-primary" aria-hidden="true" />
-            Ventas vs. meta del mes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">Aún no hay metas asignadas este mes.</p>
+      <Card variant="elevated" className="flex h-full flex-col">
+        <CardContent className="flex flex-1 items-center gap-3 p-6">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-crm-primary/10 text-crm-primary">
+            <Target className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">Aún no hay metas asignadas</p>
+            <p className="text-xs text-crm-text-muted">Asigne metas mensuales para ver el avance aquí.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -77,24 +77,29 @@ export async function VentasVsMetaBlock() {
   const delta = calcularDeltaMensual(realMonto, realMontoAnterior);
 
   return (
-    <Card variant="elevated">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-          <Target className="h-4 w-4 text-crm-primary" aria-hidden="true" />
-          Ventas vs. meta del mes
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-2xl font-semibold text-crm-text-primary">{formatearMoneda(realMonto, "PEN")}</span>
-          <span className="text-xs text-crm-text-muted">de {formatearMoneda(metaMonto, "PEN")}</span>
+    <Card variant="elevated" className="flex h-full flex-col">
+      <CardContent className="flex-1 space-y-4 p-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-crm-primary/10 text-crm-primary">
+            <Target className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-3xl font-bold leading-none tabular-nums text-crm-text-primary">
+              {formatearMoneda(realMonto, "PEN")}
+            </p>
+            <p className="mt-1.5 text-xs font-medium text-crm-text-muted">
+              Ventas del mes · de {formatearMoneda(metaMonto, "PEN")}
+            </p>
+          </div>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-crm-border">
+
+        <div className="h-3 w-full overflow-hidden rounded-full bg-crm-border">
           <div
-            className="h-full rounded-full bg-crm-primary transition-[width] duration-200 ease-out-strong"
+            className="h-full rounded-full bg-gradient-to-r from-crm-primary to-crm-primary-hover transition-[width] duration-300 ease-out-strong"
             style={{ width: `${progreso}%` }}
           />
         </div>
+
         <div className="flex items-center justify-between text-xs text-crm-text-muted">
           <span>
             {progreso}% de la meta · {realCantidad}/{metaCantidad} unidades

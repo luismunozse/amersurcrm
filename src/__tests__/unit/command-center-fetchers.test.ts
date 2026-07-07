@@ -33,7 +33,11 @@ import {
   getAgingLeads,
   getInventarioLotesPorProyecto,
   getAlertasSinGestionarCount,
+  getResumenGeneral,
+  getVentasMensuales,
+  ROLES_VENDEDOR_ACTIVOS,
 } from "@/lib/dashboard/command-center.server";
+import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
 
 function clienteRow(id: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -41,6 +45,9 @@ function clienteRow(id: string, overrides: Record<string, unknown> = {}) {
     nombre: `Cliente ${id}`,
     estado_cliente: "contactado",
     ultimo_contacto: null,
+    // Recent by default so the fix-2 creation-date window never filters out
+    // rows in tests that aren't specifically exercising it.
+    fecha_alta: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -51,6 +58,9 @@ beforeEach(() => {
   delete chains.cliente_interaccion;
   delete chains.lote;
   delete chains.alerta_cobranza;
+  delete chains.proyecto;
+  delete chains.venta;
+  delete chains.usuario_perfil;
 });
 
 afterEach(() => {
@@ -82,6 +92,49 @@ describe("getAgingLeads", () => {
     expect(chains.cliente.or).toHaveBeenCalledWith(
       "ultimo_contacto.is.null,ultimo_contacto.lte.2026-07-02T12:00:00.000Z",
     );
+    // Fix 2: only clientes created in the last 90 days are aging candidates.
+    expect(chains.cliente.gte).toHaveBeenCalledWith("fecha_alta", "2026-04-06T12:00:00.000Z");
+  });
+
+  it("excludes bulk-imported clientes never contacted from the aging candidate pool (data-provenance fix)", async () => {
+    chains.cliente = createChainMock({ data: [], error: null });
+    chains.cliente_interaccion = createChainMock({ data: [], error: null });
+
+    await getAgingLeads(true);
+
+    expect(chains.cliente.or).toHaveBeenCalledWith(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO);
+  });
+
+  it("applies the imported-never-contacted exclusion identically to the candidate query and the at-cap head-count query (data-provenance fix — count-parity)", async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => clienteRow(`c${i + 1}`));
+    chains.cliente = createChainMock({ data: rows, count: 537, error: null });
+    chains.cliente_interaccion = createChainMock({ data: [], error: null });
+
+    await getAgingLeads(true);
+
+    const exclusionCalls = chains.cliente.or.mock.calls.filter(
+      ([filtro]: [string]) => filtro === EXCLUIR_IMPORTACION_NUNCA_CONTACTADO,
+    );
+    expect(exclusionCalls).toHaveLength(2);
+  });
+
+  it("uses the exact same fecha_alta cutoff for the candidate query and the at-cap head-count query (fix 2 — count-parity)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-05T12:00:00.000Z"));
+
+    const rows = Array.from({ length: 200 }, (_, i) => clienteRow(`c${i + 1}`));
+    // Same shared chain backs both the candidate list query and the at-cap
+    // head-count query issued against 'cliente' (see the fix-2 test below) —
+    // its .gte mock therefore records calls from BOTH queries.
+    chains.cliente = createChainMock({ data: rows, count: 537, error: null });
+    chains.cliente_interaccion = createChainMock({ data: [], error: null });
+
+    await getAgingLeads(true);
+
+    const cutoffCalls = chains.cliente.gte.mock.calls.filter(([campo]: [string]) => campo === "fecha_alta");
+    expect(cutoffCalls).toHaveLength(2);
+    expect(cutoffCalls[0][1]).toBe("2026-04-06T12:00:00.000Z");
+    expect(cutoffCalls[1][1]).toBe(cutoffCalls[0][1]);
   });
 
   it("short-circuits without querying cliente_interaccion when there are no candidates", async () => {
@@ -249,5 +302,134 @@ describe("getAlertasSinGestionarCount", () => {
     const resultado = await getAlertasSinGestionarCount(true);
 
     expect(resultado).toBe(0);
+  });
+});
+
+describe("getResumenGeneral", () => {
+  it("returns a zeroed default without querying anything when esGlobal is false", async () => {
+    const resultado = await getResumenGeneral(false);
+
+    expect(resultado).toEqual({
+      clientesNuevosMes: 0,
+      clientesTotales: 0,
+      proyectosActivos: 0,
+      lotesTotales: 0,
+      lotesPctDisponible: 0,
+      lotesPctVendido: 0,
+      vendedoresActivos: 0,
+    });
+    expect(mockSupabase.schema).not.toHaveBeenCalled();
+  });
+
+  it("counts clientes nuevos by fecha_alta (not created_at), clientes totales, proyectos activos, and reuses lote totals", async () => {
+    chains.cliente = createChainMock({ data: null, error: null, count: 12 });
+    chains.proyecto = createChainMock({ data: null, error: null, count: 3 });
+    chains.lote = createChainMock({
+      data: [
+        { proyecto_id: "p1", estado: "disponible", proyecto: { nombre: "Proyecto Uno" } },
+        { proyecto_id: "p1", estado: "vendido", proyecto: { nombre: "Proyecto Uno" } },
+      ],
+      error: null,
+    });
+    chains.usuario_perfil = createChainMock({ data: null, error: null, count: 5 });
+
+    const resultado = await getResumenGeneral(true);
+
+    expect(chains.cliente.gte).toHaveBeenCalledWith("fecha_alta", expect.any(String));
+    expect(chains.cliente.gte).not.toHaveBeenCalledWith("created_at", expect.anything());
+    expect(chains.proyecto.eq).toHaveBeenCalledWith("estado", "activo");
+    expect(resultado.clientesNuevosMes).toBe(12);
+    expect(resultado.clientesTotales).toBe(12);
+    expect(resultado.proyectosActivos).toBe(3);
+    // Reused from getInventarioLotesPorProyecto's totales, not a second query.
+    expect(resultado.lotesTotales).toBe(2);
+    expect(resultado.lotesPctDisponible).toBe(50);
+    expect(resultado.lotesPctVendido).toBe(50);
+  });
+
+  it("falls back to 0 for a field whose query errors, without zeroing the others", async () => {
+    chains.cliente = createChainMock({ data: null, error: new Error("boom"), count: null });
+    chains.proyecto = createChainMock({ data: null, error: null, count: 3 });
+    chains.lote = createChainMock({ data: [], error: null });
+    chains.usuario_perfil = createChainMock({ data: null, error: null, count: 5 });
+
+    const resultado = await getResumenGeneral(true);
+
+    expect(resultado.clientesNuevosMes).toBe(0);
+    expect(resultado.clientesTotales).toBe(0);
+    expect(resultado.proyectosActivos).toBe(3);
+  });
+
+  it("counts only active usuario_perfil rows with rol ROL_VENDEDOR or ROL_COORDINADOR_VENTAS", async () => {
+    chains.cliente = createChainMock({ data: null, error: null, count: 0 });
+    chains.proyecto = createChainMock({ data: null, error: null, count: 0 });
+    chains.lote = createChainMock({ data: [], error: null });
+    chains.usuario_perfil = createChainMock({ data: null, error: null, count: 7 });
+
+    const resultado = await getResumenGeneral(true);
+
+    expect(chains.usuario_perfil.eq).toHaveBeenCalledWith("activo", true);
+    expect(chains.usuario_perfil.in).toHaveBeenCalledWith("rol.nombre", ROLES_VENDEDOR_ACTIVOS);
+    // Without !inner the rol filter would narrow only the embedded object,
+    // not the parent head-count — the join hint IS the query's correctness.
+    expect(chains.usuario_perfil.select).toHaveBeenCalledWith(
+      expect.stringContaining("!inner"),
+      expect.objectContaining({ count: "exact", head: true }),
+    );
+    expect(resultado.vendedoresActivos).toBe(7);
+  });
+
+  it("falls back to 0 vendedoresActivos when that query errors, without breaking the rest of the resumen", async () => {
+    chains.cliente = createChainMock({ data: null, error: null, count: 12 });
+    chains.proyecto = createChainMock({ data: null, error: null, count: 3 });
+    chains.lote = createChainMock({ data: [], error: null });
+    chains.usuario_perfil = createChainMock({ data: null, error: new Error("boom"), count: null });
+
+    const resultado = await getResumenGeneral(true);
+
+    expect(resultado.vendedoresActivos).toBe(0);
+    expect(resultado.clientesNuevosMes).toBe(12);
+    expect(resultado.proyectosActivos).toBe(3);
+  });
+});
+
+describe("getVentasMensuales", () => {
+  it("returns an empty object without querying when esGlobal is false", async () => {
+    const resultado = await getVentasMensuales(false);
+
+    expect(resultado).toEqual({});
+    expect(mockSupabase.schema).not.toHaveBeenCalled();
+  });
+
+  it("groups finalizada ventas into zero-padded YYYY-MM buckets for the last 6 months", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T12:00:00.000Z"));
+
+    chains.venta = createChainMock({
+      data: [
+        { fecha_venta: "2026-07-05T12:00:00.000Z" },
+        { fecha_venta: "2026-07-20T12:00:00.000Z" },
+        { fecha_venta: "2026-05-10T12:00:00.000Z" },
+      ],
+      error: null,
+    });
+
+    const resultado = await getVentasMensuales(true);
+
+    expect(chains.venta.eq).toHaveBeenCalledWith("estado", "finalizada");
+    expect(Object.keys(resultado)).toEqual([
+      "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07",
+    ]);
+    expect(resultado["2026-07"]).toBe(2);
+    expect(resultado["2026-05"]).toBe(1);
+    expect(resultado["2026-02"]).toBe(0);
+  });
+
+  it("returns an empty object when the query errors", async () => {
+    chains.venta = createChainMock({ data: null, error: new Error("boom") });
+
+    const resultado = await getVentasMensuales(true);
+
+    expect(resultado).toEqual({});
   });
 });

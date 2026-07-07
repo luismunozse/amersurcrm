@@ -7,6 +7,7 @@ import type {
   LoteCached,
   NotificacionNoLeida,
 } from "@/types/crm";
+import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
 
 // DEPRECATED: Usar getCachedUserId() directamente en su lugar
 // Mantener por compatibilidad temporal
@@ -725,6 +726,14 @@ export const getCachedNotificacionesCount = cache(async (): Promise<number> => {
 });
 
 /* ========= Funnel de clientes por estado ========= */
+
+// Displayed stage set for the command-center funnel block (unchanged by the
+// fix-1 rewrite below — verified against the pre-existing implementation,
+// not the full 8-value `estado_cliente` CHECK constraint). `en_proceso` and
+// `propietario` (added by 20260512000000_estado_propietario.sql) are
+// intentionally NOT part of this funnel's displayed distribution.
+const ESTADOS_FUNNEL = ['por_contactar', 'contactado', 'intermedio', 'potencial', 'desestimado', 'transferido'] as const;
+
 export const getCachedFunnelClientes = cache(async (): Promise<Record<string, number>> => {
   const supabase = await createOptimizedServerClient();
   const userId = await getUserIdOrNull(supabase);
@@ -746,39 +755,101 @@ export const getCachedFunnelClientes = cache(async (): Promise<Record<string, nu
   // sidebar-badges already treat coordinador as global. This fetcher backs
   // the command-center funnel block, so it must match.
   const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
+  const esPrivilegiado = esAdmin || esGerente || esCoordinador;
   const username = perfil?.username;
 
-  let query = supabase.schema('crm').from('cliente').select('estado_cliente');
+  // Fix 1: per-estado head-count queries instead of a bulk row fetch grouped
+  // in JS. PostgREST silently caps result sets at ~1000 rows, so on a large
+  // production DB the old bulk fetch under-reported the true per-estado
+  // totals. One `count: 'exact', head: true` query per estado avoids that
+  // cap entirely; the queries run in parallel (bounded — one per estado, not
+  // per-cliente).
+  const conteos = await Promise.all(
+    ESTADOS_FUNNEL.map(async (estado) => {
+      let query = supabase
+        .schema('crm')
+        .from('cliente')
+        .select('id', { count: 'exact', head: true })
+        .eq('estado_cliente', estado);
 
-  // Vendedores solo ven sus clientes
-  if (!esAdmin && !esGerente && !esCoordinador && username) {
+      // Data-provenance fix: bulk imports stamp `origen_lead = 'importacion'`
+      // and their `fecha_alta` is the import date, not a real "entered the
+      // funnel" event — without this exclusion, ~22k imported contacts sit
+      // in 'por_contactar' forever and swamp the funnel distribution for
+      // EVERY role (not just non-privileged ones), so this runs unconditionally,
+      // unlike the ownership `.or()` below. Chaining a second `.or()` ANDs it
+      // with the ownership filter (postgrest-js appends a new `or=` search
+      // param per call; PostgREST ANDs distinct query params together).
+      query = query.or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO);
+
+      // Vendedores solo ven sus clientes — same own-scope predicate as
+      // before, now applied to EVERY per-estado query (not once to a single
+      // bulk fetch).
+      if (!esPrivilegiado && username) {
+        query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+      }
+
+      const { count, error } = await query;
+      if (error) {
+        console.error(`Error obteniendo conteo de funnel para estado ${estado}:`, error);
+        return [estado, 0] as const;
+      }
+      return [estado, count ?? 0] as const;
+    }),
+  );
+
+  return Object.fromEntries(conteos);
+});
+
+/**
+ * Count of bulk-imported clientes that have NEVER been contacted — the exact
+ * complement of `EXCLUIR_IMPORTACION_NUNCA_CONTACTADO` above (the predicate
+ * the funnel and aging counters use to filter these rows OUT). Product
+ * decision: the imported backlog is "stock", not "flow" — it must be
+ * surfaced as its own quiet stat instead of being buried inside the funnel
+ * distribution. Once a row gets a real `ultimo_contacto`, it drops out of
+ * this count and naturally re-enters the funnel/aging metrics — no separate
+ * "un-flag" step needed.
+ */
+export const getCachedImportadosSinTrabajar = cache(async (): Promise<number> => {
+  const supabase = await createOptimizedServerClient();
+  const userId = await getUserIdOrNull(supabase);
+  if (!userId) return 0;
+
+  const { data: perfil } = await supabase
+    .schema('crm')
+    .from('usuario_perfil')
+    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
+    .eq('id', userId)
+    .single();
+
+  const rolData = perfil?.rol as any;
+  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+  const esAdmin = rolNombre === 'ROL_ADMIN';
+  const esGerente = rolNombre === 'ROL_GERENTE';
+  const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
+  const esPrivilegiado = esAdmin || esGerente || esCoordinador;
+  const username = perfil?.username;
+
+  let query = supabase
+    .schema('crm')
+    .from('cliente')
+    .select('id', { count: 'exact', head: true })
+    .eq('origen_lead', 'importacion')
+    .is('ultimo_contacto', null);
+
+  // Vendedores solo ven su propio backlog importado — same own-scope
+  // predicate as getCachedFunnelClientes.
+  if (!esPrivilegiado && username) {
     query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
   }
 
-  const { data, error } = await query;
-
+  const { count, error } = await query;
   if (error) {
-    console.error('Error obteniendo funnel de clientes:', error);
-    return {};
+    console.error('Error obteniendo conteo de importados sin trabajar:', error);
+    return 0;
   }
-
-  const funnel: Record<string, number> = {
-    por_contactar: 0,
-    contactado: 0,
-    intermedio: 0,
-    potencial: 0,
-    desestimado: 0,
-    transferido: 0,
-  };
-
-  for (const cliente of (data ?? []) as { estado_cliente: string }[]) {
-    const estado = cliente.estado_cliente || 'por_contactar';
-    if (estado in funnel) {
-      funnel[estado] += 1;
-    }
-  }
-
-  return funnel;
+  return count ?? 0;
 });
 
 /* ========= Seguimientos del día ========= */

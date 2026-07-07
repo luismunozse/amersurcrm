@@ -1,7 +1,13 @@
 import "server-only";
 import { cache } from "react";
 import { createOptimizedServerClient } from "@/lib/supabase.server";
-import { isAgingLead, AGING_THRESHOLD_DAYS, type AgingClienteInput } from "./aging";
+import {
+  isAgingLead,
+  AGING_THRESHOLD_DAYS,
+  AGING_WINDOW_DAYS,
+  EXCLUIR_IMPORTACION_NUNCA_CONTACTADO,
+  type AgingClienteInput,
+} from "./aging";
 
 /**
  * Command-center data layer (design.md §2 "New fetchers — explicit flags").
@@ -70,17 +76,35 @@ export const getAgingLeads = cache(
     const supabase = await createOptimizedServerClient();
     const now = new Date();
     const umbral = new Date(now.getTime() - AGING_THRESHOLD_DAYS * 24 * 60 * 60 * 1000);
+    // Fix 2: only clientes created within the last AGING_WINDOW_DAYS days are
+    // actionable aging candidates (aging.ts's doc comment has the full WHY —
+    // legacy/historical clients pre-dating the window aren't actionable,
+    // mirroring the cobranza 90-day standing-cap decision). Computed ONCE and
+    // reused by BOTH the candidate query below and the at-cap head-count
+    // query further down — mirrors the existing own-scope `.or()` predicate
+    // that's already duplicated between those two queries; don't add a
+    // second independent copy of this filter too.
+    const cutoffFechaAlta = new Date(now.getTime() - AGING_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-    // Step 1: candidate clientes by state + stale/null ultimo_contacto.
-    // PostgREST has no NOT EXISTS, so the future-action exclusion (step 2)
-    // runs as a separate query — same two-step pattern as
+    // Step 1: candidate clientes by state + stale/null ultimo_contacto +
+    // recency window. PostgREST has no NOT EXISTS, so the future-action
+    // exclusion (step 2) runs as a separate query — same two-step pattern as
     // getCachedPipelineClientes / getCachedSeguimientosHoy (ADR-3, design.md).
     const { data: candidatos, error: errorCandidatos } = await supabase
       .schema('crm')
       .from('cliente')
-      .select('id, nombre, estado_cliente, ultimo_contacto')
+      .select('id, nombre, estado_cliente, ultimo_contacto, fecha_alta')
       .not('estado_cliente', 'in', ESTADOS_EXCLUIDOS_SQL)
       .or(`ultimo_contacto.is.null,ultimo_contacto.lte.${umbral.toISOString()}`)
+      // Data-provenance fix: bulk imports stamp `origen_lead = 'importacion'`
+      // with `fecha_alta` set to the import date, so the AGING_WINDOW_DAYS
+      // cutoff above cannot tell a stale-but-recently-imported cliente from
+      // a genuinely fresh, never-worked lead — without this, ~22k imported
+      // contacts would dominate the aging-leads count. Excluding a shared
+      // constant (not a locally re-derived string) keeps this query and the
+      // at-cap head-count query below in lockstep, same as cutoffFechaAlta.
+      .or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO)
+      .gte('fecha_alta', cutoffFechaAlta)
       .order('ultimo_contacto', { ascending: true, nullsFirst: true })
       .limit(AGING_CANDIDATE_LIMIT);
 
@@ -146,7 +170,12 @@ export const getAgingLeads = cache(
       .from('cliente')
       .select('id', { count: 'exact', head: true })
       .not('estado_cliente', 'in', ESTADOS_EXCLUIDOS_SQL)
-      .or(`ultimo_contacto.is.null,ultimo_contacto.lte.${umbral.toISOString()}`);
+      .or(`ultimo_contacto.is.null,ultimo_contacto.lte.${umbral.toISOString()}`)
+      // Count-parity: same shared exclusion constant as the candidate query
+      // above — an inexact upper-bound count must never be wider than what
+      // the visible candidate pool already reflects.
+      .or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO)
+      .gte('fecha_alta', cutoffFechaAlta);
 
     if (errorCount || totalCandidatos == null) {
       console.error('Error obteniendo conteo total de candidatos aging:', errorCount);
@@ -307,5 +336,156 @@ export const getAlertasSinGestionarCount = cache(
     }
 
     return count ?? 0;
+  },
+);
+
+/* ========= Resumen general (KPI tiles) ========= */
+
+export type ResumenGeneral = {
+  clientesNuevosMes: number;
+  clientesTotales: number;
+  proyectosActivos: number;
+  lotesTotales: number;
+  lotesPctDisponible: number;
+  lotesPctVendido: number;
+  vendedoresActivos: number;
+};
+
+const RESUMEN_GENERAL_VACIO: ResumenGeneral = {
+  clientesNuevosMes: 0,
+  clientesTotales: 0,
+  proyectosActivos: 0,
+  lotesTotales: 0,
+  lotesPctDisponible: 0,
+  lotesPctVendido: 0,
+  vendedoresActivos: 0,
+};
+
+// Roles counted as "vendedores activos" for the KPI tile — front-line sales
+// (ROL_VENDEDOR) plus their coordinator (ROL_COORDINADOR_VENTAS), who also
+// carries an individual sales quota. ROL_ADMIN/ROL_GERENTE are excluded,
+// they don't sell.
+export const ROLES_VENDEDOR_ACTIVOS = ['ROL_VENDEDOR', 'ROL_COORDINADOR_VENTAS'] as const;
+
+export const getResumenGeneral = cache(
+  async (esGlobal: boolean): Promise<ResumenGeneral> => {
+    if (!esGlobal) return RESUMEN_GENERAL_VACIO;
+
+    const supabase = await createOptimizedServerClient();
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
+
+    const [clientesNuevosRes, clientesTotalesRes, proyectosActivosRes, inventario, vendedoresActivosRes] = await Promise.all([
+      // "Clientes nuevos este mes" uses `cliente.fecha_alta`, NOT `created_at`.
+      // `fecha_alta` (added by 2025-09-14_060_clientes_mejorados, DEFAULT NOW())
+      // is the column every CURRENT reportes fetcher treats as "cuándo entró
+      // el lead" — see funnel.ts:45 (`cliente` filters on `fecha_alta`) vs :54
+      // (`reserva`, a different table, still keys off `created_at`), and
+      // clientes-etapa-funnel.ts's "leads captados" step. The deleted
+      // DashboardStats.tsx (git show 7d5cf39~1) queried `cliente.created_at`,
+      // which predates `fecha_alta` and would silently disagree with every
+      // other report's "nuevos" count — not reused here on purpose.
+      supabase
+        .schema('crm')
+        .from('cliente')
+        .select('id', { count: 'exact', head: true })
+        .gte('fecha_alta', inicioMes),
+      supabase.schema('crm').from('cliente').select('id', { count: 'exact', head: true }),
+      supabase
+        .schema('crm')
+        .from('proyecto')
+        .select('id', { count: 'exact', head: true })
+        .eq('estado', 'activo'),
+      // Reuse getInventarioLotesPorProyecto's already-computed totals instead
+      // of running a second full `lote` scan — React.cache dedupes this call
+      // against InventarioLotesBlock's/LotesDonutBlock's own call to the same
+      // fetcher within the same request (same primitive `esGlobal` arg).
+      getInventarioLotesPorProyecto(esGlobal),
+      // Head-count of active vendedores/coordinador — PostgREST can filter a
+      // head-count on an embedded column, but only when the embed is declared
+      // `!inner` (same mechanism as ALERTA_SIN_GESTIONAR_SELECT above); without
+      // it, `.in('rol.nombre', ...)` would silently narrow only the nested
+      // `rol` object, not exclude non-matching `usuario_perfil` rows from the
+      // count. `usuario_perfil` is small (tens of rows), so this single
+      // head-count query is cheap — no need to fetch rows and filter in JS.
+      supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('id, rol:rol!usuario_perfil_rol_id_fkey!inner(nombre)', { count: 'exact', head: true })
+        .eq('activo', true)
+        .in('rol.nombre', ROLES_VENDEDOR_ACTIVOS),
+    ]);
+
+    if (clientesNuevosRes.error) {
+      console.error('Error obteniendo clientes nuevos del mes:', clientesNuevosRes.error);
+    }
+    if (clientesTotalesRes.error) {
+      console.error('Error obteniendo total de clientes:', clientesTotalesRes.error);
+    }
+    if (proyectosActivosRes.error) {
+      console.error('Error obteniendo proyectos activos:', proyectosActivosRes.error);
+    }
+    if (vendedoresActivosRes.error) {
+      console.error('Error obteniendo vendedores activos:', vendedoresActivosRes.error);
+    }
+
+    return {
+      clientesNuevosMes: clientesNuevosRes.count ?? 0,
+      clientesTotales: clientesTotalesRes.count ?? 0,
+      proyectosActivos: proyectosActivosRes.count ?? 0,
+      lotesTotales: inventario.totales.total,
+      lotesPctDisponible: pct(inventario.totales.disponible, inventario.totales.total),
+      lotesPctVendido: inventario.totales.pctVendido,
+      vendedoresActivos: vendedoresActivosRes.count ?? 0,
+    };
+  },
+);
+
+/* ========= Ventas mensuales (últimos 6 meses) ========= */
+
+export type VentasMensuales = Record<string, number>;
+
+export const getVentasMensuales = cache(
+  async (esGlobal: boolean): Promise<VentasMensuales> => {
+    if (!esGlobal) return {};
+
+    const supabase = await createOptimizedServerClient();
+    const ahora = new Date();
+    const hace6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1).toISOString();
+
+    const { data, error } = await supabase
+      .schema('crm')
+      .from('venta')
+      .select('fecha_venta')
+      .eq('estado', 'finalizada')
+      .gte('fecha_venta', hace6Meses)
+      .order('fecha_venta', { ascending: true });
+
+    if (error) {
+      console.error('Error obteniendo ventas mensuales:', error);
+      return {};
+    }
+
+    // Keys MUST be zero-padded "YYYY-MM" — `_VentasMensualesChart`'s
+    // `formatearMes()` splits the key on '-' to render month labels.
+    // `toLocaleDateString('es-PE', ...)` (as `reportes/page.tsx` uses) would
+    // break that split — verified at implementation time it renders "7/2026"
+    // (slash-separated, unpadded), not "2026-07".
+    const resultado: VentasMensuales = {};
+    for (let i = 5; i >= 0; i--) {
+      const fecha = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+      const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      resultado[key] = 0;
+    }
+
+    for (const venta of (data ?? []) as { fecha_venta: string }[]) {
+      const fecha = new Date(venta.fecha_venta);
+      const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      if (key in resultado) {
+        resultado[key] += 1;
+      }
+    }
+
+    return resultado;
   },
 );

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Target } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { obtenerKPIs } from "@/app/dashboard/admin/metas/_actions-metas";
 import { calcularProgresoMeta } from "@/lib/dashboard/meta";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
@@ -20,14 +20,14 @@ export async function MetaDelMes() {
     console.error("Error cargando meta del mes:", error);
     return (
       <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-            <Target className="h-4 w-4 text-crm-primary" aria-hidden="true" />
-            Meta del mes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">No se pudo cargar esta sección. Intente nuevamente.</p>
+        <CardContent className="flex items-center gap-3 p-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <Target className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">No se pudo cargar esta sección</p>
+            <p className="text-xs text-crm-text-muted">Intente nuevamente en unos momentos.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -39,14 +39,14 @@ export async function MetaDelMes() {
   if (kpis.length === 0 || metaVentasMonto <= 0) {
     return (
       <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-            <Target className="h-4 w-4 text-crm-primary" aria-hidden="true" />
-            Meta del mes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">Aún no tiene una meta asignada este mes.</p>
+        <CardContent className="flex items-center gap-3 p-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-crm-primary/10 text-crm-primary">
+            <Target className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">Aún no tiene una meta asignada</p>
+            <p className="text-xs text-crm-text-muted">Su coordinador puede asignarle una meta este mes.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -56,29 +56,37 @@ export async function MetaDelMes() {
 
   return (
     <Card variant="elevated">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-          <Target className="h-4 w-4 text-crm-primary" aria-hidden="true" />
-          Meta del mes
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-lg font-semibold text-crm-text-primary">
-            {formatearMoneda(realVentasMonto, "PEN")}
-          </span>
-          <span className="text-xs text-crm-text-muted">de {formatearMoneda(metaVentasMonto, "PEN")}</span>
+      <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3 sm:shrink-0">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-crm-primary/10 text-crm-primary">
+            <Target className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-3xl font-bold leading-none tabular-nums text-crm-text-primary">{progreso}%</p>
+            <p className="mt-1.5 text-xs font-medium text-crm-text-muted">Meta mensual</p>
+          </div>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-crm-border">
-          <div
-            className="h-full rounded-full bg-crm-primary transition-[width] duration-200 ease-out-strong"
-            style={{ width: `${progreso}%` }}
-          />
+
+        <div className="flex-1 space-y-2">
+          <div className="flex items-baseline justify-between">
+            <span className="text-lg font-semibold tabular-nums text-crm-text-primary">
+              {formatearMoneda(realVentasMonto, "PEN")}
+            </span>
+            <span className="text-xs text-crm-text-muted">
+              de {formatearMoneda(metaVentasMonto, "PEN")}
+            </span>
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-crm-border">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-crm-primary to-crm-primary-hover transition-[width] duration-300 ease-out-strong"
+              style={{ width: `${progreso}%` }}
+            />
+          </div>
         </div>
-        <p className="text-xs text-crm-text-muted">{progreso}% de la meta mensual</p>
+
         <Link
           href="/dashboard/vendedor/reportes"
-          className="inline-block text-xs font-semibold text-crm-primary transition-colors hover:text-crm-primary/80"
+          className="inline-block shrink-0 text-xs font-semibold text-crm-primary transition-colors hover:text-crm-primary/80 sm:self-center"
         >
           Ver mis reportes
         </Link>

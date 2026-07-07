@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { obtenerResumenCobranza } from "@/app/dashboard/cobranza/_actions-cobranza";
 import { getAlertasSinGestionarCount } from "@/lib/dashboard/command-center.server";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
@@ -39,11 +39,14 @@ export async function MoraAlertasBlock({ esGlobal }: MoraAlertasBlockProps) {
     console.error("Error cargando mora y alertas sin gestionar:", error);
     return (
       <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-crm-text-primary">Mora y alertas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">No se pudo cargar esta sección. Intente nuevamente.</p>
+        <CardContent className="flex items-center gap-3 p-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">No se pudo cargar esta sección</p>
+            <p className="text-xs text-crm-text-muted">Intente nuevamente en unos momentos.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -53,14 +56,14 @@ export async function MoraAlertasBlock({ esGlobal }: MoraAlertasBlockProps) {
 
   if (sinPendientes) {
     return (
-      <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-crm-text-primary">Mora y alertas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 py-1 text-sm font-medium text-crm-success">
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-            Sin mora pendiente
+      <Card variant="elevated" className="flex h-full flex-col">
+        <CardContent className="flex flex-1 items-center gap-3 p-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-crm-success/10 text-crm-success">
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">Sin mora pendiente</p>
+            <p className="text-xs text-crm-text-muted">Las cuotas de sus clientes están al día.</p>
           </div>
         </CardContent>
       </Card>
@@ -68,23 +71,24 @@ export async function MoraAlertasBlock({ esGlobal }: MoraAlertasBlockProps) {
   }
 
   return (
-    <Card variant="elevated">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-          <AlertTriangle className="h-4 w-4 text-crm-danger" aria-hidden="true" />
-          Mora y alertas
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-2xl font-bold text-crm-danger">
-            {formatearMoneda(resumen.monto_mora_total, "PEN")}
-          </span>
-          <span className="text-xs text-crm-text-muted">{resumen.en_mora} cuotas en mora</span>
+    <Card variant="elevated" className="flex h-full flex-col border-l-4 border-l-crm-danger/70">
+      <CardContent className="flex flex-1 flex-col gap-4 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-3xl font-bold leading-none tabular-nums text-crm-danger">
+              {formatearMoneda(resumen.monto_mora_total, "PEN")}
+            </p>
+            <p className="mt-1.5 text-xs font-medium text-crm-text-muted">
+              Mora total · {resumen.en_mora} cuotas
+            </p>
+          </div>
         </div>
         <Link
           href="/dashboard/cobranza?tab=alertas"
-          className="flex items-center justify-between gap-2 rounded-lg border border-crm-border/60 bg-crm-card px-3 py-2 text-sm transition-colors hover:border-crm-primary/40"
+          className="mt-auto flex items-center justify-between gap-2 rounded-lg border border-crm-border/60 bg-crm-card px-3 py-2 text-sm transition-colors hover:border-crm-primary/40"
         >
           <span className="text-crm-text-primary">{alertasSinGestionar} alertas sin gestionar</span>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-crm-text-muted" aria-hidden="true" />

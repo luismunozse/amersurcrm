@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription } from "@/components/ui/Card";
 import { obtenerAlertasCobranza } from "@/app/dashboard/cobranza/_actions-cobranza";
 import { formatearMoneda, type Moneda } from "@/lib/types/crm-flujo";
 
@@ -32,11 +32,14 @@ export async function CobranzaAlertasPropias() {
     console.error("Error cargando alertas de cobranza:", error);
     return (
       <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-crm-text-primary">Alertas de cobranza</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-crm-text-muted">No se pudo cargar esta sección. Intente nuevamente.</p>
+        <CardContent className="flex items-center gap-3 p-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">No se pudo cargar esta sección</p>
+            <p className="text-xs text-crm-text-muted">Intente nuevamente en unos momentos.</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -53,13 +56,13 @@ export async function CobranzaAlertasPropias() {
   if (pendientes.length === 0) {
     return (
       <Card variant="elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-crm-text-primary">Alertas de cobranza</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 py-1 text-sm font-medium text-crm-success">
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-            Sin cobranzas vencidas
+        <CardContent className="flex items-center gap-3 p-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-crm-success/10 text-crm-success">
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-crm-text-primary">Sin cobranzas vencidas</p>
+            <p className="text-xs text-crm-text-muted">Sus cuotas propias están al día.</p>
           </div>
         </CardContent>
       </Card>
@@ -69,36 +72,38 @@ export async function CobranzaAlertasPropias() {
   const top = pendientes.slice(0, 3);
 
   return (
-    <Card variant="elevated">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-crm-text-primary">
-            <AlertTriangle className="h-4 w-4 text-crm-danger" aria-hidden="true" />
-            Alertas de cobranza
-          </CardTitle>
-          <span className="rounded-full bg-crm-danger/10 px-2.5 py-0.5 text-xs font-semibold text-crm-danger">
-            {pendientes.length}
-          </span>
+    <Card variant="elevated" className="border-l-4 border-l-crm-danger/70">
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-crm-danger/10 text-crm-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-3xl font-bold leading-none tabular-nums text-crm-text-primary">
+              {pendientes.length}
+            </p>
+            <p className="mt-1.5 text-xs font-medium text-crm-text-muted">Alertas de cobranza</p>
+          </div>
         </div>
         <CardDescription className="text-xs">Cuotas propias pendientes de gestión</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {top.map((alerta) => {
-          const cliente = alerta.cuota?.venta?.cliente;
-          return (
-            <div
-              key={alerta.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-crm-border/60 bg-crm-card px-3 py-2 text-sm"
-            >
-              <span className="truncate text-crm-text-primary">{cliente?.nombre ?? "Cliente"}</span>
-              {alerta.cuota && (
-                <span className="whitespace-nowrap text-xs font-medium text-crm-text-muted">
-                  {formatearMoneda(alerta.cuota.monto_programado, alerta.cuota.moneda as Moneda)}
-                </span>
-              )}
-            </div>
-          );
-        })}
+        <div className="space-y-2">
+          {top.map((alerta) => {
+            const cliente = alerta.cuota?.venta?.cliente;
+            return (
+              <div
+                key={alerta.id}
+                className="flex items-center justify-between gap-2 rounded-lg border border-crm-border/60 bg-crm-card px-3 py-2 text-sm"
+              >
+                <span className="truncate text-crm-text-primary">{cliente?.nombre ?? "Cliente"}</span>
+                {alerta.cuota && (
+                  <span className="whitespace-nowrap text-xs font-medium text-crm-text-muted">
+                    {formatearMoneda(alerta.cuota.monto_programado, alerta.cuota.moneda as Moneda)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
         <Link
           href="/dashboard/cobranza?tab=alertas"
           className="flex items-center justify-center gap-1 pt-1 text-xs font-semibold text-crm-primary transition-colors hover:text-crm-primary/80"
