@@ -56,6 +56,7 @@ vi.mock("@/lib/supabase.server", () => ({
 
 vi.mock("@/lib/permissions/server", () => ({
   esAdmin: vi.fn().mockResolvedValue(true),
+  esGerente: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/utils/username-generator", () => ({
@@ -74,13 +75,14 @@ vi.mock("@/lib/auditoria-usuarios", () => ({
 
 // Import after mocks
 import { GET, POST, PATCH } from "@/app/api/admin/usuarios/route";
-import { esAdmin } from "@/lib/permissions/server";
+import { esAdmin, esGerente } from "@/lib/permissions/server";
 
 describe("GET /api/admin/usuarios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetUser.mockResolvedValue({ data: { user: { id: "admin-1", email: "admin@test.com" } } });
     (esAdmin as any).mockResolvedValue(true);
+    (esGerente as any).mockResolvedValue(false);
 
     const chain = createChainMock({ data: [], error: null, count: 0 });
     chain.range.mockResolvedValue({ data: [], error: null, count: 0 });
@@ -100,8 +102,9 @@ describe("GET /api/admin/usuarios", () => {
     expect(body.error).toBe("No autorizado");
   });
 
-  it("retorna 403 si el usuario no es admin", async () => {
+  it("retorna 403 si el usuario no es admin ni gerente", async () => {
     (esAdmin as any).mockResolvedValue(false);
+    (esGerente as any).mockResolvedValue(false);
 
     const req = new NextRequest("http://localhost:3000/api/admin/usuarios");
     const res = await GET(req);
@@ -109,6 +112,30 @@ describe("GET /api/admin/usuarios", () => {
 
     expect(res.status).toBe(403);
     expect(body.error).toContain("permisos");
+  });
+
+  it("permite a ROL_GERENTE ver la lista de usuarios (solo lectura)", async () => {
+    (esAdmin as any).mockResolvedValue(false);
+    (esGerente as any).mockResolvedValue(true);
+
+    const req = new NextRequest("http://localhost:3000/api/admin/usuarios");
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+  });
+
+  it("bloquea a ROL_GERENTE del historial de cambios (exclusivo de admin)", async () => {
+    (esAdmin as any).mockResolvedValue(false);
+    (esGerente as any).mockResolvedValue(true);
+
+    const req = new NextRequest("http://localhost:3000/api/admin/usuarios?historial=user-456");
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toContain("administrador");
   });
 
   it("parsea correctamente los parámetros de paginación", async () => {

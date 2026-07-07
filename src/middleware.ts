@@ -32,8 +32,15 @@ function clearSupabaseAuthCookies(req: NextRequest, res: NextResponse) {
 }
 
 export async function middleware(req: NextRequest) {
+  // Reenvía el pathname como header de request para que Server Components
+  // (p. ej. src/app/dashboard/admin/layout.tsx) puedan aplicar reglas de
+  // acceso específicas por segmento de ruta sin necesidad de reestructurar
+  // el árbol de carpetas de App Router.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", req.nextUrl.pathname);
+
   const response = NextResponse.next({
-    request: { headers: req.headers },
+    request: { headers: requestHeaders },
   });
 
   // ── Refrescar sesión de Supabase en cada request ──

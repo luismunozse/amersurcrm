@@ -22,7 +22,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import { PERMISOS } from "@/lib/permissions";
 import { ProtectedAction } from "@/components/permissions";
 import UserEditModal from "@/components/UserEditModal";
 import EstadoUsuarioModal from "@/components/EstadoUsuarioModal";
@@ -396,7 +395,7 @@ function GestionUsuarios() {
               variant="secondary"
             />
             {/* Import */}
-            <ProtectedAction permiso={PERMISOS.USUARIOS.CREAR}>
+            <ProtectedAction rol="ROL_ADMIN">
               <button
                 onClick={() => setImportModalOpen(true)}
                 className="px-4 py-2 rounded-lg text-sm font-medium border border-crm-border text-crm-text-primary hover:bg-crm-hover transition-colors flex items-center space-x-2"
@@ -405,15 +404,18 @@ function GestionUsuarios() {
                 <span>Importar CSV</span>
               </button>
             </ProtectedAction>
-            <a
-              href="/dashboard/admin/vendedores-activos"
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-crm-border text-crm-text-primary hover:bg-crm-hover transition-colors flex items-center space-x-2"
-              title="Configurar vendedores para asignación automática de leads"
-            >
-              <UsersIcon className="w-4 h-4" />
-              <span>Asignación automática de leads</span>
-            </a>
-            <ProtectedAction permiso={PERMISOS.USUARIOS.CREAR}>
+            {/* Destination page is admin-only (layout gate) — hide for gerente. */}
+            <ProtectedAction rol="ROL_ADMIN">
+              <a
+                href="/dashboard/admin/vendedores-activos"
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-crm-border text-crm-text-primary hover:bg-crm-hover transition-colors flex items-center space-x-2"
+                title="Configurar vendedores para asignación automática de leads"
+              >
+                <UsersIcon className="w-4 h-4" />
+                <span>Asignación automática de leads</span>
+              </a>
+            </ProtectedAction>
+            <ProtectedAction rol="ROL_ADMIN">
               <button
                 onClick={() => { setMostrarFormulario(true); setMostrarPassword(false); }}
                 className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2"
@@ -685,7 +687,7 @@ function GestionUsuarios() {
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
                           {isDeleted ? (
-                            <ProtectedAction permiso={PERMISOS.USUARIOS.ELIMINAR}>
+                            <ProtectedAction rol="ROL_ADMIN">
                               <button
                                 className="inline-flex items-center justify-center px-3 py-1 text-xs text-green-600 hover:bg-green-50 border border-green-200 rounded-lg transition-colors"
                                 onClick={() => handleRestaurar(usuario)}
@@ -697,25 +699,25 @@ function GestionUsuarios() {
                           ) : (
                             <>
                               {/* Edit */}
-                              <ProtectedAction permiso={PERMISOS.USUARIOS.EDITAR}>
+                              <ProtectedAction rol="ROL_ADMIN">
                                 <button className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors" onClick={() => editarUsuarioPrompt(usuario)} title="Editar">
                                   <PencilIcon className="w-4 h-4" />
                                 </button>
                               </ProtectedAction>
                               {/* History */}
-                              <ProtectedAction permiso={PERMISOS.USUARIOS.EDITAR}>
+                              <ProtectedAction rol="ROL_ADMIN">
                                 <button className="inline-flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors" onClick={() => { setHistorialUser(usuario); setHistorialOpen(true); }} title="Historial de cambios">
                                   <Clock className="w-4 h-4" />
                                 </button>
                               </ProtectedAction>
                               {/* Reset Password */}
-                              <ProtectedAction permiso={PERMISOS.USUARIOS.EDITAR}>
+                              <ProtectedAction rol="ROL_ADMIN">
                                 <button className="inline-flex items-center justify-center w-8 h-8 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors" onClick={() => handleResetPassword(usuario)} title="Resetear contraseña">
                                   <Key className="w-4 h-4" />
                                 </button>
                               </ProtectedAction>
                               {/* Toggle Active */}
-                              <ProtectedAction permiso={PERMISOS.USUARIOS.ACTIVAR_DESACTIVAR}>
+                              <ProtectedAction rol="ROL_ADMIN">
                                 <button className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${usuario.activo ? "text-red-600 hover:text-red-800 hover:bg-red-50" : "text-green-600 hover:text-green-800 hover:bg-green-50"}`} onClick={() => toggleActivo(usuario)} title={usuario.activo ? "Desactivar" : "Activar"}>
                                   {usuario.activo ? (
                                     <EyeOff className="w-4 h-4" />
@@ -725,7 +727,7 @@ function GestionUsuarios() {
                                 </button>
                               </ProtectedAction>
                               {/* Delete */}
-                              <ProtectedAction permiso={PERMISOS.USUARIOS.ELIMINAR}>
+                              <ProtectedAction rol="ROL_ADMIN">
                                 <button className="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors" onClick={() => handleDeleteUser(usuario)} title="Eliminar">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -842,7 +844,11 @@ function GestionUsuarios() {
 }
 
 export default function AdminUsuariosPage() {
-  // El acceso admin ya está protegido por admin/layout.tsx (soloAdmins server-side)
+  // Acceso protegido server-side por admin/layout.tsx: ROL_ADMIN (control total)
+  // y ROL_GERENTE (solo lectura). Todos los controles de mutación de esta
+  // vista (crear, editar, activar/desactivar, resetear password, eliminar,
+  // importar CSV) están gateados con <ProtectedAction rol="ROL_ADMIN">, y las
+  // server actions/API routes que invocan también re-validan esAdmin().
   return (
     <div className="min-h-screen bg-crm-bg-primary">
       <div className="container mx-auto px-4 py-6">

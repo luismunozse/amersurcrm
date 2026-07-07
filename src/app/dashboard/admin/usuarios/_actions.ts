@@ -530,6 +530,10 @@ export async function reasignarClientes(
  * Obtiene el conteo de clientes asignados a un usuario
  */
 export async function contarClientesAsignados(userId: string) {
+  // Server actions are publicly invokable endpoints — without this gate any
+  // authenticated user could enumerate client counts per vendedor.
+  if (!(await esAdmin())) return 0;
+
   const serviceRole = createServiceRoleClient();
 
   const { data: usuario } = await serviceRole

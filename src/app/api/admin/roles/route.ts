@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServerOnlyClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/permissions/server";
+import { esAdmin, esGerente } from "@/lib/permissions/server";
 export const dynamic = 'force-dynamic';
 
-// GET - Obtener lista de roles
+// GET - Obtener lista de roles.
+// Lectura: ROL_ADMIN y ROL_GERENTE (necesario para el filtro por rol y las
+// etiquetas de rol en /dashboard/admin/usuarios, que gerente ve en modo
+// solo-lectura).
 export async function GET() {
   try {
     const supabase = await createServerOnlyClient();
@@ -14,7 +17,8 @@ export async function GET() {
     }
 
     const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
+    const puedeVer = isAdminUser || (await esGerente());
+    if (!puedeVer) {
       return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 

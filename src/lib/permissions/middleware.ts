@@ -115,6 +115,18 @@ export async function soloAdminsYCoordinadores(redirectTo: string = '/dashboard'
 }
 
 /**
+ * Protege una ruta para administradores y gerentes.
+ * Usado por /dashboard/admin/usuarios, que ROL_GERENTE puede ver en modo
+ * solo-lectura (ver src/app/dashboard/admin/layout.tsx).
+ */
+export async function soloAdminsYGerentes(redirectTo: string = '/dashboard'): Promise<void> {
+  await protegerRuta({
+    roles: ['ROL_ADMIN', 'ROL_GERENTE'],
+    redirectTo,
+  });
+}
+
+/**
  * Protege una ruta asegurando que el usuario esté autenticado
  */
 export async function requiereAutenticacion(redirectTo: string = '/auth/login'): Promise<void> {

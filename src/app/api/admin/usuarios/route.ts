@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
-import { esAdmin } from "@/lib/permissions/server";
+import { esAdmin, esGerente } from "@/lib/permissions/server";
 import { generarUsername, generarUsernameConNumero, validarUsername } from "@/lib/utils/username-generator";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { registrarAuditoriaUsuario } from "@/lib/auditoria-usuarios";
 export const dynamic = 'force-dynamic';
 
-// GET - Obtener lista de usuarios con paginación server-side
+// GET - Obtener lista de usuarios con paginación server-side.
+// Lectura: ROL_ADMIN y ROL_GERENTE (gerente ve /dashboard/admin/usuarios en
+// modo solo-lectura). El historial de cambios sigue siendo exclusivo de
+// ROL_ADMIN, ya que no forma parte del alcance de solo-lectura de gerente.
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerOnlyClient();
@@ -17,8 +20,9 @@ export async function GET(request: NextRequest) {
     }
 
     const isAdminUser = await esAdmin();
-    if (!isAdminUser) {
-      return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
+    const puedeVer = isAdminUser || (await esGerente());
+    if (!puedeVer) {
+      return NextResponse.json({ error: "No tienes permisos para ver usuarios" }, { status: 403 });
     }
 
     // Parámetros de paginación y filtros
@@ -33,8 +37,11 @@ export async function GET(request: NextRequest) {
     const sortDir = searchParams.get('sortDir') || 'desc'; // 'asc' | 'desc'
     const historialUserId = searchParams.get('historial') || '';
 
-    // Si se pide historial de un usuario específico
+    // Si se pide historial de un usuario específico (exclusivo de ROL_ADMIN)
     if (historialUserId) {
+      if (!isAdminUser) {
+        return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
+      }
       return await getHistorialCambios(supabase, historialUserId);
     }
 
