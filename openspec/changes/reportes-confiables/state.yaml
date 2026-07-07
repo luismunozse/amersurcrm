@@ -14,7 +14,7 @@ phases:
   archive: pending
 
 next_recommended:
-  - apply  # PR1a + PR1b done (Phases 1-12); PR2 next (real comparisons + meta source, tasks.md Phase 13+)
+  - apply  # PR1a + PR1b + PR2 done (Phases 1-17); PR3 next (vendedor scorecard, tasks.md Phase 18+)
 
 blocked_reasons: []
 

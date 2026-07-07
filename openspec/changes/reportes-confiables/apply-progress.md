@@ -119,3 +119,83 @@ Suggested commit boundaries (no git mutations performed by this run, per deliver
 4. `cobranza.ts` + `comisiones.ts` + extended `reportes-cobranza-comisiones.test.ts` (Phases 10-11, same file pair, natural single commit since both share the ADR7 cache-wrap pattern and the same test file)
 
 — or a single squashed commit for the whole PR1b slice if the reviewer prefers one PR/one commit (matches PR1a's own note on this).
+
+---
+
+## Slice completed: PR2 — Real comparisons + meta source (ADR3, ADR4)
+
+Status: **done** (Phases 13-17 of `tasks.md`, all checked off).
+
+### Files changed
+
+| File | Action | What was done |
+|------|--------|----------------|
+| `src/app/dashboard/admin/reportes/actions/shared.ts` | Modified | Added `calcularVentanaAnterior(startDate, endDate)` (ADR3): `prevEnd = startDate - 1ms`, `prevStart = prevEnd - (endDate - startDate)`, both re-normalized to day boundaries (`setHours`) as a safety net — in practice already boundary-aligned when fed `calcularFechas` output, since `startDate.getTime() - 1` always lands on `23:59:59.999` of the prior day when `startDate` is itself `00:00:00.000`. Added `mesesEnRango(startDate, endDate)` (ADR4): walks month-by-month from `startDate`'s to `endDate`'s calendar month inclusive, returning `{anio, mes}` per overlapped month. Both are pure exports, no `server-only`/`next/cache` import (same constraint as the rest of the file). |
+| `src/app/dashboard/admin/reportes/actions/ventas.ts` | Modified | `obtenerReporteVentas`: added a second bounded `venta` sum query over `calcularVentanaAnterior(startDate, endDate)`'s `[prevStart, prevEnd]`; `resumen.ventasPeriodoAnterior` is now the real sum (was hardcoded `0`). `obtenerObjetivosVsRealidad`: **deleted** the `ticketPromedio`-derived `metaPropiedades` math and the `numVendedores * 5` / `numVendedores * 10` heuristic fallbacks entirely. Now calls `obtenerMetas({ periodoAnio, periodoMes })` (imported from `@/app/dashboard/admin/metas/_actions-metas`) once per month from `mesesEnRango`, sums `meta_ventas_monto`/`meta_ventas_cantidad` across all returned rows (all vendedores, all overlapped months) for `ventasMensuales.meta`/`propiedades.meta`. Added `esEstimado: boolean` per metric — `true` only when zero `meta_vendedor` rows exist for the whole period (an honest `0` sum-of-nothing, explicitly flagged instead of silently presented as a real target). `clientesNuevos.meta` is now always `null` ("Sin meta asignada") — `meta_vendedor` has no clientes-nuevos target column, no replacement possible; its `esEstimado` is always `false` (there's nothing to "estimate", it's a permanent structural absence, not a data-gap moment). |
+| `src/app/dashboard/admin/reportes/actions/rendimiento.ts` | Modified | `obtenerReporteRendimiento`: replaced the `usuario_perfil.meta_mensual_ventas` read as canonical meta source with a `meta_vendedor` lookup via `obtenerMetas` summed per-vendedor over `mesesEnRango`. Per vendedor: if any `meta_vendedor` row exists for them in the period, `meta` = the real summed value (even if that sum is `0` — presence of a row means a deliberate config, not absence); if **no** row exists, falls back to `usuario_perfil.meta_mensual_ventas` only if it's `> 0`, else `meta = null`. `cumplimiento` is `null` whenever `meta` is `null` or `meta <= 0` (never a `'0'` string presented as a real percentage). `resumen.vendedoresQueSuperaronMeta` now filters on `v.meta !== null && v.meta > 0 && ...` — a vendedor with no real meta can never "count" as having superado. `TopPerformer.meta: number \| null`, `TopPerformer.cumplimiento: string \| null` (were `number`/`string`). |
+| `src/app/dashboard/admin/reportes/components/ReporteVentas.tsx` | Modified | "Objetivos vs Realidad" card: `ventasMensuales`/`propiedades` rows now append an italic `(estimado)` qualifier next to the meta figure when `esEstimado` is `true`. "Clientes Nuevos" row: when `meta === null`, renders `"{realizado} · Sin meta asignada"` (muted) and skips the progress bar entirely (no `0`-denominator percentage to show); otherwise unchanged. Progress-bar tracks also gained `dark:bg-gray-700` (were light-only `bg-gray-200`, pre-existing gap noticed while touching these lines — small, in-scope fix, not a separate pass). |
+| `src/app/dashboard/admin/reportes/components/ReporteRendimientoVendedores.tsx` | Modified | Top Performers row: `performer.cumplimiento !== null` gates the colored `%` meta badge (was a truthy check on a string that was always `'0'` at minimum, so it never actually hit the "no meta" case before); when `null`, renders a muted "Sin meta asignada" pill instead. `useTableSort`'s `cumplimiento` accessor (`parseFloat(p.cumplimiento ?? "0")`) already handled `null` via `??` — no change needed there. |
+
+### Tests (all TDD RED→GREEN)
+
+| Test file | New tests | Result |
+|-----------|-----------|--------|
+| `src/__tests__/unit/reportes-shared.test.ts` (new) | 5 (`calcularVentanaAnterior` × 2, `mesesEnRango` × 3) | green |
+| `src/__tests__/unit/reportes-ventas-metas.test.ts` (new) | 9 (`obtenerReporteVentas` × 1, `obtenerObjetivosVsRealidad` × 4, `obtenerReporteRendimiento` × 4) | green |
+| **PR2 gate run** (`reportes-shared.test.ts` + `reportes-ventas-metas.test.ts`) | **14 tests / 2 files** | **all green** |
+| **Combined regression run** (all 11 reportes-confiables test files, PR1a+PR1b+PR2) | **62 tests / 11 files** | **all green — no regressions** |
+
+`npx tsc --noEmit`: clean (exit 0), repo-wide.
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | Notes |
+|------|-----|-------|-------|
+| 13.1/13.2 `calcularVentanaAnterior`/`mesesEnRango` | Confirmed — both `TypeError: ... is not a function` (5/5 failing) | Implemented, 5/5 pass | Pure unit, no supabase mocking needed |
+| 14.1/14.2 `ventasPeriodoAnterior` | Confirmed — asserted `20000`, pre-change code returns hardcoded `0` | Implemented, passes | |
+| 15.1/15.2 `obtenerObjetivosVsRealidad` meta wiring | Confirmed — all 4 cases failed against pre-change code (heuristic numbers / no `esEstimado` field / `clientesNuevos.meta` not null) | Implemented, 4/4 pass | |
+| 15.3/15.4 `obtenerReporteRendimiento` meta source | Confirmed — all 4 cases failed (`meta_mensual_ventas` still canonical, `cumplimiento` was `'0'` string not `null`, `vendedoresQueSuperaronMeta` miscounted) | Implemented, 4/4 pass | |
+| 16.1/16.2 UI | n/a (small, no dedicated unit test — visual/JSX conditional, matches existing UI-task precedent of no test coverage for pure rendering branches in this codebase) | Manual code-path review: both `null`/`esEstimado` branches render distinct markup | |
+| 17.1/17.2 gate | n/a | 14/14 gate files; 62/62 combined regression; `tsc --noEmit` clean | |
+
+### Gotcha found (test harness + a real design decision, documented for PR3)
+
+**`obtenerMetas` cross-module call — mock the whole module, not its internals.** `ventas.ts`/`rendimiento.ts` now import `obtenerMetas` from `@/app/dashboard/admin/metas/_actions-metas`, a **separate** `"use server"` action file with its own dependency chain: `createServerActionClient` (different client factory than `createServerOnlyClient`), `requierePermiso`/`tienePermiso` (`@/lib/permissions/server`, imports `server-only`), and `obtenerUsernameActual` (`../../clientes/_actions-crm-helpers`). Rather than mock each of those transitively, `reportes-ventas-metas.test.ts` does `vi.mock("@/app/dashboard/admin/metas/_actions-metas", () => ({ obtenerMetas: mockObtenerMetas }))` — this replaces the entire module before it's ever imported, so none of its internal dependencies load at all. Much simpler than the `createChainMock` supabase-chain approach used for the same-file fetchers, and the right pattern for any future cross-action-module call (PR3's scorecard will likely need the same trick if it ever calls another action file directly rather than composing `_fetch*` internals per ADR5).
+
+**Confirmed a load-bearing permission fact before wiring this up (not a bug, a design-supporting discovery):** `verificarPermiso` (`src/lib/permissions/server.ts`) short-circuits `if (usuario.rol === 'ROL_ADMIN') return { permitido: true }` **before** checking the permission matrix — so `obtenerMetas`'s `tienePermiso(PERMISOS.METAS.ASIGNAR)` always resolves `true` for an admin caller, meaning `puedeVerTodas` is always `true` inside `obtenerMetas` when called from these admin-gated reportes actions (`getAuthorizedClient` already enforces `esAdmin()`). This is what makes "call `obtenerMetas({ periodoAnio, periodoMes })` with no `vendedorUsername` filter and get every vendedor's row for that month" work correctly in production, not just in the mocked tests.
+
+### Design decision: `esEstimado` semantics (documented since tasks.md wording was ambiguous)
+
+Task 15.1 says the aggregate `ventasMensuales.meta`/`propiedades.meta` are "still returned but flagged `esEstimado: true`... never a bare heuristic number" when zero `meta_vendedor` rows exist. Since the `*5`/`*10` heuristic block is deleted with **no replacement** (ADR4 is explicit: "these are exactly the numbers that lie... they are deleted"), the only honest value left to return in the zero-rows case is the real sum-of-nothing (`0`). Implemented as: `meta` = the real (possibly-zero) sum, `esEstimado` = `true` only when the `meta_vendedor` row-set for the whole period is empty. This is **distinct** from `clientesNuevos.meta`, which is `null` permanently (a structural absence — no column exists to ever source it from), not a flagged estimate (a data-gap that could be filled by configuring metas). The UI reflects this distinction: `esEstimado` renders an `"(estimado)"` qualifier next to a real number; `meta === null` renders "Sin meta asignada" with no number at all.
+
+### Vercel React best-practices skill applied: eliminated 3 waterfalls
+
+Per the `vercel-react-best-practices` skill (`async-parallel`, CRITICAL priority), the initial PR2 draft chained new independent queries after existing sequential ones. Fixed before finalizing:
+- `obtenerReporteVentas`: current-period `venta` select and the new prior-window `venta` sum are independent — now `Promise.all([...])` instead of two sequential awaits.
+- `obtenerObjetivosVsRealidad`: `metasPorMes` (via `obtenerMetas`), `ventasReales`, and `clientesNuevos` are three independent fetches — now `Promise.all([...])`.
+- `obtenerReporteRendimiento`: the new `metasPorMes` fetch is independent of the pre-existing `vendedores`/`ventasData`/`leadsDelPeriodo` sequential awaits — all 4 now run via one `Promise.all([...])` (pre-existing sequential-await pattern was itself a latent waterfall predating this PR; folding it into the same `Promise.all` while already touching this function was in-scope and zero-risk since none of the 4 queries depend on another's result).
+
+All three match the existing `funnel.ts`/`por-vendedor.ts` `Promise.all` convention already established in this codebase (PR1a/PR1b). Confirmed the reordering doesn't break the mocked-supabase test harnesses: query-builder chain calls (`.schema().from().select()...`) execute synchronously when the array literal is evaluated (before `Promise.all` starts awaiting), so `.from(table)` call order — which the `ventaCallCount`-style test routing depends on — is preserved. Re-ran the full 62-test regression set after this refactor: still 62/62 green, `tsc --noEmit` still clean.
+
+### Deviations from tasks.md wording (both minor, both documented)
+
+1. **Optional `calcularDeltaMensual` reuse (task 14.2) — skipped.** Task text says `obtenerReporteVentas` "may reuse `calcularDeltaMensual`... for an optional delta%, per design" (explicitly optional). No UI slot currently renders a period-over-period delta for ventas, so adding an unused computed field would widen the diff/test surface with no consumer. Left as a documented future addition, not silently dropped — flagged here for whoever wires a "vs. período anterior" delta badge into `ReporteVentas.tsx` later.
+2. **`ReporteVentas.tsx`/`ReporteRendimientoVendedores.tsx` — no dedicated component unit tests.** Consistent with this codebase's existing pattern (PR1a's Phase 5 funnel-labels test was the one exception, and only because it needed to assert against exported label maps, not rendered output) — these two UI edits are small conditional-render branches reviewed by manual code-path inspection instead. Flagged, not silently skipped.
+
+### Notes for PR3 (scorecard, tasks.md Phase 18+)
+
+- The `obtenerMetas`-per-month-via-`mesesEnRango` pattern established here (`ventas.ts`/`rendimiento.ts`) is exactly what ADR5's `metaMonto`/`metaCumplimientoPct` scorecard column needs — reuse it directly rather than re-deriving.
+- The "mock the whole cross-module action" test-harness gotcha above will very likely recur in `reportes-scorecard.test.ts` if the scorecard calls `obtenerMetas` the same way (in addition to composing `_fetchPorVendedor`/`_fetchInteracciones`/`_fetchComisiones`/`fetchMetricasVentas` per ADR5).
+- `TopPerformer.meta`/`cumplimiento` are now `number | null`/`string | null` — if PR3's scorecard reuses `rendimiento.ts`'s `topPerformers` output directly (it currently doesn't per ADR5's composition table, which sources ventas/meta from `metricas-fetchers.ts`/`meta_vendedor` independently), it must carry the same nullability through, not silently coerce back to `0`/`'0'`.
+- `metricas-fetchers.ts`'s `buildTopVendedores`/`VendedorTopPieza.meta` (dashboard "top vendedores" widget) still reads `usuario_perfil.meta_mensual_ventas` untouched — confirmed still out of scope per ADR8/tasks.md's explicit PR2 scope note (only `obtenerObjetivosVsRealidad`/`obtenerReporteRendimiento` named). Not silently missed, just not this PR's concern.
+
+### Rollback boundary
+
+PR2 is independently revertible from PR1a/PR1b: reverting `shared.ts`'s two new exports, `ventas.ts`, `rendimiento.ts`, `ReporteVentas.tsx`, `ReporteRendimientoVendedores.tsx`, and the 2 new test files restores the PR1b state with no impact on PR1a/PR1b's own changes. PR3 depends on this PR's `meta_vendedor`/"Sin meta asignada" wiring pattern (ADR4) being in place — an additive-only dependency (PR3 reuses the pattern, doesn't modify these files' PR2 logic), so PR2 can ship and be reviewed independently.
+
+Suggested commit boundaries (no git mutations performed by this run, per delivery instructions):
+1. `shared.ts` (`calcularVentanaAnterior` + `mesesEnRango`) + `reportes-shared.test.ts` (Phase 13)
+2. `ventas.ts` + `rendimiento.ts` + `reportes-ventas-metas.test.ts` (Phases 14-15 — same test file covers both fetcher files, natural single commit)
+3. `ReporteVentas.tsx` + `ReporteRendimientoVendedores.tsx` (Phase 16, UI-only, no new tests)
+
+— or a single squashed commit for the whole PR2 slice if the reviewer prefers one PR/one commit (matches PR1a/PR1b's own note on this).
