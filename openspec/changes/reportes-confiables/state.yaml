@@ -9,12 +9,12 @@ phases:
   spec: done
   design: done
   tasks: done
-  apply: pending
+  apply: in_progress
   verify: pending
   archive: pending
 
 next_recommended:
-  - apply  # tasks.md ready; PR1a first (see Review Workload Forecast in tasks.md)
+  - apply  # PR1a done (Phases 1-6); PR1b next (exact counts/pagination, tasks.md Phase 7+)
 
 blocked_reasons: []
 
