@@ -59,6 +59,62 @@ export function calcularFechas(periodo: string, fechaInicio?: string, fechaFin?:
 }
 
 /**
+ * Real previous-period comparison window (design.md ADR3).
+ *
+ * Returns the window of the same length immediately before `startDate`:
+ * `prevEnd = startDate - 1ms` (the instant right before the current window
+ * starts — no gap, no overlap), `prevStart = prevEnd - (endDate - startDate)`
+ * (same duration as the current window). Both bounds are then normalized to
+ * day boundaries the same way `calcularFechas` normalizes its own
+ * `startDate`/`endDate`, so a `.gte()/.lte()` pair against this window
+ * behaves identically to the current-period query.
+ *
+ * Placed here (not in `src/lib/dashboard/meta.ts`) because reportes periods
+ * are arbitrary day ranges, not calendar months — this is period arithmetic,
+ * the natural neighbor of `calcularFechas`. `meta.ts`'s `calcularPeriodoAnterior`
+ * remains the calendar-month version used for MoM dashboard comparisons.
+ */
+export function calcularVentanaAnterior(
+  startDate: Date,
+  endDate: Date,
+): { prevStart: Date; prevEnd: Date } {
+  const duration = endDate.getTime() - startDate.getTime();
+
+  const prevEnd = new Date(startDate.getTime() - 1);
+  prevEnd.setHours(23, 59, 59, 999);
+
+  const prevStart = new Date(prevEnd.getTime() - duration);
+  prevStart.setHours(0, 0, 0, 0);
+
+  return { prevStart, prevEnd };
+}
+
+/**
+ * Every calendar month a report period overlaps (design.md ADR4,
+ * "Period-vs-month reconciliation"). `meta_vendedor` targets are monthly
+ * (`periodo_anio`, `periodo_mes`); reportes filters are arbitrary day
+ * ranges. A single-month period returns one `{anio, mes}` entry; a span
+ * crossing a month boundary returns one entry per overlapped month, in
+ * chronological order.
+ */
+export function mesesEnRango(
+  startDate: Date,
+  endDate: Date,
+): { anio: number; mes: number }[] {
+  const meses: { anio: number; mes: number }[] = [];
+
+  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  const last = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+  while (cursor.getTime() <= last.getTime()) {
+    meses.push({ anio: cursor.getFullYear(), mes: cursor.getMonth() + 1 });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return meses;
+}
+
+/**
  * Wraps a report action with standard error handling pattern
  */
 export async function safeAction<T>(
