@@ -1,7 +1,8 @@
 "use server";
 
-import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
+import { getAuthorizedClient, calcularFechas, calcularVentanaAnterior, mesesEnRango, safeAction } from "./shared";
 import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
+import { obtenerMetas } from "@/app/dashboard/admin/metas/_actions-metas";
 
 /**
  * Obtiene reporte de ventas con datos reales
@@ -15,38 +16,60 @@ export async function obtenerReporteVentas(
     const supabase = await getAuthorizedClient();
     const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
-    const { data: ventasData, error: ventasError } = await supabase
-      .schema('crm')
-      .from('venta')
-      .select(`
-        id,
-        codigo_venta,
-        precio_total,
-        moneda,
-        fecha_venta,
-        forma_pago,
-        vendedor_username,
-        propiedad:propiedad_id (
-          codigo,
-          identificacion_interna,
-          proyecto:proyecto_id (
-            nombre
+    // Comparación real vs. período anterior (design.md ADR3) — ventana de la
+    // misma longitud inmediatamente anterior a `startDate`, nunca un 0
+    // hardcodeado. Corre en paralelo con la consulta del período actual: son
+    // independientes, no hay razón para encadenarlas (async-parallel).
+    const { prevStart, prevEnd } = calcularVentanaAnterior(startDate, endDate);
+
+    const [
+      { data: ventasData, error: ventasError },
+      { data: ventasPeriodoAnteriorData },
+    ] = await Promise.all([
+      supabase
+        .schema('crm')
+        .from('venta')
+        .select(`
+          id,
+          codigo_venta,
+          precio_total,
+          moneda,
+          fecha_venta,
+          forma_pago,
+          vendedor_username,
+          propiedad:propiedad_id (
+            codigo,
+            identificacion_interna,
+            proyecto:proyecto_id (
+              nombre
+            )
+          ),
+          lote:lote_id (
+            codigo,
+            proyecto:proyecto_id (
+              nombre
+            )
           )
-        ),
-        lote:lote_id (
-          codigo,
-          proyecto:proyecto_id (
-            nombre
-          )
-        )
-      `)
-      .gte('fecha_venta', startDate.toISOString())
-      .lte('fecha_venta', endDate.toISOString())
-      .order('fecha_venta', { ascending: false });
+        `)
+        .gte('fecha_venta', startDate.toISOString())
+        .lte('fecha_venta', endDate.toISOString())
+        .order('fecha_venta', { ascending: false }),
+      supabase
+        .schema('crm')
+        .from('venta')
+        .select('precio_total')
+        .gte('fecha_venta', prevStart.toISOString())
+        .lte('fecha_venta', prevEnd.toISOString()),
+    ]);
 
     if (ventasError) {
       console.error('Error obteniendo ventas:', ventasError);
     }
+
+    const ventasPeriodoAnterior = ventasPeriodoAnteriorData?.reduce(
+      (sum, v) => sum + Number(v.precio_total),
+      0,
+    ) || 0;
 
     // Calcular métricas
     const valorTotal = ventasData?.reduce((sum, v) => sum + Number(v.precio_total), 0) || 0;
@@ -111,7 +134,7 @@ export async function obtenerReporteVentas(
         valorTotal,
         propiedadesVendidas,
         promedioVenta,
-        ventasPeriodoAnterior: 0
+        ventasPeriodoAnterior
       },
       salesData,
       topProjects,
@@ -210,7 +233,24 @@ export async function obtenerMetricasRendimiento(
 }
 
 /**
- * Obtiene comparación de objetivos vs realidad
+ * Obtiene comparación de objetivos vs realidad.
+ *
+ * Meta source is `meta_vendedor` (design.md ADR4), read through the existing
+ * `obtenerMetas` action so parity with `MetaDelMes`/`VentasVsMetaBlock` is
+ * structural. The `numVendedores * 5` / `numVendedores * 10` heuristics are
+ * deleted with no replacement — they were exactly the "numbers that lie"
+ * this change exists to kill.
+ *
+ * `meta_vendedor` targets are monthly; the report period is an arbitrary day
+ * range, so the meta figure sums every vendedor's monthly meta across every
+ * calendar month `mesesEnRango` says the period overlaps.
+ *
+ * `clientesNuevos.meta` stays `null` permanently: `meta_vendedor` has no
+ * clientes-nuevos target column. `ventasMensuales`/`propiedades` still
+ * return a `meta` number (the real, possibly-zero sum) when zero
+ * `meta_vendedor` rows exist for the period, flagged `esEstimado: true` so
+ * the UI can mark it as an aggregate estimate instead of presenting it as a
+ * trustworthy target.
  */
 export async function obtenerObjetivosVsRealidad(
   periodo: string = '30',
@@ -221,23 +261,36 @@ export async function obtenerObjetivosVsRealidad(
     const supabase = await getAuthorizedClient();
     const { startDate, endDate } = calcularFechas(periodo, fechaInicio, fechaFin);
 
-    const { data: vendedores } = await supabase
-      .schema('crm')
-      .from('usuario_perfil')
-      .select('meta_mensual_ventas')
-      .eq('activo', true);
+    // Las tres fuentes son independientes entre sí — se piden en paralelo
+    // (async-parallel) en vez de encadenarlas con awaits secuenciales.
+    const meses = mesesEnRango(startDate, endDate);
+    const [metasPorMes, { data: ventasReales }, { data: clientesNuevos }] = await Promise.all([
+      Promise.all(meses.map((m) => obtenerMetas({ periodoAnio: m.anio, periodoMes: m.mes }))),
+      supabase
+        .schema('crm')
+        .from('venta')
+        .select('precio_total')
+        .gte('fecha_venta', startDate.toISOString())
+        .lte('fecha_venta', endDate.toISOString()),
+      supabase
+        .schema('crm')
+        .from('cliente')
+        .select('id')
+        .gte('fecha_alta', startDate.toISOString())
+        .lte('fecha_alta', endDate.toISOString()),
+    ]);
 
-    const metaTotalVentas = vendedores?.reduce(
-      (sum, v) => sum + (v.meta_mensual_ventas || 0),
+    const metaRows = metasPorMes.flatMap((r) => (r.success ? r.data ?? [] : []));
+    const esEstimado = metaRows.length === 0;
+
+    const metaTotalVentas = metaRows.reduce(
+      (sum, m) => sum + Number(m.meta_ventas_monto || 0),
       0
-    ) || 0;
-
-    const { data: ventasReales } = await supabase
-      .schema('crm')
-      .from('venta')
-      .select('precio_total')
-      .gte('fecha_venta', startDate.toISOString())
-      .lte('fecha_venta', endDate.toISOString());
+    );
+    const metaTotalPropiedades = metaRows.reduce(
+      (sum, m) => sum + Number(m.meta_ventas_cantidad || 0),
+      0
+    );
 
     const ventasRealizadas = ventasReales?.reduce(
       (sum, v) => sum + Number(v.precio_total),
@@ -245,40 +298,28 @@ export async function obtenerObjetivosVsRealidad(
     ) || 0;
 
     const propiedadesVendidas = ventasReales?.length || 0;
-    const ticketPromedio = propiedadesVendidas > 0
-      ? ventasRealizadas / propiedadesVendidas
-      : 0;
-    const numVendedores = vendedores?.length || 1;
-    const metaPropiedades = ticketPromedio > 0 && metaTotalVentas > 0
-      ? Math.max(1, Math.ceil(metaTotalVentas / ticketPromedio))
-      : numVendedores * 5;
-
-    const metaClientesNuevos = numVendedores * 10;
-
-    const { data: clientesNuevos } = await supabase
-      .schema('crm')
-      .from('cliente')
-      .select('id')
-      .gte('fecha_alta', startDate.toISOString())
-      .lte('fecha_alta', endDate.toISOString());
-
     const clientesNuevosRealizados = clientesNuevos?.length || 0;
 
     return {
       ventasMensuales: {
         meta: metaTotalVentas,
         realizado: ventasRealizadas,
-        porcentaje: metaTotalVentas > 0 ? (ventasRealizadas / metaTotalVentas) * 100 : 0
+        porcentaje: metaTotalVentas > 0 ? (ventasRealizadas / metaTotalVentas) * 100 : 0,
+        esEstimado
       },
       propiedades: {
-        meta: metaPropiedades,
+        meta: metaTotalPropiedades,
         realizado: propiedadesVendidas,
-        porcentaje: metaPropiedades > 0 ? (propiedadesVendidas / metaPropiedades) * 100 : 0
+        porcentaje: metaTotalPropiedades > 0 ? (propiedadesVendidas / metaTotalPropiedades) * 100 : 0,
+        esEstimado
       },
       clientesNuevos: {
-        meta: metaClientesNuevos,
+        // meta_vendedor no tiene columna de meta de clientes nuevos: sin
+        // reemplazo posible, se muestra "Sin meta asignada" siempre.
+        meta: null,
         realizado: clientesNuevosRealizados,
-        porcentaje: metaClientesNuevos > 0 ? (clientesNuevosRealizados / metaClientesNuevos) * 100 : 0
+        porcentaje: 0,
+        esEstimado: false
       }
     };
   });
