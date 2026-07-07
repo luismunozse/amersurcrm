@@ -132,3 +132,75 @@ SUGGESTION:
 
 ### Verdict
 FAIL -- one CRITICAL: the "Unified masterplan upload path" requirement (the foundational PR1 slice) has 2 of its 3 acceptance scenarios with zero runtime test coverage of the actual uploader component behavior, despite Strict TDD Mode being active for this change and tasks.md's own stated TDD scope. Everything else -- the price-free guarantee, single-write-path enforcement, normalized-coordinate invariance, editor vertex/history ops, presentation-mode price-free rendering, and the PR5 legacy-freeze/dead-code deletion -- is correctly implemented, test-covered (52/52 passing), type-clean, and lint-clean. This is a coverage gap in one component, not a functional defect; recommend a small follow-up task (add MasterplanEditorPanel.test.tsx) before archiving.
+
+(SUPERSEDED 2026-07-07 -- see the Re-verification section below: the CRITICAL was remediated in commit d26f142 and independently re-verified. Updated verdict: PASS WITH WARNINGS.)
+
+---
+
+## Re-verification (2026-07-07) — CRITICAL resolved
+
+**Fix commit**: d26f142 "test(masterplan): cover uploader PDF rasterization, rejection and aspect-ratio guard" -- 1 new file, 230 lines, no production code changed.
+
+**File reviewed fresh**: src/components/masterplan/MasterplanEditorPanel.test.tsx (5 tests).
+
+Mock-boundary audit (checking the mocks don't hollow out the assertions):
+- guardarMasterplanProyecto and uploadProyectoAsset/removeProyectoAssets are mocked (correct boundary -- these are the network/DB edges, not the logic under test).
+- validateProyectoImage is left REAL (spread from importOriginal, only uploadProyectoAsset/removeProyectoAssets overridden) -- the rejection test asserts the actual production error string "Masterplan: formato no permitido (usa JPG, PNG o WEBP)", not a hand-crafted stand-in.
+- aspectRatioChanged is left REAL (spread from importOriginal, only rasterizeFirstPageToPng overridden) -- the aspect-ratio guard tests exercise the true tolerance/ratio math, not a mock.
+- rasterizeFirstPageToPng is mocked at the call boundary (its internals -- pdfjs-dist/canvas -- are out of scope here and were never in scope; its pure helpers scaleForMaxDimension/aspectRatioChanged are already covered by rasterize.test.ts).
+
+Scenario-by-scenario re-check:
+1. "PDF upload is rasterized before storage" -- test "un PDF se rasteriza antes de subir el PNG resultante": asserts rasterizeFirstPageToPng called exactly once with the ORIGINAL pdf File, then uploadProyectoAsset called with the RASTERIZED png File (not the original), then guardarMasterplanProyecto called with the rasterized image's width/height (1200x900, distinct from the PDF itself which has no dims). This proves the PDF-to-PNG handoff end-to-end through the real onFile handler. Not hollow: every assertion is on a real call made by production code, with distinguishable before/after values.
+2. "Unsupported file type is rejected" -- test "un tipo de archivo no soportado se rechaza...": a real .docx File (correct non-image, non-PDF MIME) drives the real onFile handler; asserts the real validateProyectoImage error string renders, AND that rasterizeFirstPageToPng/uploadProyectoAsset/guardarMasterplanProyecto/onSaved were never called (previous masterplan state provably untouched -- no write attempted at all). Not hollow: uses the real validation function and real negative-call assertions rather than only checking the file was "not accepted" via a UI state, which would have been a weaker proxy.
+3. Bonus coverage beyond the original 2 flagged scenarios: valid-image happy path (asserts the persisted payload's key set is exactly {url,path,width,height} -- proves no legacy key leaks through this call site too) and the aspect-ratio ConfirmDialog guard (cancel aborts with zero write calls, confirm proceeds with the correct new dims).
+
+Verdict on the fix: genuine, non-hollow coverage of both previously-flagged scenarios. No new gaps introduced by the mocking strategy.
+
+**Regression run** (9 files, per the coordinator's exact command):
+```
+npx vitest run src/components/masterplan/MasterplanEditorPanel.test.tsx src/lib/masterplan/dto.test.ts \
+  src/lib/masterplan/presentacion.server.test.ts src/lib/masterplan/geometry.test.ts \
+  src/lib/masterplan/rasterize.test.ts src/components/masterplan/MasterplanViewer.test.tsx \
+  src/components/masterplan/MasterplanEditor.test.tsx src/components/masterplan/PlanoPresentacion.test.tsx \
+  src/__tests__/unit/masterplan-actions.test.ts
+
+Test Files  9 passed (9)
+     Tests  57 passed (57)
+```
+
+```
+npx tsc --noEmit
+(exit 0, no errors, full project)
+```
+
+```
+npx eslint src/components/masterplan/MasterplanEditorPanel.test.tsx
+(no errors, no warnings)
+```
+
+**Updated Spec Compliance Matrix (the 2 previously-UNTESTED rows)**:
+| Requirement | Scenario | Test | Result |
+|-------------|----------|------|--------|
+| Unified masterplan upload path | PDF upload is rasterized before storage | MasterplanEditorPanel.test.tsx: "un PDF se rasteriza antes de subir el PNG resultante" (rasterizeFirstPageToPng called with original, uploadProyectoAsset called with rasterized PNG, persisted dims match rasterized image) | COMPLIANT |
+| Unified masterplan upload path | Unsupported file type is rejected | MasterplanEditorPanel.test.tsx: "un tipo de archivo no soportado se rechaza..." (real validateProyectoImage error message rendered; zero calls to rasterize/upload/persist/onSaved) | COMPLIANT |
+
+**Updated compliance summary**: 14/16 scenarios COMPLIANT, 2/16 PARTIAL (both WARNING-level, not CRITICAL -- static-inspection-only verification of a pre-existing, unchanged legacy screen; and the account-layer-only test for "Image upload persists masterplan only," now additionally reinforced by the new component-level test's payload-key assertion in the fix commit). 0/16 UNTESTED.
+
+**Updated Test Layer Distribution**: Integration tests now 18 (13 + 5), Unit unchanged at 39. New total: 57 tests across 9 files.
+
+**Updated TDD Compliance**: 6/6 checks now pass -- MasterplanEditorPanel.onFile now has a component-level test file; all tasks in scope have verifiable test coverage.
+
+### Issues Found (updated)
+
+CRITICAL: None. (Previously: 1 -- "Unified masterplan upload path" untested at the component level. RESOLVED by commit d26f142; see re-verification above.)
+
+WARNING (unchanged, both still stand, still non-blocking):
+1. Requirement "Legacy plano write paths are frozen" -- scenario "Existing proyecto detail screen still renders" is still verified only by static code inspection (no runtime render test for page.tsx in this repo). Low risk, code path unchanged.
+2. ADR-5's "dynamic-imported" wording for react-zoom-pan-pinch is honored one level up (around MasterplanEditor/PlanoPresentacion, not TransformWrapper directly). Documented, functionally equivalent, no action required.
+
+SUGGESTION (unchanged):
+1. PlanoPresentacionDTO.width/height are populated but never consumed by the render path. Harmless.
+2. Aspect-ratio guard implemented as a single Continuar/Cancelar confirm rather than design.md's two-option sketch. Explicitly deferred by design.md itself; no spec scenario requires the second option.
+
+### Updated Verdict
+PASS WITH WARNINGS -- the CRITICAL is resolved (verified fresh: the new test file's assertions are real, boundary-appropriate, and non-hollow). 2 WARNINGs remain, both low-risk and non-blocking (a static-inspection-only regression check on an unchanged legacy screen, and a benign implementation-detail deviation from one ADR's exact wording). All 57 targeted tests pass, tsc is clean, eslint is clean, 32/32 tasks remain checked. Recommended: proceed to sdd-archive.

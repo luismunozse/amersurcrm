@@ -9,32 +9,34 @@ phases:
   spec: done
   design: done  # corrected: design.md already existed with full content when tasks phase ran
   tasks: done
-  apply: done  # PR1+PR2+PR3+PR4+PR5 done (uploader + PDF rasterization; editor zoom/pan+vertex ops; price-free DTO + server builder + viewer refactor; PlanoPresentacion component + entry point; legacy freeze/rename + verified dead-code deletion); remediation batch added MasterplanEditorPanel.test.tsx to close the verify CRITICAL
-  verify: done  # first pass: 52/52 targeted tests pass, tsc clean, eslint clean, 32/32 tasks checked. 1 CRITICAL (uploader component behavior untested), 2 WARNING, 2 SUGGESTION. See verify-report.md. Remediated below -- awaiting a fresh verify pass.
+  apply: done  # PR1+PR2+PR3+PR4+PR5 done (uploader + PDF rasterization; editor zoom/pan+vertex ops; price-free DTO + server builder + viewer refactor; PlanoPresentacion component + entry point; legacy freeze/rename + verified dead-code deletion). Plus commit d26f142: added MasterplanEditorPanel.test.tsx to close the verify-phase CRITICAL (no production code changed).
+  verify: done  # Re-verified 2026-07-07 after d26f142: 57/57 targeted tests pass, tsc clean, eslint clean, 32/32 tasks checked. CRITICAL resolved. 2 WARNING, 2 SUGGESTION remain (non-blocking). See verify-report.md
   archive: pending
 
 verify_outcome:
-  verdict: FAIL
-  critical_count: 1
+  verdict: PASS WITH WARNINGS
+  critical_count: 0
   warning_count: 2
   suggestion_count: 2
-  summary: "Unified masterplan upload path requirement (PR1) has 2/3 scenarios with zero runtime test coverage of MasterplanEditorPanel.onFile (PDF branch, unsupported-file rejection); all other requirements (price-free DTO/presentation, editor vertex ops, normalized coords, legacy freeze + dead-code deletion) are fully implemented, test-covered (52/52 passing), type-clean, and lint-clean."
+  resolved_critical:
+    - issue: "Unified masterplan upload path requirement had 2/3 scenarios (PDF rasterization, unsupported-file rejection) with zero runtime test coverage of MasterplanEditorPanel.onFile"
+      fix_commit: d26f142
+      fix_summary: "Added src/components/masterplan/MasterplanEditorPanel.test.tsx (5 tests): valid image upload, PDF rasterize-then-upload, unsupported-type rejection with real validateProyectoImage message, aspect-ratio ConfirmDialog cancel/confirm. No production code changed -- confirms a coverage gap, not a defect. Re-verified independently: mocks are boundary-appropriate (guardarMasterplanProyecto/uploadProyectoAsset mocked; validateProyectoImage and aspectRatioChanged left real), assertions are non-hollow (real call args, real error strings, real before/after dimension values)."
+  remaining_warnings:
+    - "Legacy plano write paths frozen -- scenario 'existing proyecto detail screen still renders' verified only by static inspection, no runtime render test for page.tsx in this repo. Low risk, unchanged code path."
+    - "ADR-5's 'dynamic-imported' wording for react-zoom-pan-pinch honored one level up (around MasterplanEditor/PlanoPresentacion, not TransformWrapper directly). Documented, functionally equivalent, no action required."
+  summary: "All 6 spec requirements implemented and test-covered (57/57 targeted tests passing, tsc clean, eslint clean, 32/32 tasks checked). Price-free DTO/presentation, single write path, normalized-coordinate invariance, editor vertex ops, and legacy-freeze + dead-code deletion all verified with fresh code inspection plus passing runtime tests. No CRITICAL issues remain."
   report: openspec/changes/plano-interactivo/verify-report.md
 
-remediation:
-  critical_resolved: 1
-  what: "Added src/components/masterplan/MasterplanEditorPanel.test.tsx (5 tests) covering onFile's PDF-vs-image branching, rasterizeFirstPageToPng invocation, unsupported-file rejection, and the aspect-ratio ConfirmDialog guard."
-  tests_added: 5
-  regression: "57/57 passed across the 9-file masterplan set (8 pre-existing + new); npx tsc --noEmit clean"
-  production_code_changed: false
-
 next_recommended:
-  - verify
+  - archive
+
+blocked_reasons: []
 
 delivery:
   strategy: auto-chain
   chain_strategy: stacked-to-main
-  note: "5 stacked PRs: PR1 uploader, PR2 editor zoom/pan+vertex ops, PR3 DTO+viewer refactor, PR4 presentation mode, PR5 isolated legacy cleanup (ordered last, exempt from feature budget)."
+  note: "5 stacked PRs: PR1 uploader, PR2 editor zoom/pan+vertex ops, PR3 DTO+viewer refactor, PR4 presentation mode, PR5 isolated legacy cleanup (ordered last, exempt from feature budget). Plus a small PR6-equivalent test-only commit (d26f142) closing the verify-phase coverage gap."
 
 constraints:
   strict_tdd: true
