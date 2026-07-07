@@ -54,8 +54,15 @@ export type ReportePorVendedorData = {
  *  - nivel de interés (mejor prioridad de cliente_propiedad_interes)
  *
  * Si no se pasa vendedorUsername, agrega TODOS los vendedores activos.
+ *
+ * Exported (design.md ADR5, tasks.md Phase 18.1) — PR3's scorecard calls
+ * this directly once per vendedor activo (same `filtroVendedor` shape used
+ * here) instead of duplicating the aggregation logic. Reusing the exact
+ * function with the exact filter is what makes the scorecard's
+ * `conversionPct` reconcile with this file's own `resumen.conversionGlobal`
+ * for the same vendedor + period — no parallel formula, no drift.
  */
-async function _fetchPorVendedor(
+export async function _fetchPorVendedor(
   supabase: SupabaseClient<any, "crm">,
   startISO: string,
   endISO: string,
