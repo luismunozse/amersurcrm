@@ -9,12 +9,12 @@ phases:
   spec: done
   design: done
   tasks: done
-  apply: in_progress
+  apply: done
   verify: pending
   archive: pending
 
 next_recommended:
-  - apply  # PR1a + PR1b + PR2 + PR3 done (Phases 1-21); PR4 next (cobranza single source of truth, tasks.md Phase 22+)
+  - verify  # PR1a + PR1b + PR2 + PR3 + PR4 all done (Phases 1-24, tasks.md fully checked off). Run sdd-verify against spec.md's 7 requirements / 14 scenarios, then sdd-archive.
 
 blocked_reasons: []
 
