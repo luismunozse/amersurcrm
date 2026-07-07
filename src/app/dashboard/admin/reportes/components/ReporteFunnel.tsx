@@ -33,20 +33,18 @@ interface ReporteFunnelProps {
   fechaFin?: string;
 }
 
-const ESTADO_LABELS: Record<string, string> = {
-  nuevo:           'Nuevo',
-  activo:          'Activo',
-  en_negociacion:  'En negociación',
-  interesado:      'Interesado',
-  no_interesado:   'No interesado',
-  reservado:       'Reservado',
-  vendido:         'Vendido',
-  perdido:         'Perdido',
-  por_contactar:   'Por contactar',
+// Covers exactly the 8 valid EstadoCliente values (src/lib/reportes/estados.ts)
+// plus the `sin_estado` sentinel (funnel.ts's fallback bucket for a null
+// estado_cliente). No dead legacy keys (spec: "Dead legacy labels are gone").
+export const ESTADO_LABELS: Record<string, string> = {
+  por_contactar:   'Por Contactar',
   contactado:      'Contactado',
   intermedio:      'Intermedio',
-  desestimado:     'Desestimado',
   potencial:       'Potencial',
+  en_proceso:      'En Proceso',
+  propietario:     'Propietario',
+  desestimado:     'Desestimado',
+  transferido:     'Transferido',
   sin_estado:      'Sin estado',
 };
 
@@ -58,20 +56,15 @@ const ETAPA_ICONS: Record<string, LucideIcon> = {
   venta:       PartyPopper,
 };
 
-const ESTADO_COLORS: Record<string, string> = {
-  nuevo:           'bg-blue-100 text-blue-800',
-  activo:          'bg-green-100 text-green-800',
-  en_negociacion:  'bg-yellow-100 text-yellow-800',
-  interesado:      'bg-indigo-100 text-indigo-800',
-  no_interesado:   'bg-gray-100 text-gray-600',
-  reservado:       'bg-orange-100 text-orange-800',
-  vendido:         'bg-emerald-100 text-emerald-800',
-  perdido:         'bg-red-100 text-red-700',
+export const ESTADO_COLORS: Record<string, string> = {
   por_contactar:   'bg-yellow-100 text-yellow-800',
   contactado:      'bg-blue-100 text-blue-800',
   intermedio:      'bg-purple-100 text-purple-700',
-  desestimado:     'bg-red-100 text-red-600',
   potencial:       'bg-teal-100 text-teal-700',
+  en_proceso:      'bg-orange-100 text-orange-800',
+  propietario:     'bg-green-100 text-green-800',
+  desestimado:     'bg-red-100 text-red-600',
+  transferido:     'bg-cyan-100 text-cyan-700',
   sin_estado:      'bg-gray-100 text-gray-500',
 };
 
