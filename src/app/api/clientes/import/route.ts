@@ -26,6 +26,11 @@ interface ClienteInsertPayload {
   telefono: string;
   telefono_e164: string;
   estado_cliente: 'por_contactar';
+  // Data-provenance: bulk-imported clientes must be distinguishable from
+  // CRM-captured leads. Without this, ~22k imported contacts look identical
+  // to leads worked through the funnel and pollute funnel/aging metrics
+  // (their fecha_alta is the import date, not a real "lead entered" event).
+  origen_lead: 'importacion';
   notas: string | null;
   created_by: string;
   vendedor_asignado?: string | null;
@@ -118,6 +123,7 @@ export async function POST(request: NextRequest) {
           telefono: cliente.telefono.trim(),
           telefono_e164: phoneKey,
           estado_cliente: 'por_contactar',
+          origen_lead: 'importacion',
           notas,
           created_by: user.id,
           vendedor_asignado: null,
