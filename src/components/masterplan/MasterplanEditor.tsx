@@ -220,7 +220,9 @@ export function MasterplanEditor({ imageUrl, lotes, onSaved }: MasterplanEditorP
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
           >
             <option value="">— Seleccione un lote —</option>
-            {lotes.map((l) => (
+            {/* Solo lotes sin polígono: para re-marcar uno ya asignado, primero
+                se borra desde la lista. */}
+            {lotes.filter((l) => !l.poly).map((l) => (
               <option key={l.id} value={l.id}>{l.codigo} ({l.estado})</option>
             ))}
           </select>

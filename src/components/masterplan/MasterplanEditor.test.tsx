@@ -33,6 +33,14 @@ describe("MasterplanEditor", () => {
     expect(screen.getByTestId("borrar-poly-B2")).toBeInTheDocument();
   });
 
+  it("el selector de asignación solo ofrece lotes sin polígono", () => {
+    render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
+    // A1 no tiene polígono: debe poder asignarse. B2 ya está marcado: para
+    // re-marcarlo primero hay que borrarlo desde la lista.
+    expect(screen.getByRole("option", { name: "A1 (disponible)" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "B2 (vendido)" })).not.toBeInTheDocument();
+  });
+
   it("borra el polígono de un lote llamando a la action", async () => {
     render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
     fireEvent.click(screen.getByTestId("borrar-poly-B2"));
