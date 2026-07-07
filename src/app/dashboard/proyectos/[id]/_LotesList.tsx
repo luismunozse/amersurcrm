@@ -759,35 +759,57 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan, p
         </CardHeader>
         {showMasterplan && (
           <CardContent>
-            {masterplan?.url ? (
-              <MasterplanViewer
-                imageUrl={masterplan.url}
-                lotes={lotesMarcados}
-                onLoteClick={(id) =>
-                  setSelectedLote(lotesAMostrar.find((l) => l.id === id) ?? null)
-                }
-              />
+            {/* El editor reemplaza al viewer en el mismo lugar: mostrar ambos
+                planos apilados hacía que se intentara dibujar sobre el viewer
+                de solo lectura. */}
+            {editandoMp && puedeEditarMasterplan ? (
+              <>
+                <MasterplanEditorPanel
+                  proyectoId={proyectoId}
+                  masterplan={masterplan ?? null}
+                  lotes={lotesMarcados}
+                  onSaved={() => router.refresh()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setEditandoMp(false)}
+                  className="mt-3 px-3 py-2 border border-crm-border rounded-md text-sm active:scale-[0.98] transition ease-out-strong"
+                >
+                  Cerrar editor
+                </button>
+              </>
+            ) : masterplan?.url ? (
+              <>
+                <MasterplanViewer
+                  imageUrl={masterplan.url}
+                  lotes={lotesMarcados}
+                  onLoteClick={(id) =>
+                    setSelectedLote(lotesAMostrar.find((l) => l.id === id) ?? null)
+                  }
+                />
+                {puedeEditarMasterplan && (
+                  <button
+                    type="button"
+                    onClick={() => setEditandoMp(true)}
+                    className="mt-3 px-3 py-2 border border-crm-border rounded-md text-sm active:scale-[0.98] transition ease-out-strong"
+                  >
+                    Editar masterplan
+                  </button>
+                )}
+              </>
             ) : (
               <div className="p-6 text-center text-sm text-crm-text-muted dark:text-gray-400">
-                Aún no hay masterplan cargado para este proyecto.
+                <p>Aún no hay masterplan cargado para este proyecto.</p>
+                {puedeEditarMasterplan && (
+                  <button
+                    type="button"
+                    onClick={() => setEditandoMp(true)}
+                    className="mt-3 px-3 py-2 bg-crm-primary text-white rounded-md text-sm active:scale-[0.98] transition ease-out-strong"
+                  >
+                    Subir plano
+                  </button>
+                )}
               </div>
-            )}
-            {puedeEditarMasterplan && (
-              <button
-                type="button"
-                onClick={() => setEditandoMp((v) => !v)}
-                className="mt-3 px-3 py-2 border border-crm-border rounded-md text-sm active:scale-[0.98] transition ease-out-strong"
-              >
-                {editandoMp ? "Cerrar editor" : "Editar masterplan"}
-              </button>
-            )}
-            {editandoMp && (
-              <MasterplanEditorPanel
-                proyectoId={proyectoId}
-                masterplan={masterplan ?? null}
-                lotes={lotesMarcados}
-                onSaved={() => router.refresh()}
-              />
             )}
           </CardContent>
         )}
