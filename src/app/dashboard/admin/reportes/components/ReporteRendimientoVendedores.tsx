@@ -183,7 +183,7 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
                     <p className="font-bold text-crm-text-primary">{formatCurrency(performer.sales)}</p>
                     <div className="flex gap-2 items-center text-xs">
                       <span className="text-crm-text-secondary">Conversión: {performer.conversion}</span>
-                      {performer.cumplimiento && (
+                      {performer.cumplimiento !== null ? (
                         <span className={`px-2 py-0.5 rounded-full ${
                           Number(performer.cumplimiento) >= 100
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
@@ -192,6 +192,10 @@ export default function ReporteRendimientoVendedores({ periodo, fechaInicio, fec
                             : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         }`}>
                           {performer.cumplimiento}% meta
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-crm-text-muted">
+                          Sin meta asignada
                         </span>
                       )}
                     </div>

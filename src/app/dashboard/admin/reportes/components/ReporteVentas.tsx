@@ -268,9 +268,12 @@ export default function ReporteVentas({ periodo, fechaInicio, fechaFin }: Report
                     <span className="text-crm-text-secondary">Ventas Mensuales</span>
                     <span className="text-sm text-crm-text-muted">
                       {formatCurrency(objetivos.ventasMensuales.realizado)} / {formatCurrency(objetivos.ventasMensuales.meta)}
+                      {objetivos.ventasMensuales.esEstimado && (
+                        <span className="italic"> (estimado)</span>
+                      )}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${objetivos.ventasMensuales.porcentaje >= 90 ? 'bg-green-500' : objetivos.ventasMensuales.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
                       style={{ width: `${Math.min(objetivos.ventasMensuales.porcentaje, 100)}%` }}
@@ -283,9 +286,12 @@ export default function ReporteVentas({ periodo, fechaInicio, fechaFin }: Report
                     <span className="text-crm-text-secondary">Propiedades</span>
                     <span className="text-sm text-crm-text-muted">
                       {objetivos.propiedades.realizado} / {objetivos.propiedades.meta}
+                      {objetivos.propiedades.esEstimado && (
+                        <span className="italic"> (estimado)</span>
+                      )}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${objetivos.propiedades.porcentaje >= 90 ? 'bg-green-500' : objetivos.propiedades.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
                       style={{ width: `${Math.min(objetivos.propiedades.porcentaje, 100)}%` }}
@@ -297,15 +303,24 @@ export default function ReporteVentas({ periodo, fechaInicio, fechaFin }: Report
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-crm-text-secondary">Clientes Nuevos</span>
                     <span className="text-sm text-crm-text-muted">
-                      {objetivos.clientesNuevos.realizado} / {objetivos.clientesNuevos.meta}
+                      {objetivos.clientesNuevos.meta === null ? (
+                        <>
+                          {objetivos.clientesNuevos.realizado} ·{" "}
+                          <span className="text-crm-text-muted">Sin meta asignada</span>
+                        </>
+                      ) : (
+                        `${objetivos.clientesNuevos.realizado} / ${objetivos.clientesNuevos.meta}`
+                      )}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${objetivos.clientesNuevos.porcentaje >= 90 ? 'bg-green-500' : objetivos.clientesNuevos.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                      style={{ width: `${Math.min(objetivos.clientesNuevos.porcentaje, 100)}%` }}
-                    ></div>
-                  </div>
+                  {objetivos.clientesNuevos.meta !== null && (
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${objetivos.clientesNuevos.porcentaje >= 90 ? 'bg-green-500' : objetivos.clientesNuevos.porcentaje >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                        style={{ width: `${Math.min(objetivos.clientesNuevos.porcentaje, 100)}%` }}
+                      ></div>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
