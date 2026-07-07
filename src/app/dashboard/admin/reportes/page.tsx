@@ -7,6 +7,7 @@ import {
   Calendar, Download, BarChart3, UserCheck, UserCog, MessageSquare,
   Users, PieChart, Target, Clock, AlertCircle, Building, DollarSign,
   TrendingUp, GitCompare, FileDown, Banknote, Wallet, Layers, Bell,
+  ClipboardList,
 } from "lucide-react";
 import { useReportes } from "@/hooks/useReportes";
 import ReporteVentas from "./components/ReporteVentas";
@@ -25,6 +26,7 @@ import ReporteOrigenLead from "./components/ReporteOrigenLead";
 import ReporteTiempoRespuesta from "./components/ReporteTiempoRespuesta";
 import ReporteCobranza from "./components/ReporteCobranza";
 import ReporteComisionesAdmin from "./components/ReporteComisionesAdmin";
+import ScorecardVendedores from "./components/ScorecardVendedores";
 import ResumenKPIs from "./components/ResumenKPIs";
 import SidebarSecciones from "./components/SidebarSecciones";
 import ComparacionPeriodos from "@/components/reportes/ComparacionPeriodos";
@@ -96,6 +98,7 @@ const GRUPOS_TABS = [
     id: "equipo",
     title: "Equipo",
     secciones: [
+      { id: "scorecard",           title: "Scorecard",    icon: ClipboardList },
       { id: "rendimiento",         title: "Rendimiento",  icon: UserCog },
       { id: "por-vendedor",        title: "Por Vendedor", icon: UserCog },
       { id: "comparar-vendedores", title: "Comparar",     icon: GitCompare },
@@ -611,6 +614,20 @@ function ReportesPageContent() {
             >
               {visitedTabs.has("clientes") && (
                 <ReporteClientes
+                  periodo={selectedPeriod}
+                  fechaInicio={fechasEfectivas.fechaInicio}
+                  fechaFin={fechasEfectivas.fechaFin}
+                />
+              )}
+            </section>
+
+            <section
+              data-seccion="scorecard"
+              data-seccion-activa={activeTab === "scorecard" ? "true" : undefined}
+              className={activeTab === "scorecard" ? "" : "hidden"}
+            >
+              {visitedTabs.has("scorecard") && (
+                <ScorecardVendedores
                   periodo={selectedPeriod}
                   fechaInicio={fechasEfectivas.fechaInicio}
                   fechaFin={fechasEfectivas.fechaFin}
