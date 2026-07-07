@@ -16,8 +16,7 @@ phases:
 
 verify_outcome: pass_with_warnings
 
-next_recommended:
-  - archive  # 0 CRITICAL, 3 WARNING (documented scope gaps: scorecard tiempoRespuestaHoras always null; cobranza dias_max_atraso/vencido bucket not tier-aligned; 2 out-of-scope component files with dead-but-harmless estado literals), 3 SUGGESTION. 76/76 targeted tests pass fresh, tsc --noEmit clean. See verify-report.md for full detail.
+next_recommended: []
 
 blocked_reasons: []
 
@@ -32,9 +31,10 @@ constraints:
   ui_copy_language: "Peruvian formal Spanish (usted)"
 
 artifacts:
-  proposal: openspec/changes/reportes-confiables/proposal.md
-  spec: openspec/changes/reportes-confiables/spec.md
-  design: openspec/changes/reportes-confiables/design.md
-  tasks: openspec/changes/reportes-confiables/tasks.md
-  apply_progress: openspec/changes/reportes-confiables/apply-progress.md
-  verify_report: openspec/changes/reportes-confiables/verify-report.md
+  proposal: openspec/changes/archive/2026-07-07-reportes-confiables/proposal.md
+  spec: openspec/changes/archive/2026-07-07-reportes-confiables/spec.md
+  design: openspec/changes/archive/2026-07-07-reportes-confiables/design.md
+  tasks: openspec/changes/archive/2026-07-07-reportes-confiables/tasks.md
+  apply_progress: openspec/changes/archive/2026-07-07-reportes-confiables/apply-progress.md
+  verify_report: openspec/changes/archive/2026-07-07-reportes-confiables/verify-report.md
+  archive_report: openspec/changes/archive/2026-07-07-reportes-confiables/archive-report.md
