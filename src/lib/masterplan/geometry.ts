@@ -32,6 +32,26 @@ export function estadoColor(estado: string): { fill: string; stroke: string } {
 }
 
 /**
+ * Devuelve un nuevo polígono con el vértice en `index` movido a `punto`
+ * (recortado a [0,1]). No muta `poly`. Índices fuera de rango son un no-op.
+ */
+export function moverVertice(poly: Poligono, index: number, punto: Punto): Poligono {
+  if (index < 0 || index >= poly.length) return poly;
+  const nuevoPunto: Punto = [clampUnidad(punto[0]), clampUnidad(punto[1])];
+  return poly.map((v, i) => (i === index ? nuevoPunto : v));
+}
+
+/**
+ * Devuelve un nuevo polígono sin el vértice en `index`. No muta `poly`.
+ * No-op si el polígono tiene 3 vértices o menos (mínimo para un polígono válido).
+ */
+export function eliminarVertice(poly: Poligono, index: number): Poligono {
+  if (poly.length <= 3) return poly;
+  if (index < 0 || index >= poly.length) return poly;
+  return poly.filter((_, i) => i !== index);
+}
+
+/**
  * Mergea el polígono en el JSONB `data` del lote sin pisar otras claves.
  * poly=null elimina la clave masterplan_poly.
  */
