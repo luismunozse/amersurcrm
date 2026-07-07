@@ -483,7 +483,7 @@ export default function VendedoresActivosPage() {
               />
             )}
             <h2 className="font-semibold text-gray-900">
-              Vendedores Activos ({vendedores.filter((v) => v.activo).length})
+              Vendedores en la rotación ({vendedores.filter((v) => v.activo).length})
             </h2>
           </div>
 

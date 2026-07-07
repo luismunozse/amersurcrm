@@ -114,8 +114,8 @@ function AdminDashboard() {
               <Users className="w-6 h-6 text-indigo-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-crm-text-primary">Vendedores Activos</h3>
-              <p className="text-sm text-crm-text-muted">Asignación automática</p>
+              <h3 className="text-lg font-semibold text-crm-text-primary">Asignación automática de leads</h3>
+              <p className="text-sm text-crm-text-muted">Rotación round-robin</p>
             </div>
           </div>
           <p className="text-crm-text-secondary text-sm mb-4">

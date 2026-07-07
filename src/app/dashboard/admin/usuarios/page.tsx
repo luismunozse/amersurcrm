@@ -411,7 +411,7 @@ function GestionUsuarios() {
               title="Configurar vendedores para asignación automática de leads"
             >
               <UsersIcon className="w-4 h-4" />
-              <span>Vendedores Activos</span>
+              <span>Asignación automática de leads</span>
             </a>
             <ProtectedAction permiso={PERMISOS.USUARIOS.CREAR}>
               <button
