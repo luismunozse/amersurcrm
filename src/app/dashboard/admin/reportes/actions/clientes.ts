@@ -1,6 +1,7 @@
 "use server";
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
+import { esEstadoActivo } from "@/lib/reportes/estados";
 
 /**
  * Obtiene reporte de clientes con datos reales
@@ -28,8 +29,8 @@ export async function obtenerReporteClientes(
       .from('cliente')
       .select('id, estado_cliente, origen_lead, propiedades_compradas, propiedades_reservadas');
 
-    // Clientes activos
-    const clientesActivos = todosClientes?.filter(c => c.estado_cliente === 'activo').length || 0;
+    // Clientes activos — pipeline-membership (no invalid literal 'activo').
+    const clientesActivos = todosClientes?.filter(c => esEstadoActivo(c.estado_cliente ?? '')).length || 0;
 
     // Clientes por fuente (origen_lead)
     const fuentesMap = new Map<string, number>();
@@ -136,7 +137,7 @@ export async function obtenerReporteGestionClientes(
 ): Promise<{ data: any | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: clientes } = await supabase
       .schema('crm')
@@ -153,6 +154,7 @@ export async function obtenerReporteGestionClientes(
         proxima_accion
       `)
       .gte('fecha_alta', startDate.toISOString())
+      .lte('fecha_alta', endDate.toISOString())
       .order('fecha_alta', { ascending: false });
 
     const idsClientesGestion = clientes?.map(c => c.id) || [];

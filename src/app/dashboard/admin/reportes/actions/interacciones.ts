@@ -49,7 +49,7 @@ export async function obtenerReporteInteracciones(
 ): Promise<{ data: ReporteInteraccionesData | null; error: string | null }> {
   return safeAction(async () => {
     const supabase = await getAuthorizedClient();
-    const { startDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
 
     const { data: interacciones } = await supabase
       .schema('crm')
@@ -59,6 +59,7 @@ export async function obtenerReporteInteracciones(
         duracion_minutos, fecha_interaccion, proxima_accion
       `)
       .gte('fecha_interaccion', startDate.toISOString())
+      .lte('fecha_interaccion', endDate.toISOString())
       .order('fecha_interaccion', { ascending: false });
 
     const { data: vendedores } = await supabase

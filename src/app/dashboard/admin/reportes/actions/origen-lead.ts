@@ -1,6 +1,7 @@
 "use server";
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
+import { ESTADOS_AVANZADOS } from "@/lib/reportes/estados";
 
 /**
  * Obtiene reporte de clientes captados según origen del lead
@@ -145,13 +146,11 @@ export async function obtenerReporteOrigenLead(
     // Usa clientes del período filtrado para consistencia con el resto del reporte
     const avancePorOrigen = new Map<string, { total: number; avanzados: number }>();
 
-    const estadosAvanzados = ['activo', 'en_seguimiento', 'interesado', 'reserva', 'comprador', 'contactado'];
-
     clientesPeriodo?.forEach(cliente => {
       const origen = cliente.origen_lead || 'No especificado';
       const actual = avancePorOrigen.get(origen) || { total: 0, avanzados: 0 };
       actual.total++;
-      if (estadosAvanzados.includes(cliente.estado_cliente)) {
+      if ((ESTADOS_AVANZADOS as readonly string[]).includes(cliente.estado_cliente ?? '')) {
         actual.avanzados++;
       }
       avancePorOrigen.set(origen, actual);

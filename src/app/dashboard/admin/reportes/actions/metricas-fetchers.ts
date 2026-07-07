@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { esEstadoConvertido } from "@/lib/reportes/estados";
 
 const MESES_TENDENCIA = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -21,7 +22,7 @@ export interface MetricasClientesPiezas {
   nuevos: number;
   activos: number;
   totalHistorico: number;
-  /** Conversion: clientes con estado_cliente='cliente' / leads del período. */
+  /** Conversion: clientes con estado_cliente='propietario' (ESTADOS_CONVERTIDOS) / leads del período. */
   tasaConversion: number;
 }
 
@@ -90,7 +91,7 @@ export async function fetchMetricasClientes(
   (interaccionRes.data || []).forEach((i: any) => i.cliente_id && activosSet.add(i.cliente_id));
   (ventaRes.data || []).forEach((v: any) => v.cliente_id && activosSet.add(v.cliente_id));
 
-  const convertidos = leadsRaw.filter((c) => c.estado_cliente === "cliente").length;
+  const convertidos = leadsRaw.filter((c) => esEstadoConvertido(c.estado_cliente ?? "")).length;
   const tasaConversion = nuevos > 0 ? (convertidos / nuevos) * 100 : 0;
 
   return {

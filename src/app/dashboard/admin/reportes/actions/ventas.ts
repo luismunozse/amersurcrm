@@ -1,6 +1,7 @@
 "use server";
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
+import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
 
 /**
  * Obtiene reporte de ventas con datos reales
@@ -136,11 +137,18 @@ export async function obtenerMetricasRendimiento(
     const supabase = await getAuthorizedClient();
     const { startDate, endDate } = calcularFechas(periodo, fechaInicio, fechaFin);
 
-    const { data: totalLeads } = await supabase
+    // Conversion denominator = leads del período (funnel-cohort semantics,
+    // single-sourced with funnel.ts) excluyendo el backlog de importación
+    // nunca contactado — ver design.md ADR1 "Conversion denominator".
+    const { data: leadsPeriodo } = await supabase
       .schema('crm')
       .from('cliente')
       .select('id')
-      .in('estado_cliente', ['lead', 'prospecto']);
+      .gte('fecha_alta', startDate.toISOString())
+      .lte('fecha_alta', endDate.toISOString())
+      .or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO);
+
+    const leadIds = new Set((leadsPeriodo ?? []).map((c: any) => c.id));
 
     const { data: clientesConVentas } = await supabase
       .schema('crm')
@@ -149,9 +157,16 @@ export async function obtenerMetricasRendimiento(
       .gte('fecha_venta', startDate.toISOString())
       .lte('fecha_venta', endDate.toISOString());
 
-    const clientesUnicos = new Set(clientesConVentas?.map(v => v.cliente_id) || []);
-    const tasaConversion = (totalLeads && totalLeads.length > 0)
-      ? (clientesUnicos.size / totalLeads.length) * 100
+    // Numerador = leads del período que llegaron a venta (intersección con
+    // el set de leads, mismo patrón que funnel.ts's leadIds/ventasCerradasIds).
+    const clientesUnicos = new Set(
+      (clientesConVentas ?? [])
+        .map((v: any) => v.cliente_id)
+        .filter((clienteId: string) => leadIds.has(clienteId)),
+    );
+    const totalLeads = leadIds.size;
+    const tasaConversion = totalLeads > 0
+      ? (clientesUnicos.size / totalLeads) * 100
       : 0;
 
     const { data: ventasConCliente } = await supabase
@@ -188,7 +203,7 @@ export async function obtenerMetricasRendimiento(
     return {
       tasaConversion: Math.round(tasaConversion * 10) / 10,
       tiempoPromedioVenta,
-      totalLeads: totalLeads?.length || 0,
+      totalLeads,
       clientesConvertidos: clientesUnicos.size
     };
   });
