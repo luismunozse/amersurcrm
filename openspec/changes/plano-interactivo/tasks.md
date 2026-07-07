@@ -65,15 +65,15 @@ Maps to: Requirement "Polygon editor vertex and history operations" (4 scenarios
 Maps to: Requirement "Presentation component consumes a price-free whitelist DTO" (2 scenarios), "Polygon coordinates remain resolution-independent" (1 scenario); ADR-4, ADR-3
 
 ### Phase 5: DTO + server builder (TDD)
-- [ ] 5.1 RED — `src/lib/masterplan/dto.test.ts`: `toPlanoLoteDTO(rowWithPrice)` keys are exactly `[id, codigo, estado, area, manzana, etapa, poly]`, never `precio`/`moneda`/`descuento`/`precio_m2`/`condiciones`; `buildPlanoPresentacion` never leaks those keys
-- [ ] 5.2 GREEN — `src/lib/masterplan/dto.ts` (`PlanoLoteDTO`, `PlanoPresentacionDTO`, explicit-pick `toPlanoLoteDTO`, never spreads the raw row) + `src/lib/masterplan/presentacion.server.ts` (`buildPlanoPresentacion(proyectoId)`: reads `proyecto.masterplan` + `lote` rows, `null` when `masterplan.url` absent)
-- [ ] 5.3 RED/GREEN — `presentacion.server.test.ts`: `null` without masterplan; maps `sup_m2→area`, `data.manzana`, `data.etapa`
+- [x] 5.1 RED — `src/lib/masterplan/dto.test.ts`: `toPlanoLoteDTO(rowWithPrice)` keys are exactly `[id, codigo, estado, area, manzana, etapa, poly]`, never `precio`/`moneda`/`descuento`/`precio_m2`/`condiciones`; `buildPlanoPresentacion` never leaks those keys
+- [x] 5.2 GREEN — `src/lib/masterplan/dto.ts` (`PlanoLoteDTO`, `PlanoPresentacionDTO`, explicit-pick `toPlanoLoteDTO`, never spreads the raw row) + `src/lib/masterplan/presentacion.server.ts` (`buildPlanoPresentacion(proyectoId)`: reads `proyecto.masterplan` + `lote` rows, `null` when `masterplan.url` absent)
+- [x] 5.3 RED/GREEN — `presentacion.server.test.ts`: `null` without masterplan; maps `sup_m2→area`, `data.manzana`, `data.etapa`
 
 ### Phase 6: Viewer refactor (price-free, global guarantee)
-- [ ] 6.1 Refactor `MasterplanViewer.tsx`: replace `LoteMarcado` props with `PlanoLoteDTO`; tooltip drops `formatPrecio`, shows `codigo` + `estado` only
-- [ ] 6.2 Update callers: `_LotesList.tsx` `lotesMarcados` (line 450) drops `precio`/`moneda` for `MasterplanViewer`/`MasterplanEditorPanel` props (admin price columns elsewhere in the list are untouched); `MasterplanEditor.tsx`/`MasterplanEditorPanel.tsx` type imports updated to `PlanoLoteDTO`
-- [ ] 6.3 RED→GREEN — update `MasterplanViewer.test.tsx`: no price text/attribute in rendered output; existing polygon/color assertions still pass
-- [ ] 6.4 `npx vitest run src/lib/masterplan/dto.test.ts src/lib/masterplan/presentacion.server.test.ts src/components/masterplan/MasterplanViewer.test.tsx`; `npx tsc --noEmit`
+- [x] 6.1 Refactor `MasterplanViewer.tsx`: replace `LoteMarcado` props with `PlanoLoteDTO`; tooltip drops `formatPrecio`, shows `codigo` + `estado` only
+- [x] 6.2 Update callers: `_LotesList.tsx` `lotesMarcados` (line 450) drops `precio`/`moneda` for `MasterplanViewer`/`MasterplanEditorPanel` props (admin price columns elsewhere in the list are untouched); `MasterplanEditor.tsx`/`MasterplanEditorPanel.tsx` type imports updated to `PlanoLoteDTO`
+- [x] 6.3 RED→GREEN — update `MasterplanViewer.test.tsx`: no price text/attribute in rendered output; existing polygon/color assertions still pass
+- [x] 6.4 `npx vitest run src/lib/masterplan/dto.test.ts src/lib/masterplan/presentacion.server.test.ts src/components/masterplan/MasterplanViewer.test.tsx`; `npx tsc --noEmit`
 
 ## PR4 — Presentation mode
 Maps to: Requirement "Presentation mode shows no price anywhere on screen" (2 scenarios); ADR-4 (shared component/DTO seam)

@@ -157,3 +157,117 @@ Rollback: revert one or both commits; PR1's uploader path and the frozen legacy 
 - The new `dibujo` vertex-editing UI (drag/delete/undo) operates entirely on the local, unsaved `Poligono` draft and does not touch `LoteMarcado`/DTO shapes at all — PR3's price-free DTO refactor should have zero interaction with this logic.
 - `react-zoom-pan-pinch` is now a project dependency (`^4.0.3`); its usage is isolated to `MasterplanEditor.tsx` per ADR-5's isolation guidance — no other file imports it.
 - `MasterplanEditorPanel.tsx` now imports `MasterplanEditor` via `next/dynamic`; if PR3 needs to change `MasterplanEditor`'s export shape (e.g., default vs. named export), update the `.then((m) => m.MasterplanEditor)` accessor accordingly.
+
+---
+
+## Slice implemented: PR3 — Price-free DTO + server builder + viewer refactor
+
+Status: **done**. Phases 5-6 (all PR3 tasks in `tasks.md`) checked off.
+
+### Files touched
+
+| File | Change |
+|------|--------|
+| `src/lib/masterplan/dto.ts` | **New.** `PlanoLoteDTO` (`id, codigo, estado, area, manzana, etapa, poly` — matches design.md's ADR-4 shape exactly), `PlanoPresentacionDTO` (`imageUrl, width, height, lotes`), `LoteRowParaDTO` (loose raw-row input type, no index signature — kept narrow on purpose, see gotcha below), and `toPlanoLoteDTO(row)`: an explicit-pick object literal (never spreads `row`) that maps `sup_m2→area`, `data.manzana→manzana`, `data.etapa→etapa`, `data.masterplan_poly→poly` (validated via a private `esPoligonoValido` guard, falls back to `null` on any malformed shape). No `precio`/`moneda`/`descuento`/`precio_m2`/`condiciones` field is read or producible. |
+| `src/lib/masterplan/dto.test.ts` | **New.** 4 tests: exact key list (`Object.keys(dto)` order-sensitive) even when the row carries price fields (`JSON.stringify` never contains the price value either); field mapping; all-defaults-to-null when `sup_m2`/`data` absent; invalid `masterplan_poly` shape falls back to `null`. RED confirmed (`./dto` unresolved) before implementation. |
+| `src/lib/masterplan/presentacion.server.ts` | **New.** `buildPlanoPresentacion(proyectoId)`: `import "server-only"`; uses `createServerOnlyClient()` (session-scoped, schema `crm` — same client factory `page.tsx` already uses for proyecto/lote reads, per the "service-role vs session client" project convention). Reads `proyecto.masterplan`, returns `null` if the proyecto row or `masterplan.url` is absent; reads `lote` rows (`id,codigo,estado,sup_m2,data`) filtered by `proyecto_id`, maps each through `toPlanoLoteDTO`. Throws on a Postgrest error from either query (caller/route decides on error handling — no swallowing). |
+| `src/lib/masterplan/presentacion.server.test.ts` | **New.** 4 tests using the same hand-rolled thenable-chain mock pattern as `masterplan-actions.test.ts` (`vi.mock("@/lib/supabase.server", ...)` since this file calls `createServerOnlyClient`, not `createServerActionClient`): null on missing masterplan.url, null on missing proyecto row, throws on proyecto query error, and a full mapping test whose raw `lote` row carries `precio: 99999`/`moneda: "USD"` — asserts the returned DTO's `JSON.stringify` never contains `"99999"`, `"precio"`, or `"moneda"` (the leak-proof structural test design.md calls for, executed against the actual server builder rather than only the pure mapper). RED confirmed (`./presentacion.server` unresolved) before implementation. |
+| `src/components/masterplan/MasterplanViewer.tsx` | Replaced the local `LoteMarcado` interface + `formatPrecio` helper with `PlanoLoteDTO` (imported from `@/lib/masterplan/dto`). The SVG `<title>` tooltip now renders `${codigo} — ${estado}` instead of `${codigo} — ${formatPrecio(precio, moneda)}` — price is no longer read, computed, or renderable (the prop type has no price field, so this is a compile-time guarantee, not just a UI change). |
+| `src/components/masterplan/MasterplanViewer.test.tsx` | Fixture rewritten to `PlanoLoteDTO[]` shape (`area`/`manzana`/`etapa` instead of `precio`/`moneda`). Added a 3rd test: renders the viewer and asserts `container.innerHTML` (case-insensitive) never contains `"precio"`/`"moneda"`, and never contains the numeric `area` value (`"120"`) either — locks in task 6.3's "no price text/attribute in rendered output" requirement globally, not just for the tooltip. RED confirmed pre-refactor (old `formatPrecio(null, null)` produced literal text `"Sin precio"`, which itself contains the substring `"precio"` — a nice accidental proof the leak was real). |
+| `src/components/masterplan/MasterplanEditor.tsx` | Type-only change: `import type { LoteMarcado } from "./MasterplanViewer"` → `import type { PlanoLoteDTO } from "@/lib/masterplan/dto"`; `lotes: LoteMarcado[]` → `lotes: PlanoLoteDTO[]`. No runtime logic touched (confirmed by reading — the file only reads `.id`/`.codigo`/`.estado`/`.poly` off each lote, all of which exist unchanged on `PlanoLoteDTO`). |
+| `src/components/masterplan/MasterplanEditor.test.tsx` | Fixture updated to `PlanoLoteDTO` shape (added `area`/`manzana`/`etapa` with `as const` on `estado` so the literal narrows to the union type instead of widening to `string`) — this was a compile-fix, not a behavior test change; all 5 existing assertions (list rendering, borrar-poly action, drag/delete/undo) still pass unmodified. |
+| `src/components/masterplan/MasterplanEditorPanel.tsx` | Type-only change: same `LoteMarcado` → `PlanoLoteDTO` swap for the `lotes` prop type and its import. |
+| `src/app/dashboard/proyectos/[id]/_LotesList.tsx` | `lotesMarcados` construction replaced: the previous 11-line inline object-literal map (which explicitly copied `precio`/`moneda` and reached into `l.data as any` for `masterplan_poly`) is now `lotesAMostrar.map(toPlanoLoteDTO)` — a single call into the same shared, tested mapper `presentacion.server.ts` uses, so the admin editor path and the (future PR4) presentation path are guaranteed to derive the DTO identically. Import swapped from `type { LoteMarcado } from "@/components/masterplan/MasterplanViewer"` to `{ toPlanoLoteDTO, type PlanoLoteDTO } from "@/lib/masterplan/dto"`. **Admin price columns elsewhere in this file are untouched** — they read `precio`/`moneda` directly off `lotesAMostrar`/`lotesState` (the full `Lote` type, unaffected by this change), not off `lotesMarcados`. |
+
+No other files changed. `_actions.ts` (`guardarMasterplanProyecto`, `guardarPoligonoLote`, `eliminarPoligonoLote`), `geometry.ts`, `rasterize.client.ts`, and the legacy `planos_url`/`overlay_layers` write paths were not touched — verified by reading, not modifying.
+
+### Scope decisions and deviations (documented)
+
+1. **`toPlanoLoteDTO` is reused directly in `_LotesList.tsx`**, not re-implemented. Task 6.2 only asked to "drop `precio`/`moneda`"; reusing the exact pure mapper that `presentacion.server.ts` also calls was a deliberate choice beyond the letter of the task, because it makes the admin editor's DTO and the future presentation DTO provably identical (same function, same tests) rather than two hand-maintained mappings that could drift. This directly serves ADR-4's "global guarantee" intent.
+2. **`LoteRowParaDTO` has no index signature.** An initial draft included `[extra: string]: unknown` to make the "tolerates extra raw columns" intent explicit in the type itself, but TypeScript's index-signature assignability rule would then have required the local `Lote` type in `_LotesList.tsx` (and any other caller) to also declare a matching index signature to be assignable — which would have forced an unrelated, unnecessary type change on that file's existing `Lote` type. Dropped the index signature; the "tolerates extra fields" guarantee is enforced by `toPlanoLoteDTO`'s explicit-pick implementation and the dto test suite, not by the input type's shape. Documented here as the one non-obvious TS gotcha from this slice.
+3. **`buildPlanoPresentacion` throws on a Postgrest error** rather than swallowing it into a `{ok:false}`-style result, matching `page.tsx`'s existing pattern of `if (error) throw error;` for read paths (as opposed to the mutation actions in `_actions.ts`, which return `{ok:false,error}`). Since this is a read-only server function called from a server component (not a form action), letting the error propagate to Next's error boundary is the existing convention for this kind of read, not a new one.
+4. **Client choice: session-scoped `createServerOnlyClient()`, not service-role.** Per the gotcha in the task brief ("service-role vs session client choice must follow how existing proyecto/lote server code does it"), `page.tsx`'s proyecto/lote reads use `createServerOnlyClient()` (schema `crm`, cookie-based session, RLS-enforced). `buildPlanoPresentacion` follows that exact precedent. **Flagged for PR4/Phase-2 attention**: the deferred public `/p/[token]` route (out of scope here) is unauthenticated by definition, so it cannot reuse a cookie-session client as-is — whoever builds that route will need either an RLS policy that allows anonymous reads scoped by a valid token-resolved `proyectoId`, or a service-role variant of this same builder. Not a PR3 concern (no public route exists yet), but noted so it isn't rediscovered from scratch later.
+
+### Tests written and results
+
+```
+npx vitest run src/lib/masterplan/dto.test.ts
+```
+- RED (before `dto.ts` existed): 1 failed suite — `Failed to resolve import "./dto"`.
+- GREEN (after implementation): 1 file passed, 4 tests passed.
+
+```
+npx vitest run src/lib/masterplan/presentacion.server.test.ts
+```
+- RED (before `presentacion.server.ts` existed): 1 failed suite — `Failed to resolve import "./presentacion.server"`.
+- GREEN (after implementation): 1 file passed, 4 tests passed.
+
+```
+npx vitest run src/components/masterplan/MasterplanViewer.test.tsx
+```
+- RED (before the viewer refactor, new price-free assertion only): 1 failed test — tooltip rendered literal text `"Sin precio"`, which contains the substring `"precio"`, failing the `not.toContain("precio")` assertion. The two pre-existing tests already passed.
+- GREEN (after refactor): 1 file passed, 3 tests passed.
+
+Full targeted regression for this slice (per Strict TDD "targeted files" instruction — no full-suite run):
+```
+npx vitest run src/lib/masterplan/dto.test.ts src/lib/masterplan/presentacion.server.test.ts src/components/masterplan/MasterplanViewer.test.tsx src/components/masterplan/MasterplanEditor.test.tsx src/lib/masterplan/geometry.test.ts src/lib/masterplan/rasterize.test.ts src/__tests__/unit/masterplan-actions.test.ts
+```
+- Result: 7 files passed, 47 tests passed, 0 failed.
+
+```
+npx tsc --noEmit
+```
+- Result: exit code 0, no errors (full project). One pre-existing-pattern fix needed along the way: `MasterplanEditor.test.tsx`'s lote fixture had to gain `area`/`manzana`/`etapa` (now required, non-optional fields on `PlanoLoteDTO`) and an `as const` on `estado` — this was necessary for the fixture to satisfy the new prop type, not a behavior change; all its assertions still pass.
+
+### Changed-line estimate vs budget
+
+Forecast for PR3: ~300 changed lines (excluding tests). Actual, non-test files only:
+
+- `src/lib/masterplan/dto.ts`: 79 lines (new).
+- `src/lib/masterplan/presentacion.server.ts`: 48 lines (new).
+- `src/components/masterplan/MasterplanViewer.tsx`: 39 → 25 lines net (refactor removes `formatPrecio` + the wider `LoteMarcado` interface).
+- `src/components/masterplan/MasterplanEditor.tsx`: 2-line import/type swap only.
+- `src/components/masterplan/MasterplanEditorPanel.tsx`: 2-line import/type swap only.
+- `src/app/dashboard/proyectos/[id]/_LotesList.tsx`: net −8 lines (import line change + 11-line inline map collapsed to 1 line + comment).
+
+Total non-test ≈ **~135 lines** — well under the ~300-line forecast and the 400-line budget. Test-only additions (`dto.test.ts` 75 lines, `presentacion.server.test.ts` 96 lines, `MasterplanViewer.test.tsx` net +9 lines, `MasterplanEditor.test.tsx` fixture-only diff) excluded from the budget per the PR1/PR2-established convention.
+
+### Suggested commit boundaries (work-unit-commits skill)
+
+Two reviewable work units for this PR (both still part of the single PR3 slice/branch, stacked after PR2 merges):
+
+```
+feat(masterplan): add price-free PlanoPresentacionDTO + server builder
+
+- dto.ts: PlanoLoteDTO/PlanoPresentacionDTO types + explicit-pick
+  toPlanoLoteDTO(row) mapper — never spreads the raw row, so precio/
+  moneda/descuento/precio_m2/condiciones cannot reach the DTO
+- presentacion.server.ts: buildPlanoPresentacion(proyectoId), server-only,
+  reads proyecto.masterplan + lote rows, null when no masterplan uploaded
+- structural + integration tests lock the no-price guarantee at both the
+  pure-mapper and the server-builder level
+```
+
+```
+refactor(masterplan): make MasterplanViewer and its callers price-agnostic
+
+- MasterplanViewer: LoteMarcado -> PlanoLoteDTO, tooltip drops formatPrecio,
+  shows codigo + estado only
+- MasterplanEditor/MasterplanEditorPanel: type import swapped to PlanoLoteDTO
+  (no runtime change — same fields already used)
+- _LotesList.tsx: lotesMarcados now built via the shared toPlanoLoteDTO
+  mapper instead of a hand-rolled inline object literal; admin price
+  columns elsewhere in the list are untouched (they read lotesAMostrar
+  directly)
+- MasterplanViewer.test.tsx: new assertion that no price text/attribute
+  ever appears in the rendered output
+```
+
+Rollback: revert one or both commits; PR1's uploader and PR2's editor zoom/pan/vertex-op logic are untouched by either (verified — `MasterplanEditor.tsx`'s only PR3 edit is the type import line), so rollback has zero blast radius outside this slice. If only commit 2 needs reverting, commit 1's DTO/builder are harmless additions unused by anything else yet (PR4 is their first real consumer).
+
+### What PR4 needs to know
+
+- **DTO shape (exact, stable)**: `PlanoPresentacionDTO = { imageUrl: string; width: number; height: number; lotes: PlanoLoteDTO[] }`, `PlanoLoteDTO = { id: string; codigo: string; estado: "disponible"|"reservado"|"vendido"; area: number|null; manzana: string|null; etapa: string|null; poly: Poligono|null }`. Both exported from `src/lib/masterplan/dto.ts`.
+- **Builder entry point**: `buildPlanoPresentacion(proyectoId: string): Promise<PlanoPresentacionDTO | null>` in `src/lib/masterplan/presentacion.server.ts`. Call it from a server component (it's `import "server-only"`-guarded and uses the session-scoped `createServerOnlyClient()`, so it must run in an authenticated request context — the proyecto detail screen, where PR4 wires the "Modo presentación" entry point, already has that context). Returns `null` when no masterplan is uploaded yet — task 7.1/7.2 already anticipate this as `PlanoPresentacion`'s empty-state trigger.
+- `PlanoPresentacion.tsx` (PR4) should type its props as `PlanoPresentacionDTO | null` directly — no new DTO needed, no additional mapping. It can compose the already-refactored `MasterplanViewer` (`PlanoLoteDTO[]` prop, price-agnostic) as its base rendering layer per design.md section 7.
+- The public `/p/[token]` route (deferred, out of this change entirely) will need a service-role or RLS-anonymous variant of `buildPlanoPresentacion`'s Supabase client — see deviation #4 above. Not a PR4 blocker (PR4 is the dashboard-only presentation mode), but worth remembering before that later change starts.

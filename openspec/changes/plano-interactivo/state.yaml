@@ -9,12 +9,12 @@ phases:
   spec: done
   design: done  # corrected: design.md already existed with full content when tasks phase ran
   tasks: done
-  apply: in_progress  # PR1+PR2 done (uploader + PDF rasterization; editor zoom/pan+vertex ops); PR3-PR5 pending
+  apply: in_progress  # PR1+PR2+PR3 done (uploader + PDF rasterization; editor zoom/pan+vertex ops; price-free DTO + server builder + viewer refactor); PR4-PR5 pending
   verify: pending
   archive: pending
 
 next_recommended:
-  - apply  # continue with PR3 (price-free DTO + server builder + viewer refactor); stacked-to-main
+  - apply  # continue with PR4 (PlanoPresentacion component + entry point, consumes PR3's DTO); stacked-to-main (branch after PR3 merges)
 
 delivery:
   strategy: auto-chain
