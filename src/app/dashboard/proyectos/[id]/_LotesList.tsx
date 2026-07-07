@@ -769,7 +769,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
             {editandoMp && (
               <MasterplanEditorPanel
                 proyectoId={proyectoId}
-                masterplan={masterplan ? { url: masterplan.url, path: masterplan.path } : null}
+                masterplan={masterplan ?? null}
                 lotes={lotesMarcados}
                 onSaved={() => router.refresh()}
               />
