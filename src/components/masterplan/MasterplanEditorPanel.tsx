@@ -4,7 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { uploadProyectoAsset, validateProyectoImage, removeProyectoAssets } from "@/lib/storage/proyectoUpload.client";
 import { guardarMasterplanProyecto } from "@/app/dashboard/proyectos/_actions";
-import type { LoteMarcado } from "@/components/masterplan/MasterplanViewer";
+import type { PlanoLoteDTO } from "@/lib/masterplan/dto";
 import { createClient } from "@/lib/supabase.client";
 import { rasterizeFirstPageToPng, aspectRatioChanged } from "@/lib/masterplan/rasterize.client";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -32,7 +32,7 @@ export function MasterplanEditorPanel({
 }: {
   proyectoId: string;
   masterplan: Masterplan | null;
-  lotes: LoteMarcado[];
+  lotes: PlanoLoteDTO[];
   onSaved: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(masterplan?.url ?? null);

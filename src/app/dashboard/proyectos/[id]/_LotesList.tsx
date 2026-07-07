@@ -40,8 +40,9 @@ import DeleteAllLotesModal from "./_DeleteAllLotesModal";
 import BulkImportLotesModal from "./_BulkImportLotesModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
-import { MasterplanViewer, type LoteMarcado } from "@/components/masterplan/MasterplanViewer";
+import { MasterplanViewer } from "@/components/masterplan/MasterplanViewer";
 import { MasterplanEditorPanel } from "@/components/masterplan/MasterplanEditorPanel";
+import { toPlanoLoteDTO, type PlanoLoteDTO } from "@/lib/masterplan/dto";
 import type { Masterplan } from "@/types/proyectos";
 
 type Lote = {
@@ -447,17 +448,10 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
   const lotesAMostrar = lotesState;
   const totalListado = typeof totalLotes === "number" ? totalLotes : lotesAMostrar.length;
 
-  const lotesMarcados: LoteMarcado[] = lotesAMostrar.map((l) => ({
-    id: l.id,
-    codigo: l.codigo,
-    estado: l.estado,
-    precio: l.precio ?? null,
-    moneda: l.moneda ?? null,
-    poly:
-      l.data && typeof l.data === "object" && Array.isArray((l.data as any).masterplan_poly)
-        ? ((l.data as any).masterplan_poly as [number, number][])
-        : null,
-  }));
+  // Price-free whitelist DTO for the masterplan overlay (viewer + editor).
+  // Admin price columns elsewhere in this list read from `lotesAMostrar`
+  // directly and are untouched by this mapping.
+  const lotesMarcados: PlanoLoteDTO[] = lotesAMostrar.map(toPlanoLoteDTO);
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {

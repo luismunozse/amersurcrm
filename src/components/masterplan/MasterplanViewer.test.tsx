@@ -1,10 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MasterplanViewer } from "./MasterplanViewer";
+import type { PlanoLoteDTO } from "@/lib/masterplan/dto";
 
-const lotes = [
-  { id: "a", codigo: "A1", estado: "disponible", precio: 1000, moneda: "PEN", poly: [[0, 0], [0.1, 0], [0.1, 0.1]] as [number, number][] },
-  { id: "b", codigo: "B2", estado: "vendido", precio: 2000, moneda: "PEN", poly: null },
+const lotes: PlanoLoteDTO[] = [
+  {
+    id: "a",
+    codigo: "A1",
+    estado: "disponible",
+    area: 120,
+    manzana: "A",
+    etapa: "1",
+    poly: [[0, 0], [0.1, 0], [0.1, 0.1]],
+  },
+  { id: "b", codigo: "B2", estado: "vendido", area: 80, manzana: "B", etapa: "1", poly: null },
 ];
 
 describe("MasterplanViewer", () => {
@@ -22,5 +31,12 @@ describe("MasterplanViewer", () => {
     render(<MasterplanViewer imageUrl="x.jpg" lotes={lotes} onLoteClick={() => {}} />);
     const fill = screen.getByTestId("lote-poly-A1").getAttribute("fill");
     expect(fill).toContain("34,197,94");
+  });
+
+  it("nunca renderiza precio en ningún atributo o texto (DTO price-free)", () => {
+    const { container } = render(<MasterplanViewer imageUrl="x.jpg" lotes={lotes} onLoteClick={() => {}} />);
+    expect(container.innerHTML.toLowerCase()).not.toContain("precio");
+    expect(container.innerHTML.toLowerCase()).not.toContain("moneda");
+    expect(container.innerHTML).not.toContain("120");
   });
 });

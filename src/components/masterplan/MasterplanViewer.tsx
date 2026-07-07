@@ -1,26 +1,12 @@
 "use client";
 
 import { estadoColor, poligonoASvgPoints } from "@/lib/masterplan/geometry";
-import type { Poligono } from "@/types/proyectos";
-
-export interface LoteMarcado {
-  id: string;
-  codigo: string;
-  estado: string;
-  precio: number | null;
-  moneda: string | null;
-  poly: Poligono | null;
-}
+import type { PlanoLoteDTO } from "@/lib/masterplan/dto";
 
 interface MasterplanViewerProps {
   imageUrl: string;
-  lotes: LoteMarcado[];
+  lotes: PlanoLoteDTO[];
   onLoteClick: (loteId: string) => void;
-}
-
-function formatPrecio(precio: number | null, moneda: string | null): string {
-  if (precio == null) return "Sin precio";
-  return `${moneda || ""} ${precio.toLocaleString("es-PE")}`.trim();
 }
 
 export function MasterplanViewer({ imageUrl, lotes, onLoteClick }: MasterplanViewerProps) {
@@ -42,7 +28,7 @@ export function MasterplanViewer({ imageUrl, lotes, onLoteClick }: MasterplanVie
               className="cursor-pointer transition-opacity ease-out-strong hover:opacity-80"
               onClick={() => onLoteClick(l.id)}
             >
-              <title>{`${l.codigo} — ${formatPrecio(l.precio, l.moneda)}`}</title>
+              <title>{`${l.codigo} — ${l.estado}`}</title>
             </polygon>
           );
         })}

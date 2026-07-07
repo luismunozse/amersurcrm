@@ -10,14 +10,14 @@ import {
   eliminarVertice,
 } from "@/lib/masterplan/geometry";
 import { guardarPoligonoLote, eliminarPoligonoLote } from "@/app/dashboard/proyectos/_actions";
-import type { LoteMarcado } from "./MasterplanViewer";
+import type { PlanoLoteDTO } from "@/lib/masterplan/dto";
 import type { Poligono } from "@/types/proyectos";
 
 type Modo = "navegar" | "dibujar";
 
 interface MasterplanEditorProps {
   imageUrl: string;
-  lotes: LoteMarcado[];
+  lotes: PlanoLoteDTO[];
   onSaved: () => void;
 }
 

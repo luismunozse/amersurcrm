@@ -12,8 +12,16 @@ vi.mock("@/app/dashboard/proyectos/_actions", () => ({
 import { MasterplanEditor } from "./MasterplanEditor";
 
 const lotes = [
-  { id: "a", codigo: "A1", estado: "disponible", precio: 1, moneda: "PEN", poly: null },
-  { id: "b", codigo: "B2", estado: "vendido", precio: 2, moneda: "PEN", poly: [[0, 0], [0.1, 0], [0.1, 0.1]] as [number, number][] },
+  { id: "a", codigo: "A1", estado: "disponible" as const, area: 120, manzana: "A", etapa: "1", poly: null },
+  {
+    id: "b",
+    codigo: "B2",
+    estado: "vendido" as const,
+    area: 80,
+    manzana: "B",
+    etapa: "1",
+    poly: [[0, 0], [0.1, 0], [0.1, 0.1]] as [number, number][],
+  },
 ];
 
 beforeEach(() => vi.clearAllMocks());
