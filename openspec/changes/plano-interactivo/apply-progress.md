@@ -371,3 +371,103 @@ Rollback: revert one or both commits; PR1-PR3's uploader/editor/DTO work is unto
 - PR4 does not import or reference the legacy `guardarPoligonoLote` (`[id]/_actions.ts:363`, `lote.plano_poligono`) — PR5's rename/freeze of that export has zero interaction with PR4's files.
 - The new "Modo presentación" button lives in `_LotesList.tsx`'s `CardHeader`, which PR5 does not need to touch — no conflict expected when PR5 branches after PR4 merges.
 - `PlanoPresentacion.tsx` is the component the deferred Phase 2 public route (`/p/[token]`, out of this entire change) is designed to reuse verbatim, per design.md section 7 — when that future work starts, it should import `PlanoPresentacion` directly and call `buildPlanoPresentacion` from its own server-side token-resolution logic (see PR3's note on needing a service-role/RLS-anonymous client variant for that unauthenticated context).
+
+---
+
+## Slice implemented: PR5 — Legacy freeze/rename + verified dead-code deletion (isolated, size:exception)
+
+Status: **done**. Phases 8-9 (all PR5 tasks in `tasks.md`) checked off. This slice runs under an explicit `size:exception` (deletion-heavy, ~2,831 changed lines, exempt from the 400-line feature budget per design.md section 6c / ADR-6).
+
+### Pre-deletion re-verification (mandatory per apply instructions — repo moved since design/tasks were written)
+
+Grepped the current tree (post-PR1–PR4) for every file in the dead cluster, not trusting the design/tasks analysis:
+
+```
+rg -n "MapeoLotesMejorado|MapeoLotesVisualizacion|PlanosViewer|PlanosUploader|OverlayLayersPanel" -g '!node_modules' -g '!*.md' src/
+```
+Result: only internal cluster references (`_PlanosUploader.tsx:7` imports `./_PlanosViewer`) and each file's own declaration. **Zero external importers** for all 5 files — matches the design's corrected scope note. No test file anywhere references any of the 5 names (`rg -ln ... -g '*.test.*'` → no output).
+
+Also grepped `_ProjectTabs.tsx`, `page.tsx`, and `_LotesList.tsx` for the dead-cluster names — zero matches. Confirmed `page.tsx:7` imports `_MapeoLotes` (not the dead cluster) and renders it at `page.tsx:498` via the `mapeoSection` prop of `ProjectTabs` — matches the design's corrected ADR-6 note that `_MapeoLotes.tsx` is the live "Mapeo de Lotes" Google-Maps tab and must not be touched beyond the required rename below.
+
+### Files touched
+
+| File | Change | Verification evidence |
+|------|--------|------------------------|
+| `src/app/dashboard/proyectos/[id]/_actions.ts` | Renamed `guardarPoligonoLote` (line 363, writes `lote.plano_poligono`) → `guardarPoligonoLoteLegacy`; added a comment explaining the collision with the masterplan writer of the same original name in `src/app/dashboard/proyectos/_actions.ts:578` (untouched). | `rg -n "guardarPoligonoLote" src/` before the rename showed 2 distinct exports sharing the name (`[id]/_actions.ts:363` legacy vs `proyectos/_actions.ts:578` correct/masterplan) plus 3 live call sites in `_MapeoLotes.tsx` and 3 dead call sites in `_MapeoLotesMejorado.tsx` (deleted below). |
+| `src/app/dashboard/proyectos/[id]/_MapeoLotes.tsx` | Updated the import and all 3 call sites (`handleConfirmPin`, `handleMarkerDragEnd`, `handleRemovePin`) from `guardarPoligonoLote` → `guardarPoligonoLoteLegacy`. **Required by the rename in the file above** — this live file is a legitimate existing caller of the legacy writer (Google-Maps lote pinning writes to `lote.plano_poligono`, distinct from the masterplan overlay), not a new caller introduced by PR1-4. No other logic in this file touched. | `git diff --stat` on this file: 8 lines changed (4 lines × add/remove for import + 3 call sites), no other diff. `rg -n "guardarPoligonoLote\b"` post-change: zero matches (only `guardarPoligonoLoteLegacy` remains). |
+| `src/app/dashboard/proyectos/[id]/_MapeoLotesMejorado.tsx` | **Deleted** (1,828 lines). | Zero external importers (grep above); its own internal calls to the old `guardarPoligonoLote` name are moot since the whole file is gone. |
+| `src/app/dashboard/proyectos/[id]/_MapeoLotesVisualizacion.tsx` | **Deleted** (348 lines). | Zero external importers (grep above). |
+| `src/app/dashboard/proyectos/[id]/_PlanosViewer.tsx` | **Deleted** (270 lines). | Zero external importers apart from the also-deleted `_PlanosUploader.tsx` (grep above). |
+| `src/app/dashboard/proyectos/[id]/_PlanosUploader.tsx` | **Deleted** (202 lines). | Zero external importers (grep above); `upload-plano/route.ts` (its likely server counterpart) has zero fetch-callers anywhere in `src/` either (only an unrelated `data-tour="upload-plano"` string match in `proyectosTour.ts`). |
+| `src/app/dashboard/proyectos/[id]/OverlayLayersPanel.tsx` | **Deleted** (183 lines). | Zero importers found anywhere (grep above matched only the file's own declarations). |
+
+Total deletions: **2,831 lines** (vs. ~2,630 estimated in design/tasks — the cluster grew slightly since those docs were written; still the same 5-file set, no scope change).
+
+**Not touched** (per corrected scope, explicitly out of bounds): `_MapeoLotes.tsx` (only the required import rename above), `_ProjectTabs.tsx`, `page.tsx` (aside from what PR4 already added), `src/app/dashboard/proyectos/_actions.ts` (the correct masterplan writer at line 578), `src/app/api/proyectos/upload-plano/route.ts` (frozen per design, not deleted — tasks 8.2 only requires a grep-guard confirming no new callers, not removal), `overlay_layers` writers (`guardarOverlayBounds`/`guardarOverlayLayers`/`subirPlanos` in `[id]/_actions.ts`) — still called by the live `_MapeoLotes.tsx`, frozen (no new callers) not removed.
+
+### Deviations from tasks.md text (documented)
+
+1. **Task 8.1's "no new caller from PR1–PR4" guard**: the legacy function does have a caller — `_MapeoLotes.tsx` — but it is a *pre-existing* live caller (Google Maps pinning), not one introduced by PR1-4. The rename therefore required updating that caller's import/call sites to keep the build green; this is a mechanical consequence of the rename itself, not new scope. Verified no PR1-4-authored file (`rasterize.client.ts`, `MasterplanEditorPanel.tsx`, `geometry.ts`, `MasterplanEditor.tsx`, `dto.ts`, `presentacion.server.ts`, `MasterplanViewer.tsx`, `PlanoPresentacion.tsx`, `page.tsx`, `_LotesList.tsx`) references either the old or new name.
+2. **Task 9.3's "`npx vitest run` (full unit suite)"**: this apply run's explicit governing instructions mandate Strict TDD targeted-files-only ("Test runner: vitest, targeted files only... NEVER full suite"). Ran the full targeted masterplan regression (8 files, 52 tests) before and after the deletions instead, plus a repo-wide grep confirming zero remaining references to any of the 5 deleted modules — this satisfies the same property (nothing references the deleted files) that task 9.3's full-suite run was meant to catch, without violating the Strict TDD constraint for this run.
+3. **8.3's "manual check"** was done by static code inspection (reading `page.tsx`'s `planosUrl`/`overlayLayers` derivation, confirmed unchanged and still feeding `MapeoLotes`) rather than by starting a dev server, since no runtime/browser check was otherwise required or available in this environment.
+
+### Tests: before / after
+
+Targeted masterplan regression suite (unchanged file list across both runs):
+```
+npx vitest run src/lib/masterplan/dto.test.ts src/lib/masterplan/presentacion.server.test.ts src/components/masterplan/MasterplanViewer.test.tsx src/components/masterplan/MasterplanEditor.test.tsx src/lib/masterplan/geometry.test.ts src/lib/masterplan/rasterize.test.ts src/__tests__/unit/masterplan-actions.test.ts src/components/masterplan/PlanoPresentacion.test.tsx
+```
+- **Before** (rename + deletions not yet applied): 8 files passed, 52 tests passed, 0 failed.
+- **After** (rename + all 5 deletions applied): 8 files passed, 52 tests passed, 0 failed. Identical counts — no test in this set exercised any of the deleted files or the renamed export, confirming the cleanup is behaviorally invisible to the existing suite.
+
+No test file anywhere in the repo tested only deleted code (confirmed by grep before deleting), so no test file was deleted alongside its module.
+
+```
+npx tsc --noEmit
+```
+- **After**: exit code 0, no errors (full project — this also validates the rename's call-site update compiles cleanly).
+
+### Changed-line estimate vs budget
+
+`size:exception` acknowledged for this slice per the delivery parameters (deletion-heavy, isolated, ordered last). Actual:
+- Deletions: 2,831 lines (5 files).
+- Modifications: `_actions.ts` +7/−1 (rename + comment), `_MapeoLotes.tsx` +4/−4 (import + 3 call sites) — 12 lines total, well within normal budget on their own.
+- Net: −2,819 lines.
+
+### Suggested commit boundaries (work-unit-commits skill)
+
+Two reviewable work units, both part of the single PR5 slice/branch (stacked after PR4 merges, per `stacked-to-main`):
+
+```
+refactor(masterplan): rename legacy guardarPoligonoLote to avoid export collision
+
+- [id]/_actions.ts: guardarPoligonoLote (writes lote.plano_poligono) ->
+  guardarPoligonoLoteLegacy; documents the collision with the correct
+  masterplan writer of the same original name in proyectos/_actions.ts
+- _MapeoLotes.tsx: update the one live caller (Google Maps lote pinning)
+  to the new name — mechanical, no behavior change
+- grep-guard: confirms no PR1-4 file references either name
+```
+
+```
+chore(masterplan): delete verified-orphaned legacy plano UI (size:exception)
+
+- delete _MapeoLotesMejorado.tsx, _MapeoLotesVisualizacion.tsx,
+  _PlanosViewer.tsx, _PlanosUploader.tsx, OverlayLayersPanel.tsx
+  (2,831 lines total) — zero external importers, re-verified immediately
+  before deletion against the current tree (post PR1-4)
+- _MapeoLotes.tsx (live "Mapeo de Lotes" Google Maps tab) and the frozen
+  planos_url/overlay_layers write paths are explicitly untouched
+- npx tsc --noEmit clean; targeted masterplan regression (8 files/52 tests)
+  unchanged before/after
+```
+
+Rollback: revert one or both commits independently. Reverting only the second commit (the deletions) is a pure file restore with zero interaction with the rename, since neither deleted file referenced the renamed export by its new name (the dead cluster's calls to the old name become moot once those files no longer exist). Reverting only the first commit (the rename) would require re-reverting `_MapeoLotes.tsx`'s 3 call sites too, or the live Google Maps tab would fail to compile — both changes are in the same commit for exactly this reason (atomic rename + required caller update), so partial revert of commit 1 alone is not meaningful; treat it as a single unit if reverted.
+
+### Corrected scope note carried forward
+
+Confirmed at apply time, matching the design/tasks correction: `_MapeoLotes.tsx` is live (rendered at `page.tsx:498` via `ProjectTabs`'s `mapeoSection` prop) and was **not** deleted — only its import of the renamed legacy function was updated. `_PlanosSection.tsx` (named in design.md's original ADR-6 draft) does not exist in the repo and was correctly dropped from scope in the tasks phase.
+
+### What's left for this change
+
+PR5 was the last planned slice. All 5 PRs (tasks.md Phases 1-9) are now checked off. `state.yaml` updated: `phases.apply: done`, `next_recommended: verify`. Next step is `sdd-verify` against `spec.md`'s acceptance scenarios (including the "Legacy plano write paths are frozen" requirement this slice implements) and then `sdd-archive`.

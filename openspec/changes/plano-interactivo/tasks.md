@@ -88,14 +88,14 @@ Maps to: Requirement "Presentation mode shows no price anywhere on screen" (2 sc
 Maps to: Requirement "Legacy plano write paths are frozen" (2 scenarios); ADR-6
 
 ### Phase 8: Freeze + collision rename
-- [ ] 8.1 Rename `src/app/dashboard/proyectos/[id]/_actions.ts:363 guardarPoligonoLote` → `guardarPoligonoLoteLegacy` (writes `lote.plano_poligono`); grep-guard confirms no new caller from PR1–PR4
-- [ ] 8.2 Grep-guard: `src/app/api/proyectos/upload-plano/route.ts` (`planos_url`) and `overlay_layers` writers have zero new callers from this change
-- [ ] 8.3 Manual check: proyecto detail screen still renders for a proyecto with legacy `planos_url` data and no `masterplan` (no code change expected)
+- [x] 8.1 Rename `src/app/dashboard/proyectos/[id]/_actions.ts:363 guardarPoligonoLote` → `guardarPoligonoLoteLegacy` (writes `lote.plano_poligono`); grep-guard confirms no new caller from PR1–PR4. Deviation: the legacy function has a pre-existing live caller — `_MapeoLotes.tsx` (the live "Mapeo de Lotes" Google Maps tab) — not a "new caller from PR1-4"; its import and 3 call sites were updated to the new name (required by the rename itself, not a scope expansion)
+- [x] 8.2 Grep-guard: `src/app/api/proyectos/upload-plano/route.ts` (`planos_url`) and `overlay_layers` writers (`subirPlanos`, `guardarOverlayBounds`, `guardarOverlayLayers`) have zero new callers from this change — confirmed, only pre-existing callers are `_MapeoLotes.tsx` (live, untouched) and the now-deleted `_MapeoLotesMejorado.tsx`/`_PlanosUploader.tsx`
+- [x] 8.3 Manual check: proyecto detail screen still renders for a proyecto with legacy `planos_url` data and no `masterplan` (no code change expected) — confirmed by static inspection: `page.tsx`'s `planosUrl`/`overlayLayers` derivation (unchanged) still feeds `MapeoLotes`, which is functionally untouched (only the renamed import)
 
 ### Phase 9: Delete verified-orphaned files only
-- [ ] 9.1 Re-run the grep-guard immediately before deletion (repo may have moved since design): zero external importers for `_MapeoLotesMejorado.tsx`, `_MapeoLotesVisualizacion.tsx`, `_PlanosViewer.tsx`, `_PlanosUploader.tsx`, `OverlayLayersPanel.tsx`
-- [ ] 9.2 Delete the 5 confirmed-orphaned files (~2630 lines). Do **not** delete/modify `_MapeoLotes.tsx`, `_ProjectTabs.tsx`, or `page.tsx:487` — the "Mapeo de Lotes" tab is live and out of scope
-- [ ] 9.3 `npx tsc --noEmit`; `npx vitest run` (full unit suite — confirm nothing references the deleted files)
+- [x] 9.1 Re-run the grep-guard immediately before deletion (repo may have moved since design): zero external importers for `_MapeoLotesMejorado.tsx`, `_MapeoLotesVisualizacion.tsx`, `_PlanosViewer.tsx`, `_PlanosUploader.tsx`, `OverlayLayersPanel.tsx` — confirmed (only internal `_PlanosUploader.tsx` → `_PlanosViewer.tsx` import, no other src/ references, no test files reference any of the 5)
+- [x] 9.2 Delete the 5 confirmed-orphaned files (2,831 lines actual, vs ~2630 estimated — files grew since design was written). Did **not** delete/modify `_MapeoLotes.tsx` beyond the required import rename (task 8.1); `_ProjectTabs.tsx`/`page.tsx:487` untouched — the "Mapeo de Lotes" tab is live and out of scope
+- [x] 9.3 `npx tsc --noEmit` (clean, 0 errors). Deviation: ran the targeted masterplan regression suite (8 files / 52 tests, before and after deletion, both green) instead of the full `npx vitest run` suite the task text names — this apply run's explicit instructions mandate targeted-files-only under Strict TDD ("NEVER full suite"); grep confirmed zero references to the deleted modules anywhere in `src/`, which is the property task 9.3 was checking for
 
 ## Risks
 
