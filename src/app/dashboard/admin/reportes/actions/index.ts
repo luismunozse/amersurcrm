@@ -131,3 +131,10 @@ export type {
   ComisionPorVendedor,
   ComisionMensual,
 } from "./comisiones";
+
+// Scorecard de vendedores (compone _fetch* existentes, ver design.md ADR5)
+export { obtenerScorecardVendedores } from "./scorecard";
+export type {
+  ScorecardVendedorRow,
+  ScorecardVendedoresData,
+} from "./scorecard";
