@@ -69,6 +69,28 @@ describe("MasterplanEditor — edición de vértices (zoom/pan + Navegar/Dibujar
     });
   }
 
+  it("clic directo sobre el contenedor agrega vértices (el img tiene pointer-events:none por CSS de react-zoom-pan-pinch)", () => {
+    // Regresión: en browser real la librería inyecta
+    // `.transform-component img { pointer-events: none }`, así que los clics
+    // nunca llegan al <img>; el handler debe vivir en el contenedor.
+    render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Dibujar" }));
+    const canvas = screen.getByTestId("plano-canvas");
+    fireEvent.click(canvas, { clientX: 10, clientY: 10 });
+    fireEvent.click(canvas, { clientX: 60, clientY: 10 });
+    expect(screen.getByTestId("vertice-0")).toBeInTheDocument();
+    expect(screen.getByTestId("vertice-1")).toBeInTheDocument();
+  });
+
+  it("clic sobre un vértice existente no agrega un vértice nuevo", () => {
+    render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
+    dibujarPoligono([[10, 10], [60, 10], [60, 60]]);
+    // un clic simple sobre el handle de un vértice burbujea hasta el
+    // contenedor; no debe interpretarse como "marcar vértice nuevo".
+    fireEvent.click(screen.getByTestId("vertice-1"), { clientX: 60, clientY: 10 });
+    expect(screen.queryByTestId("vertice-3")).not.toBeInTheDocument();
+  });
+
   it("arrastrar un vértice actualiza solo sus coordenadas", () => {
     render(<MasterplanEditor imageUrl="x.jpg" lotes={lotes} onSaved={() => {}} />);
     dibujarPoligono([[10, 10], [60, 10], [60, 60], [10, 60]]);

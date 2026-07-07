@@ -44,6 +44,9 @@ export function MasterplanEditor({ imageUrl, lotes, onSaved }: MasterplanEditorP
 
   function onImageClick(e: React.MouseEvent) {
     if (modo !== "dibujar") return;
+    // Un clic sobre el handle de un vértice burbujea hasta el contenedor;
+    // no debe marcar un vértice nuevo.
+    if ((e.target as Element).closest("circle")) return;
     const img = imgRef.current;
     if (!img) return;
     const rect = img.getBoundingClientRect();
@@ -157,13 +160,20 @@ export function MasterplanEditor({ imageUrl, lotes, onSaved }: MasterplanEditorP
 
         <TransformWrapper panning={{ disabled: modo === "dibujar" }} doubleClick={{ disabled: true }} minScale={1} maxScale={6}>
           <TransformComponent wrapperStyle={{ width: "100%" }} contentStyle={{ width: "100%" }}>
-            <div className="relative inline-block w-full">
+            {/* El onClick vive en el contenedor, NO en el <img>: el CSS que
+                inyecta react-zoom-pan-pinch pone pointer-events:none a todo
+                img dentro de TransformComponent, así que el img nunca recibe
+                clics en un browser real. */}
+            <div
+              data-testid="plano-canvas"
+              className={`relative inline-block w-full ${modo === "dibujar" ? "cursor-crosshair" : "cursor-grab"}`}
+              onClick={onImageClick}
+            >
               <img
                 ref={imgRef}
                 src={imageUrl}
                 alt="Masterplan (edición)"
-                className={`block w-full h-auto select-none ${modo === "dibujar" ? "cursor-crosshair" : "cursor-grab"}`}
-                onClick={onImageClick}
+                className="block w-full h-auto select-none"
               />
               <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 w-full h-full">
                 {lotes.filter((l) => l.poly && l.poly.length >= 3).map((l) => {
