@@ -11,7 +11,7 @@ import {
   subirPlanos,
   guardarOverlayBounds,
   guardarOverlayLayers,
-  guardarPoligonoLote,
+  guardarPoligonoLoteLegacy,
 } from './_actions';
 import type { OverlayLayerConfig } from '@/types/overlay-layers';
 
@@ -357,7 +357,7 @@ export default function MapeoLotes({
       setPinDialogOpen(false);
       setIsSavingPin(true);
       try {
-        await guardarPoligonoLote(loteId, proyectoId, [[pendingPin.lat, pendingPin.lng]]);
+        await guardarPoligonoLoteLegacy(loteId, proyectoId, [[pendingPin.lat, pendingPin.lng]]);
         setLotesState((prev) =>
           prev.map((l) =>
             l.id === loteId
@@ -379,7 +379,7 @@ export default function MapeoLotes({
   const handleMarkerDragEnd = useCallback(
     async (loteId: string, lat: number, lng: number) => {
       try {
-        await guardarPoligonoLote(loteId, proyectoId, [[lat, lng]]);
+        await guardarPoligonoLoteLegacy(loteId, proyectoId, [[lat, lng]]);
         setLotesState((prev) =>
           prev.map((l) =>
             l.id === loteId ? { ...l, plano_poligono: [[lat, lng]], ubicacion: { lat, lng } } : l
@@ -395,7 +395,7 @@ export default function MapeoLotes({
   const handleRemovePin = useCallback(
     async (loteId: string) => {
       try {
-        await guardarPoligonoLote(loteId, proyectoId, []);
+        await guardarPoligonoLoteLegacy(loteId, proyectoId, []);
         setLotesState((prev) =>
           prev.map((l) =>
             l.id === loteId ? { ...l, plano_poligono: null, ubicacion: null } : l

@@ -360,7 +360,12 @@ export async function eliminarPoligonoProyecto(proyectoId: string) {
   return { success: true };
 }
 
-export async function guardarPoligonoLote(
+// Legacy writer for `lote.plano_poligono` (distinct from the current
+// masterplan writer `guardarPoligonoLote` in
+// `src/app/dashboard/proyectos/_actions.ts`, which writes
+// `lote.data.masterplan_poly`). Renamed to remove the export-name collision;
+// still used by the live "Mapeo de Lotes" Google Maps tab (`_MapeoLotes.tsx`).
+export async function guardarPoligonoLoteLegacy(
   loteId: string,
   proyectoId: string,
   vertices: Array<[number, number]>
