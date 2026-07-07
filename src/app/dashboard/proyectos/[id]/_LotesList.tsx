@@ -87,12 +87,20 @@ type Lote = {
 interface LotesListProps {
   proyectoId: string;
   lotes: Lote[];
+  /**
+   * TODOS los lotes del proyecto (sin paginar ni filtrar por búsqueda/
+   * estado), usados para alimentar el masterplan (editor "Asignar polígono
+   * a lote" + viewer + su click-to-view). Si falta o llega vacío, se cae a
+   * `lotes` (la página actual) para no romper el masterplan en llamadores
+   * que aún no pasen este prop.
+   */
+  lotesPlano?: Lote[];
   totalLotes?: number;
   masterplan?: Masterplan | null;
   presentacionDto?: PlanoPresentacionDTO | null;
 }
 
-export default function LotesList({ proyectoId, lotes, totalLotes, masterplan, presentacionDto }: LotesListProps) {
+export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, masterplan, presentacionDto }: LotesListProps) {
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -458,10 +466,28 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan, p
   const lotesAMostrar = lotesState;
   const totalListado = typeof totalLotes === "number" ? totalLotes : lotesAMostrar.length;
 
+  // Lotes completos del proyecto para el masterplan (editor + viewer): si no
+  // llega el prop (o llega vacío), se cae a la página actual (`lotesAMostrar`)
+  // para no romper el masterplan. Los lotes que además están en la página
+  // actual se sobreescriben con `lotesAMostrar` (= `lotesState`) para que las
+  // actualizaciones optimistas de estado (vender/reservar/liberar, hechas
+  // sin `router.refresh()`) se reflejen de inmediato en el color de los
+  // pines del viewer y el texto del dropdown del editor, en vez de quedar
+  // desactualizadas hasta el próximo refresh del server component.
+  const lotesParaPlano = (() => {
+    const base = lotesPlano && lotesPlano.length > 0 ? lotesPlano : lotesAMostrar;
+    if (base === lotesAMostrar) return base;
+    // `Map` está tomado por el ícono de lucide-react importado arriba: se usa
+    // un record plano en su lugar (los ids de lote son strings).
+    const enPaginaActualPorId: Record<string, Lote> = {};
+    for (const l of lotesAMostrar) enPaginaActualPorId[l.id] = l;
+    return base.map((l) => enPaginaActualPorId[l.id] ?? l);
+  })();
+
   // Price-free whitelist DTO for the masterplan overlay (viewer + editor).
   // Admin price columns elsewhere in this list read from `lotesAMostrar`
   // directly and are untouched by this mapping.
-  const lotesMarcados: PlanoLoteDTO[] = lotesAMostrar.map(toPlanoLoteDTO);
+  const lotesMarcados: PlanoLoteDTO[] = lotesParaPlano.map(toPlanoLoteDTO);
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -784,7 +810,11 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan, p
                   imageUrl={masterplan.url}
                   lotes={lotesMarcados}
                   onLoteClick={(id) =>
-                    setSelectedLote(lotesAMostrar.find((l) => l.id === id) ?? null)
+                    setSelectedLote(
+                      lotesParaPlano.find((l) => l.id === id) ??
+                        lotesAMostrar.find((l) => l.id === id) ??
+                        null,
+                    )
                   }
                 />
                 {puedeEditarMasterplan && (

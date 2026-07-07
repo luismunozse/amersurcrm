@@ -147,15 +147,40 @@ export default async function ProyLotesPage({
   if (q) countQuery = countQuery.ilike("codigo", `%${q}%`);
   if (estado && estado !== "all") countQuery = countQuery.eq("estado", estado as unknown);
 
-  const { count, error: eCount } = await countQuery;
+  // Conteo + lotes para mapeo + lotes para el plano interactivo son
+  // consultas independientes entre sí (ninguna depende del resultado de las
+  // otras): se disparan en paralelo.
+  const [
+    { count, error: eCount },
+    { data: lotesParaMapeoRaw, error: eLotesMapRaw },
+    { data: lotesPlanoRaw, error: eLotesPlano },
+  ] = await Promise.all([
+    countQuery,
+    // Lotes para mapeo (todos)
+    supabase
+      .from("lote")
+      .select("id,codigo,estado,data,plano_poligono,coordenada_lat,coordenada_lng")
+      .eq("proyecto_id", id)
+      .order("codigo", { ascending: true }),
+    // Lotes para el plano interactivo (editor "Asignar polígono a lote" y
+    // click-to-view del masterplan viewer, ambos en LotesList): TODOS los
+    // lotes del proyecto, sin `.range` ni filtros de búsqueda/estado — el
+    // plano debe listar el proyecto completo independientemente de los
+    // filtros/paginación de la tabla. El total de lotes por proyecto está
+    // en las centenas, muy por debajo del límite ~1000 de PostgREST; se
+    // agrega `.limit(2000)` como guarda explícita.
+    supabase
+      .from("lote")
+      .select("*")
+      .eq("proyecto_id", id)
+      .order("codigo", { ascending: true })
+      .limit(2000),
+  ]);
   if (eCount) throw eCount;
+  if (eLotesPlano) throw eLotesPlano;
 
-  // Lotes para mapeo (todos)
-  let { data: lotesParaMapeo, error: eLotesMap } = await supabase
-    .from("lote")
-    .select("id,codigo,estado,data,plano_poligono,coordenada_lat,coordenada_lng")
-    .eq("proyecto_id", id)
-    .order("codigo", { ascending: true });
+  let lotesParaMapeo = lotesParaMapeoRaw;
+  let eLotesMap = eLotesMapRaw;
 
   // Si coordenada_lat/lng no existen en la BD (código 42703), caer sin esas columnas
   if (eLotesMap?.code === "42703") {
@@ -168,6 +193,20 @@ export default async function ProyLotesPage({
     eLotesMap = fallback.error;
   }
   if (eLotesMap) throw eLotesMap;
+
+  // Lotes para el plano interactivo, con la misma info de proyecto agregada
+  // que `lotesConProyecto` (mismo shape, para que _LotesList pueda usar el
+  // mismo tipo `Lote` en ambos props).
+  const lotesPlano = (lotesPlanoRaw ?? []).map((lote) => {
+    const proyectoReal = todosLosProyectos?.find(p => p.id === lote.proyecto_id);
+    return {
+      ...lote,
+      proyecto: {
+        id: lote.proyecto_id,
+        nombre: proyectoReal?.nombre || "Proyecto no encontrado"
+      }
+    };
+  });
 
   const total = count ?? 0;
   const lastPage = Math.max(1, Math.ceil(total / perPage));
@@ -476,6 +515,7 @@ export default async function ProyLotesPage({
               key="lotes-list"
               proyectoId={proyecto.id}
               lotes={lotesConProyecto}
+              lotesPlano={lotesPlano}
               totalLotes={total}
               masterplan={(proyecto as { masterplan?: Masterplan | null }).masterplan ?? null}
               presentacionDto={presentacionDto}
