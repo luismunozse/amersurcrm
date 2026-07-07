@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { mockGetUser, mockServerOnlyClient, createChainMock, mockEsAdmin } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
@@ -63,6 +63,7 @@ vi.mock("next/cache", () => ({
 
 import { obtenerReporteCobranza } from "@/app/dashboard/admin/reportes/actions/cobranza";
 import { obtenerReporteComisiones } from "@/app/dashboard/admin/reportes/actions/comisiones";
+import { computeTier } from "@/lib/cobranza/tiers";
 
 // `fetchAllRows` rebuilds the whole query chain on every `.range()` retry,
 // so a single logical paginated query needs a chain whose OWN `.range()`
@@ -109,34 +110,40 @@ describe("obtenerReporteCobranza: autorizacion", () => {
   });
 });
 
+// Shared by every `obtenerReporteCobranza` describe block below (agregaciones,
+// mora tier-alineada ADR6, gestión de cobranza ADR6) — module-scoped so it
+// isn't re-declared per describe.
+function setupCuotasYPagos(opts: {
+  cuotas?: any[];
+  pagos?: any[];
+  cuotasPagadas?: any[];
+  ventas?: any[];
+  gestiones?: any[];
+} = {}) {
+  const cuotasChain = createChainMock({ data: opts.cuotas ?? [], error: null });
+  const pagosChain = createChainMock({ data: opts.pagos ?? [], error: null });
+  const cuotasPagadasChain = createChainMock({ data: opts.cuotasPagadas ?? [], error: null });
+  const ventaChain = createChainMock({ data: opts.ventas ?? [], error: null });
+  const gestionChain = createChainMock({ data: opts.gestiones ?? [], error: null });
+
+  // Hack: mismo nombre 'cuota' se llama 2 veces (cuotas activas + cuotas pagadas).
+  // Resolver con override progresivo.
+  let cuotaCallCount = 0;
+  mockServerOnlyClient.schema = vi.fn((schemaName: string) => ({
+    from: vi.fn((table: string) => {
+      if (schemaName === "crm" && table === "cuota") {
+        cuotaCallCount += 1;
+        return cuotaCallCount === 1 ? cuotasChain : cuotasPagadasChain;
+      }
+      if (schemaName === "crm" && table === "pago") return pagosChain;
+      if (schemaName === "crm" && table === "venta") return ventaChain;
+      if (schemaName === "crm" && table === "gestion_cobranza") return gestionChain;
+      return createChainMock();
+    }),
+  }));
+}
+
 describe("obtenerReporteCobranza: agregaciones", () => {
-  function setupCuotasYPagos(opts: {
-    cuotas?: any[];
-    pagos?: any[];
-    cuotasPagadas?: any[];
-    ventas?: any[];
-  } = {}) {
-    const cuotasChain = createChainMock({ data: opts.cuotas ?? [], error: null });
-    const pagosChain = createChainMock({ data: opts.pagos ?? [], error: null });
-    const cuotasPagadasChain = createChainMock({ data: opts.cuotasPagadas ?? [], error: null });
-    const ventaChain = createChainMock({ data: opts.ventas ?? [], error: null });
-
-    // Hack: mismo nombre 'cuota' se llama 2 veces (cuotas activas + cuotas pagadas).
-    // Resolver con override progresivo.
-    let cuotaCallCount = 0;
-    mockServerOnlyClient.schema = vi.fn((schemaName: string) => ({
-      from: vi.fn((table: string) => {
-        if (schemaName === "crm" && table === "cuota") {
-          cuotaCallCount += 1;
-          return cuotaCallCount === 1 ? cuotasChain : cuotasPagadasChain;
-        }
-        if (schemaName === "crm" && table === "pago") return pagosChain;
-        if (schemaName === "crm" && table === "venta") return ventaChain;
-        return createChainMock();
-      }),
-    }));
-  }
-
   it("retorna resumen vacio si no hay cuotas ni pagos", async () => {
     setupCuotasYPagos();
     const res = await obtenerReporteCobranza("30");
@@ -240,6 +247,147 @@ describe("obtenerReporteCobranza: agregaciones", () => {
 
     const res = await obtenerReporteCobranza("30");
     expect(res.data?.resumen.recaudadoEnPeriodo).toBe(1250);
+  });
+});
+
+// ============================================================
+// obtenerReporteCobranza: mora alineada a tiers.ts (ADR6, PR4)
+// ============================================================
+
+describe("obtenerReporteCobranza: mora alineada a computeTier (ADR6)", () => {
+  // "2026-07-07T15:00:00Z" = 2026-07-07 10:00 Lima (UTC-5) -> limaToday() "2026-07-07".
+  const HOY_LIMA = "2026-07-07";
+  const SYSTEM_NOW = new Date("2026-07-07T15:00:00Z");
+
+  const cuotasFixture = [
+    // 36 días de atraso (dentro del tope de 90) + estado 'vencida' -> computeTier === 'mora'.
+    { id: "c1", venta_id: "v1", monto_programado: 1000, monto_pagado: 200, monto_mora: 40, estado: "vencida", fecha_vencimiento: "2026-06-01", moneda: "PEN" },
+    // 187 días de atraso (fuera del tope de 90) + estado 'en_mora' -> computeTier === null pese al estado.
+    { id: "c2", venta_id: "v1", monto_programado: 500, monto_pagado: 0, monto_mora: 15, estado: "en_mora", fecha_vencimiento: "2026-01-01", moneda: "PEN" },
+    // Aún no vence (futuro lejano) -> computeTier === null.
+    { id: "c3", venta_id: "v1", monto_programado: 1000, monto_pagado: 0, monto_mora: 0, estado: "pendiente", fecha_vencimiento: "2030-01-01", moneda: "PEN" },
+    // Pagada -> excluida de ambos cálculos (legacy y tier-alineado).
+    { id: "c4", venta_id: "v1", monto_programado: 500, monto_pagado: 500, monto_mora: 0, estado: "pagada", fecha_vencimiento: "2026-05-01", moneda: "PEN" },
+  ];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(SYSTEM_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("cuotasEnMoraTier/moraTierTotal coinciden con computeTier calculado directamente sobre las mismas cuotas", async () => {
+    setupCuotasYPagos({
+      cuotas: cuotasFixture,
+      ventas: [{ id: "v1", cliente_id: "cl1", cliente: { nombre: "Cliente Uno" } }],
+    });
+
+    const res = await obtenerReporteCobranza("30");
+    expect(res.error).toBeNull();
+
+    const esperadas = cuotasFixture.filter(
+      (c) =>
+        c.estado !== "pagada" &&
+        computeTier({ fechaVencimiento: c.fecha_vencimiento, estado: c.estado, today: HOY_LIMA }) === "mora",
+    );
+    const saldoEsperado = esperadas.reduce((s, c) => s + (c.monto_programado - c.monto_pagado), 0);
+
+    expect(res.data?.resumen.cuotasEnMoraTier).toBe(esperadas.length);
+    expect(res.data?.resumen.moraTierTotal).toBe(saldoEsperado);
+    // Solo c1 es tier-mora en este fixture (c2 supera el tope de 90 días).
+    expect(res.data?.resumen.cuotasEnMoraTier).toBe(1);
+    expect(res.data?.resumen.moraTierTotal).toBe(800);
+  });
+
+  it("una cuota fuera del tope de 90 días no cuenta como mora tier-alineada aunque estado sea en_mora", async () => {
+    setupCuotasYPagos({
+      cuotas: cuotasFixture,
+      ventas: [{ id: "v1", cliente_id: "cl1", cliente: { nombre: "Cliente Uno" } }],
+    });
+
+    const res = await obtenerReporteCobranza("30");
+    // c2 (187 días, estado en_mora) no debe aportar al conteo/saldo tier-alineado.
+    expect(res.data?.resumen.cuotasEnMoraTier).toBe(1);
+    expect(res.data?.resumen.moraTierTotal).not.toBe(1300); // 800 (c1) + 500 (c2) sería el bug
+  });
+
+  it("moraTotal y cuotasEnMora legacy (accrued) sobreviven junto a los nuevos campos tier-alineados", async () => {
+    setupCuotasYPagos({
+      cuotas: cuotasFixture,
+      ventas: [{ id: "v1", cliente_id: "cl1", cliente: { nombre: "Cliente Uno" } }],
+    });
+
+    const res = await obtenerReporteCobranza("30");
+    // Legacy: suma de monto_mora sobre no-pagadas (c1+c2+c3 = 40+15+0).
+    expect(res.data?.resumen.moraTotal).toBe(55);
+    // Legacy: conteo por estado === 'en_mora' (solo c2).
+    expect(res.data?.resumen.cuotasEnMora).toBe(1);
+    // Los campos tier-alineados son una figura DISTINTA, no un reemplazo.
+    expect(res.data?.resumen.moraTierTotal).not.toBe(res.data?.resumen.moraTotal);
+  });
+});
+
+// ============================================================
+// obtenerReporteCobranza: gestión de cobranza (ADR6, PR4)
+// ============================================================
+
+describe("obtenerReporteCobranza: gestión de cobranza (ADR6)", () => {
+  it("agrupa las gestiones del período por resultado", async () => {
+    setupCuotasYPagos({
+      gestiones: [
+        { id: "g1", fecha_gestion: "2026-07-01T10:00:00Z", medio: "llamada", resultado: "contactado", notas: null, cliente_id: "cl1", cuota_id: "c1", cliente: { nombre: "Cliente Uno" }, cuota: { numero_cuota: 3 } },
+        { id: "g2", fecha_gestion: "2026-07-02T10:00:00Z", medio: "whatsapp", resultado: "contactado", notas: "Prometió pagar", cliente_id: "cl2", cuota_id: "c2", cliente: { nombre: "Cliente Dos" }, cuota: { numero_cuota: 1 } },
+        { id: "g3", fecha_gestion: "2026-07-03T10:00:00Z", medio: "llamada", resultado: "no_contactado", notas: null, cliente_id: "cl3", cuota_id: "c3", cliente: { nombre: "Cliente Tres" }, cuota: { numero_cuota: 2 } },
+      ],
+    });
+
+    const res = await obtenerReporteCobranza("30");
+    expect(res.error).toBeNull();
+    expect(res.data?.gestionPorResultado).toEqual(
+      expect.arrayContaining([
+        { resultado: "contactado", count: 2 },
+        { resultado: "no_contactado", count: 1 },
+      ]),
+    );
+  });
+
+  it("arma la lista de gestiones recientes con nombre de cliente y número de cuota", async () => {
+    setupCuotasYPagos({
+      gestiones: [
+        { id: "g1", fecha_gestion: "2026-07-01T10:00:00Z", medio: "llamada", resultado: "promesa_pago", notas: "Paga el viernes", cliente_id: "cl1", cuota_id: "c1", cliente: { nombre: "Cliente Uno" }, cuota: { numero_cuota: 3 } },
+      ],
+    });
+
+    const res = await obtenerReporteCobranza("30");
+    expect(res.data?.gestionesRecientes).toHaveLength(1);
+    expect(res.data?.gestionesRecientes[0]).toMatchObject({
+      cliente_nombre: "Cliente Uno",
+      cuota_numero: 3,
+      resultado: "promesa_pago",
+      medio: "llamada",
+      notas: "Paga el viernes",
+    });
+  });
+
+  it("limita las gestiones recientes a 20 registros", async () => {
+    const muchas = Array.from({ length: 25 }, (_, i) => ({
+      id: `g${i}`,
+      fecha_gestion: "2026-07-01T10:00:00Z",
+      medio: "llamada",
+      resultado: "contactado",
+      notas: null,
+      cliente_id: `cl${i}`,
+      cuota_id: `c${i}`,
+      cliente: { nombre: `Cliente ${i}` },
+      cuota: { numero_cuota: i },
+    }));
+    setupCuotasYPagos({ gestiones: muchas });
+
+    const res = await obtenerReporteCobranza("30");
+    expect(res.data?.gestionesRecientes).toHaveLength(20);
   });
 });
 
