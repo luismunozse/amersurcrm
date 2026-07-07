@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Banknote, AlertTriangle, Clock, TrendingDown, Wallet } from "lucide-react";
+import { Banknote, AlertTriangle, Clock, TrendingDown, Wallet, PhoneCall } from "lucide-react";
 import { PageLoader } from "@/components/ui/PageLoader";
 import { obtenerReporteCobranza } from "../_actions";
 import type { ReporteCobranza } from "../_actions";
@@ -31,11 +31,39 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 const ESTADO_COLOR: Record<string, string> = {
-  pendiente: "bg-gray-100 text-gray-700",
-  vencida: "bg-red-100 text-red-700",
-  en_mora: "bg-red-200 text-red-800",
-  parcial: "bg-orange-100 text-orange-700",
+  pendiente: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  vencida: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  en_mora: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  parcial: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
 };
+
+// ADR6: mismas etiquetas Peruano-formales que `_GestionCobranzaModal.tsx`
+// (mismo dominio de valores del CHECK constraint de `gestion_cobranza`).
+const RESULTADO_LABEL: Record<string, string> = {
+  contactado: "Contactado",
+  no_contactado: "No contactado",
+  promesa_pago: "Promesa de pago",
+  pago_parcial: "Pago parcial",
+  renegociacion: "Renegociación",
+  ilocalizable: "Ilocalizable",
+};
+
+const MEDIO_LABEL: Record<string, string> = {
+  llamada: "Llamada",
+  whatsapp: "WhatsApp",
+  email: "Email",
+  visita: "Visita",
+  mensaje: "Mensaje",
+};
+
+function formatFechaGestion(iso: string): string {
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone: "America/Lima",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
 
 export default function ReporteCobranzaComp({ periodo, fechaInicio, fechaFin }: Props) {
   const [data, setData] = useState<ReporteCobranza | null>(null);
@@ -84,11 +112,16 @@ export default function ReporteCobranzaComp({ periodo, fechaInicio, fechaFin }: 
         </Card>
         <Card padding="md">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-crm-text-muted uppercase">Mora total</span>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <span className="text-xs text-crm-text-muted uppercase">Mora (sistema)</span>
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
           </div>
-          <div className="text-2xl font-bold text-red-700">{formatPEN(r.moraTotal)}</div>
-          <p className="text-xs text-crm-text-muted mt-0.5">Acumulado</p>
+          <div className="text-2xl font-bold text-red-700 dark:text-red-400">{formatPEN(r.moraTierTotal)}</div>
+          <p className="text-xs text-crm-text-muted mt-0.5">
+            {r.cuotasEnMoraTier} {r.cuotasEnMoraTier === 1 ? "cuota" : "cuotas"} · mismo criterio del panel de cobranza
+          </p>
+          <p className="text-[11px] text-crm-text-muted/70 mt-1">
+            Mora acumulada (histórico): {formatPEN(r.moraTotal)}
+          </p>
         </Card>
         <Card padding="md">
           <div className="flex items-center justify-between mb-1">
@@ -127,6 +160,77 @@ export default function ReporteCobranzaComp({ periodo, fechaInicio, fechaFin }: 
           </CardContent>
         </Card>
       )}
+
+      {/* Gestión de cobranza */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <PhoneCall className="h-4 w-4 text-crm-primary" /> Gestión de cobranza
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.gestionPorResultado.length === 0 ? (
+            <div className="text-center py-6 text-crm-text-muted text-sm">
+              Sin gestiones registradas en el período
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {data.gestionPorResultado.map((g) => (
+                  <div key={g.resultado} className="border border-crm-border rounded-lg p-2 text-center">
+                    <div className="text-lg font-bold text-crm-text-primary">{g.count}</div>
+                    <div className="text-xs text-crm-text-muted">
+                      {RESULTADO_LABEL[g.resultado] ?? g.resultado}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-crm-border text-left">
+                      <th className="py-2 px-2 text-crm-text-muted font-medium">Fecha</th>
+                      <th className="py-2 px-2 text-crm-text-muted font-medium">Cliente</th>
+                      <th className="py-2 px-2 text-crm-text-muted font-medium text-center">Cuota</th>
+                      <th className="py-2 px-2 text-crm-text-muted font-medium">Medio</th>
+                      <th className="py-2 px-2 text-crm-text-muted font-medium">Resultado</th>
+                      <th className="py-2 px-2 text-crm-text-muted font-medium">Notas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.gestionesRecientes.map((g) => (
+                      <tr key={g.id} className="border-b border-crm-border/50 hover:bg-crm-background/50">
+                        <td className="py-2 px-2 text-crm-text whitespace-nowrap">
+                          {formatFechaGestion(g.fecha_gestion)}
+                        </td>
+                        <td className="py-2 px-2">
+                          <a
+                            href={`/dashboard/clientes/${g.cliente_id}`}
+                            className="text-crm-primary hover:underline font-medium"
+                          >
+                            {g.cliente_nombre}
+                          </a>
+                        </td>
+                        <td className="py-2 px-2 text-center text-crm-text">
+                          {g.cuota_numero ?? "—"}
+                        </td>
+                        <td className="py-2 px-2 text-crm-text">{MEDIO_LABEL[g.medio] ?? g.medio}</td>
+                        <td className="py-2 px-2 text-crm-text">
+                          {RESULTADO_LABEL[g.resultado] ?? g.resultado}
+                        </td>
+                        <td className="py-2 px-2 text-crm-text-muted max-w-xs truncate">
+                          {g.notas ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Top deudores */}
       <Card>
