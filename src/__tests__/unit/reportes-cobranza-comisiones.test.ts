@@ -38,14 +38,51 @@ const { mockGetUser, mockServerOnlyClient, createChainMock, mockEsAdmin } = vi.h
 
 vi.mock("@/lib/supabase.server", () => ({
   createServerOnlyClient: vi.fn().mockImplementation(() => Promise.resolve(mockServerOnlyClient)),
+  // PR1b wraps both fetchers with `buildCachedReportFetcher`, which runs the
+  // pure `_fetch*` on a service-role client. Reusing `mockServerOnlyClient`
+  // here means the existing `setupCuotasYPagos`/`setupComisiones` helpers
+  // (which reassign `mockServerOnlyClient.schema`) keep working unchanged.
+  createServiceRoleClient: vi.fn().mockImplementation(() => mockServerOnlyClient),
 }));
 
 vi.mock("@/lib/permissions/server", () => ({
   esAdmin: mockEsAdmin,
 }));
 
+// `buildCachedReportFetcher` calls `unstable_cache` from `next/cache` at
+// module top-level (via `cobranza.ts`/`comisiones.ts`'s `fetch*Cached`
+// constants). The global `vitest.setup.ts` mock only stubs
+// `revalidatePath`/`revalidateTag`, so this file needs its own
+// identity-passthrough override (documented gotcha from PR1a apply-progress,
+// precedent: `cobranza-gestion-action.test.ts`).
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
+  unstable_cache: (fn: any) => fn,
+}));
+
 import { obtenerReporteCobranza } from "@/app/dashboard/admin/reportes/actions/cobranza";
 import { obtenerReporteComisiones } from "@/app/dashboard/admin/reportes/actions/comisiones";
+
+// `fetchAllRows` rebuilds the whole query chain on every `.range()` retry,
+// so a single logical paginated query needs a chain whose OWN `.range()`
+// call count decides which page to return — regardless of how many times
+// the enclosing `.from(table)` router hands this same chain back out.
+function createPagedChainMock(pages: any[][]) {
+  const chain: any = {};
+  const methods = [
+    "select", "insert", "update", "delete", "eq", "neq", "is", "or",
+    "order", "single", "in", "limit", "head", "maybeSingle", "not", "gte", "lte",
+  ];
+  for (const method of methods) chain[method] = vi.fn().mockReturnValue(chain);
+  let pageIdx = 0;
+  chain.range = vi.fn().mockImplementation(() => {
+    const page = pages[pageIdx] ?? [];
+    pageIdx += 1;
+    return Promise.resolve({ data: page, error: null });
+  });
+  return chain;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -132,6 +169,50 @@ describe("obtenerReporteCobranza: agregaciones", () => {
     expect(res.data?.resumen.cuotasVencidas).toBe(1);
   });
 
+  it("suma saldo y mora correctamente cuando cuota abarca >1000 filas en 2 páginas mockeadas", async () => {
+    const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      id: `c${i}`, venta_id: "v1", monto_programado: 100, monto_pagado: 0, monto_mora: 1,
+      estado: "vencida", fecha_vencimiento: "2020-01-01", moneda: "PEN",
+    }));
+    const page2 = Array.from({ length: 50 }, (_, i) => ({
+      id: `c${1000 + i}`, venta_id: "v1", monto_programado: 100, monto_pagado: 0, monto_mora: 1,
+      estado: "vencida", fecha_vencimiento: "2020-01-01", moneda: "PEN",
+    }));
+
+    const cuotasActivasChain = createPagedChainMock([page1, page2]);
+    const cuotasPagadasChain = createChainMock({ data: [], error: null });
+    const pagosChain = createChainMock({ data: [], error: null });
+    const ventaChain = createChainMock({
+      data: [{ id: "v1", cliente_id: "cl1", cliente: { nombre: "Cliente Uno" } }],
+      error: null,
+    });
+
+    let cuotaCall = 0;
+    mockServerOnlyClient.schema = vi.fn((schemaName: string) => ({
+      from: vi.fn((table: string) => {
+        if (schemaName === "crm" && table === "cuota") {
+          cuotaCall += 1;
+          // cuotasActivas paginates internally (2 pages, tracked by its own
+          // `.range()` call count); once both pages are consumed, the NEXT
+          // `.from('cuota')` call belongs to cuotasPagadasPeriodo.
+          return cuotaCall <= 2 ? cuotasActivasChain : cuotasPagadasChain;
+        }
+        if (schemaName === "crm" && table === "pago") return pagosChain;
+        if (schemaName === "crm" && table === "venta") return ventaChain;
+        return createChainMock();
+      }),
+    }));
+
+    const res = await obtenerReporteCobranza("30");
+
+    expect(res.error).toBeNull();
+    // 1050 cuotas activas @ saldo=100, mora=1 cada una.
+    expect(res.data?.resumen.saldoTotalPorCobrar).toBe(105000);
+    expect(res.data?.resumen.moraTotal).toBe(1050);
+    expect(res.data?.topDeudores[0]?.cuotas_pendientes).toBe(1050);
+    expect(res.data?.topDeudores[0]?.saldo_total).toBe(105000);
+  });
+
   it("agrupa top deudores por cliente y suma saldos + mora", async () => {
     setupCuotasYPagos({
       cuotas: [
@@ -187,6 +268,39 @@ describe("obtenerReporteComisiones: agregaciones", () => {
       }),
     }));
   }
+
+  it("agrega resumen/porVendedor/porMes correctamente cuando comision abarca >1000 filas en 2 páginas mockeadas", async () => {
+    const page1 = Array.from({ length: 1000 }, () => ({
+      beneficiario_username: "v1", monto: 10, estado: "pendiente",
+      fecha_generacion: "2026-04-01", fecha_pago: null, moneda: "PEN",
+    }));
+    const page2 = Array.from({ length: 50 }, () => ({
+      beneficiario_username: "v2", monto: 20, estado: "aprobada",
+      fecha_generacion: "2026-04-01", fecha_pago: null, moneda: "PEN",
+    }));
+
+    const comisionChain = createPagedChainMock([page1, page2]);
+    const perfilChain = createChainMock({ data: [], error: null });
+
+    mockServerOnlyClient.schema = vi.fn((schemaName: string) => ({
+      from: vi.fn((table: string) => {
+        if (schemaName === "crm" && table === "comision") return comisionChain;
+        if (schemaName === "crm" && table === "usuario_perfil") return perfilChain;
+        return createChainMock();
+      }),
+    }));
+
+    const res = await obtenerReporteComisiones("30");
+
+    expect(res.error).toBeNull();
+    expect(res.data?.resumen.pendientes).toEqual({ count: 1000, monto: 10000 });
+    expect(res.data?.resumen.aprobadas).toEqual({ count: 50, monto: 1000 });
+    // totalGenerado = 10000 + 1000 = 11000 (ninguna anulada)
+    expect(res.data?.resumen.totalGenerado).toBe(11000);
+    const v1 = res.data?.porVendedor.find((v) => v.username === "v1");
+    expect(v1?.pendiente_count).toBe(1000);
+    expect(v1?.total_generado).toBe(10000);
+  });
 
   it("agrupa por estado con count + monto", async () => {
     setupComisiones([

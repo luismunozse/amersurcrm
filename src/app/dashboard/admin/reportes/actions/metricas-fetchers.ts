@@ -11,6 +11,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { esEstadoConvertido } from "@/lib/reportes/estados";
+import { fetchAllRows } from "@/lib/reportes/pagination";
 
 const MESES_TENDENCIA = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -64,32 +65,42 @@ export async function fetchMetricasClientes(
   startISO: string,
   endISO: string,
 ): Promise<MetricasClientesPiezas & { leadsRaw: Array<{ id: string; estado_cliente: string | null }> }> {
-  const [nuevosRes, totalRes, interaccionRes, ventaRes] = await Promise.all([
-    supabase.schema("crm").from("cliente")
-      .select("id, estado_cliente, fecha_alta, vendedor_asignado")
-      .gte("fecha_alta", startISO).lte("fecha_alta", endISO),
+  // Strategy B (ADR2) for the three id-bearing selects: `nuevos`/`activos`
+  // need the actual `cliente_id` rows for dedupe, so a head:true count can't
+  // substitute — paginate via `fetchAllRows`. `totalRes` only needs a number,
+  // so it stays a Strategy A exact head count (already correct pre-PR1b).
+  const [leadsRaw, totalRes, interacciones, ventas] = await Promise.all([
+    fetchAllRows<{ id: string; estado_cliente: string | null; fecha_alta: string; vendedor_asignado: string | null }>(
+      (offset) =>
+        supabase.schema("crm").from("cliente")
+          .select("id, estado_cliente, fecha_alta, vendedor_asignado")
+          .gte("fecha_alta", startISO).lte("fecha_alta", endISO)
+          .range(offset, offset + 999),
+    ),
     supabase.schema("crm").from("cliente")
       .select("id", { count: "exact", head: true })
       .lte("fecha_alta", endISO),
-    supabase.schema("crm").from("cliente_interaccion")
-      .select("cliente_id")
-      .gte("fecha_interaccion", startISO).lte("fecha_interaccion", endISO),
-    supabase.schema("crm").from("venta")
-      .select("cliente_id")
-      .gte("fecha_venta", startISO).lte("fecha_venta", endISO)
-      .not("cliente_id", "is", null),
+    fetchAllRows<{ cliente_id: string | null }>((offset) =>
+      supabase.schema("crm").from("cliente_interaccion")
+        .select("cliente_id")
+        .gte("fecha_interaccion", startISO).lte("fecha_interaccion", endISO)
+        .range(offset, offset + 999),
+    ),
+    fetchAllRows<{ cliente_id: string | null }>((offset) =>
+      supabase.schema("crm").from("venta")
+        .select("cliente_id")
+        .gte("fecha_venta", startISO).lte("fecha_venta", endISO)
+        .not("cliente_id", "is", null)
+        .range(offset, offset + 999),
+    ),
   ]);
 
-  const leadsRaw = (nuevosRes.data || []) as Array<{
-    id: string;
-    estado_cliente: string | null;
-  }>;
   const nuevos = leadsRaw.length;
   const totalHistorico = totalRes.count ?? 0;
 
   const activosSet = new Set<string>();
-  (interaccionRes.data || []).forEach((i: any) => i.cliente_id && activosSet.add(i.cliente_id));
-  (ventaRes.data || []).forEach((v: any) => v.cliente_id && activosSet.add(v.cliente_id));
+  interacciones.forEach((i: any) => i.cliente_id && activosSet.add(i.cliente_id));
+  ventas.forEach((v: any) => v.cliente_id && activosSet.add(v.cliente_id));
 
   const convertidos = leadsRaw.filter((c) => esEstadoConvertido(c.estado_cliente ?? "")).length;
   const tasaConversion = nuevos > 0 ? (convertidos / nuevos) * 100 : 0;
@@ -112,35 +123,52 @@ export async function fetchMetricasInventario(
   startISO: string,
   endISO: string,
 ): Promise<MetricasInventarioPiezas> {
-  const [lotesNuevosRes, lotesEstadosRes, propsNuevasRes, propsEstadosRes] = await Promise.all([
+  // Strategy A (ADR2): every value here is a pure count — no row data is
+  // consumed downstream — so each becomes a `count: 'exact', head: true`
+  // query instead of a bulk `.select()` relied on for `.length`/`.filter()`,
+  // mirroring `getCachedFunnelClientes`'s per-estado head-count pattern.
+  // NOTE (deviation from tasks.md 9.2 wording): the task describes "4
+  // per-estado head-count queries (lote vendido, lote disponible, propiedad
+  // vendido, propiedad disponible)". Implemented as 8 head counts instead —
+  // 4 per table (total, nuevas, vendido, disponible) — because the old bulk
+  // selects also fed `totalPropiedades`/`propiedadesNuevas`; dropping those
+  // to only cover vendido/disponible would have silently broken those two
+  // fields (a `lote`/`propiedad` can be in a third state, e.g. "reservado",
+  // so vendido+disponible alone can't reconstruct the total).
+  const [
+    loteTotalRes, loteNuevasRes, loteVendidoRes, loteDisponibleRes,
+    propTotalRes, propNuevasRes, propVendidoRes, propDisponibleRes,
+  ] = await Promise.all([
     supabase.schema("crm").from("lote")
-      .select("id, estado, precio, created_at")
+      .select("id", { count: "exact", head: true })
+      .lte("created_at", endISO),
+    supabase.schema("crm").from("lote")
+      .select("id", { count: "exact", head: true })
       .gte("created_at", startISO).lte("created_at", endISO),
     supabase.schema("crm").from("lote")
-      .select("id, estado, precio")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "vendido").lte("created_at", endISO),
+    supabase.schema("crm").from("lote")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "disponible").lte("created_at", endISO),
+    supabase.schema("crm").from("propiedad")
+      .select("id", { count: "exact", head: true })
       .lte("created_at", endISO),
     supabase.schema("crm").from("propiedad")
-      .select("id, estado_comercial, precio, created_at")
+      .select("id", { count: "exact", head: true })
       .gte("created_at", startISO).lte("created_at", endISO),
     supabase.schema("crm").from("propiedad")
-      .select("id, estado_comercial, precio")
-      .lte("created_at", endISO),
+      .select("id", { count: "exact", head: true })
+      .eq("estado_comercial", "vendido").lte("created_at", endISO),
+    supabase.schema("crm").from("propiedad")
+      .select("id", { count: "exact", head: true })
+      .eq("estado_comercial", "disponible").lte("created_at", endISO),
   ]);
 
-  const lotesEstados = lotesEstadosRes.data || [];
-  const propsEstados = propsEstadosRes.data || [];
-
-  const propiedadesNuevas = (lotesNuevosRes.data?.length || 0) + (propsNuevasRes.data?.length || 0);
-
-  const lotesVendidos = lotesEstados.filter((l: any) => l.estado === "vendido").length;
-  const propsVendidas = propsEstados.filter((p: any) => p.estado_comercial === "vendido").length;
-  const totalVendidas = lotesVendidos + propsVendidas;
-
-  const lotesDisponibles = lotesEstados.filter((l: any) => l.estado === "disponible").length;
-  const propsDisponibles = propsEstados.filter((p: any) => p.estado_comercial === "disponible").length;
-  const totalDisponibles = lotesDisponibles + propsDisponibles;
-
-  const totalPropiedades = lotesEstados.length + propsEstados.length;
+  const totalPropiedades = (loteTotalRes.count ?? 0) + (propTotalRes.count ?? 0);
+  const propiedadesNuevas = (loteNuevasRes.count ?? 0) + (propNuevasRes.count ?? 0);
+  const totalVendidas = (loteVendidoRes.count ?? 0) + (propVendidoRes.count ?? 0);
+  const totalDisponibles = (loteDisponibleRes.count ?? 0) + (propDisponibleRes.count ?? 0);
 
   return { totalPropiedades, propiedadesNuevas, totalVendidas, totalDisponibles };
 }
@@ -154,23 +182,31 @@ export async function fetchMetricasVentas(
   startISO: string,
   endISO: string,
 ): Promise<MetricasVentasPiezas> {
-  const [montosRes, vendedoresRes] = await Promise.all([
-    supabase.schema("crm").from("venta")
-      .select("id, precio_total")
-      .gte("fecha_venta", startISO).lte("fecha_venta", endISO),
-    supabase.schema("crm").from("venta")
-      .select("vendedor_username, precio_total")
-      .gte("fecha_venta", startISO).lte("fecha_venta", endISO),
+  // Strategy B (ADR2): both queries aggregate row values (sum, group-by), so
+  // a head:true count cannot substitute — paginate via `fetchAllRows`.
+  const [montos, vendedores] = await Promise.all([
+    fetchAllRows<{ id: string; precio_total: number | null }>((offset) =>
+      supabase.schema("crm").from("venta")
+        .select("id, precio_total")
+        .gte("fecha_venta", startISO).lte("fecha_venta", endISO)
+        .range(offset, offset + 999),
+    ),
+    fetchAllRows<{ vendedor_username: string | null; precio_total: number | null }>((offset) =>
+      supabase.schema("crm").from("venta")
+        .select("vendedor_username, precio_total")
+        .gte("fecha_venta", startISO).lte("fecha_venta", endISO)
+        .range(offset, offset + 999),
+    ),
   ]);
 
-  const valorVentasRegistradas = (montosRes.data || []).reduce(
+  const valorVentasRegistradas = montos.reduce(
     (sum: number, v: any) => sum + (Number(v.precio_total) || 0),
     0,
   );
-  const cantidadVentas = montosRes.data?.length || 0;
+  const cantidadVentas = montos.length;
 
   const ventasPorVendedor = new Map<string, { ventas: number; propiedades: number }>();
-  (vendedoresRes.data || []).forEach((v: any) => {
+  vendedores.forEach((v: any) => {
     if (!v.vendedor_username) return;
     const actual = ventasPorVendedor.get(v.vendedor_username) || { ventas: 0, propiedades: 0 };
     ventasPorVendedor.set(v.vendedor_username, {

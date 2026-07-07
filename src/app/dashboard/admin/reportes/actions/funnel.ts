@@ -2,6 +2,7 @@
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
 import { buildCachedReportFetcher } from "./shared-cache";
+import { fetchAllRows } from "@/lib/reportes/pagination";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface EtapaFunnelStat {
@@ -28,49 +29,62 @@ export interface ReporteFunnelData {
   tasaConversionFinal: number;
 }
 
-async function _fetchFunnel(
+export async function _fetchFunnel(
   supabase: SupabaseClient<any, "crm">,
   startISO: string,
   endISO: string,
 ): Promise<ReporteFunnelData> {
-  const [
-    leadsResult,
-    interaccionesResult,
-    visitasResult,
-    reservasResult,
-    ventasResult,
-  ] = await Promise.all([
-    supabase.schema('crm').from('cliente')
-      .select('id, estado_cliente')
-      .gte('fecha_alta', startISO).lte('fecha_alta', endISO),
-    supabase.schema('crm').from('cliente_interaccion')
-      .select('cliente_id')
-      .gte('fecha_interaccion', startISO).lte('fecha_interaccion', endISO),
-    supabase.schema('crm').from('visita_propiedad')
-      .select('cliente_id')
-      .gte('fecha_visita', startISO).lte('fecha_visita', endISO),
-    supabase.schema('crm').from('reserva')
-      .select('cliente_id')
-      .gte('created_at', startISO).lte('created_at', endISO),
-    supabase.schema('crm').from('venta')
-      .select('cliente_id, precio_total')
-      .gte('fecha_venta', startISO).lte('fecha_venta', endISO),
+  // Strategy B (ADR2): every source here needs the actual `cliente_id` rows
+  // for cross-referencing/dedupe, not just a count, so a head:true count
+  // cannot substitute — paginate each unbounded select via `fetchAllRows`
+  // instead of relying on PostgREST's ~1000-row cap. The 5 fetches still run
+  // in parallel (Promise.all); pagination happens inside each independently.
+  const [leads, interacciones, visitas, reservas, ventas] = await Promise.all([
+    fetchAllRows<{ id: string; estado_cliente: string | null }>((offset) =>
+      supabase.schema('crm').from('cliente')
+        .select('id, estado_cliente')
+        .gte('fecha_alta', startISO).lte('fecha_alta', endISO)
+        .range(offset, offset + 999)
+    ),
+    fetchAllRows<{ cliente_id: string }>((offset) =>
+      supabase.schema('crm').from('cliente_interaccion')
+        .select('cliente_id')
+        .gte('fecha_interaccion', startISO).lte('fecha_interaccion', endISO)
+        .range(offset, offset + 999)
+    ),
+    fetchAllRows<{ cliente_id: string }>((offset) =>
+      supabase.schema('crm').from('visita_propiedad')
+        .select('cliente_id')
+        .gte('fecha_visita', startISO).lte('fecha_visita', endISO)
+        .range(offset, offset + 999)
+    ),
+    fetchAllRows<{ cliente_id: string }>((offset) =>
+      supabase.schema('crm').from('reserva')
+        .select('cliente_id')
+        .gte('created_at', startISO).lte('created_at', endISO)
+        .range(offset, offset + 999)
+    ),
+    fetchAllRows<{ cliente_id: string; precio_total: number | null }>((offset) =>
+      supabase.schema('crm').from('venta')
+        .select('cliente_id, precio_total')
+        .gte('fecha_venta', startISO).lte('fecha_venta', endISO)
+        .range(offset, offset + 999)
+    ),
   ]);
 
-  const leads = leadsResult.data ?? [];
   const leadIds = new Set(leads.map((l: any) => l.id));
 
   const contactadosIds = new Set(
-    (interaccionesResult.data ?? []).filter((i: any) => leadIds.has(i.cliente_id)).map((i: any) => i.cliente_id)
+    interacciones.filter((i: any) => leadIds.has(i.cliente_id)).map((i: any) => i.cliente_id)
   );
   const conVisitaIds = new Set(
-    (visitasResult.data ?? []).filter((v: any) => leadIds.has(v.cliente_id)).map((v: any) => v.cliente_id)
+    visitas.filter((v: any) => leadIds.has(v.cliente_id)).map((v: any) => v.cliente_id)
   );
   const conReservaIds = new Set(
-    (reservasResult.data ?? []).filter((r: any) => leadIds.has(r.cliente_id)).map((r: any) => r.cliente_id)
+    reservas.filter((r: any) => leadIds.has(r.cliente_id)).map((r: any) => r.cliente_id)
   );
   const ventasCerradasIds = new Set(
-    (ventasResult.data ?? []).filter((v: any) => leadIds.has(v.cliente_id)).map((v: any) => v.cliente_id)
+    ventas.filter((v: any) => leadIds.has(v.cliente_id)).map((v: any) => v.cliente_id)
   );
 
   const totalLeads = leads.length;
@@ -78,7 +92,7 @@ async function _fetchFunnel(
   const totalConVisita = conVisitaIds.size;
   const totalConReserva = conReservaIds.size;
   const totalVentas = ventasCerradasIds.size;
-  const valorVentas = (ventasResult.data ?? []).reduce((sum: number, v: any) => sum + (v.precio_total || 0), 0);
+  const valorVentas = ventas.reduce((sum: number, v: any) => sum + (v.precio_total || 0), 0);
 
   const distribucionEstado = leads.reduce<Record<string, number>>((acc, c: any) => {
     const estado = c.estado_cliente || 'sin_estado';
