@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { ArrowUp, ArrowDown, ArrowUpDown, Rows3, Rows2, AlignJustify } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowUp, ArrowDown, ArrowUpDown, Rows3, Rows2, AlignJustify, Presentation } from "lucide-react";
 
 type Density = "compact" | "normal" | "relaxed";
 const DENSITY_KEY = "lotes-list-density";
@@ -42,8 +43,15 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { usePermissions, PERMISOS } from "@/lib/permissions";
 import { MasterplanViewer } from "@/components/masterplan/MasterplanViewer";
 import { MasterplanEditorPanel } from "@/components/masterplan/MasterplanEditorPanel";
-import { toPlanoLoteDTO, type PlanoLoteDTO } from "@/lib/masterplan/dto";
+import { toPlanoLoteDTO, type PlanoLoteDTO, type PlanoPresentacionDTO } from "@/lib/masterplan/dto";
 import type { Masterplan } from "@/types/proyectos";
+
+// Carga diferida: react-zoom-pan-pinch (compartido con el editor) solo se
+// descarga cuando el vendedor abre el modo presentación.
+const PlanoPresentacion = dynamic(
+  () => import("@/components/masterplan/PlanoPresentacion").then((m) => m.PlanoPresentacion),
+  { ssr: false },
+);
 
 type Lote = {
   id: string;
@@ -81,9 +89,10 @@ interface LotesListProps {
   lotes: Lote[];
   totalLotes?: number;
   masterplan?: Masterplan | null;
+  presentacionDto?: PlanoPresentacionDTO | null;
 }
 
-export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }: LotesListProps) {
+export default function LotesList({ proyectoId, lotes, totalLotes, masterplan, presentacionDto }: LotesListProps) {
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -107,6 +116,7 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
   const [density, setDensity] = useState<Density>("normal");
   const [showMasterplan, setShowMasterplan] = useState<boolean>(!!masterplan?.url);
   const [editandoMp, setEditandoMp] = useState(false);
+  const [modoPresentacion, setModoPresentacion] = useState(false);
   const puedeEditarMasterplan = esAdminOCoordinador();
   const lockedLotes = useLoteLocks(proyectoId);
 
@@ -717,24 +727,35 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
       {/* Sección Masterplan interactivo */}
       <Card>
         <CardHeader>
-          <button
-            type="button"
-            onClick={() => setShowMasterplan((v) => !v)}
-            className="flex items-center justify-between w-full gap-3 text-left"
-            aria-expanded={showMasterplan}
-          >
-            <CardTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
-                <Map className="w-4 h-4 text-crm-primary" />
-              </div>
-              Masterplan
-            </CardTitle>
-            {showMasterplan ? (
-              <ChevronUp className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
-            )}
-          </button>
+          <div className="flex w-full items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMasterplan((v) => !v)}
+              className="flex flex-1 items-center gap-3 text-left"
+              aria-expanded={showMasterplan}
+            >
+              <CardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-crm-primary/10 rounded-lg flex items-center justify-center">
+                  <Map className="w-4 h-4 text-crm-primary" />
+                </div>
+                Masterplan
+              </CardTitle>
+              {showMasterplan ? (
+                <ChevronUp className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoPresentacion(true)}
+              title="Abrir el masterplan en modo presentación (pantalla completa, sin precios)"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-crm-border px-3 py-1.5 text-xs font-medium text-crm-text-primary transition-colors ease-out-strong hover:bg-crm-card-hover active:scale-[0.98]"
+            >
+              <Presentation className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Modo presentación</span>
+            </button>
+          </div>
         </CardHeader>
         {showMasterplan && (
           <CardContent>
@@ -1369,6 +1390,9 @@ export default function LotesList({ proyectoId, lotes, totalLotes, masterplan }:
         </CardContent>
       </Card>
     </div>
+    {modoPresentacion && (
+      <PlanoPresentacion dto={presentacionDto ?? null} onClose={() => setModoPresentacion(false)} />
+    )}
     {/* Modal de edición de lote */}
     <LoteEditModal
       open={!!editingLote}

@@ -12,6 +12,7 @@ import ProyectoGaleria from "./_ProyectoGaleria";
 import type { ProyectoMediaItem, Masterplan } from "@/types/proyectos";
 import type { OverlayLayerConfig } from "@/types/overlay-layers";
 import { ChevronLeft, MapPin, Search, Circle } from "lucide-react";
+import { buildPlanoPresentacion } from "@/lib/masterplan/presentacion.server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -55,6 +56,14 @@ export default async function ProyLotesPage({
   const perPage = 10;
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
+
+  // Se inicia temprano (sin await) para que corra en paralelo con las
+  // consultas de proyecto/lotes de abajo; se espera recién donde se usa.
+  const presentacionDtoPromise = buildPlanoPresentacion(id);
+  // Evita un "unhandled rejection" si alguna guarda anterior (404, error de
+  // proyecto) retorna antes de llegar al await real más abajo. El await
+  // real conserva el rechazo (y por lo tanto el throw) si ocurre.
+  presentacionDtoPromise.catch(() => {});
 
   const supabase = await createServerOnlyClient();
 
@@ -316,6 +325,7 @@ export default async function ProyLotesPage({
   const _primaryOverlayBounds = primaryOverlayLayer?.bounds ?? overlayBoundsValue;
 
   const galeriaItems = parseGaleria((proyecto as { galeria_imagenes?: unknown } | null)?.galeria_imagenes);
+  const presentacionDto = await presentacionDtoPromise;
 
   const lotesMapeoSource = lotesParaMapeo ?? [];
   const lotesForMapeo = lotesMapeoSource.map((lote) => {
@@ -468,6 +478,7 @@ export default async function ProyLotesPage({
               lotes={lotesConProyecto}
               totalLotes={total}
               masterplan={(proyecto as { masterplan?: Masterplan | null }).masterplan ?? null}
+              presentacionDto={presentacionDto}
             />
 
             {/* Paginación mejorada */}
