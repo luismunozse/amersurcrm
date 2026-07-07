@@ -79,10 +79,10 @@ Maps to: Requirement "Presentation component consumes a price-free whitelist DTO
 Maps to: Requirement "Presentation mode shows no price anywhere on screen" (2 scenarios); ADR-4 (shared component/DTO seam)
 
 ### Phase 7: `PlanoPresentacion` component (TDD)
-- [ ] 7.1 RED — `src/components/masterplan/PlanoPresentacion.test.tsx`: legend shows 3 estado colors, no monetary text; tap on a lote polygon opens a detail panel with área + manzana/etapa only; empty state renders when `dto` is `null`
-- [ ] 7.2 GREEN — `PlanoPresentacion.tsx`: fullscreen wrapper over the refactored `MasterplanViewer`, `estadoColor` legend, tap→detail panel (bottom sheet on small screens, dark-aware), formal-Spanish empty-state copy, props typed `PlanoPresentacionDTO | null` only (no DB access)
-- [ ] 7.3 Wire entry point: proyecto detail screen resolves `proyectoId`, server-calls `buildPlanoPresentacion`, `next/dynamic`-imports `PlanoPresentacion` behind a "Modo presentación" action
-- [ ] 7.4 `npx vitest run src/components/masterplan/PlanoPresentacion.test.tsx`; `npx tsc --noEmit`
+- [x] 7.1 RED — `src/components/masterplan/PlanoPresentacion.test.tsx`: legend shows 3 estado colors, no monetary text; tap on a lote polygon opens a detail panel with área + manzana/etapa only; empty state renders when `dto` is `null`
+- [x] 7.2 GREEN — `PlanoPresentacion.tsx`: fullscreen wrapper over the refactored `MasterplanViewer`, `estadoColor` legend, tap→detail panel (bottom sheet on small screens, dark-aware), formal-Spanish empty-state copy, props typed `PlanoPresentacionDTO | null` only (no DB access)
+- [x] 7.3 Wire entry point: proyecto detail screen resolves `proyectoId`, server-calls `buildPlanoPresentacion`, `next/dynamic`-imports `PlanoPresentacion` behind a "Modo presentación" action
+- [x] 7.4 `npx vitest run src/components/masterplan/PlanoPresentacion.test.tsx`; `npx tsc --noEmit`
 
 ## PR5 — Legacy freeze + verified dead-code cleanup (isolated, last; exempt from feature budget per design)
 Maps to: Requirement "Legacy plano write paths are frozen" (2 scenarios); ADR-6

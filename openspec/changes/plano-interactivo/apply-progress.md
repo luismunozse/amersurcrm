@@ -271,3 +271,103 @@ Rollback: revert one or both commits; PR1's uploader and PR2's editor zoom/pan/v
 - **Builder entry point**: `buildPlanoPresentacion(proyectoId: string): Promise<PlanoPresentacionDTO | null>` in `src/lib/masterplan/presentacion.server.ts`. Call it from a server component (it's `import "server-only"`-guarded and uses the session-scoped `createServerOnlyClient()`, so it must run in an authenticated request context — the proyecto detail screen, where PR4 wires the "Modo presentación" entry point, already has that context). Returns `null` when no masterplan is uploaded yet — task 7.1/7.2 already anticipate this as `PlanoPresentacion`'s empty-state trigger.
 - `PlanoPresentacion.tsx` (PR4) should type its props as `PlanoPresentacionDTO | null` directly — no new DTO needed, no additional mapping. It can compose the already-refactored `MasterplanViewer` (`PlanoLoteDTO[]` prop, price-agnostic) as its base rendering layer per design.md section 7.
 - The public `/p/[token]` route (deferred, out of this change entirely) will need a service-role or RLS-anonymous variant of `buildPlanoPresentacion`'s Supabase client — see deviation #4 above. Not a PR4 blocker (PR4 is the dashboard-only presentation mode), but worth remembering before that later change starts.
+
+---
+
+## Slice implemented: PR4 — Presentation mode
+
+Status: **done**. Phase 7 (all PR4 tasks in `tasks.md`) checked off.
+
+### Files touched
+
+| File | Change |
+|------|--------|
+| `src/components/masterplan/PlanoPresentacion.tsx` | **New.** Fullscreen (`fixed inset-0 z-50`, portal-free — rendered directly, consistent with the page-level modal pattern already used for `ConfirmDialog`/`LoteDetailModal`) presentation view. Props: `{ dto: PlanoPresentacionDTO | null; onClose?: () => void }` — structurally price-free (no `precio`/`moneda` reachable, no DB/session import anywhere in the file). Composes the already-refactored `MasterplanViewer` inside `react-zoom-pan-pinch`'s `TransformWrapper`/`TransformComponent` (pinch-zoom/pan for mobile, statically imported here — dynamic-imported one level up, mirroring PR2's `MasterplanEditor` boundary placement). Always-visible estado legend (disponible/reservado/vendido, colors from `estadoColor` in `geometry.ts` — single source of truth, no duplicated palette). Tap on a lote polygon opens a bottom-sheet-on-mobile/centered-on-desktop detail panel showing área + manzana + etapa only (never price). Empty state (formal Spanish copy) when `dto` is `null`, with a "Cerrar modo presentación" CTA. Dark-aware via existing `crm-*` CSS variables; buttons use `active:scale` + `ease-out-strong` per the design-polish convention; safe-area insets (`env(safe-area-inset-top/bottom)`) on the header and both sheets for notched/gesture-bar phones. |
+| `src/components/masterplan/PlanoPresentacion.test.tsx` | **New.** 5 tests: DTO structural no-price contract (`Object.keys` on each fixture lote); legend renders all 3 estado labels with no monetary text anywhere in `innerHTML`; tapping a lote polygon opens the detail panel with área/manzana/etapa and no price text; closing the detail panel removes it; `dto={null}` renders the formal-Spanish empty state and never attempts to render a lote polygon. RED confirmed (`./PlanoPresentacion` unresolved) before implementation. |
+| `src/app/dashboard/proyectos/[id]/page.tsx` | Added `buildPlanoPresentacion(id)` call. Started early as an unawaited promise right after `id` is known (parallel with the proyecto/lotes queries already in this file, per `async-parallel`/`async-defer-await`), with a no-op `.catch(() => {})` attached to the same promise handle purely to avoid a Node "unhandled rejection" warning if an earlier guard (`notFound()`, `throw eProyecto`) returns before the real `await` is reached — the real `await presentacionDtoPromise` later still throws normally on error, preserving `presentacion.server.ts`'s existing "throw, don't swallow" convention. Awaited once, right before use, and passed as a new `presentacionDto` prop to `<LotesList>`. |
+| `src/app/dashboard/proyectos/[id]/_LotesList.tsx` | Added `presentacionDto?: PlanoPresentacionDTO | null` prop; `next/dynamic(ssr:false)`-imports `PlanoPresentacion` (same lazy-load pattern as `MasterplanEditor` in `MasterplanEditorPanel.tsx` — `react-zoom-pan-pinch` only downloads when the vendedor actually opens the view); added a `modoPresentacion` boolean state; restructured the Masterplan `CardHeader` from a single full-width toggle `<button>` into a flex row containing the existing collapse-toggle button (unchanged behavior) plus a new sibling "Modo presentación" button (icon-only on narrow screens, icon+label from `sm:` up) — avoided nesting a second `<button>` inside the existing one, which would have been invalid HTML. Renders `<PlanoPresentacion dto={presentacionDto ?? null} onClose={...} />` at the bottom of the component tree (next to the other modals: `LoteEditModal`, `LoteDetailModal`, etc.) when `modoPresentacion` is true. The button is unconditionally visible (not gated behind `masterplan?.url` or any permission check) — clicking it with no masterplan uploaded yet simply shows `PlanoPresentacion`'s own empty state, which is the intended UX per design.md section 7 ("Empty state ... with formal-Spanish copy") rather than hiding the entry point entirely. |
+
+No other files changed. `MasterplanViewer.tsx`, `MasterplanEditor.tsx`, `dto.ts`, `presentacion.server.ts`, and the legacy write paths were not touched in this slice (verified by reading, not modifying) — PR4 only *consumes* PR3's DTO/builder and PR2's editor patterns (dynamic-import boundary, `TransformWrapper` usage).
+
+### Scope decisions and deviations (documented)
+
+1. **`buildPlanoPresentacion` is called unconditionally on every proyecto-detail page load**, not lazily on-demand via a server action when the vendedor clicks "Modo presentación". This duplicates two lightweight reads (`proyecto.masterplan`, unfiltered `lote` rows) against queries the page already runs elsewhere (paginated/filtered). This is a deliberate tradeoff, not an oversight: task 7.3 explicitly says the proyecto detail screen "server-calls `buildPlanoPresentacion`" as part of the entry-point wiring (i.e., eagerly, at page-render time), and the sales-floor use case (a vendedor standing in front of a client, tapping "Modo presentación") wants zero added latency at the moment of the tap — an on-demand server action would add a network round-trip exactly when instant feedback matters most. The extra queries are cheap (two indexed reads, no joins) and are started in parallel with the page's existing queries, not appended to a serial waterfall.
+2. **Fullscreen implemented as a `fixed inset-0 z-50` full-viewport `<div>`, not the browser Fullscreen API** (`element.requestFullscreen()`). The only precedent in this codebase (`_PlanosViewer.tsx`) uses the native Fullscreen API, but that file is dead code slated for deletion in PR5 and was not reused. The native API is unreliable on iOS Safari (no `requestFullscreen` support on non-video elements in most iOS versions), which matters directly here since design.md notes "Phase 2 opens on phones via WhatsApp" — overwhelmingly iOS Safari in this market. A `position: fixed` overlay (the same pattern already used by `ConfirmDialog.tsx` and `LoteDetailModal.tsx`) works identically across all mobile browsers and needed no new browser-API surface.
+3. **No `createPortal` for `PlanoPresentacion`'s root**, unlike `ConfirmDialog`/`LoteDetailModal`. Since `PlanoPresentacion` is already the outermost, single, most-nested-inside-nothing-else element rendered by `_LotesList` (not stacked under another dialog/modal), a portal to `document.body` was not structurally necessary for z-index/overflow-clipping correctness the way it is for `ConfirmDialog` (which can be triggered from inside scrollable table rows). Kept simple; if a future consumer renders `PlanoPresentacion` from inside a scrollable/overflow-clipped ancestor, adding a `createPortal(..., document.body)` wrapper at the call site (not inside the component) is the safe fix — the component's DTO-only props contract is unaffected either way.
+4. **"Modo presentación" button has no permission gate**, unlike "Editar masterplan" (`puedeEditarMasterplan`-gated). This matches the spec's framing of presentation mode as a vendedor-facing view (anyone who can reach the proyecto detail screen should be able to show the plano to a client) — no ADR or task in this change calls for restricting it, so no gate was added rather than inventing one.
+
+### Tests written and results
+
+```
+npx vitest run src/components/masterplan/PlanoPresentacion.test.tsx
+```
+- RED (before `PlanoPresentacion.tsx` existed): 1 failed suite — `Failed to resolve import "./PlanoPresentacion"`.
+- GREEN (after implementation): 1 file passed, 5 tests passed.
+
+Full targeted regression for the masterplan area (per Strict TDD "targeted files" instruction — no full-suite run):
+```
+npx vitest run src/components/masterplan/PlanoPresentacion.test.tsx src/lib/masterplan/dto.test.ts src/lib/masterplan/presentacion.server.test.ts src/components/masterplan/MasterplanViewer.test.tsx src/components/masterplan/MasterplanEditor.test.tsx src/lib/masterplan/geometry.test.ts src/lib/masterplan/rasterize.test.ts src/__tests__/unit/masterplan-actions.test.ts
+```
+- Result: 8 files passed, 52 tests passed, 0 failed.
+
+```
+npx tsc --noEmit
+```
+- Result: exit code 0, no errors (full project).
+
+```
+npx eslint src/components/masterplan/PlanoPresentacion.tsx src/app/dashboard/proyectos/[id]/_LotesList.tsx src/app/dashboard/proyectos/[id]/page.tsx
+```
+- Result: no errors, no warnings.
+
+### Changed-line estimate vs budget
+
+Forecast for PR4: ~350 changed lines (excluding tests). Actual, non-test files only:
+
+- `src/components/masterplan/PlanoPresentacion.tsx`: 166 lines (new).
+- `src/app/dashboard/proyectos/[id]/page.tsx`: +11 lines (net; a new import, an early-started+guarded promise, one `await`, one prop pass-through).
+- `src/app/dashboard/proyectos/[id]/_LotesList.tsx`: +56/-21 lines (net +35; new import + dynamic import, one new prop, one new state var, CardHeader restructure to add the sibling button, one new conditional render block at the bottom).
+
+Total non-test ≈ **212 changed lines** — well under the ~350-line forecast and the 400-line budget. `PlanoPresentacion.test.tsx` (85 lines) excluded from the budget per the PR1/PR2/PR3-established convention.
+
+### Suggested commit boundaries (work-unit-commits skill)
+
+Two reviewable work units for this PR (both still part of the single PR4 slice/branch, stacked after PR3 merges):
+
+```
+feat(masterplan): add PlanoPresentacion fullscreen price-free component
+
+- PlanoPresentacion.tsx: fullscreen, mobile-first (pinch-zoom/pan via
+  react-zoom-pan-pinch), dark-aware presentation view; composes the
+  already price-agnostic MasterplanViewer
+- always-visible estado legend (disponible/reservado/vendido); tap a lote
+  to open a bottom-sheet detail panel with área + manzana/etapa only,
+  never price
+- formal-Spanish empty state with a close CTA when no masterplan exists
+- props typed { dto: PlanoPresentacionDTO | null; onClose?: () => void }
+  only — no DB/session import anywhere in the component tree, so it is
+  reusable verbatim by the deferred public /p/[token] route
+- structural + rendered-output tests lock the no-price guarantee at this
+  layer too (mirrors dto.test.ts's key-list assertion)
+```
+
+```
+feat(masterplan): wire "Modo presentación" entry point on proyecto detail
+
+- page.tsx: server-calls buildPlanoPresentacion(id) in parallel with the
+  existing proyecto/lotes queries, passes the DTO down as a new prop
+- _LotesList.tsx: next/dynamic(ssr:false)-imports PlanoPresentacion so
+  react-zoom-pan-pinch only loads when opened; adds a "Modo presentación"
+  button in the Masterplan card header (sibling to the existing
+  collapse-toggle button, not nested); renders the fullscreen view on
+  demand
+```
+
+Rollback: revert one or both commits; PR1-PR3's uploader/editor/DTO work is untouched by either (verified — no edits to `dto.ts`, `presentacion.server.ts`, `MasterplanViewer.tsx`, or `MasterplanEditor.tsx` in this slice), so rollback has zero blast radius outside this slice. If only commit 2 needs reverting, commit 1's `PlanoPresentacion.tsx` is a harmless, unused-but-correct component until then (no other file imports it).
+
+### What PR5 needs to know
+
+- PR4 does **not** touch any of the 5 confirmed-orphaned dead files (`_MapeoLotesMejorado.tsx`, `_MapeoLotesVisualizacion.tsx`, `_PlanosViewer.tsx`, `_PlanosUploader.tsx`, `OverlayLayersPanel.tsx`) or the live `_MapeoLotes.tsx` — PR5's dead-code deletion scope is unaffected by anything added here.
+- PR4 does not import or reference the legacy `guardarPoligonoLote` (`[id]/_actions.ts:363`, `lote.plano_poligono`) — PR5's rename/freeze of that export has zero interaction with PR4's files.
+- The new "Modo presentación" button lives in `_LotesList.tsx`'s `CardHeader`, which PR5 does not need to touch — no conflict expected when PR5 branches after PR4 merges.
+- `PlanoPresentacion.tsx` is the component the deferred Phase 2 public route (`/p/[token]`, out of this entire change) is designed to reuse verbatim, per design.md section 7 — when that future work starts, it should import `PlanoPresentacion` directly and call `buildPlanoPresentacion` from its own server-side token-resolution logic (see PR3's note on needing a service-role/RLS-anonymous client variant for that unauthenticated context).
