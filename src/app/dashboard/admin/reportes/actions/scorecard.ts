@@ -5,6 +5,7 @@ import { buildCachedReportFetcher } from "./shared-cache";
 import { _fetchPorVendedor } from "./por-vendedor";
 import { _fetchInteracciones } from "./interacciones";
 import { _fetchComisiones } from "./comisiones";
+import { _fetchTiempoRespuesta } from "./tiempo-respuesta";
 import { fetchMetricasVentas } from "./metricas-fetchers";
 import { obtenerMetas } from "@/app/dashboard/admin/metas/_actions-metas";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,9 +17,12 @@ export interface ScorecardVendedorRow {
   contactados: number;
   conversionPct: number;
   /**
-   * Not wired in this slice — see the `_fetchScorecard` doc comment below
-   * for why. Always `null` for now; renders as an explicit "Sin datos"
-   * state, never a fabricated number.
+   * Average hours to first contact (`_fetchTiempoRespuesta`'s
+   * `promedioHoras`), resolved from `cliente.vendedor_asignado` (UUID) to
+   * this vendedor's `username` — see the `_fetchScorecard` doc comment
+   * below for the join mechanics. `null` when the vendedor has zero
+   * attended clients in the period (never a fabricated `0`); renders as an
+   * explicit "Sin datos" state.
    */
   tiempoRespuestaHoras: number | null;
   interacciones: number;
@@ -64,18 +68,19 @@ export interface ScorecardVendedoresData {
  * inert `proyecto` param here would be a filter that silently does
  * nothing, which is the exact kind of lie this change exists to remove.
  *
- * `tiempoRespuestaHoras` is intentionally always `null` in this slice.
- * `tiempo-respuesta.ts` buckets its per-vendedor ranking by
- * `cliente.vendedor_asignado` (a `usuario_perfil.id` UUID — confirmed via
- * `sync-vendedor-fields`'s own description of that column), not
- * `vendedor_username` like every other fetcher composed here. Extracting a
- * `_fetchTiempoRespuesta` and joining it by `username` would either
- * silently mis-join every row (comparing a UUID key against a username
- * key) or require changing that file's live grouping key — a behavior
- * change to an already-shipped, untested report tab that is out of this
- * PR's scope (tasks.md Phase 18 lists only `por-vendedor`/`interacciones`/
- * `comisiones` for extraction). Flagged for a follow-up slice rather than
- * silently faked with a fresh, unreconciled query.
+ * `tiempoRespuestaHoras` (WARNING 1 follow-up, verify-report.md of archived
+ * reportes-confiables) ← `_fetchTiempoRespuesta.rankingVendedores`, joined
+ * by **UUID, not username**: that ranking is keyed by
+ * `cliente.vendedor_asignado` (a `usuario_perfil.id` UUID), not
+ * `vendedor_username` like every other fetcher composed here. Comparing it
+ * directly against `v.username` would silently mis-join every row, so this
+ * function additionally fetches `usuario_perfil.id -> username` for active
+ * vendedores and resolves each ranking entry's raw key through that map
+ * before building the join — `tiempo-respuesta.ts`'s own grouping key is
+ * left untouched (no behavior change to that already-shipped, live tab).
+ * Entries with zero `clientesAtendidos` (no real response times computed)
+ * are excluded from the join so the row renders an honest `null` ("Sin
+ * datos") instead of a fabricated `0`.
  */
 export async function _fetchScorecard(
   supabase: SupabaseClient<any, "crm">,
@@ -89,15 +94,36 @@ export async function _fetchScorecard(
 
   // Fase 1: piezas agregadas independientes entre sí, en paralelo
   // (async-parallel) — ninguna depende del resultado de otra.
-  const [catalogo, interaccionesData, comisionesData, ventasData, metasPorMes] = await Promise.all([
-    _fetchPorVendedor(supabase, startISO, endISO, days, null),
-    _fetchInteracciones(supabase, startISO, endISO),
-    _fetchComisiones(supabase, startISO, endISO),
-    fetchMetricasVentas(supabase, startISO, endISO),
-    Promise.all(meses.map((m) => obtenerMetas({ periodoAnio: m.anio, periodoMes: m.mes }))),
-  ]);
+  const [catalogo, interaccionesData, comisionesData, ventasData, metasPorMes, tiempoRespuestaData, perfilesConId] =
+    await Promise.all([
+      _fetchPorVendedor(supabase, startISO, endISO, days, null),
+      _fetchInteracciones(supabase, startISO, endISO),
+      _fetchComisiones(supabase, startISO, endISO),
+      fetchMetricasVentas(supabase, startISO, endISO),
+      Promise.all(meses.map((m) => obtenerMetas({ periodoAnio: m.anio, periodoMes: m.mes }))),
+      _fetchTiempoRespuesta(supabase, startISO, endISO, days),
+      supabase.schema("crm").from("usuario_perfil").select("id, username").eq("activo", true),
+    ]);
 
   const vendedoresActivos = catalogo.vendedores;
+
+  // `_fetchTiempoRespuesta`'s ranking is keyed by `cliente.vendedor_asignado`
+  // (a `usuario_perfil.id` UUID) — resolve it to `username` here so the join
+  // below is a genuine identity match, not a positional guess. Entries with
+  // no attended clients are skipped, leaving those vendedores unmapped
+  // (→ honest `null`, not a fabricated `0`).
+  const idAUsername = new Map<string, string>(
+    (perfilesConId.data ?? [])
+      .filter((p: any) => p.id && p.username)
+      .map((p: any) => [String(p.id), p.username as string]),
+  );
+  const tiempoRespuestaPorUsername = new Map<string, number>();
+  tiempoRespuestaData.rankingVendedores.forEach((r) => {
+    if (r.clientesAtendidos <= 0) return;
+    const username = idAUsername.get(r.username);
+    if (!username) return;
+    tiempoRespuestaPorUsername.set(username, r.promedioHoras);
+  });
 
   // Fase 2: desglose por vendedor individual. Un llamado a `_fetchPorVendedor`
   // POR vendedor activo, con ese vendedor como filtro — la misma llamada que
@@ -133,7 +159,7 @@ export async function _fetchScorecard(
       leadsAsignados: resumen.totalLeads,
       contactados: resumen.totalContactados,
       conversionPct: parseFloat(resumen.conversionGlobal) || 0,
-      tiempoRespuestaHoras: null,
+      tiempoRespuestaHoras: tiempoRespuestaPorUsername.get(v.username) ?? null,
       interacciones: interaccionesMap.get(v.username) ?? 0,
       ventasMonto,
       ventasCantidad: ventasVendedor?.propiedades ?? 0,

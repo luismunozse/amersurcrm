@@ -1,26 +1,74 @@
 "use server";
 
 import { getAuthorizedClient, calcularFechas, safeAction } from "./shared";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export interface RankingTiempoRespuestaVendedor {
+  /**
+   * Raw grouping key as stored on `cliente.vendedor_asignado` — a
+   * `usuario_perfil.id` UUID (as text), or the literal `'Sin asignar'`.
+   * NOT a `vendedor_username` like every other per-vendedor fetcher in this
+   * directory (`_fetchPorVendedor`, `_fetchInteracciones`,
+   * `_fetchComisiones`). Callers that need to join this by username (e.g.
+   * `scorecard.ts`'s `_fetchScorecard`) MUST resolve this UUID through a
+   * `usuario_perfil.id -> username` lookup themselves — never compare it
+   * directly against a `vendedor_username` value.
+   */
+  username: string;
+  nombre: string;
+  clientesAtendidos: number;
+  clientesSinContactar: number;
+  totalClientes: number;
+  promedioHoras: number;
+  medianaHoras: number;
+  minimoHoras: number;
+  maximoHoras: number;
+  tasaContacto: string;
+}
+
+export interface ReporteTiempoRespuestaData {
+  resumen: {
+    totalClientes: number;
+    clientesContactados: number;
+    clientesSinContactar: number;
+    promedioGlobalHoras: number;
+    alertasCriticas: number;
+    alertasAlerta: number;
+    alertasAtencion: number;
+  };
+  rankingVendedores: RankingTiempoRespuestaVendedor[];
+  rangosDistribucion: Array<{ rango: string; min: number; max: number; cantidad: number; color: string }>;
+  clientesSinContactar: any[];
+  tendenciaData: Array<{ fecha: string; promedioHoras: number }>;
+  periodo: { inicio: string; fin: string; dias: number };
+}
 
 /**
- * Obtiene reporte de tiempo de respuesta entre captación y primer contacto
+ * Pure fetcher (no auth) — mirrors `_fetchPorVendedor`/`_fetchInteracciones`'s
+ * shape (design.md ADR5 precedent) so it can be reused by `scorecard.ts`'s
+ * `_fetchScorecard` without a second, unreconciled query.
+ *
+ * IMPORTANT (WARNING 1 follow-up, verify-report.md of archived
+ * reportes-confiables): this function's grouping key
+ * (`RankingTiempoRespuestaVendedor.username`) is `cliente.vendedor_asignado`
+ * — a UUID, not a `vendedor_username` — UNCHANGED from this tab's existing,
+ * already-shipped behavior. Do NOT "fix" this to key by username here; that
+ * would be a live behavior change to an untested, in-production report tab.
+ * Callers needing a username-keyed join must resolve the UUID themselves.
  */
-export async function obtenerReporteTiempoRespuesta(
-  periodo: string = '30',
-  fechaInicio?: string,
-  fechaFin?: string
-): Promise<{ data: any | null; error: string | null }> {
-  return safeAction(async () => {
-    const supabase = await getAuthorizedClient();
-    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
-
+export async function _fetchTiempoRespuesta(
+  supabase: SupabaseClient<any, "crm">,
+  startISO: string,
+  endISO: string,
+  days: number,
+): Promise<ReporteTiempoRespuestaData> {
     // Obtener clientes del período con su vendedor
     const { data: clientes } = await supabase
       .schema('crm')
       .from('cliente')
       .select('id, nombre, fecha_alta, vendedor_asignado, estado_cliente, telefono, email')
-      .gte('fecha_alta', startDate.toISOString())
-      .lte('fecha_alta', endDate.toISOString())
+      .gte('fecha_alta', startISO)
+      .lte('fecha_alta', endISO)
       .order('fecha_alta', { ascending: false });
 
     // Obtener primera interacción de cada cliente (solo del período y de los clientes captados en él)
@@ -30,7 +78,7 @@ export async function obtenerReporteTiempoRespuesta(
       .from('cliente_interaccion')
       .select('cliente_id, fecha_interaccion, vendedor_username, tipo')
       .in('cliente_id', clienteIdsDelPeriodo.length > 0 ? clienteIdsDelPeriodo : ['00000000-0000-0000-0000-000000000000'])
-      .gte('fecha_interaccion', startDate.toISOString())
+      .gte('fecha_interaccion', startISO)
       .order('fecha_interaccion', { ascending: true });
 
     // Obtener información de vendedores
@@ -230,10 +278,30 @@ export async function obtenerReporteTiempoRespuesta(
         .slice(0, 50),
       tendenciaData,
       periodo: {
-        inicio: startDate.toISOString(),
-        fin: endDate.toISOString(),
+        inicio: startISO,
+        fin: endISO,
         dias: days
       }
     };
+}
+
+/**
+ * Obtiene reporte de tiempo de respuesta entre captación y primer contacto.
+ *
+ * NOT wrapped in `buildCachedReportFetcher` (ADR7 precedent, same reasoning
+ * as `_fetchInteracciones`): this is a pure extraction, not a restructuring
+ * for pagination/exact-counts, so it keeps computing fresh on the
+ * authorized user's client exactly as before — no new caching layer, no
+ * behavior change to this already-shipped tab.
+ */
+export async function obtenerReporteTiempoRespuesta(
+  periodo: string = '30',
+  fechaInicio?: string,
+  fechaFin?: string
+): Promise<{ data: ReporteTiempoRespuestaData | null; error: string | null }> {
+  return safeAction(async () => {
+    const supabase = await getAuthorizedClient();
+    const { startDate, endDate, days } = calcularFechas(periodo, fechaInicio, fechaFin);
+    return _fetchTiempoRespuesta(supabase, startDate.toISOString(), endDate.toISOString(), days);
   });
 }

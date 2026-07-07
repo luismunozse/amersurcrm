@@ -256,4 +256,77 @@ describe("obtenerScorecardVendedores: composicion (ADR5)", () => {
     expect(fila.metaCumplimientoPct).toBe(50);
     expect(mockObtenerMetas).toHaveBeenCalledWith({ periodoAnio: 2026, periodoMes: 6 });
   });
+
+  /**
+   * WARNING 1 follow-up (verify-report.md, archived reportes-confiables):
+   * `tiempo-respuesta.ts` buckets its ranking by `cliente.vendedor_asignado`
+   * (a `usuario_perfil.id` UUID), while the scorecard's own row order comes
+   * from `_fetchPorVendedor`'s catalog (sorted by `nombre_completo`). This
+   * fixture deliberately makes those two orderings DIVERGE — v1 ("Ana Uno")
+   * sorts first alphabetically but has the SLOWER response time, v2 ("Beto
+   * Dos") sorts second alphabetically but has the FASTER response time — so
+   * `rankingVendedores` (sorted "mejor tiempo primero") comes back as
+   * [v2, v1], the reverse of `vendedoresActivos` ([v1, v2]). A positional
+   * join (`rankingVendedores[i]` assigned to `filas[i]`) would silently swap
+   * the two vendedores' values; a correct key-based join (UUID -> username)
+   * must not.
+   */
+  it("tiempoRespuestaHoras resuelve vendedor_asignado (UUID) a username por clave, no por posición", async () => {
+    setupScorecardFixture({
+      perfiles: [
+        { id: "11111111-1111-1111-1111-111111111111", username: "v1", nombre_completo: "Ana Uno" },
+        { id: "22222222-2222-2222-2222-222222222222", username: "v2", nombre_completo: "Beto Dos" },
+      ],
+      clientes: [
+        {
+          id: "c1", vendedor_username: "v1",
+          vendedor_asignado: "11111111-1111-1111-1111-111111111111",
+          fecha_alta: "2026-06-05T00:00:00.000Z", estado_cliente: "nuevo",
+          telefono: null, email: null,
+        },
+        {
+          id: "c2", vendedor_username: "v2",
+          vendedor_asignado: "22222222-2222-2222-2222-222222222222",
+          fecha_alta: "2026-06-05T00:00:00.000Z", estado_cliente: "nuevo",
+          telefono: null, email: null,
+        },
+      ],
+      interaccionesPorVendedor: [
+        // v1: contacted 72h after captación (slow).
+        { id: "i1", cliente_id: "c1", vendedor_username: "v1", tipo: "llamada", resultado: "contactado", duracion_minutos: 5, fecha_interaccion: "2026-06-08T00:00:00.000Z", proxima_accion: null },
+        // v2: contacted 1h after captación (fast).
+        { id: "i2", cliente_id: "c2", vendedor_username: "v2", tipo: "llamada", resultado: "contactado", duracion_minutos: 5, fecha_interaccion: "2026-06-05T01:00:00.000Z", proxima_accion: null },
+      ],
+    });
+
+    const res = await obtenerScorecardVendedores("30", "2026-06-01", "2026-06-30");
+    expect(res.error).toBeNull();
+    const filas = res.data!.filas;
+    expect(filas).toHaveLength(2);
+
+    const filaV1 = filas.find((f) => f.username === "v1")!;
+    const filaV2 = filas.find((f) => f.username === "v2")!;
+
+    expect(filaV1.tiempoRespuestaHoras).toBeCloseTo(72, 1);
+    expect(filaV2.tiempoRespuestaHoras).toBeCloseTo(1, 1);
+  });
+
+  it("tiempoRespuestaHoras es null (Sin datos) cuando el vendedor no tiene interacciones en el período", async () => {
+    setupScorecardFixture({
+      perfiles: [{ id: "11111111-1111-1111-1111-111111111111", username: "v1", nombre_completo: "Vendedor Uno" }],
+      clientes: [
+        {
+          id: "c1", vendedor_username: "v1",
+          vendedor_asignado: "11111111-1111-1111-1111-111111111111",
+          fecha_alta: "2026-06-05T00:00:00.000Z", estado_cliente: "nuevo",
+          telefono: null, email: null,
+        },
+      ],
+      interaccionesPorVendedor: [],
+    });
+
+    const res = await obtenerScorecardVendedores("30", "2026-06-01", "2026-06-30");
+    const fila = res.data!.filas[0];
+    expect(fila.tiempoRespuestaHoras).toBeNull();
+  });
 });
