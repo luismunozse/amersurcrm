@@ -1,0 +1,33 @@
+change: plano-interactivo
+title: Interactive masterplan as a live sales tool
+created: "2026-07-06"
+artifact_store: openspec
+status: proposed
+
+phases:
+  proposal: done
+  spec: done
+  design: done  # corrected: design.md already existed with full content when tasks phase ran
+  tasks: done
+  apply: in_progress  # PR1+PR2 done (uploader + PDF rasterization; editor zoom/pan+vertex ops); PR3-PR5 pending
+  verify: pending
+  archive: pending
+
+next_recommended:
+  - apply  # continue with PR3 (price-free DTO + server builder + viewer refactor); stacked-to-main
+
+delivery:
+  strategy: auto-chain
+  chain_strategy: stacked-to-main
+  note: "5 stacked PRs: PR1 uploader, PR2 editor zoom/pan+vertex ops, PR3 DTO+viewer refactor, PR4 presentation mode, PR5 isolated legacy cleanup (ordered last, exempt from feature budget)."
+
+constraints:
+  strict_tdd: true
+  test_command: "npm test"
+  ui_copy_language: "Peruvian formal Spanish (usted)"
+
+artifacts:
+  proposal: openspec/changes/plano-interactivo/proposal.md
+  spec: openspec/changes/plano-interactivo/spec.md
+  design: openspec/changes/plano-interactivo/design.md
+  tasks: openspec/changes/plano-interactivo/tasks.md
