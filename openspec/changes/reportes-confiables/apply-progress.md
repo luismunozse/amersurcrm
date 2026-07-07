@@ -199,3 +199,72 @@ Suggested commit boundaries (no git mutations performed by this run, per deliver
 3. `ReporteVentas.tsx` + `ReporteRendimientoVendedores.tsx` (Phase 16, UI-only, no new tests)
 
 — or a single squashed commit for the whole PR2 slice if the reviewer prefers one PR/one commit (matches PR1a/PR1b's own note on this).
+
+---
+
+## Slice completed: PR3 — Vendedor scorecard (ADR5)
+
+Status: **done** (Phases 18-21 of `tasks.md`, all checked off).
+
+### Files changed
+
+| File | Action | What was done |
+|------|--------|----------------|
+| `src/app/dashboard/admin/reportes/actions/por-vendedor.ts` | Modified | Added `export` to `_fetchPorVendedor` (Phase 18.1). Its supporting types (`ReportePorVendedorDia`/`Vendedor`/`Resumen`/`Data`) were already exported — no change needed there. Doc comment extended to explain why the scorecard calls this same function once per vendedor (reconciliation by construction, not a parallel formula). |
+| `src/app/dashboard/admin/reportes/actions/interacciones.ts` | Restructured | Extracted the existing inline aggregation out of `obtenerReporteInteracciones` into an exported pure `_fetchInteracciones(supabase, startISO, endISO)` (Phase 18.2), mirroring `_fetchComisiones`'s 3-arg shape. `obtenerReporteInteracciones` is now a thin `getAuthorizedClient()` + `calcularFechas()` + `_fetchInteracciones(...)` wrapper. **No behavior change**: query construction, aggregation logic, and the pre-existing `periodo.fin: new Date().toISOString()` quirk (PR1a deviation #2) are all preserved verbatim — only `days` is now derived from `startISO`/`endISO` inside the fetcher instead of being threaded in from `calcularFechas`'s `days` return value (same deviation pattern as `_fetchCobranza`/`_fetchComisiones` in PR1b). NOT wrapped in `buildCachedReportFetcher` — ADR7 scopes the cache wrap to fetchers being restructured for pagination/exact-counts; this extraction alone doesn't touch that concern. Regression-guarded by the pre-existing `reportes-interacciones.test.ts` (PR1a Phase 4) — reran green with zero test changes. |
+| `src/app/dashboard/admin/reportes/actions/comisiones.ts` | Unchanged | `_fetchComisiones` already exported in PR1b Phase 11 — reused directly (Phase 18.3, no-op). |
+| `src/app/dashboard/admin/reportes/actions/scorecard.ts` (new) | Created | `_fetchScorecard(supabase, startISO, endISO, days)`: pure fetcher (ADR5) composing 5 independent pieces in `Promise.all` (async-parallel) — `_fetchPorVendedor(..., null)` for the active-vendedor catalog, `_fetchInteracciones`, `_fetchComisiones`, `fetchMetricasVentas`, and `Promise.all(meses.map(m => obtenerMetas(...)))` for `meta_vendedor` summed per vendedor across every `mesesEnRango`-overlapped month (ADR4 pattern, reused verbatim from PR2's `ventas.ts`/`rendimiento.ts`). A second `Promise.all` (Fase 2) then calls `_fetchPorVendedor(supabase, startISO, endISO, days, v.username)` **once per active vendedor** — the exact same function, same filter shape "Por Vendedor" uses — which is what makes `leadsAsignados`/`contactados`/`conversionPct` reconcile by construction rather than by a parallel formula. Composed into `ScorecardVendedorRow[]` by `username`; wrapped with `buildCachedReportFetcher(_fetchScorecard, ["reporte-scorecard"], 60)` (ADR7); public `obtenerScorecardVendedores(periodo, fechaInicio?, fechaFin?)` keeps `getAuthorizedClient()` outside the cache. |
+| `src/app/dashboard/admin/reportes/actions/index.ts` | Modified | Barrel now exports `obtenerScorecardVendedores` + `ScorecardVendedorRow`/`ScorecardVendedoresData` types (Phase 19.3). |
+| `src/app/dashboard/admin/reportes/components/ScorecardVendedores.tsx` (new) | Created | Client table component: header + `Card` with a sortable table (`useTableSort`/`SortableHeader`, same hook already used by `ReportePorVendedor.tsx`/`ReporteRendimientoVendedores.tsx`) — columns: Vendedor, Leads, Contactados, Conversión, T. Respuesta, Interacciones, Ventas (monto + cantidad), Meta vs. Real, Comisiones (generada + pagada). "Sin meta asignada" pill (muted) when `metaMonto` is `null` (reuses the color-tier badge pattern from `ReporteRendimientoVendedores.tsx`'s `cumplimiento` badge: green ≥100%, yellow ≥80%, red otherwise). Tiempo de respuesta renders "Sin datos" (a distinct string from "Sin meta asignada" — different kind of absence, see scorecard.ts's deviation note) when `tiempoRespuestaHoras` is `null`. Empty state (no active vendedores) with a CTA `Link` to `/dashboard/admin/usuarios` ("Gestionar vendedores"). Dark-mode-aware (`crm-*` tokens, `dark:` variants on badges), no `transition-all` anywhere in the new file. Peruvian formal Spanish headers throughout. |
+| `src/app/dashboard/admin/reportes/page.tsx` | Modified | Added `ClipboardList` to the `lucide-react` import list; added `{ id: "scorecard", title: "Scorecard", icon: ClipboardList }` as the first entry of the `"equipo"` group in `GRUPOS_TABS`; added a new `<section data-seccion="scorecard">` (same `visitedTabs`/`activeTab` lazy-mount pattern as every sibling section) rendering `<ScorecardVendedores periodo fechaInicio fechaFin />`, placed immediately before the `"rendimiento"` section. |
+
+### Tests (all TDD RED→GREEN)
+
+| Test file | Tests | Result |
+|-----------|-------|--------|
+| `src/__tests__/unit/reportes-scorecard.test.ts` (new) | 8 (2 auth guard + 6 composition/reconciliation) | green |
+| `src/__tests__/unit/reportes-interacciones.test.ts` (re-run, unchanged) | 1 | green (confirms Phase 18.2 extraction is behavior-preserving) |
+| **PR3 gate run** | **9 tests / 2 files** | **all green** |
+| **Combined regression** (all 12 reportes-confiables test files, PR1a+PR1b+PR2+PR3) | **70 tests / 12 files** | **all green — no regressions** |
+
+`npx tsc --noEmit`: clean (exit 0), repo-wide.
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | Notes |
+|------|-----|-------|-------|
+| 18.1 export `_fetchPorVendedor` | n/a (mechanical, no dedicated test — used transitively by 19.1's import) | Added `export` keyword; `tsc` clean | |
+| 18.2 extract `_fetchInteracciones` | Confirmed no regression via re-run of pre-existing `reportes-interacciones.test.ts` before/after the extraction (1/1 green both times — behavior-preserving refactor, not a new-behavior RED/GREEN pair) | Extraction implemented; test still green | |
+| 19.1/19.2 `_fetchScorecard`/`obtenerScorecardVendedores` | Confirmed — `Failed to resolve import ".../actions/scorecard"` (file didn't exist yet) | Implemented `scorecard.ts`; first run was 8/8 green (no iteration needed — composition logic mirrored the already-proven `rendimiento.ts`/PR2 meta-wiring pattern closely enough that no calibration pass was required) | |
+| 21.1/21.2 gate | n/a | 9/9 gate files; 70/70 combined regression; `tsc --noEmit` clean | |
+
+### Design decision: `tiempoRespuestaHoras` is `null` in this slice (documented, not silently dropped)
+
+`design.md` ADR5's row DTO includes `tiempoRespuestaHoras: number | null` and the spec's "Vendedor scorecard consolidates seven dimensions" requirement names "tiempo de respuesta" as one of the seven columns that MUST be shown. `tasks.md` Phase 18 ("Export internal per-vendedor pieces") lists exactly three extractions — `por-vendedor`, `interacciones`, `comisiones` — and does NOT list `tiempo-respuesta.ts`. Task 19.1's RED-test composition list also does not mention a tiempo-de-respuesta source. Investigated why: `tiempo-respuesta.ts` buckets its per-vendedor ranking by `cliente.vendedor_asignado`, which the `sync-vendedor-fields` admin tool's own UI copy documents as a UUID (`usuario_perfil.id`), NOT `vendedor_username` (a separate string column) — every other fetcher composed into the scorecard (`por-vendedor`, `interacciones`, `comisiones`, `metricas-fetchers`) keys its per-vendedor maps by `vendedor_username`. Extracting `_fetchTiempoRespuesta` and joining its ranking by `username` as-is would silently mis-join every row (comparing a UUID against a username, so `Map.get(username)` would never hit). The alternative — changing that file's internal grouping key from `vendedor_asignado` to `vendedor_username` — would be a live behavior change to an already-shipped, currently-untested report tab (no existing unit test for `tiempo-respuesta.ts`), well outside PR3's declared scope and its own line budget.
+
+Decision: kept `tiempoRespuestaHoras: number | null` in the DTO (forward-compatible with the design), always `null` in this slice, rendered as "Sin datos" (a string distinct from "Sin meta asignada" — a different kind of absence: "no data wired yet" vs. "no target configured"). This is the same "explicit absence over invented number" philosophy the whole change is built on (ADR4), applied to a column this PR doesn't yet have a trustworthy, correctly-joined source for. Flagged here as a concrete, scoped follow-up (not folded into PR4, which is cobranza-only per ADR6) — a future small PR should either fix `tiempo-respuesta.ts`'s grouping key to `vendedor_username` (with its own dedicated test, since none exists today) or add a lookup table (`usuario_perfil.id` → `username`) to bridge the two keys without touching that file's live behavior.
+
+### Design decision: no `proyecto` parameter on `obtenerScorecardVendedores`
+
+`design.md` ADR5's signature sketch includes an optional `proyecto?` parameter. None of the four composed pieces (`_fetchPorVendedor`, `_fetchInteracciones`, `_fetchComisiones`, `fetchMetricasVentas`) accept or honor a project filter today, and no other "Equipo" group sibling tab (`rendimiento`, `por-vendedor`, `interacciones`) exposes a project selector on `page.tsx` either — there is no global project filter control on this page at all currently. Wiring an inert `proyecto` parameter into the scorecard's public signature would be a filter that silently does nothing, which is the exact class of lie ADR1-ADR6 exist to remove. Omitted; documented here instead of silently dropped. A future PR wiring project-scoping across the whole reportes page (a larger, cross-cutting change well beyond PR3's diff) would be the right place to add it everywhere at once, including here.
+
+### Reconciliation guarantee — how it's structurally enforced (not just tested)
+
+The scorecard's Fase 2 calls `_fetchPorVendedor(supabase, startISO, endISO, days, v.username)` — the identical function, identical argument shape, that `ReportePorVendedor.tsx` calls (via `obtenerReportePorVendedor`) when a user picks a specific vendedor from that tab's dropdown. Because it's the same function reading the same tables with the same filter, `leadsAsignados`/`contactados`/`conversionPct` cannot drift from "Por Vendedor" by construction — there is no parallel formula to fall out of sync. The `reportes-scorecard.test.ts` reconciliation test (Phase 19.1) makes this explicit by calling `_fetchPorVendedor` a second time directly, against the identical mocked data, and asserting equality — but the actual guarantee lives in the production code path reusing the function, not in the test alone.
+
+### Rollback boundary
+
+PR3 is independently revertible from PR1a/PR1b/PR2: reverting `scorecard.ts` (delete), `ScorecardVendedores.tsx` (delete), the `index.ts` barrel addition, `page.tsx`'s three additions (icon import, `GRUPOS_TABS` entry, `<section>` block), the `export` keyword on `_fetchPorVendedor`, the `_fetchInteracciones` extraction in `interacciones.ts` (collapsing back to the original inline `obtenerReporteInteracciones` body), and the new test file restores the PR2 state with no impact on PR1a/PR1b/PR2's own changes. PR4 (cobranza unification, ADR6) has no file-level dependency on PR3 — it re-touches `cobranza.ts` only, sequenced next purely by ADR8's slice ordering.
+
+Suggested commit boundaries (no git mutations performed by this run, per delivery instructions):
+1. `por-vendedor.ts` (export) + `interacciones.ts` (extraction) — Phase 18, mechanical, low-risk, natural single commit (both are "make an existing computation directly callable" changes with no new behavior)
+2. `scorecard.ts` + `reportes-scorecard.test.ts` + `index.ts` barrel export — Phase 19, the new composed action
+3. `ScorecardVendedores.tsx` + `page.tsx` (icon import + `GRUPOS_TABS` entry + `<section>` block) — Phase 20, UI-only, no new tests
+
+— or a single squashed commit for the whole PR3 slice if the reviewer prefers one PR/one commit (matches PR1a/PR1b/PR2's own note on this).
+
+### Notes for PR4 (final slice — cobranza single source of truth, ADR6)
+
+- PR4 re-opens `cobranza.ts` (already restructured in PR1b into `_fetchCobranza` + `buildCachedReportFetcher`). Per PR1b's own note: `pagosPeriodo`/`cuotasPagadasPeriodo`/`ventasData` are still unbounded `.select()` calls (out-of-scope gap flagged in PR1b) — good opportunity to close that gap in the same pass since the file is being re-opened anyway for `computeTier`/`limaToday` wiring, though it's not strictly required by ADR6's own task list (Phase 22-24) — flag to the apply-progress author of that slice to decide scope explicitly rather than silently bundling or silently skipping.
+- `computeTier`/`limaToday` come from `src/lib/cobranza/tiers.ts` — pass `cuota.fecha_vencimiento` through unchanged (date-only `"YYYY-MM-DD"`, no `.toISOString()` re-stringify) per ADR6's documented date-contract gotcha.
+- The single-shared-mock-chain-per-table test pattern (no call-count routing) used in `reportes-scorecard.test.ts` works because this PR's fixtures used exactly one vendedor. PR4's `computeTier` parity test will likely need the `createPagedChainMock`/call-count routing pattern again (PR1b precedent) since it re-touches the same `cuota` table PR1b already paginated — check `reportes-cobranza-comisiones.test.ts`'s existing `setupCuotasYPagos` helper before adding new mock infrastructure.
