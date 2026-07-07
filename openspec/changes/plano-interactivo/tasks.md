@@ -45,6 +45,7 @@ Maps to: Requirement "Unified masterplan upload path" (3 scenarios); ADR-2, ADR-
 - [x] 2.2 Wire `aspectRatioChanged` in `onFile`: on replace, compare new PNG dims vs `masterplan.width/height`; beyond tolerance, confirm via "El nuevo plano tiene otra proporción..." dialog before `guardarMasterplanProyecto`
 - [x] 2.3 Confirm `guardarMasterplanProyecto` (`_actions.ts:534`) + `uploadProyectoAsset` remain the only write path (Scenarios: image upload persists masterplan only / PDF rasterized before storage / unsupported type rejected)
 - [x] 2.4 `npx vitest run src/lib/masterplan/rasterize.test.ts`; `npx tsc --noEmit`
+- [x] 2.5 (remediation, post-verify) RED→GREEN — `src/components/masterplan/MasterplanEditorPanel.test.tsx`: valid image persists masterplan-only payload; PDF triggers `rasterizeFirstPageToPng` before persist; unsupported file type rejected with the formal-Spanish message and no persist call; aspect-ratio guard shows `ConfirmDialog` (Cancelar aborts, Continuar persists). Closes the verify-report.md CRITICAL for tasks 2.1-2.3 (uploader component behavior previously untested)
 
 ## PR2 — Editor: zoom/pan + vertex operations
 Maps to: Requirement "Polygon editor vertex and history operations" (4 scenarios); ADR-5

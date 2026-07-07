@@ -471,3 +471,27 @@ Confirmed at apply time, matching the design/tasks correction: `_MapeoLotes.tsx`
 ### What's left for this change
 
 PR5 was the last planned slice. All 5 PRs (tasks.md Phases 1-9) are now checked off. `state.yaml` updated: `phases.apply: done`, `next_recommended: verify`. Next step is `sdd-verify` against `spec.md`'s acceptance scenarios (including the "Legacy plano write paths are frozen" requirement this slice implements) and then `sdd-archive`.
+
+## Remediation — verify-report.md CRITICAL (uploader component coverage)
+
+`sdd-verify` (first pass) found 1 CRITICAL: `MasterplanEditorPanel.onFile` (PR1's `Unified masterplan upload path` requirement) shipped without a runtime test, so the "PDF upload is rasterized before storage" and "Unsupported file type is rejected" scenarios had zero test coverage of the actual component behavior (only the pure helpers `scaleForMaxDimension`/`aspectRatioChanged` were unit-tested).
+
+**Fix**: added `src/components/masterplan/MasterplanEditorPanel.test.tsx` (5 tests, RED confirmed empty/missing beforehand per verify-report, GREEN on first run against the existing unmodified implementation):
+1. Valid image upload — `uploadProyectoAsset` called with the original file; `guardarMasterplanProyecto` called with exactly `{ url, path, width, height }` (no `planos_url`/`overlay_layers` key); `rasterizeFirstPageToPng` never called; `onSaved` fires.
+2. PDF upload — `rasterizeFirstPageToPng` invoked with the original PDF `File`; the rasterized PNG (not the original) is the one passed to `uploadProyectoAsset`/persisted with its own dims.
+3. Unsupported file type (`.docx`) — rejected with the exact formal-Spanish message from `validateProyectoImage` (`"Masterplan: formato no permitido (usa JPG, PNG o WEBP)"`); no rasterizer/upload/persist call; `onSaved` never fires.
+4. Aspect-ratio guard on re-upload — replacing a masterplan with different-ratio dims renders the `ConfirmDialog` (`role="dialog"`, title `"El nuevo plano tiene otra proporción"`); `Cancelar` closes it with zero persist calls; `Continuar` proceeds to `persistir` with the new dims.
+
+**Mocking approach**: `@/app/dashboard/proyectos/_actions` (`guardarMasterplanProyecto`), `@/lib/storage/proyectoUpload.client` (`uploadProyectoAsset`/`removeProyectoAssets` only — `validateProyectoImage` kept real via `importOriginal` since it's pure and its exact message is the thing under test), `@/lib/masterplan/rasterize.client` (`rasterizeFirstPageToPng` only — `aspectRatioChanged` kept real), `@/lib/supabase.client` (`createClient` stub), `next/dynamic` (stub, matching the existing `contrato-components.test.tsx` precedent — `MasterplanEditor` itself is out of scope here, already covered by its own test file).
+
+**jsdom gaps hit and worked around** (new, added to engram #436's running list): (a) `URL.createObjectURL`/`revokeObjectURL` are not implemented in this repo's jsdom — stubbed directly on the `URL` global; (b) `<img>` never actually decodes in jsdom, so `leerDimensiones`'s `img.onload`/`naturalWidth`/`naturalHeight` never fire/populate on their own — replaced `window.Image` with a `MockImage` class whose `src` setter schedules `onload` via `queueMicrotask` with test-controlled `naturalWidth`/`naturalHeight`. Note: wrapping the mock `Image` constructor in `vi.fn().mockImplementation(() => ...)` failed with `"() => createMockImage() is not a constructor"` (tinyspy's `new`-invocation path does not accept an arrow-function-returning-object implementation as a constructor) — fixed by stubbing a plain `class MockImage { set src(...) {...} }` directly via `vi.stubGlobal`, no `vi.fn()` indirection needed since call-count assertions on `Image` itself aren't required.
+
+**Production code**: unchanged. All 5 new tests passed on the first run against the existing implementation — the CRITICAL was a coverage gap, not a functional defect, confirming the verify report's own assessment ("this is a coverage gap in one component, not a functional defect").
+
+**Verification run**:
+- `npx vitest run src/components/masterplan/MasterplanEditorPanel.test.tsx` → 5/5 passed.
+- Masterplan regression set (8 pre-existing files + the new one, 9 files total): `dto.test.ts`, `geometry.test.ts`, `rasterize.test.ts`, `presentacion.server.test.ts`, `masterplan-actions.test.ts`, `MasterplanViewer.test.tsx`, `MasterplanEditor.test.tsx`, `PlanoPresentacion.test.tsx`, `MasterplanEditorPanel.test.tsx` → 57/57 passed (52 pre-existing + 5 new), 0 regressions.
+- `npx tsc --noEmit` → clean, 0 errors (full project).
+- No full suite / `next build` run per Strict TDD targeted-execution constraint for this remediation batch.
+
+`tasks.md` PR1 Phase 2 (tasks 2.1-2.3, previously marked done without a component-level test pair) now has its missing RED/GREEN test file in place; task 2.4's command list is unchanged (historical record of what ran at the time) but the gap it left is closed by this remediation. `state.yaml`: `verify_outcome` left as the historical record of the first verify pass; `next_recommended` reset to `verify` for a fresh pass now that the CRITICAL's remediation is in place.

@@ -9,9 +9,24 @@ phases:
   spec: done
   design: done  # corrected: design.md already existed with full content when tasks phase ran
   tasks: done
-  apply: done  # PR1+PR2+PR3+PR4+PR5 done (uploader + PDF rasterization; editor zoom/pan+vertex ops; price-free DTO + server builder + viewer refactor; PlanoPresentacion component + entry point; legacy freeze/rename + verified dead-code deletion)
-  verify: pending
+  apply: done  # PR1+PR2+PR3+PR4+PR5 done (uploader + PDF rasterization; editor zoom/pan+vertex ops; price-free DTO + server builder + viewer refactor; PlanoPresentacion component + entry point; legacy freeze/rename + verified dead-code deletion); remediation batch added MasterplanEditorPanel.test.tsx to close the verify CRITICAL
+  verify: done  # first pass: 52/52 targeted tests pass, tsc clean, eslint clean, 32/32 tasks checked. 1 CRITICAL (uploader component behavior untested), 2 WARNING, 2 SUGGESTION. See verify-report.md. Remediated below -- awaiting a fresh verify pass.
   archive: pending
+
+verify_outcome:
+  verdict: FAIL
+  critical_count: 1
+  warning_count: 2
+  suggestion_count: 2
+  summary: "Unified masterplan upload path requirement (PR1) has 2/3 scenarios with zero runtime test coverage of MasterplanEditorPanel.onFile (PDF branch, unsupported-file rejection); all other requirements (price-free DTO/presentation, editor vertex ops, normalized coords, legacy freeze + dead-code deletion) are fully implemented, test-covered (52/52 passing), type-clean, and lint-clean."
+  report: openspec/changes/plano-interactivo/verify-report.md
+
+remediation:
+  critical_resolved: 1
+  what: "Added src/components/masterplan/MasterplanEditorPanel.test.tsx (5 tests) covering onFile's PDF-vs-image branching, rasterizeFirstPageToPng invocation, unsupported-file rejection, and the aspect-ratio ConfirmDialog guard."
+  tests_added: 5
+  regression: "57/57 passed across the 9-file masterplan set (8 pre-existing + new); npx tsc --noEmit clean"
+  production_code_changed: false
 
 next_recommended:
   - verify
@@ -31,3 +46,4 @@ artifacts:
   spec: openspec/changes/plano-interactivo/spec.md
   design: openspec/changes/plano-interactivo/design.md
   tasks: openspec/changes/plano-interactivo/tasks.md
+  verify_report: openspec/changes/plano-interactivo/verify-report.md
