@@ -48,3 +48,6 @@ docs/superpowers/
 # AI tooling local state
 .atl/
 .claude/worktrees/
+
+
+chrome-extension/*.zip
