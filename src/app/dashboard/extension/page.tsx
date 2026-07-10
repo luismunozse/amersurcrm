@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.2.2
+                Descargar AmersurChat v1.2.3
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: 29 Junio 2026
+                Última actualización: 10 Julio 2026
               </p>
             </div>
           </li>
@@ -125,35 +125,23 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.2.2 */}
+      {/* Novedades v1.2.3 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.2.2
+          🎉 Novedades v1.2.3
         </h3>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Captura del mensaje arreglada:</strong> Se adaptó al nuevo WhatsApp Web; el primer mensaje del cliente vuelve a cargarse solo al crear el lead</span>
+            <span><strong>Su sesión ya no se cierra:</strong> puede cerrar y volver a abrir Chrome sin tener que iniciar sesión de nuevo; la extensión mantiene su sesión activa</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Más rápido:</strong> foco automático en el nombre y <strong>Ctrl+Enter</strong> para crear el lead sin tocar el mouse</span>
+            <span><strong>Información de contacto corregida:</strong> se solucionó un error que impedía mostrar los datos del cliente cuando faltaba la fecha de registro</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Consulta general:</strong> ahora podés registrar el interés sin un proyecto/lote específico, igual que en el CRM</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Nunca más "pantalla en blanco":</strong> si falla buscar el cliente o cargar proyectos, ahora avisa con un botón <strong>Reintentar</strong></span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Sesión expirada clara:</strong> si tu sesión vence, te lleva al login con un aviso en vez de fallar en silencio</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Interfaz más pulida:</strong> animaciones suaves, skeletons de carga y el logo de Amersur en el inicio de sesión</span>
+            <span><strong>Versión siempre correcta:</strong> el pie del panel ahora muestra la versión real que tiene instalada</span>
           </li>
         </ul>
         <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
