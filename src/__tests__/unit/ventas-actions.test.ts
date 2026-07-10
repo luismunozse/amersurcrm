@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ==================== HOISTED MOCKS ====================
-const { mockGetUser, mockServerActionClient, createChainMock } = vi.hoisted(() => {
+const { mockGetUser, mockServerActionClient, createChainMock, mockNotificarVentaCreada } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = ["select", "insert", "update", "delete", "eq", "neq", "is", "or", "order", "range", "single", "in", "limit", "head", "maybeSingle", "gte", "lte", "not"];
@@ -19,7 +19,8 @@ const { mockGetUser, mockServerActionClient, createChainMock } = vi.hoisted(() =
     from: vi.fn().mockReturnValue(createChainMock()),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
-  return { mockGetUser, mockServerActionClient, createChainMock };
+  const mockNotificarVentaCreada = vi.fn().mockResolvedValue({ enviadas: 1, errores: 0 });
+  return { mockGetUser, mockServerActionClient, createChainMock, mockNotificarVentaCreada };
 });
 
 vi.mock("@/lib/supabase.server-actions", () => ({
@@ -40,6 +41,10 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
   revalidarCliente: vi.fn(),
   crearEventoAgenda: vi.fn().mockResolvedValue(true),
   validarMonto: vi.fn().mockReturnValue({ valid: true }),
+}));
+
+vi.mock("@/lib/notifications/venta", () => ({
+  notificarVentaCreada: mockNotificarVentaCreada,
 }));
 
 import {
@@ -81,6 +86,57 @@ describe("convertirReservaEnVenta", () => {
 
     const result = await convertirReservaEnVenta({ reservaId: "r-1", precioTotal: 0, formaPago: "contado" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("convertirReservaEnVenta — notificación de venta creada", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: "uid-1" } } });
+    // "valida precio total positivo" (above) permanently overrides this mock's
+    // return value via .mockReturnValue() — vi.clearAllMocks() clears call
+    // history but not that override, so later describe blocks must restore it.
+    const { validarMonto } = await import("@/app/dashboard/clientes/_actions-crm-helpers");
+    (validarMonto as any).mockReturnValue({ valid: true });
+  });
+
+  it("llama a notificarVentaCreada con cliente, lote, monto y actor resueltos", async () => {
+    const chain = createChainMock({
+      data: {
+        id: "v-1",
+        cliente_id: "c-1",
+        lote_id: "l-1",
+        estado: "activa",
+        moneda: "PEN",
+        nombre: "Juan Perez",
+        codigo: "L-001",
+        codigo_venta: "VTA-1",
+      },
+      error: null,
+    });
+    mockServerActionClient.from.mockReturnValue(chain);
+
+    await convertirReservaEnVenta({ reservaId: "r-1", precioTotal: 75000, formaPago: "contado" });
+
+    expect(mockNotificarVentaCreada).toHaveBeenCalledTimes(1);
+    const arg = mockNotificarVentaCreada.mock.calls[0][0];
+    expect(arg.clienteNombre).toBe("Juan Perez");
+    expect(arg.loteCodigo).toBe("L-001");
+    expect(arg.monto).toBe(75000);
+    expect(arg.actorId).toBe("uid-1");
+    expect(arg.actorNombre).toBe("vendedor1");
+  });
+
+  it("no falla la conversión si notificarVentaCreada lanza", async () => {
+    const chain = createChainMock({
+      data: { id: "v-1", cliente_id: "c-1", lote_id: "l-1", estado: "activa", moneda: "PEN" },
+      error: null,
+    });
+    mockServerActionClient.from.mockReturnValue(chain);
+    mockNotificarVentaCreada.mockRejectedValueOnce(new Error("push down"));
+
+    const result = await convertirReservaEnVenta({ reservaId: "r-1", precioTotal: 75000, formaPago: "contado" });
+    expect(result.success).toBe(true);
   });
 });
 

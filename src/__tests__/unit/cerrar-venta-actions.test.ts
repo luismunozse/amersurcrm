@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord } = vi.hoisted(() => {
+const { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord, mockNotificarVentaCreada } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = [
@@ -37,11 +37,17 @@ const { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord 
     },
   };
 
-  return { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord };
+  const mockNotificarVentaCreada = vi.fn().mockResolvedValue({ enviadas: 1, errores: 0 });
+
+  return { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord, mockNotificarVentaCreada };
 });
 
 vi.mock("@/lib/supabase.server-actions", () => ({
   createServerActionClient: vi.fn().mockImplementation(() => Promise.resolve(mockServerActionClient)),
+}));
+
+vi.mock("@/lib/notifications/venta", () => ({
+  notificarVentaCreada: mockNotificarVentaCreada,
 }));
 
 vi.mock("@/lib/permissions/server", () => ({
@@ -417,6 +423,88 @@ describe("cerrarProcesoYCrearVenta: flujo OK", () => {
       "cerrar_proceso_y_crear_venta",
       expect.objectContaining({ p_fecha_primera_cuota: null, p_numero_cuotas: 0 }),
     );
+  });
+});
+
+// ============================================================
+// cerrarProcesoYCrearVenta — notificación de venta creada
+// ============================================================
+
+describe("cerrarProcesoYCrearVenta: notificación de venta creada", () => {
+  function setupProcesoConClienteYLote() {
+    const procChain = createChainMock({
+      data: {
+        id: "p-1",
+        vendedor_username: "vendedor1",
+        estado: "activo",
+        etapa_actual: "desembolso",
+        cliente_id: "c-1",
+        cliente: { nombre: "Juan Perez" },
+        lote: { codigo: "A1" },
+      },
+      error: null,
+    });
+    mockServerActionClient.__setPublicChain("proceso_adquisicion", procChain);
+  }
+
+  it("notifica via notificarVentaCreada con cliente, lote, monto y actor resueltos", async () => {
+    setupProcesoConClienteYLote();
+    mockServerActionClient.rpc.mockResolvedValue({
+      data: {
+        venta_id: "v-1",
+        codigo_venta: "VTA-2026-0001",
+        total_cuotas: 61,
+        forma_pago: "credito_bancario",
+        precio_total: 150000,
+        saldo_pendiente: 120000,
+      },
+      error: null,
+    });
+
+    await cerrarProcesoYCrearVenta({
+      procesoId: "p-1",
+      precioTotal: 150000,
+      montoInicial: 30000,
+      numeroCuotas: 60,
+    });
+
+    expect(mockNotificarVentaCreada).toHaveBeenCalledTimes(1);
+    expect(mockNotificarVentaCreada).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clienteNombre: "Juan Perez",
+        loteCodigo: "A1",
+        monto: 150000,
+        actorId: "uid-1",
+        actorNombre: "vendedor1",
+        ventaId: "v-1",
+        codigoVenta: "VTA-2026-0001",
+      }),
+    );
+  });
+
+  it("no falla el cierre si notificarVentaCreada lanza", async () => {
+    setupProcesoConClienteYLote();
+    mockServerActionClient.rpc.mockResolvedValue({
+      data: {
+        venta_id: "v-2",
+        codigo_venta: "VTA-2026-0002",
+        total_cuotas: 1,
+        forma_pago: "contado",
+        precio_total: 50000,
+        saldo_pendiente: 0,
+      },
+      error: null,
+    });
+    mockNotificarVentaCreada.mockRejectedValueOnce(new Error("push down"));
+
+    const res = await cerrarProcesoYCrearVenta({
+      procesoId: "p-1",
+      precioTotal: 50000,
+      montoInicial: 50000,
+      numeroCuotas: 0,
+    });
+
+    expect(res.success).toBe(true);
   });
 });
 

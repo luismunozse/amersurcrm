@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso, obtenerPermisosUsuario } from "@/lib/permissions/server";
+import { notificarVentaCreada } from "@/lib/notifications/venta";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FORMAS_PAGO = ["contado", "financiado", "credito_bancario", "mixto"] as const;
@@ -215,21 +216,24 @@ export async function convertirReservaAVenta(
     }
 
     try {
-      const { notificarUsuariosPorRoles } = await import("@/app/_actionsNotifications");
-      await notificarUsuariosPorRoles(
-        ["ROL_ADMIN", "ROL_COORDINADOR_VENTAS"],
-        "venta",
-        `Nueva venta: lote ${lote.codigo}`,
-        `${usuario.nombre_completo || usuario.email} convirtió la reserva en venta (${codigoVenta}) por ${datos.precioTotal}`,
-        {
-          loteId: datos.loteId,
-          proyectoId: lote.proyecto_id,
-          ventaId: nuevaVenta.id,
-          codigoVenta,
-          url: `/dashboard/proyectos/${lote.proyecto_id}`,
-        },
-        usuario.id,
-      );
+      const { data: clienteRow } = await supabase
+        .schema("crm")
+        .from("cliente")
+        .select("nombre")
+        .eq("id", reservaActiva.cliente_id)
+        .maybeSingle();
+
+      await notificarVentaCreada({
+        clienteNombre: clienteRow?.nombre ?? "Cliente",
+        loteCodigo: lote.codigo,
+        monto: datos.precioTotal,
+        actorId: usuario.id,
+        actorNombre: usuario.nombre_completo || usuario.email,
+        ventaId: nuevaVenta.id,
+        codigoVenta,
+        proyectoId: lote.proyecto_id,
+        url: `/dashboard/proyectos/${lote.proyecto_id}`,
+      });
     } catch (notifError) {
       console.warn("Error notificando venta:", notifError);
     }

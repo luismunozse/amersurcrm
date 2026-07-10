@@ -250,4 +250,48 @@ describe("convertirReservaAVenta - flujo exitoso", () => {
     expect(res.error).toBeNull();
     expect(res.data?.codigo_venta).toBe("VTA-20260519-001");
   });
+
+  it("notifica via notificarUsuariosPorRoles a ROL_ADMIN + ROL_COORDINADOR_VENTAS excluyendo al actor", async () => {
+    const loteChain = createChainMock({
+      data: { id: validLoteId, codigo: "L-001", estado: "reservado", proyecto_id: "p-1" },
+      error: null,
+    });
+    const reservaChain = createChainMock({
+      data: { id: "r-1", cliente_id: "c-1", vendedor_username: "vendedor1" },
+      error: null,
+    });
+    const ultimaVentaChain = createChainMock({ data: null, error: null });
+    const insertVentaChain = createChainMock({
+      data: { id: "v-1", codigo_venta: "VTA-20260519-001" },
+      error: null,
+    });
+    const updateLoteChain = createChainMock();
+    updateLoteChain.eq.mockImplementationOnce(() => Promise.resolve({ data: null, error: null }));
+    const updateReservaChain = createChainMock();
+    updateReservaChain.eq.mockImplementationOnce(() => Promise.resolve({ data: null, error: null }));
+
+    mockSchemaClient.from
+      .mockReturnValueOnce(loteChain)
+      .mockReturnValueOnce(reservaChain)
+      .mockReturnValueOnce(ultimaVentaChain)
+      .mockReturnValueOnce(insertVentaChain)
+      .mockReturnValueOnce(updateLoteChain)
+      .mockReturnValueOnce(updateReservaChain);
+
+    await convertirReservaAVenta({
+      loteId: validLoteId,
+      formaPago: "contado",
+      precioTotal: 100000,
+      montoInicial: 100000,
+    });
+
+    expect(mockNotificar).toHaveBeenCalledWith(
+      ["ROL_ADMIN", "ROL_COORDINADOR_VENTAS"],
+      "venta",
+      expect.stringContaining("L-001"),
+      expect.any(String),
+      expect.objectContaining({ ventaId: "v-1", codigoVenta: expect.stringMatching(/^VTA-/) }),
+      "uid-1",
+    );
+  });
 });

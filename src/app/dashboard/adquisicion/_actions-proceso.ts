@@ -6,6 +6,8 @@ import { tienePermiso, esAdminOCoordinador, esAdmin, esAdminOGerente } from "@/l
 import { obtenerUsernameActual, revalidarCliente } from "../clientes/_actions-crm-helpers";
 import { revalidatePath } from "next/cache";
 import type { EstadoRevision } from "@/lib/types/proceso-adquisicion";
+import { crearNotificacion } from "@/app/_actionsNotifications";
+import { notificarVentaCreada } from "@/lib/notifications/venta";
 
 // ============================================================
 // PROCESOS DE ADQUISICIÓN
@@ -473,6 +475,8 @@ export async function cambiarEstadoRevision(
 
     if (estadoNuevo === 'en_revision') {
       await notificarPrivilegiadosRevisionPendiente(supabase, etapaId, auth.username);
+    } else if (estadoNuevo === 'aprobado' || estadoNuevo === 'observado') {
+      await notificarVendedorResultadoRevision(supabase, etapaId, estadoNuevo, observaciones, auth.username);
     }
 
     revalidatePath('/dashboard/adquisicion');
@@ -556,6 +560,93 @@ async function notificarPrivilegiadosRevisionPendiente(
     }
   } catch (err) {
     console.error('Error notificando a privilegiados:', err);
+  }
+}
+
+/**
+ * Notifica al vendedor dueño del proceso el resultado de una revision
+ * (aprobado / observado) — la contraparte de notificarPrivilegiadosRevisionPendiente:
+ * esa notifica revisor <- vendedor (etapa lista para revisar), esta notifica
+ * vendedor <- revisor (resultado de la revision). No notifica si el propio
+ * dueño del proceso fue quien hizo la revision (no tiene sentido auto-notificarse).
+ */
+async function notificarVendedorResultadoRevision(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  etapaId: string,
+  estadoNuevo: 'aprobado' | 'observado',
+  observaciones: string | undefined,
+  revisorUsername: string,
+) {
+  try {
+    const { data: etapa } = await supabase
+      .from('proceso_etapa')
+      .select(`
+        nombre,
+        proceso:proceso_id (
+          codigo,
+          cliente_id,
+          vendedor_username,
+          cliente:cliente_id ( id, nombre )
+        )
+      `)
+      .eq('id', etapaId)
+      .maybeSingle();
+
+    if (!etapa) return;
+
+    const procesoData = Array.isArray(etapa.proceso) ? etapa.proceso[0] : etapa.proceso;
+    const vendedorUsername: string | null = procesoData?.vendedor_username ?? null;
+
+    if (!vendedorUsername) {
+      console.warn('notificarVendedorResultadoRevision: proceso sin vendedor asignado', etapaId);
+      return;
+    }
+
+    if (vendedorUsername === revisorUsername) {
+      // El propio dueño del proceso hizo la revision: nada que notificar.
+      return;
+    }
+
+    const { data: perfil } = await supabase
+      .from('usuario_perfil')
+      .select('id')
+      .eq('username', vendedorUsername)
+      .maybeSingle();
+
+    if (!perfil?.id) {
+      console.warn('notificarVendedorResultadoRevision: vendedor sin perfil resoluble', vendedorUsername);
+      return;
+    }
+
+    const clienteData = Array.isArray(procesoData?.cliente) ? procesoData.cliente[0] : procesoData?.cliente;
+    const clienteNombre: string = clienteData?.nombre ?? 'Cliente';
+    const codigoProceso: string = procesoData?.codigo ?? 'proceso';
+    const etapaNombre: string = etapa.nombre ?? 'Etapa';
+    const clienteId: string | null = procesoData?.cliente_id ?? null;
+    const url = clienteId
+      ? `/dashboard/clientes/${clienteId}?tab=adquisicion&subtab=procesos`
+      : '/dashboard/adquisicion';
+
+    const titulo = estadoNuevo === 'aprobado' ? 'Etapa aprobada' : 'Etapa observada';
+    const mensajeBase =
+      estadoNuevo === 'aprobado'
+        ? `La etapa "${etapaNombre}" del proceso ${codigoProceso} (${clienteNombre}) fue aprobada.`
+        : `La etapa "${etapaNombre}" del proceso ${codigoProceso} (${clienteNombre}) fue observada.`;
+    const mensaje =
+      estadoNuevo === 'observado' && observaciones?.trim()
+        ? `${mensajeBase} Observaciones: ${observaciones.trim()}`
+        : mensajeBase;
+
+    await crearNotificacion(perfil.id, 'sistema', titulo, mensaje, {
+      etapa_id: etapaId,
+      proceso_codigo: codigoProceso,
+      cliente_id: clienteId,
+      cliente_nombre: clienteNombre,
+      accion: 'resultado_revision_etapa',
+      url,
+    });
+  } catch (err) {
+    console.warn('Error notificando resultado de revision al vendedor:', err);
   }
 }
 
@@ -756,10 +847,11 @@ export async function cerrarProcesoYCrearVenta(input: CerrarVentaInput): Promise
 
     const privilegiado = await esAdminOCoordinador();
 
-    // Cargar proceso para chequear permiso del vendedor.
+    // Cargar proceso para chequear permiso del vendedor. cliente/lote se
+    // traen embebidos para la notificación de venta creada más abajo.
     const { data: proceso, error: procError } = await supabase
       .from('proceso_adquisicion')
-      .select('id, vendedor_username, estado, etapa_actual, cliente_id')
+      .select('id, vendedor_username, estado, etapa_actual, cliente_id, cliente:cliente!cliente_id(nombre), lote:lote!lote_id(codigo)')
       .eq('id', input.procesoId)
       .maybeSingle();
 
@@ -794,6 +886,31 @@ export async function cerrarProcesoYCrearVenta(input: CerrarVentaInput): Promise
     const result = data as Record<string, unknown> | null;
     if (!result || typeof result.venta_id !== 'string') {
       return { success: false, error: 'Respuesta inesperada del servidor' };
+    }
+
+    // Notificación no-bloqueante: mismo evento "venta creada" que
+    // convertirReservaAVenta (proyectos) / convertirReservaEnVenta (clientes)
+    // — ROL_ADMIN + ROL_COORDINADOR_VENTAS, excluyendo al actor.
+    try {
+      const clienteData = Array.isArray((proceso as any).cliente)
+        ? (proceso as any).cliente[0]
+        : (proceso as any).cliente;
+      const loteData = Array.isArray((proceso as any).lote)
+        ? (proceso as any).lote[0]
+        : (proceso as any).lote;
+
+      await notificarVentaCreada({
+        clienteNombre: clienteData?.nombre ?? 'Cliente',
+        loteCodigo: loteData?.codigo ?? null,
+        monto: Number(result.precio_total ?? input.precioTotal),
+        actorId: auth.userId,
+        actorNombre: auth.username,
+        ventaId: result.venta_id as string,
+        codigoVenta: (result.codigo_venta as string) ?? '',
+        url: proceso.cliente_id ? `/dashboard/clientes/${proceso.cliente_id}` : undefined,
+      });
+    } catch (notifError) {
+      console.warn('Error notificando venta creada desde cierre de proceso:', notifError);
     }
 
     return {

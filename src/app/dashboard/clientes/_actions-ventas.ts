@@ -11,6 +11,7 @@ import { createServerActionClient } from "@/lib/supabase.server-actions";
 import { revalidatePath } from "next/cache";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso } from "@/lib/permissions/server";
+import { notificarVentaCreada } from "@/lib/notifications/venta";
 
 import {
   obtenerUsernameActual,
@@ -190,6 +191,44 @@ export async function convertirReservaEnVenta(data: {
     revalidatePath('/dashboard/proyectos');
     revalidatePath('/dashboard/ventas');
     revalidatePath('/dashboard/cobranza');
+
+    // Notificación no-bloqueante: mismo evento "venta creada" que
+    // convertirReservaAVenta (proyectos) / cerrarProcesoYCrearVenta
+    // (adquisicion) — ROL_ADMIN + ROL_COORDINADOR_VENTAS, excluyendo al actor.
+    try {
+      let loteCodigo: string | null = null;
+      if (reserva.lote_id) {
+        const { data: loteRow } = await supabase
+          .from('lote')
+          .select('codigo')
+          .eq('id', reserva.lote_id)
+          .maybeSingle();
+        loteCodigo = loteRow?.codigo ?? null;
+      }
+
+      let clienteNombre = 'Cliente';
+      if (reserva.cliente_id) {
+        const { data: clienteRow } = await supabase
+          .from('cliente')
+          .select('nombre')
+          .eq('id', reserva.cliente_id)
+          .maybeSingle();
+        clienteNombre = clienteRow?.nombre ?? 'Cliente';
+      }
+
+      await notificarVentaCreada({
+        clienteNombre,
+        loteCodigo,
+        monto: data.precioTotal,
+        actorId: authResult.userId,
+        actorNombre: authResult.username,
+        ventaId: venta.id,
+        codigoVenta: venta.codigo_venta,
+        url: `/dashboard/clientes/${reserva.cliente_id}`,
+      });
+    } catch (notifError) {
+      console.warn('Error notificando venta creada:', notifError);
+    }
 
     return { success: true, data: venta };
   } catch (error: any) {

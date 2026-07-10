@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 import { validateBearerAndEnsureGlobalRole } from "@/lib/auth/extension-auth";
+import { crearNotificacionSistema } from "@/lib/notifications/system";
+import { getEstadoClienteLabel, type EstadoCliente } from "@/lib/types/clientes";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +82,19 @@ export async function PATCH(
 
     console.log(`[UpdateEstado] Actualizando cliente ${id} a estado: ${estado_cliente}`);
 
+    // Leer el estado previo (y notas) ANTES del update: la notificación de
+    // más abajo solo debe dispararse si el estado realmente cambió — un PATCH
+    // idempotente/reintentado desde la extensión no debe generar una
+    // notificación engañosa de "estado cambiado".
+    const { data: clienteActual } = await supabase
+      .schema("crm")
+      .from("cliente")
+      .select("estado_cliente, notas")
+      .eq("id", id)
+      .maybeSingle();
+
+    const estadoAnterior = clienteActual?.estado_cliente as string | null | undefined;
+
     // Actualizar estado
     const updateData: Record<string, unknown> = {
       estado_cliente,
@@ -87,13 +102,6 @@ export async function PATCH(
 
     // Si hay nota, agregarla o concatenarla
     if (nota) {
-      const { data: clienteActual } = await supabase
-        .schema("crm")
-        .from("cliente")
-        .select("notas")
-        .eq("id", id)
-        .single();
-
       const notaConFecha = `[${new Date().toLocaleDateString("es-PE")}] ${nota}`;
 
       if (clienteActual?.notas) {
@@ -120,6 +128,50 @@ export async function PATCH(
     }
 
     console.log(`[UpdateEstado] Cliente ${id} actualizado exitosamente`);
+
+    // Notificación no-bloqueante al vendedor asignado — mismo evento que el
+    // form path (actualizarEstadoCliente) y el Kanban (moverClientePipeline).
+    // Esta ruta puede autenticarse sin sesión web (Bearer token de la
+    // extensión de Chrome), así que usamos el helper session-free en vez de
+    // crearNotificacion (que exige un usuario autenticado en la sesión).
+    // Solo se notifica si el estado realmente cambió (ver lectura previa).
+    const estadoCambio = estadoAnterior !== estado_cliente;
+    const vendedorUsername = cliente.vendedor_username as string | null | undefined;
+    if (estadoCambio && vendedorUsername) {
+      const clienteId = cliente.id as string;
+      const clienteNombre = cliente.nombre as string | null | undefined;
+      const estadoNuevoNotificado = estado_cliente as string;
+      after(async () => {
+        try {
+          const supabaseAdmin = createServiceRoleClient();
+          const { data: perfil } = await supabaseAdmin
+            .schema("crm")
+            .from("usuario_perfil")
+            .select("id")
+            .eq("username", vendedorUsername)
+            .maybeSingle();
+
+          if (!perfil?.id) {
+            console.warn("[UpdateEstado] Vendedor no encontrado para notificar:", vendedorUsername);
+            return;
+          }
+
+          await crearNotificacionSistema(
+            perfil.id,
+            "cliente",
+            "Estado de cliente actualizado",
+            `El cliente ${clienteNombre ?? ""} ahora está marcado como ${getEstadoClienteLabel(estadoNuevoNotificado as EstadoCliente)}.`,
+            {
+              cliente_id: clienteId,
+              nuevo_estado: estadoNuevoNotificado,
+              url: `/dashboard/clientes/${clienteId}`,
+            },
+          );
+        } catch (notifyError) {
+          console.warn("[UpdateEstado] No se pudo notificar al vendedor:", notifyError);
+        }
+      });
+    }
 
     return NextResponse.json({
       success: true,

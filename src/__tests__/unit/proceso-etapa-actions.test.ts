@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord } = vi.hoisted(() => {
+const { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord, mockCrearNotificacion } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = [
@@ -51,11 +51,17 @@ const { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord 
     __storageCreateSignedUrl: storageCreateSignedUrl,
   };
 
-  return { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord };
+  const mockCrearNotificacion = vi.fn().mockResolvedValue({ id: "n-1" });
+
+  return { mockGetUser, mockServerActionClient, createChainMock, mockEsAdminOCoord, mockCrearNotificacion };
 });
 
 vi.mock("@/lib/supabase.server-actions", () => ({
   createServerActionClient: vi.fn().mockImplementation(() => Promise.resolve(mockServerActionClient)),
+}));
+
+vi.mock("@/app/_actionsNotifications", () => ({
+  crearNotificacion: mockCrearNotificacion,
 }));
 
 vi.mock("@/lib/permissions/server", () => ({
@@ -172,6 +178,139 @@ describe("cambiarEstadoRevision: autorizacion", () => {
 
     const res = await cambiarEstadoRevision("e-1", "observado", "Falta firma");
     expect(res.success).toBe(true);
+  });
+});
+
+// ============================================================
+// cambiarEstadoRevision: notifica al vendedor dueño en aprobado/observado
+// ============================================================
+
+describe("cambiarEstadoRevision: notifica al vendedor dueño en aprobado/observado", () => {
+  it("notifica al vendedor dueño cuando se aprueba (revisor distinto al dueño)", async () => {
+    mockEsAdminOCoord.mockResolvedValue(true);
+    const etapaChain = createChainMock({
+      data: {
+        nombre: "Firma de contrato",
+        proceso: {
+          codigo: "ADQ-2026-0001",
+          cliente_id: "c-1",
+          vendedor_username: "vendedor2",
+          cliente: { id: "c-1", nombre: "Juan Perez" },
+        },
+      },
+      error: null,
+    });
+    mockServerActionClient.__setPublicChain("proceso_etapa", etapaChain);
+
+    const perfilChain = createChainMock({ data: { id: "perfil-vendedor2" }, error: null });
+    mockServerActionClient.__setPublicChain("usuario_perfil", perfilChain);
+
+    const res = await cambiarEstadoRevision("e-1", "aprobado");
+    expect(res.success).toBe(true);
+
+    expect(mockCrearNotificacion).toHaveBeenCalledTimes(1);
+    const [usuarioId, tipo, titulo, mensaje] = mockCrearNotificacion.mock.calls[0];
+    expect(usuarioId).toBe("perfil-vendedor2");
+    expect(tipo).toBe("sistema");
+    expect(titulo).toMatch(/aprobada/i);
+    expect(mensaje).toContain("Firma de contrato");
+    expect(mensaje).toContain("Juan Perez");
+  });
+
+  it("notifica al vendedor dueño cuando se observa, incluyendo las observaciones", async () => {
+    mockEsAdminOCoord.mockResolvedValue(true);
+    const etapaChain = createChainMock({
+      data: {
+        nombre: "Desembolso",
+        proceso: {
+          codigo: "ADQ-2026-0002",
+          cliente_id: "c-2",
+          vendedor_username: "vendedor2",
+          cliente: { id: "c-2", nombre: "Maria Lopez" },
+        },
+      },
+      error: null,
+    });
+    mockServerActionClient.__setPublicChain("proceso_etapa", etapaChain);
+
+    const perfilChain = createChainMock({ data: { id: "perfil-vendedor2" }, error: null });
+    mockServerActionClient.__setPublicChain("usuario_perfil", perfilChain);
+
+    const res = await cambiarEstadoRevision("e-1", "observado", "Falta firma del banco");
+    expect(res.success).toBe(true);
+
+    expect(mockCrearNotificacion).toHaveBeenCalledTimes(1);
+    const [usuarioId, , titulo, mensaje] = mockCrearNotificacion.mock.calls[0];
+    expect(usuarioId).toBe("perfil-vendedor2");
+    expect(titulo).toMatch(/observada/i);
+    expect(mensaje).toContain("Falta firma del banco");
+  });
+
+  it("NO notifica cuando el revisor es el mismo dueño del proceso", async () => {
+    mockEsAdminOCoord.mockResolvedValue(true);
+    const etapaChain = createChainMock({
+      data: {
+        nombre: "Firma de contrato",
+        proceso: {
+          codigo: "ADQ-2026-0003",
+          cliente_id: "c-1",
+          vendedor_username: "vendedor1", // mismo username que auth mockeado (el revisor)
+          cliente: { id: "c-1", nombre: "Juan Perez" },
+        },
+      },
+      error: null,
+    });
+    mockServerActionClient.__setPublicChain("proceso_etapa", etapaChain);
+
+    const res = await cambiarEstadoRevision("e-1", "aprobado");
+    expect(res.success).toBe(true);
+    expect(mockCrearNotificacion).not.toHaveBeenCalled();
+  });
+
+  it("no falla la accion si crearNotificacion lanza", async () => {
+    mockEsAdminOCoord.mockResolvedValue(true);
+    const etapaChain = createChainMock({
+      data: {
+        nombre: "Firma de contrato",
+        proceso: {
+          codigo: "ADQ-2026-0004",
+          cliente_id: "c-1",
+          vendedor_username: "vendedor2",
+          cliente: { id: "c-1", nombre: "Juan Perez" },
+        },
+      },
+      error: null,
+    });
+    mockServerActionClient.__setPublicChain("proceso_etapa", etapaChain);
+    const perfilChain = createChainMock({ data: { id: "perfil-vendedor2" }, error: null });
+    mockServerActionClient.__setPublicChain("usuario_perfil", perfilChain);
+    mockCrearNotificacion.mockRejectedValueOnce(new Error("boom"));
+
+    const res = await cambiarEstadoRevision("e-1", "aprobado");
+    expect(res.success).toBe(true);
+  });
+
+  it("no notifica al vendedor si no se resuelve su perfil por username", async () => {
+    mockEsAdminOCoord.mockResolvedValue(true);
+    const etapaChain = createChainMock({
+      data: {
+        nombre: "Firma de contrato",
+        proceso: {
+          codigo: "ADQ-2026-0005",
+          cliente_id: "c-1",
+          vendedor_username: "vendedor-fantasma",
+          cliente: { id: "c-1", nombre: "Juan Perez" },
+        },
+      },
+      error: null,
+    });
+    mockServerActionClient.__setPublicChain("proceso_etapa", etapaChain);
+    const perfilChain = createChainMock({ data: null, error: null });
+    mockServerActionClient.__setPublicChain("usuario_perfil", perfilChain);
+
+    const res = await cambiarEstadoRevision("e-1", "aprobado");
+    expect(res.success).toBe(true);
+    expect(mockCrearNotificacion).not.toHaveBeenCalled();
   });
 });
 
