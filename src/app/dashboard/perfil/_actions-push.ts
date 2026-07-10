@@ -118,7 +118,7 @@ export async function enviarPushPruebaAction(): Promise<ActionResult> {
   }
 
   try {
-    await dispatchNotificationChannels(
+    const result = await dispatchNotificationChannels(
       {
         userId: user.id,
         titulo: "Prueba de notificación push",
@@ -139,7 +139,16 @@ export async function enviarPushPruebaAction(): Promise<ActionResult> {
       },
       { supabaseClient: supabaseAdmin },
     );
-    return { success: true, message: `Push enviado a ${count} dispositivo(s)` };
+
+    const outcome = result.push;
+    if (!outcome || outcome.sent === 0) {
+      const detail = outcome
+        ? ` (${outcome.attempted} intento(s), ${outcome.failed} fallido(s), ${outcome.pruned} expirado(s))`
+        : "";
+      return { success: false, error: `No se pudo enviar la notificación push${detail}` };
+    }
+
+    return { success: true, message: `Push enviado a ${outcome.sent}/${outcome.attempted} dispositivo(s)` };
   } catch (err) {
     console.error("Error enviando push de prueba:", err);
     return { success: false, error: err instanceof Error ? err.message : "Error desconocido" };

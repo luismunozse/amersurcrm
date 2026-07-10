@@ -71,7 +71,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     usuarioPermisos,
   ] = await Promise.all([
     // CRÍTICA: configuración del sistema (necesaria para push)
-    s
+    // configuracion_sistema solo concede SELECT vía RLS a admins (guarda la
+    // VAPID private key), así que el cliente de sesión `s` devolvería null
+    // para cualquier actor no-admin, dejando pushConfig.enabled en false y
+    // evitando que su navegador se auto-suscriba. Usamos service role para
+    // esta lectura puntual — el select solo pide la public key, que es segura
+    // de exponer al cliente; la private key nunca se solicita aquí.
+    createServiceRoleClient()
+      .schema("crm")
       .from("configuracion_sistema")
       .select("notificaciones_push, push_vapid_public, push_provider")
       .eq("id", 1)

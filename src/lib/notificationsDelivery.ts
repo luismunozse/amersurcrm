@@ -34,44 +34,71 @@ export interface NotificationChannelConfig {
   };
 }
 
+/** Outcome of a single push dispatch attempt, in terms real callers can trust. */
+export interface PushDispatchOutcome {
+  /** Subscriptions found for the target user. */
+  attempted: number;
+  /** Deliveries that succeeded. */
+  sent: number;
+  /** Deliveries that failed for a reason other than an expired subscription. */
+  failed: number;
+  /** Subscriptions removed because the push service reported them gone (404/410). */
+  pruned: number;
+}
+
+export interface NotificationDispatchResult {
+  push?: PushDispatchOutcome;
+}
+
 export async function dispatchNotificationChannels(
   payload: NotificationDeliveryPayload,
   prefs: NotificationPreferences,
   config?: NotificationChannelConfig,
   context?: { supabaseClient?: AnySupabaseClient },
-) {
+): Promise<NotificationDispatchResult> {
   const isRecordatorio = Boolean((payload.data as Record<string, unknown> | undefined)?.recordatorio_id);
   const allowRecordatorio = !isRecordatorio || prefs.recordatoriosEnabled;
 
   if (prefs.pushEnabled && allowRecordatorio && config?.push) {
-    await sendPushNotification(payload, config.push, context);
+    const push = await sendPushNotification(payload, config.push, context);
+    return { push };
   }
+
+  return {};
 }
 
 async function sendPushNotification(
   payload: NotificationDeliveryPayload,
   pushConfig: NonNullable<NotificationChannelConfig["push"]>,
   context?: { supabaseClient?: AnySupabaseClient },
-) {
+): Promise<PushDispatchOutcome> {
+  const empty: PushDispatchOutcome = { attempted: 0, sent: 0, failed: 0, pruned: 0 };
+
   const webpush = await loadWebPushModule();
   if (!webpush) {
     console.warn("Librería web-push no disponible; notificación push omitida.");
-    return;
+    return empty;
   }
 
   const supabase = context?.supabaseClient ?? (await createServerActionClient());
+  // Always pin the schema explicitly: callers may pass a service-role client
+  // (whose default schema is "public"), and relying on the caller's default
+  // silently turns this into a no-op query against a nonexistent table.
+  const crmSchema = supabase.schema("crm");
 
   const {
     data: subscriptions,
     error,
-  } = await supabase
+  } = await crmSchema
     .from("push_subscription")
     .select("id, endpoint, p256dh, auth")
     .eq("usuario_id", payload.userId);
 
   if (error) {
-    console.warn("No se pudieron obtener suscripciones push:", error.message);
-    return;
+    // Surface the failure instead of swallowing it into a false "success" —
+    // callers (e.g. the test-push action, the recordatorios cron) rely on
+    // this to report real failures instead of "0/N sent" as success.
+    throw new Error(`No se pudieron obtener suscripciones push: ${error.message}`);
   }
 
   const subscriptionRows =
@@ -83,7 +110,7 @@ async function sendPushNotification(
     }>;
 
   if (subscriptionRows.length === 0) {
-    return;
+    return empty;
   }
 
   const subject = pushConfig.subject ?? "mailto:notificaciones@amersurcrm.com";
@@ -105,6 +132,10 @@ async function sendPushNotification(
     data: baseData,
   });
 
+  let sent = 0;
+  let failed = 0;
+  let pruned = 0;
+
   await Promise.all(
     subscriptionRows.map(async (subscription) => {
       try {
@@ -118,16 +149,21 @@ async function sendPushNotification(
           },
           pushPayload,
         );
+        sent += 1;
       } catch (err) {
         const statusCode = (err as { statusCode?: number }).statusCode;
         if (statusCode === 404 || statusCode === 410) {
-          await supabase.from("push_subscription").delete().eq("id", subscription.id);
+          await crmSchema.from("push_subscription").delete().eq("id", subscription.id);
+          pruned += 1;
         } else {
+          failed += 1;
           console.warn("Error enviando push notification:", err);
         }
       }
     }),
   );
+
+  return { attempted: subscriptionRows.length, sent, failed, pruned };
 }
 
 async function loadWebPushModule(): Promise<WebPushModule | null> {

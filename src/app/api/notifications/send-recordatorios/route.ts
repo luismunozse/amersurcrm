@@ -118,14 +118,30 @@ async function handleRequest(req: NextRequest) {
             },
           },
           { supabaseClient: supabase },
-        ).then(() => recordatorio.id),
+        ).then((result) => ({ id: recordatorio.id, outcome: result.push })),
       ),
     );
 
     dispatchResults.forEach((result, index) => {
       const recordatorioId = pushTargets[index]?.recordatorio.id ?? "";
       if (result.status === "fulfilled") {
-        pushSuccessIds.push(result.value);
+        const { id, outcome } = result.value;
+        if (outcome && outcome.sent > 0) {
+          // At least one device actually received the push.
+          pushSuccessIds.push(id);
+        } else if (!outcome || outcome.attempted > 0) {
+          // Either the channel wasn't attempted, or subscriptions existed
+          // but every send failed — both are real failures, not silent
+          // successes.
+          failures.push({
+            id: recordatorioId,
+            error: outcome
+              ? `0/${outcome.attempted} dispositivo(s) recibieron el push (${outcome.failed} fallidos, ${outcome.pruned} expirados)`
+              : "Despacho de push no ejecutado",
+          });
+        }
+        // outcome.attempted === 0 (no subscriptions for this vendedor):
+        // not a failure, simply nothing to deliver.
       } else {
         failures.push({
           id: recordatorioId,

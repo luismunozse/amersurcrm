@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { createServiceRoleClient } from "@/lib/supabase.server";
 import { dispatchNotificationChannels } from "@/lib/notificationsDelivery";
 
 function revalidateNotificaciones() {
@@ -51,14 +52,20 @@ export async function crearNotificacion(
   data?: Record<string, unknown>
 ) {
   const supabase = await createServerActionClient();
+  // configuracion_sistema only grants SELECT to admins via RLS (it holds the
+  // VAPID private key), so a non-admin actor's session client would get a
+  // silently-null row here. Use the service role for this read — the private
+  // key never leaves this function (see pushConfig below, only passed to
+  // dispatchNotificationChannels, never returned to the caller).
+  const supabaseAdmin = createServiceRoleClient();
 
   const [{ data: { user } }, configResult] = await Promise.all([
     supabase.auth.getUser(),
-    supabase
+    supabaseAdmin
       .schema("crm")
       .from("configuracion_sistema")
       .select(
-        "notificaciones_email, notificaciones_push, notificaciones_recordatorios, push_provider, push_vapid_public, push_vapid_private, push_vapid_subject",
+        "notificaciones_push, notificaciones_recordatorios, push_provider, push_vapid_public, push_vapid_private, push_vapid_subject",
       )
       .eq("id", 1)
       .maybeSingle(),
@@ -117,6 +124,12 @@ export async function crearNotificacion(
       },
       prefs,
       pushConfig,
+      // push_subscription RLS only lets a user read their own rows. Most
+      // notifications target someone other than the acting user (e.g. a
+      // coordinator notifying a vendedor), so the session client would find
+      // zero subscriptions. Reuse the service-role client already fetched
+      // above — notificationsDelivery.ts schema-scopes it internally.
+      { supabaseClient: supabaseAdmin },
     );
   } catch (deliveryError) {
     console.warn("No se pudo despachar notificación externa:", deliveryError);
