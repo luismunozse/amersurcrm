@@ -41,6 +41,20 @@ $$;
 -- crm.rol.permisos — see 20250326000008_permissions_matrix.sql). Without
 -- this ordering, the ver_todos check would short-circuit to global for
 -- coordinador regardless of team membership.
+--
+-- vendedor_asignado arm: cliente.vendedor_asignado is a TEXT column holding
+-- a username (FK to crm.usuario_perfil(username), see
+-- 20251219100001_add_vendedor_fk_cliente.sql; comment "Vendedor responsable
+-- del cliente (texto)", 2025-09-14_060_clientes_mejorados_fixed.sql), same
+-- as vendedor_username, and crm.p1_puede_ver_cliente() already matches it
+-- with `c.vendedor_asignado = crm.get_current_username()` (text=text). This
+-- branch mirrors that: c.vendedor_asignado IN (equipo_usernames). NOTE this
+-- intentionally does NOT copy crm.cliente_pertenece_a_usuario()'s own
+-- `c.vendedor_asignado = v_usuario_id` (a uuid comparison against a text
+-- column) — that line is inconsistent with every other reference to this
+-- column in the codebase and looks like a stale leftover from when the
+-- column was still UUID-typed (20250115000000_roles_usuarios.sql); flagged
+-- as a pre-existing concern, not fixed here (out of this migration's scope).
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION crm.usuario_puede_ver_cliente(p_cliente_id uuid)
@@ -69,6 +83,7 @@ BEGIN
       WHERE c.id = p_cliente_id
         AND (
           c.vendedor_username IN (SELECT crm.equipo_usernames(v_usuario_id))
+          OR c.vendedor_asignado IN (SELECT crm.equipo_usernames(v_usuario_id))
           OR EXISTS (
             SELECT 1 FROM crm.usuario_perfil owner
             WHERE owner.id = c.created_by
@@ -132,6 +147,7 @@ AS $$
               )
               AND (
                 c.vendedor_username IN (SELECT crm.equipo_usernames(auth.uid()))
+                OR c.vendedor_asignado IN (SELECT crm.equipo_usernames(auth.uid()))
                 OR EXISTS (
                   SELECT 1 FROM crm.usuario_perfil owner
                   WHERE owner.id = c.created_by
