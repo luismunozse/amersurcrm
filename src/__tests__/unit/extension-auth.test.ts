@@ -130,20 +130,20 @@ describe("validateBearerAndEnsureGlobalRole", () => {
   });
 
   describe("GLOBAL_ROLES export", () => {
-    it("exports the three global-visibility role names", () => {
-      expect(GLOBAL_ROLES).toEqual([
-        "ROL_ADMIN",
-        "ROL_GERENTE",
-        "ROL_COORDINADOR_VENTAS",
-      ]);
+    it("exports only the two global-visibility role names (coordinador is team-scoped, not global)", () => {
+      expect(GLOBAL_ROLES).toEqual(["ROL_ADMIN", "ROL_GERENTE"]);
     });
 
     it("does not include ROL_VENDEDOR", () => {
       expect((GLOBAL_ROLES as readonly string[]).includes("ROL_VENDEDOR")).toBe(false);
     });
+
+    it("does not include ROL_COORDINADOR_VENTAS", () => {
+      expect((GLOBAL_ROLES as readonly string[]).includes("ROL_COORDINADOR_VENTAS")).toBe(false);
+    });
   });
 
-  it.each(["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"])(
+  it.each(["ROL_ADMIN", "ROL_GERENTE"])(
     "returns ok: true with user/username/rol/supabase for global role %s",
     async (rolNombre) => {
       const mockUser = { id: "uid-global" };
@@ -164,4 +164,16 @@ describe("validateBearerAndEnsureGlobalRole", () => {
       }
     },
   );
+
+  it("returns 403 for ROL_COORDINADOR_VENTAS (team-scoped, no longer a global-visibility role)", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "uid-coord" } }, error: null });
+    mockSingle.mockResolvedValue({
+      data: { username: "coord1", rol: { nombre: "ROL_COORDINADOR_VENTAS" } },
+      error: null,
+    });
+
+    const result = await validateBearerAndEnsureGlobalRole("valid-coord-token");
+
+    expect(result).toEqual({ ok: false, status: 403, error: "Permiso insuficiente" });
+  });
 });

@@ -3,13 +3,23 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 
 /**
  * Global-visibility roles. Callers in this set see all clients; callers NOT
- * in this set (e.g. ROL_VENDEDOR) are scoped to their own clients by routes
- * that consume this constant (search, etc.).
+ * in this set (e.g. ROL_VENDEDOR, ROL_COORDINADOR_VENTAS) are scoped by
+ * routes that consume this constant (search, etc.) — coordinador is
+ * team-scoped as of the coordinador-teams change (see
+ * src/lib/auth/equipo-scope.server.ts), not globally visible.
+ *
+ * KNOWN GAP: validateBearerAndEnsureGlobalRole() below is a binary gate —
+ * it does not (yet) admit "equipo"-tier callers with a narrower scope, so
+ * every Bearer-token route that calls it (estado, notas, interacciones,
+ * pendientes, proyecto-interes, cron/cobranza-alertas) now rejects
+ * coordinador callers outright (403) instead of scoping them to their team.
+ * This is a deliberate incremental step, not a hidden regression — see the
+ * coordinador-teams plan's risk notes for the follow-up needed before a
+ * coordinador can use the Chrome extension's write endpoints again.
  */
 export const GLOBAL_ROLES = [
   "ROL_ADMIN",
   "ROL_GERENTE",
-  "ROL_COORDINADOR_VENTAS",
 ] as const;
 
 // ── Discriminated union returned by the helper ──────────────────────────────

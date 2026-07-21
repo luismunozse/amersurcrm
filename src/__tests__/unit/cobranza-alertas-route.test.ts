@@ -389,8 +389,11 @@ describe("GET /api/cron/cobranza-alertas — notification fan-out", () => {
     const notifChain = tableChains.notificacion;
     expect(notifChain.insertCalls).toHaveLength(1);
     const recipientIds = notifChain.insertCalls[0].map((row: any) => row.usuario_id).sort();
+    // After coordinador-teams: coordinadores are team-scoped (not global),
+    // so only admin and the cliente owner (vendedor) receive notifications.
+    // Coordinador notification routing is pending follow-up (Task 6b).
     expect(recipientIds).toEqual(
-      ["uid-admin1", "uid-coord1", "uid-coord2", "uid-owner1"].sort(),
+      ["uid-admin1", "uid-owner1"].sort(),
     );
   });
 

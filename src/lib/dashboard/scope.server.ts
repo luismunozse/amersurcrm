@@ -9,7 +9,7 @@ export type PerfilRol = {
   esAdmin: boolean;
   esGerente: boolean;
   esCoordinador: boolean;
-  /** True for any role covered by `crm.es_visibilidad_global()` (admin/gerente/coordinador). */
+  /** True for admin/gerente only (ROL_COORDINADOR_VENTAS is team-scoped, not global). */
   esGlobal: boolean;
 };
 
@@ -25,14 +25,18 @@ const PERFIL_NEUTRO: PerfilRol = {
 
 /**
  * Shared profile+role lookup, memoized per request via `React.cache` so the
- * new command-center fetchers (design.md ADR-1) don't each repeat the
+ * command-center fetchers (design.md ADR-1) don't each repeat the
  * `usuario_perfil` query that several existing `cache.server.ts` fetchers
  * already run independently.
  *
- * Unlike `getCachedFunnelClientes`/`getCachedSeguimientosHoy` (which only
- * check `esAdmin`/`esGerente`), this resolver includes `ROL_COORDINADOR_VENTAS`
- * in `esGlobal` from the start, matching `crm.es_visibilidad_global()` and the
- * spec's role-scope invariant for any *new* dashboard code.
+ * `esGlobal` matches `crm.es_visibilidad_global()` — admin/gerente only.
+ * ROL_COORDINADOR_VENTAS is intentionally EXCLUDED as of the coordinador-teams
+ * change: coordinador visibility is team-scoped (see
+ * `src/lib/auth/equipo-scope.server.ts`). `esGlobal` (this field) is consumed
+ * only by callers that still want a strict "admin/gerente only" boolean —
+ * `src/lib/dashboard/command-center.server.ts`'s fetchers no longer take it
+ * (Task 4b switched them to the richer `EquipoScope`, which distinguishes
+ * "global" from "equipo" instead of collapsing both into one flag).
  */
 export const getPerfilRol = cache(async (): Promise<PerfilRol> => {
   const userId = await getCachedUserId();
@@ -61,6 +65,6 @@ export const getPerfilRol = cache(async (): Promise<PerfilRol> => {
     esAdmin,
     esGerente,
     esCoordinador,
-    esGlobal: esAdmin || esGerente || esCoordinador,
+    esGlobal: esAdmin || esGerente,
   };
 });

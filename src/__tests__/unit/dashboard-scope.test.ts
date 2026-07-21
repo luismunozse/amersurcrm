@@ -59,11 +59,11 @@ describe("getPerfilRol", () => {
     expect(perfil.esGlobal).toBe(true);
   });
 
-  it("resolves esGlobal=true for ROL_COORDINADOR_VENTAS (closes the coordinador gap for new code)", async () => {
-    setupPerfil("ROL_COORDINADOR_VENTAS");
+  it("resolves esGlobal=false for ROL_COORDINADOR_VENTAS (team-scoped, no longer global)", async () => {
+    setupPerfil("ROL_COORDINADOR_VENTAS", "coord1");
     const perfil = await getPerfilRol();
     expect(perfil.esCoordinador).toBe(true);
-    expect(perfil.esGlobal).toBe(true);
+    expect(perfil.esGlobal).toBe(false);
   });
 
   it("resolves esGlobal=false for ROL_VENDEDOR", async () => {
