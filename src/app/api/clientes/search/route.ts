@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
-import { GLOBAL_ROLES } from "@/lib/auth/extension-auth";
+import { resolveEquipoScope, equipoOrFilter } from "@/lib/auth/equipo-scope.server";
 
 export const dynamic = "force-dynamic";
 
@@ -88,14 +88,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Single source of truth for global-visibility roles — imported from extension-auth.
-    // Previously this was `rolNombre === "admin" || rolNombre === "ROL_ADMIN"`,
-    // which wrongly scoped ROL_GERENTE and ROL_COORDINADOR_VENTAS to vendor view.
-    const esGlobalRole = (GLOBAL_ROLES as readonly string[]).includes(rolNombre);
+    // Tiered visibility scope — replaces the old GLOBAL_ROLES boolean gate.
+    // global: unfiltered search. equipo: restricted to the coordinador's team
+    // via equipoOrFilter(). propio: own clients only (unchanged vendor
+    // behavior). anonimo: no resolvable scope — must be rejected below.
+    const scope = await resolveEquipoScope(supabase, userId);
+
+    // CRITICAL: equipoOrFilter() returns null for BOTH 'global' and 'anonimo'.
+    // If we let 'anonimo' fall through, a null filter would be treated as
+    // "no restriction" and leak every client to an unresolvable caller. The
+    // outer !perfil guard above already covers the common case, but this is
+    // a defensive short-circuit in case resolveEquipoScope's independent
+    // profile lookup diverges from the route's own.
+    if (scope.tier === "anonimo") {
+      return NextResponse.json(
+        { error: "Permiso insuficiente" },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const vendedorUsername = perfil.username ?? undefined;
 
     // Additional guard: a vendor with no username cannot be safely scoped.
-    if (!esGlobalRole && !vendedorUsername) {
+    if (scope.tier === "propio" && !vendedorUsername) {
       console.error("[ClienteSearch] vendor profile has no username — rejecting");
       return NextResponse.json(
         { error: "Permiso insuficiente" },
@@ -147,7 +162,12 @@ export async function GET(request: NextRequest) {
       .select(`${camposCliente}, vendedor:usuario_perfil!cliente_vendedor_asignado_fkey(nombre_completo)`)
       .or(orFilter);
 
-    if (!esGlobalRole && vendedorUsername) {
+    if (scope.tier === "equipo") {
+      const filtroEquipo = equipoOrFilter(scope);
+      if (filtroEquipo) {
+        queryWithJoin = queryWithJoin.or(filtroEquipo);
+      }
+    } else if (scope.tier === "propio" && vendedorUsername) {
       queryWithJoin = queryWithJoin.eq("vendedor_asignado", vendedorUsername);
     }
 
@@ -167,7 +187,12 @@ export async function GET(request: NextRequest) {
         .select(camposCliente)
         .or(orFilter);
 
-      if (!esGlobalRole && vendedorUsername) {
+      if (scope.tier === "equipo") {
+        const filtroEquipo = equipoOrFilter(scope);
+        if (filtroEquipo) {
+          queryBasic = queryBasic.or(filtroEquipo);
+        }
+      } else if (scope.tier === "propio" && vendedorUsername) {
         queryBasic = queryBasic.eq("vendedor_asignado", vendedorUsername);
       }
 
@@ -194,7 +219,7 @@ export async function GET(request: NextRequest) {
 
     if (!cliente) {
       // Si es vendedor y no encontró cliente, verificar si existe pero está asignado a otro
-      if (!esGlobalRole && vendedorUsername) {
+      if (scope.tier !== "global" && vendedorUsername) {
         const { data: clienteExiste } = await supabase
           .schema("crm")
           .from("cliente")
