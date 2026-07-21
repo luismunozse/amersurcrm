@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createOptimizedServerClient } from "@/lib/supabase.server";
 import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
-import { equipoOrFilter } from "@/lib/auth/equipo-scope.server";
+import { equipoOrFilter, isValidUsername } from "@/lib/auth/equipo-scope.server";
 import {
   isAgingLead,
   AGING_THRESHOLD_DAYS,
@@ -351,6 +351,70 @@ const ALERTA_SIN_GESTIONAR_SELECT = `
   )
 `;
 
+/**
+ * Team-owned cliente ids for a coordinador (Task 4a — linked-cliente team
+ * arm). Mirrors `venta_select_policy`'s cliente subquery (see
+ * supabase/migrations/20260720000002_coordinador_teams_rls_followup.sql):
+ * a cliente is team-owned when its OWN vendedor_username/vendedor_asignado
+ * is on the team, OR its owner (created_by) is a team member — exactly
+ * what `equipoOrFilter` already expresses for the `cliente` table. Reused
+ * here by both `getAlertasSinGestionarCount` and `getVentasMensuales` so a
+ * venta whose OWN vendedor_username isn't on the team, but whose linked
+ * cliente IS team-owned, is still counted — the gap `venta_select_policy`
+ * closed at the RLS level (review of the coordinador-teams follow-up) but
+ * these two app-level fetchers had not.
+ */
+async function getClienteIdsEquipo(
+  supabase: Awaited<ReturnType<typeof createOptimizedServerClient>>,
+  scope: Extract<EquipoScope, { tier: "equipo" }>,
+): Promise<string[]> {
+  const filtro = equipoOrFilter(scope);
+  if (!filtro) return [];
+
+  const { data, error } = await supabase
+    .schema("crm")
+    .from("cliente")
+    .select("id")
+    .or(filtro);
+
+  if (error) {
+    console.error("Error obteniendo clientes del equipo (venta team-scope):", error);
+    return [];
+  }
+
+  return (data ?? []).map((c: { id: string }) => c.id);
+}
+
+/**
+ * Builds the `.or()` arm string for team-scoped venta visibility: the
+ * venta's OWN vendedor_username is on the team, OR its `cliente_id` is one
+ * of the team-owned clientes from `getClienteIdsEquipo`. `prefix` lets the
+ * SAME two conditions be expressed either against `crm.venta` directly
+ * (prefix `""`, used by `getVentasMensuales`) or through the existing
+ * nested embed (prefix `"cuota.venta."`, used by
+ * `getAlertasSinGestionarCount` — same 2-level dotted-path depth as the
+ * pre-existing `cuota.venta.vendedor_username`/`cuota.venta.estado`
+ * filters on that fetcher, just combined via `.or()` instead of
+ * `.in()`/`.not()`).
+ */
+function buildVentaEquipoOrFilter(
+  scope: Extract<EquipoScope, { tier: "equipo" }>,
+  clienteIdsEquipo: string[],
+  prefix: string,
+): string {
+  const validUsernames = scope.equipoUsernames.filter(isValidUsername);
+  const arms: string[] = [];
+  if (validUsernames.length > 0) {
+    const usernamesCsv = validUsernames.map((u) => `"${u}"`).join(",");
+    arms.push(`${prefix}vendedor_username.in.(${usernamesCsv})`);
+  }
+  if (clienteIdsEquipo.length > 0) {
+    const clienteIdsCsv = clienteIdsEquipo.map((id) => `"${id}"`).join(",");
+    arms.push(`${prefix}cliente_id.in.(${clienteIdsCsv})`);
+  }
+  return arms.join(",");
+}
+
 export const getAlertasSinGestionarCount = cache(
   async (scope: EquipoScope): Promise<number> => {
     if (scope.tier !== 'global' && scope.tier !== 'equipo') return 0;
@@ -364,15 +428,10 @@ export const getAlertasSinGestionarCount = cache(
       .neq('cuota.estado', 'pagada')
       .not('cuota.venta.estado', 'in', '("cancelada","suspendida")');
 
-    // Team scope (coordinador): this table has no direct cliente_id — the
-    // ownership signal lives on venta.vendedor_username, reached via the
-    // nested embed (same dotted-path filter mechanism as the existing
-    // `cuota.venta.estado` filter above). This is a nested/embedded column,
-    // not a top-level cliente/venta column, so it cannot reuse
-    // equipoOrFilter() (which returns bare unqualified column names) —
-    // filtered directly by team usernames instead.
     if (scope.tier === 'equipo') {
-      query = query.in('cuota.venta.vendedor_username', scope.equipoUsernames);
+      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
+      const filtro = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, 'cuota.venta.');
+      if (filtro) query = query.or(filtro);
     }
 
     const { count, error } = await query;
@@ -527,7 +586,9 @@ export const getVentasMensuales = cache(
       .gte('fecha_venta', hace6Meses);
 
     if (scope.tier === 'equipo') {
-      query = query.in('vendedor_username', scope.equipoUsernames);
+      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
+      const filtro = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, '');
+      if (filtro) query = query.or(filtro);
     }
 
     const { data, error } = await query.order('fecha_venta', { ascending: true });

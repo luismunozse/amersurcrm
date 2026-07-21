@@ -482,13 +482,28 @@ describe("getInventarioLotesPorProyecto — equipo (coordinador) sees the SAME f
 });
 
 describe("getAlertasSinGestionarCount — equipo (coordinador) team scope", () => {
-  it("filters by the team's venta.vendedor_username", async () => {
+  it("filters by the team's own venta.vendedor_username plus the linked cliente's team ownership", async () => {
+    chains.cliente = createChainMock({ data: [{ id: "c1" }, { id: "c2" }], error: null });
     chains.alerta_cobranza = createChainMock({ data: null, error: null, count: 2 });
 
     const resultado = await getAlertasSinGestionarCount(EQUIPO_SCOPE);
 
-    expect(chains.alerta_cobranza.in).toHaveBeenCalledWith("cuota.venta.vendedor_username", ["coord1", "vend1"]);
+    expect(chains.cliente.or).toHaveBeenCalledWith(equipoOrFilter(EQUIPO_SCOPE));
+    expect(chains.alerta_cobranza.or).toHaveBeenCalledWith(
+      'cuota.venta.vendedor_username.in.("coord1","vend1"),cuota.venta.cliente_id.in.("c1","c2")',
+    );
     expect(resultado).toBe(2);
+  });
+
+  it("omits the cliente_id arm when the team owns no clientes", async () => {
+    chains.cliente = createChainMock({ data: [], error: null });
+    chains.alerta_cobranza = createChainMock({ data: null, error: null, count: 0 });
+
+    await getAlertasSinGestionarCount(EQUIPO_SCOPE);
+
+    expect(chains.alerta_cobranza.or).toHaveBeenCalledWith(
+      'cuota.venta.vendedor_username.in.("coord1","vend1")',
+    );
   });
 });
 
@@ -512,11 +527,23 @@ describe("getResumenGeneral — equipo (coordinador) team scope", () => {
 });
 
 describe("getVentasMensuales — equipo (coordinador) team scope", () => {
-  it("filters ventas by the team's vendedor_username", async () => {
+  it("filters ventas by the team's own vendedor_username plus the linked cliente's team ownership", async () => {
+    chains.cliente = createChainMock({ data: [{ id: "c1" }], error: null });
     chains.venta = createChainMock({ data: [], error: null });
 
     await getVentasMensuales(EQUIPO_SCOPE);
 
-    expect(chains.venta.in).toHaveBeenCalledWith("vendedor_username", ["coord1", "vend1"]);
+    expect(chains.venta.or).toHaveBeenCalledWith(
+      'vendedor_username.in.("coord1","vend1"),cliente_id.in.("c1")',
+    );
+  });
+
+  it("omits the cliente_id arm when the team owns no clientes", async () => {
+    chains.cliente = createChainMock({ data: [], error: null });
+    chains.venta = createChainMock({ data: [], error: null });
+
+    await getVentasMensuales(EQUIPO_SCOPE);
+
+    expect(chains.venta.or).toHaveBeenCalledWith('vendedor_username.in.("coord1","vend1")');
   });
 });

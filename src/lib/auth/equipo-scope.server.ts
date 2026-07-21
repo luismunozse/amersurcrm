@@ -23,7 +23,7 @@ export type EquipoScope =
  */
 const VALID_USERNAME_PATTERN = /^[A-Za-z0-9_.\-]+$/;
 
-function isValidUsername(username: string): boolean {
+export function isValidUsername(username: string): boolean {
   return VALID_USERNAME_PATTERN.test(username);
 }
 
