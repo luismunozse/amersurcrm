@@ -34,7 +34,8 @@ vi.mock("@/app/dashboard/clientes/_actions-crm-helpers", () => ({
   revalidarCliente: vi.fn(),
 }));
 
-import { obtenerCobranza, obtenerResumenCobranza, ejecutarActualizacionMora } from "@/app/dashboard/cobranza/_actions-cobranza";
+import { obtenerCobranza, obtenerResumenCobranza, obtenerResumenCobranzaScoped, ejecutarActualizacionMora } from "@/app/dashboard/cobranza/_actions-cobranza";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 describe("obtenerCobranza", () => {
   beforeEach(() => { vi.clearAllMocks(); mockGetUser.mockResolvedValue({ data: { user: { id: "uid-1" } } }); });
@@ -71,6 +72,57 @@ describe("obtenerResumenCobranza", () => {
 
     const result = await obtenerResumenCobranza();
     expect(result.success).toBe(true);
+  });
+});
+
+describe("obtenerResumenCobranzaScoped", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("returns a zeroed summary without querying for propio/anonimo tiers (MoraAlertasBlock is never rendered for them)", async () => {
+    const propio: EquipoScope = { tier: "propio", userId: "u1", username: "vend1" };
+    const resultado = await obtenerResumenCobranzaScoped(propio);
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual({
+      total_cuotas: 0, por_vencer: 0, vencidas: 0, en_mora: 0, monto_por_cobrar: 0, monto_mora_total: 0,
+    });
+    expect(mockServerActionClient.from).not.toHaveBeenCalled();
+  });
+
+  it("queries without a vendedor_username filter for tier: global", async () => {
+    const chain = createChainMock();
+    chain.order.mockImplementation(() => Promise.resolve({
+      data: [{ estado_cobranza: "en_mora", monto_programado: 1000, monto_pagado: 200, monto_mora: 50, dias_atraso: 10 }],
+      error: null,
+    }));
+    // v_cobranza has no .order() in the real query — reuse the generic
+    // chain's thenable-less shape by resolving directly on the select/eq
+    // no-op chain instead:
+    const selectChain = createChainMock();
+    mockServerActionClient.from.mockReturnValue(selectChain);
+    (selectChain as any).then = (resolve: any) => Promise.resolve({
+      data: [{ estado_cobranza: "en_mora", monto_programado: 1000, monto_pagado: 200, monto_mora: 50, dias_atraso: 10 }],
+      error: null,
+    }).then(resolve);
+
+    const global: EquipoScope = { tier: "global" };
+    const resultado = await obtenerResumenCobranzaScoped(global);
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data!.en_mora).toBe(1);
+    expect(resultado.data!.monto_mora_total).toBe(50);
+    expect(selectChain.eq).not.toHaveBeenCalledWith("vendedor_username", expect.anything());
+  });
+
+  it("filters by the team's usernames for tier: equipo", async () => {
+    const selectChain = createChainMock();
+    (selectChain as any).then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+    mockServerActionClient.from.mockReturnValue(selectChain);
+
+    const equipo: EquipoScope = { tier: "equipo", userId: "coord-1", username: "coord1", equipoUsernames: ["coord1", "vend1"], equipoUserIds: ["coord-1", "vend-1"] };
+    await obtenerResumenCobranzaScoped(equipo);
+
+    expect(selectChain.in).toHaveBeenCalledWith("vendedor_username", ["coord1", "vend1"]);
   });
 });
 

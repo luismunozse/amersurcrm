@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
-import { obtenerResumenCobranza } from "@/app/dashboard/cobranza/_actions-cobranza";
+import { obtenerResumenCobranzaScoped } from "@/app/dashboard/cobranza/_actions-cobranza";
 import { getAlertasSinGestionarCount } from "@/lib/dashboard/command-center.server";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
 import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
@@ -18,18 +18,21 @@ type ResumenCobranza = {
 /**
  * Command center block ④ — total mora + unmanaged collection alerts
  * (design.md §2, §4; spec.md "Every surfaced number reuses its module's
- * source of truth" — mora total must match the cobranza hub). Reuses
- * `obtenerResumenCobranza()` exactly as `_CobranzaList.tsx` does, including
- * the same `formatearMoneda(total, 'PEN')` currency assumption — the
- * underlying `v_cobranza` aggregate has no per-row `moneda` column, so the
- * cobranza hub itself already renders this total hardcoded to PEN.
+ * source of truth" — mora total must match the coordinador's own team
+ * scope, same as the alertasSinGestionar count rendered next to it).
+ * Uses `obtenerResumenCobranzaScoped()` (Task 4b — NOT the same function
+ * `_CobranzaList.tsx` uses, which is permission-gated rather than
+ * team-scoped), including the same `formatearMoneda(total, 'PEN')`
+ * currency assumption — the underlying `v_cobranza` aggregate has no
+ * per-row `moneda` column, so the cobranza hub itself already renders this
+ * total hardcoded to PEN.
  */
 export async function MoraAlertasBlock({ scope }: MoraAlertasBlockProps) {
   let resumen: ResumenCobranza;
   let alertasSinGestionar: number;
   try {
     const [resultResumen, resultAlertas] = await Promise.all([
-      obtenerResumenCobranza(),
+      obtenerResumenCobranzaScoped(scope),
       getAlertasSinGestionarCount(scope),
     ]);
     resumen = resultResumen.success

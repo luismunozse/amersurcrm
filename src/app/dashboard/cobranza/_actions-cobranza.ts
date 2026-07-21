@@ -7,6 +7,7 @@ import { requierePermiso, tienePermiso } from "@/lib/permissions/server";
 import { handleSupabaseError } from "@/lib/errors";
 import { obtenerUsernameActual } from "../clientes/_actions-crm-helpers";
 import { limaToday } from "@/lib/cobranza/tiers";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 export type MedioGestionCobranza = "llamada" | "whatsapp" | "email" | "visita" | "mensaje";
 export type ResultadoGestionCobranza =
@@ -71,6 +72,45 @@ export async function obtenerCobranza(filtros?: {
   }
 }
 
+type CobranzaResumenRow = {
+  estado_cobranza: string | null;
+  monto_programado: number;
+  monto_pagado: number;
+  monto_mora: number | null;
+};
+
+type ResumenCobranza = {
+  total_cuotas: number;
+  por_vencer: number;
+  vencidas: number;
+  en_mora: number;
+  monto_por_cobrar: number;
+  monto_mora_total: number;
+};
+
+function agregarResumenCobranza(rows: CobranzaResumenRow[]): ResumenCobranza {
+  const resumen: ResumenCobranza = {
+    total_cuotas: rows.length,
+    por_vencer: 0,
+    vencidas: 0,
+    en_mora: 0,
+    monto_por_cobrar: 0,
+    monto_mora_total: 0,
+  };
+
+  rows.forEach((item) => {
+    const saldo = item.monto_programado - item.monto_pagado;
+    resumen.monto_por_cobrar += saldo;
+    resumen.monto_mora_total += item.monto_mora || 0;
+
+    if (item.estado_cobranza === 'en_mora') resumen.en_mora++;
+    else if (item.estado_cobranza === 'vencida') resumen.vencidas++;
+    else if (item.estado_cobranza?.startsWith('por_vencer')) resumen.por_vencer++;
+  });
+
+  return resumen;
+}
+
 export async function obtenerResumenCobranza() {
   const supabase = await createServerActionClient();
 
@@ -91,26 +131,42 @@ export async function obtenerResumenCobranza() {
 
     if (error) throw error;
 
-    const resumen = {
-      total_cuotas: data?.length || 0,
-      por_vencer: 0,
-      vencidas: 0,
-      en_mora: 0,
-      monto_por_cobrar: 0,
-      monto_mora_total: 0,
-    };
+    return { success: true, data: agregarResumenCobranza(data || []) };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
-    (data || []).forEach((item) => {
-      const saldo = item.monto_programado - item.monto_pagado;
-      resumen.monto_por_cobrar += saldo;
-      resumen.monto_mora_total += item.monto_mora || 0;
+/**
+ * Scope-aware mora summary for MoraAlertasBlock (Task 4b — design.md §3).
+ * Unlike `obtenerResumenCobranza` (permission-gated: all-or-own-username),
+ * this filters by EquipoScope tier so a coordinador sees their TEAM's mora
+ * total, matching the alertasSinGestionar count rendered next to it.
+ * `CommandCenter.tsx` only ever renders MoraAlertasBlock for tier "global"
+ * or "equipo" — "propio"/"anonimo" return a zeroed default here purely as
+ * defense-in-depth, same convention as every command-center fetcher.
+ */
+export async function obtenerResumenCobranzaScoped(scope: EquipoScope) {
+  if (scope.tier !== 'global' && scope.tier !== 'equipo') {
+    return { success: true, data: agregarResumenCobranza([]) };
+  }
 
-      if (item.estado_cobranza === 'en_mora') resumen.en_mora++;
-      else if (item.estado_cobranza === 'vencida') resumen.vencidas++;
-      else if (item.estado_cobranza?.startsWith('por_vencer')) resumen.por_vencer++;
-    });
+  const supabase = await createServerActionClient();
 
-    return { success: true, data: resumen };
+  try {
+    let query = supabase
+      .from('v_cobranza')
+      .select('estado_cobranza, monto_programado, monto_pagado, monto_mora, dias_atraso');
+
+    if (scope.tier === 'equipo') {
+      query = query.in('vendedor_username', scope.equipoUsernames);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    return { success: true, data: agregarResumenCobranza(data || []) };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
