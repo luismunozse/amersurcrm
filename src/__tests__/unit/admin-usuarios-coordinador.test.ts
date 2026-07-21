@@ -38,7 +38,16 @@ const { mockGetUser, mockServerOnlyClient, mockServiceRoleClient, createChainMoc
   };
   const mockServiceRoleClient: any = {
     auth: { admin: { createUser: vi.fn(), updateUserById: vi.fn(), listUsers: vi.fn() } },
-    schema: vi.fn(() => ({ from: vi.fn((table: string) => serviceRoleChains[table] ?? createChainMock()) })),
+    // Falls back to the RLS client's chains dict when a test hasn't
+    // explicitly populated a dedicated service-role chain for this table —
+    // this lets the currentUser fetch (now on the service-role client) keep
+    // consuming the SAME .single() sequence most tests already configure on
+    // `chains.usuario_perfil`, without needing every test in this file
+    // updated. Tests that specifically assert "which client" ran the UPDATE
+    // populate `serviceRoleChains.usuario_perfil` explicitly, which then
+    // takes precedence over this fallback for ALL usuario_perfil calls in
+    // that test (both the read and the write).
+    schema: vi.fn(() => ({ from: vi.fn((table: string) => serviceRoleChains[table] ?? chains[table] ?? createChainMock()) })),
   };
 
   (mockServerOnlyClient as any).__chains = chains;
@@ -157,9 +166,16 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
     const chains = (mockServerOnlyClient as any).__chains;
     const svChains = (mockServiceRoleClient as any).__chains;
     svChains.usuario_perfil = createChainMock({ data: null, error: null }); // service-role update
+    // Populating svChains.usuario_perfil makes it take precedence over the
+    // chains[table] fallback for ALL usuario_perfil calls in this test — so
+    // the currentUser fetch (now on the service-role client) needs its OWN
+    // .single() configured here too, not on the RLS chains dict.
+    svChains.usuario_perfil.single = vi.fn().mockResolvedValue({
+      data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: null, meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } },
+      error: null,
+    }); // currentUser fetch — now via service-role client
     chains.usuario_perfil.single = vi.fn()
-      .mockResolvedValueOnce({ data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: null, meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } }, error: null })
-      .mockResolvedValueOnce({ data: { id: "coord-1", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null })
+      .mockResolvedValueOnce({ data: { id: "coord-1", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null }) // coordinador lookup
       .mockResolvedValue({ data: { nombre_completo: "Admin Uno" }, error: null }); // admin profile lookup for audit trail
 
     const res = await PATCH(req({ id: "vend-1", coordinador_id: "coord-1" }));
@@ -205,11 +221,16 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
     const chains = (mockServerOnlyClient as any).__chains;
     const svChains = (mockServiceRoleClient as any).__chains;
     svChains.usuario_perfil = createChainMock({ data: null, error: null }); // service-role update
+    svChains.usuario_perfil.single = vi.fn().mockResolvedValue({
+      data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: "coord-old", meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } },
+      error: null,
+    }); // currentUser fetch — now via service-role client
     chains.rol = createChainMock({ data: { id: "rol-admin", nombre: "ROL_ADMIN" }, error: null });
     chains.historial_cambios_usuario = createChainMock({ error: null });
-    chains.usuario_perfil.single = vi.fn()
-      .mockResolvedValueOnce({ data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: "coord-old", meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } }, error: null })
-      .mockResolvedValue({ data: { nombre_completo: "Admin Uno" }, error: null }); // admin profile lookup for audit trail
+    // Body only sends rol_id (no coordinador_id), so validarCoordinadorId is
+    // never invoked — the only remaining RLS call here is the admin profile
+    // lookup for the audit trail.
+    chains.usuario_perfil.single = vi.fn().mockResolvedValue({ data: { nombre_completo: "Admin Uno" }, error: null }); // admin profile lookup for audit trail
 
     // Client only sends rol_id — no coordinador_id — yet the stale link must
     // not survive the promotion.
@@ -230,10 +251,21 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
 
   it("records the real previous coordinador_id (not null) in history when it changes", async () => {
     const chains = (mockServerOnlyClient as any).__chains;
+    const svChains = (mockServiceRoleClient as any).__chains;
     chains.historial_cambios_usuario = createChainMock({ error: null });
+    // Populating svChains.usuario_perfil makes it take precedence over the
+    // chains[table] fallback for ALL usuario_perfil calls in this test — so
+    // the currentUser fetch (now on the service-role client) needs its OWN
+    // .single() configured here, and coordinador validation + the audit
+    // lookup move to the FRONT of the RLS chain's sequence (currentUser is
+    // no longer the first call there).
+    svChains.usuario_perfil = createChainMock({ data: null, error: null }); // service-role update
+    svChains.usuario_perfil.single = vi.fn().mockResolvedValue({
+      data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: "coord-old", meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } },
+      error: null,
+    }); // currentUser fetch — now via service-role client
     chains.usuario_perfil.single = vi.fn()
-      .mockResolvedValueOnce({ data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: "coord-old", meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } }, error: null })
-      .mockResolvedValueOnce({ data: { id: "coord-new", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null })
+      .mockResolvedValueOnce({ data: { id: "coord-new", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null }) // coordinador lookup
       .mockResolvedValue({ data: { nombre_completo: "Admin Uno" }, error: null }); // admin profile lookup for audit trail
 
     const res = await PATCH(req({ id: "vend-1", coordinador_id: "coord-new" }));
@@ -244,8 +276,8 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
     // Proves the currentUser select actually requests coordinador_id — without
     // it, the route's oldVal lookup silently reads undefined regardless of
     // what this mock returns, and the assertion below would pass for the
-    // wrong reason.
-    expect(chains.usuario_perfil.select.mock.calls[0][0]).toContain("coordinador_id");
+    // wrong reason. The currentUser fetch now runs on the service-role client.
+    expect(svChains.usuario_perfil.select.mock.calls[0][0]).toContain("coordinador_id");
     expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ campo: "coordinador_id", valor_anterior: "coord-old", valor_nuevo: "coord-new" }),

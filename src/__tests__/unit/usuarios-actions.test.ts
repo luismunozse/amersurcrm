@@ -619,30 +619,45 @@ describe("resetearPasswordUsuario", () => {
     expect(result.error).toContain("no encontrado");
   });
 
-  it("retorna password temporal si todo sale bien", async () => {
+  it("actualiza requiere_cambio_password a través del cliente service-role, nunca del cliente RLS", async () => {
+    // Regression test for the production RLS bug: "admins_ven_todos_perfiles"
+    // was gated on a permission name ('gestionar_usuarios') deleted by the
+    // permissions-matrix rewrite (20250326000008_permissions_matrix.sql), so
+    // RLS silently matched 0 rows on this cross-user usuario_perfil UPDATE
+    // via the RLS-bound client — no error, but nothing persisted. The fix
+    // routes this write through the service-role client (already created in
+    // this function for the auth password reset) instead. Guarding the
+    // RLS-bound chain's update() to throw turns a silent false-green into a
+    // loud failure if the action ever regresses back to the RLS-bound client.
     mockServiceRoleClient.auth.admin.getUserById.mockResolvedValue({
       data: { user: { id: "user-1", email: "test@test.com" } },
       error: null,
     });
     mockServiceRoleClient.auth.admin.updateUserById.mockResolvedValue({ error: null });
 
-    // getAdminInfo reads profile (single), then resetear updates profile (update.eq)
+    // getAdminInfo's own-row lookup (select) uses this client too — only
+    // update() is guarded, since that is the call that must move.
     const adminChain = createChainMock({ data: { nombre_completo: "Admin Test" }, error: null });
-    const updateChain = createChainMock({ error: null });
-    updateChain.eq.mockReturnValue(Promise.resolve({ error: null }));
-
-    let callCount = 0;
-    const mockFrom = vi.fn().mockImplementation(() => {
-      callCount++;
-      return callCount === 1 ? adminChain : updateChain;
+    adminChain.update = vi.fn(() => {
+      throw new Error("RLS-bound client must not UPDATE crm.usuario_perfil — use the service-role client instead");
     });
-    mockServerActionClient.schema.mockReturnValue({ from: mockFrom });
+    mockServerActionClient.schema.mockReturnValue({ from: vi.fn().mockReturnValue(adminChain) });
+
+    const serviceRoleUpdateChain = createChainMock({ error: null });
+    const serviceRoleFrom = vi.fn().mockReturnValue(serviceRoleUpdateChain);
+    mockServiceRoleClient.schema.mockReturnValue({ from: serviceRoleFrom });
 
     const result = await resetearPasswordUsuario("user-1");
+
     expect(result.success).toBe(true);
     expect(result.passwordTemporal).toBeDefined();
     expect(typeof result.passwordTemporal).toBe("string");
     expect(result.passwordTemporal!.length).toBeGreaterThanOrEqual(12);
+    expect(serviceRoleFrom).toHaveBeenCalledWith("usuario_perfil");
+    expect(serviceRoleUpdateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ requiere_cambio_password: true })
+    );
+    expect(adminChain.update).not.toHaveBeenCalled();
   });
 
   it("registra auditoría al resetear password", async () => {
@@ -653,15 +668,10 @@ describe("resetearPasswordUsuario", () => {
     mockServiceRoleClient.auth.admin.updateUserById.mockResolvedValue({ error: null });
 
     const adminChain = createChainMock({ data: { nombre_completo: "Admin Test" }, error: null });
-    const updateChain = createChainMock({ error: null });
-    updateChain.eq.mockReturnValue(Promise.resolve({ error: null }));
-
-    let callCount = 0;
-    const mockFrom = vi.fn().mockImplementation(() => {
-      callCount++;
-      return callCount === 1 ? adminChain : updateChain;
+    mockServerActionClient.schema.mockReturnValue({ from: vi.fn().mockReturnValue(adminChain) });
+    mockServiceRoleClient.schema.mockReturnValue({
+      from: vi.fn().mockReturnValue(createChainMock({ error: null })),
     });
-    mockServerActionClient.schema.mockReturnValue({ from: mockFrom });
 
     await resetearPasswordUsuario("user-1");
 

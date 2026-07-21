@@ -193,7 +193,6 @@ export async function resetearPasswordUsuario(userId: string) {
   }
 
   const admin = await getAdminInfo();
-  const supabase = admin?.supabase || (await createServerActionClient());
   const serviceRole = createServiceRoleClient();
 
   try {
@@ -213,7 +212,13 @@ export async function resetearPasswordUsuario(userId: string) {
       throw new Error(`Error actualizando contraseña: ${authError.message}`);
     }
 
-    const { error: profileError } = await supabase
+    // The RLS-bound client cannot UPDATE another user's usuario_perfil row:
+    // admins_ven_todos_perfiles is gated on a permission name deleted by the
+    // permissions-matrix rewrite, so it silently matches 0 rows instead of
+    // persisting the change. Use the service-role client (already created
+    // above for the auth password reset) instead — this action is already
+    // esAdmin()-gated at the top.
+    const { error: profileError } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
       .update({

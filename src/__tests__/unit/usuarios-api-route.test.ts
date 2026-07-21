@@ -43,7 +43,13 @@ const {
         updateUserById: vi.fn(),
       },
     },
-    schema: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue(createChainMock()) }),
+    // Defaults to the SAME `from` mock as the RLS-bound client (mockSchemaFrom)
+    // so existing tests — which configure mockSchemaFrom and don't care which
+    // physical client the route uses — keep working unchanged now that
+    // several usuario_perfil reads/writes moved to the service-role client.
+    // Tests that specifically need to prove "which client" override this
+    // locally (e.g. via mockReturnValueOnce) with a distinguishable chain.
+    schema: vi.fn().mockReturnValue({ from: mockSchemaFrom }),
   };
 
   return { mockGetUser, mockSchemaFrom, mockSchema, mockSupabase, mockServiceRole, createChainMock };
@@ -411,6 +417,60 @@ describe("POST /api/admin/usuarios", () => {
     expect(res.status).toBe(400);
     expect(body.error).toContain("email");
   });
+
+  it("aplica el INSERT de usuario_perfil a través del cliente service-role, nunca del cliente RLS", async () => {
+    // Regression test: the new profile row's id is the freshly-created auth
+    // user's id, never the caller's (admin's) own id, so neither
+    // usuarios_ven_su_perfil (own-row) nor the stale admins_ven_todos_perfiles
+    // matches it under RLS — the INSERT silently fails via the RLS-bound
+    // client. The fix routes it through the service-role client instead
+    // (already created in this route for auth.admin.createUser). Guarding the
+    // RLS-bound chain's insert() to throw turns a silent false-green into a
+    // loud failure if the route ever regresses back to the RLS-bound client.
+    const rlsChain = createChainMock();
+    rlsChain.single = vi.fn()
+      .mockResolvedValueOnce({ data: { id: "rol-1", nombre: "ROL_VENDEDOR" }, error: null }) // rol lookup
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } }) // username uniqueness check
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } }) // email uniqueness check
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } }) // dni uniqueness check
+      .mockResolvedValue({ data: { nombre_completo: "Admin Uno" }, error: null }); // adminPerfil lookup for audit trail
+    rlsChain.insert = vi.fn(() => {
+      throw new Error("RLS-bound client must not INSERT crm.usuario_perfil — use the service-role client instead");
+    });
+    mockSchemaFrom.mockReturnValue(rlsChain);
+    mockSchema.mockReturnValue({ from: mockSchemaFrom });
+
+    (mockServiceRole.auth.admin.createUser as any).mockResolvedValue({
+      data: { user: { id: "new-user-1" } },
+      error: null,
+    });
+
+    const serviceRoleInsertChain = createChainMock();
+    const serviceRoleFrom = vi.fn().mockReturnValue(serviceRoleInsertChain);
+    mockServiceRole.schema.mockReturnValueOnce({ from: serviceRoleFrom });
+
+    const formData = new FormData();
+    formData.append("nombre_completo", "Test User");
+    formData.append("dni", "12345678");
+    formData.append("password", "password123");
+    formData.append("rol_id", "rol-1");
+    formData.append("email", "test@gmail.com");
+
+    const req = new NextRequest("http://localhost:3000/api/admin/usuarios", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(serviceRoleFrom).toHaveBeenCalledWith("usuario_perfil");
+    expect(serviceRoleInsertChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "new-user-1", dni: "12345678" })
+    );
+    expect(rlsChain.insert).not.toHaveBeenCalled();
+  });
 });
 
 describe("PATCH /api/admin/usuarios", () => {
@@ -565,18 +625,23 @@ describe("PATCH /api/admin/usuarios", () => {
     expect(body.error).toContain("email");
   });
 
-  it("aplica el UPDATE de usuario_perfil a través del cliente service-role, nunca del cliente RLS", async () => {
+  it("lee y actualiza usuario_perfil a través del cliente service-role, nunca del cliente RLS", async () => {
     // Regression test for the production RLS bug: "admins_ven_todos_perfiles"
     // was gated on a permission name ('gestionar_usuarios') deleted by the
     // permissions-matrix rewrite (20250326000008_permissions_matrix.sql), so
-    // RLS silently matched 0 rows on cross-user updates via the RLS-bound
-    // client — no error, but nothing persisted. The fix routes this specific
-    // UPDATE through the service-role client instead. Guarding the RLS-bound
-    // chain's `.update()` to throw turns a silent false-green into a loud
-    // failure if the route ever regresses back to the RLS-bound client.
-    const currentChain = createChainMock({
-      data: { username: "jperez", nombre_completo: "Juan", activo: true },
-      error: null,
+    // RLS silently matched 0 rows on cross-user reads/updates via the
+    // RLS-bound client — no error, but nothing found/persisted. The fix
+    // routes the currentUser fetch AND the UPDATE through the service-role
+    // client instead (so the route also works independently of whether the
+    // RLS migration has been applied yet). Guarding the RLS-bound chain's
+    // relevant calls to throw turns a silent false-green into a loud failure
+    // if the route ever regresses back to the RLS-bound client.
+    const currentChain = createChainMock({ data: [], error: null, count: 0 });
+    currentChain.select = vi.fn((fields: any) => {
+      if (typeof fields === "string" && fields.includes("dni, telefono, email, rol_id")) {
+        throw new Error("RLS-bound client must not SELECT another user's usuario_perfil row — use the service-role client instead");
+      }
+      return currentChain;
     });
     currentChain.update = vi.fn(() => {
       throw new Error("RLS-bound client must not UPDATE crm.usuario_perfil — use the service-role client instead");
@@ -584,9 +649,16 @@ describe("PATCH /api/admin/usuarios", () => {
     mockSchemaFrom.mockReturnValue(currentChain);
     mockSchema.mockReturnValue({ from: mockSchemaFrom });
 
+    const serviceRoleCurrentUserChain = createChainMock({
+      data: { username: "jperez", nombre_completo: "Juan", activo: true },
+      error: null,
+    });
     const serviceRoleUpdateChain = createChainMock({ data: null, error: null });
-    const serviceRoleFrom = vi.fn().mockReturnValue(serviceRoleUpdateChain);
-    mockServiceRole.schema.mockReturnValueOnce({ from: serviceRoleFrom });
+    const serviceRoleFromCurrentUser = vi.fn().mockReturnValue(serviceRoleCurrentUserChain);
+    const serviceRoleFromUpdate = vi.fn().mockReturnValue(serviceRoleUpdateChain);
+    mockServiceRole.schema
+      .mockReturnValueOnce({ from: serviceRoleFromCurrentUser })
+      .mockReturnValueOnce({ from: serviceRoleFromUpdate });
 
     const req = new NextRequest("http://localhost:3000/api/admin/usuarios", {
       method: "PATCH",
@@ -597,7 +669,9 @@ describe("PATCH /api/admin/usuarios", () => {
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(serviceRoleFrom).toHaveBeenCalledWith("usuario_perfil");
+    expect(serviceRoleFromCurrentUser).toHaveBeenCalledWith("usuario_perfil");
+    expect(serviceRoleCurrentUserChain.select).toHaveBeenCalled();
+    expect(serviceRoleFromUpdate).toHaveBeenCalledWith("usuario_perfil");
     expect(serviceRoleUpdateChain.update).toHaveBeenCalledWith(
       expect.objectContaining({ nombre_completo: "Nuevo Nombre" })
     );

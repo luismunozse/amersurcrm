@@ -481,8 +481,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "La comisión debe estar entre 0 y 100" }, { status: 400 });
     }
 
-    // Crear perfil de usuario
-    const { error: perfilError } = await supabase
+    // Crear perfil de usuario. The new row's id is the freshly-created auth
+    // user's id, never the caller's own id, so the RLS-bound client's
+    // usuarios_ven_su_perfil (own-row) policy never matches it, and
+    // admins_ven_todos_perfiles is stale (see PATCH above) — this INSERT
+    // must go through the service-role client (srv, already created above
+    // for auth.admin.createUser) instead of the RLS-bound one.
+    const { error: perfilError } = await srv
       .schema('crm')
       .from('usuario_perfil')
       .insert({
@@ -612,8 +617,21 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Falta id de usuario" }, { status: 400 });
     }
 
+    // Single service-role client for this request. RLS's admins_ven_todos_perfiles
+    // is gated on a permission name ('gestionar_usuarios') deleted by the
+    // permissions-matrix rewrite (20250326000008_permissions_matrix.sql), so it
+    // silently matches 0 rows for reads/writes on another user's usuario_perfil
+    // row — no error, just nothing found/persisted. This route is already
+    // esAdmin()-gated above, so bypass RLS via service role for every
+    // usuario_perfil read/write on the SUBJECT user below. This also makes the
+    // route work correctly regardless of whether
+    // supabase/migrations/20260721000000_fix_usuario_perfil_admin_policies.sql
+    // has been applied yet — the RLS fix there is defense in depth, not a
+    // deploy-order dependency.
+    const serviceRole = createServiceRoleClient();
+
     // Leer valores actuales para historial de cambios
-    const { data: currentUser, error: currentError } = await supabase
+    const { data: currentUser, error: currentError } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
       .select('username, nombre_completo, dni, telefono, email, rol_id, coordinador_id, meta_mensual_ventas, comision_porcentaje, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
@@ -658,7 +676,7 @@ export async function PATCH(request: NextRequest) {
         }, { status: 400 });
       }
 
-      const serviceRole = createServiceRoleClient();
+      // Reuse the service-role client created above.
       const { error: authError } = await serviceRole.auth.admin.updateUserById(
         id,
         { email: newEmail, email_confirm: true }
@@ -769,17 +787,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
     }
 
-    // The RLS-bound client cannot UPDATE another user's usuario_perfil row:
-    // "admins_ven_todos_perfiles" is gated on a permission name
-    // ('gestionar_usuarios') deleted by the permissions-matrix rewrite
-    // (20250326000008_permissions_matrix.sql), so it silently matches 0 rows
-    // (no error) instead of persisting the change. Use the service-role
-    // client to bypass RLS for this write — this route is already
-    // esAdmin()-gated above. See
-    // supabase/migrations/20260721000000_fix_usuario_perfil_admin_policies.sql
-    // for the matching RLS-side fix.
-    const serviceRoleForUpdate = createServiceRoleClient();
-    const { error: updError } = await serviceRoleForUpdate
+    // Reuse the service-role client created above (see comment there) to
+    // bypass RLS for this write.
+    const { error: updError } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
       .update(updatePayload)
@@ -836,8 +846,10 @@ export async function PATCH(request: NextRequest) {
         console.warn('[PATCH] Error registrando historial de cambios:', histErr);
       }
 
-      // Auditoría
-      const serviceRole = createServiceRoleClient();
+      // Auditoría — admin's OWN row, allowed under usuarios_ven_su_perfil
+      // (own-row RLS, unaffected by this hotfix), so this stays on the
+      // RLS-bound client. Reuses the service-role client created above for
+      // the audit call itself.
       const { data: adminPerfil } = await supabase
         .schema('crm')
         .from('usuario_perfil')
