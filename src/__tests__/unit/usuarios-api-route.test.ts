@@ -564,4 +564,43 @@ describe("PATCH /api/admin/usuarios", () => {
     expect(res.status).toBe(400);
     expect(body.error).toContain("email");
   });
+
+  it("aplica el UPDATE de usuario_perfil a través del cliente service-role, nunca del cliente RLS", async () => {
+    // Regression test for the production RLS bug: "admins_ven_todos_perfiles"
+    // was gated on a permission name ('gestionar_usuarios') deleted by the
+    // permissions-matrix rewrite (20250326000008_permissions_matrix.sql), so
+    // RLS silently matched 0 rows on cross-user updates via the RLS-bound
+    // client — no error, but nothing persisted. The fix routes this specific
+    // UPDATE through the service-role client instead. Guarding the RLS-bound
+    // chain's `.update()` to throw turns a silent false-green into a loud
+    // failure if the route ever regresses back to the RLS-bound client.
+    const currentChain = createChainMock({
+      data: { username: "jperez", nombre_completo: "Juan", activo: true },
+      error: null,
+    });
+    currentChain.update = vi.fn(() => {
+      throw new Error("RLS-bound client must not UPDATE crm.usuario_perfil — use the service-role client instead");
+    });
+    mockSchemaFrom.mockReturnValue(currentChain);
+    mockSchema.mockReturnValue({ from: mockSchemaFrom });
+
+    const serviceRoleUpdateChain = createChainMock({ data: null, error: null });
+    const serviceRoleFrom = vi.fn().mockReturnValue(serviceRoleUpdateChain);
+    mockServiceRole.schema.mockReturnValueOnce({ from: serviceRoleFrom });
+
+    const req = new NextRequest("http://localhost:3000/api/admin/usuarios", {
+      method: "PATCH",
+      body: JSON.stringify({ id: "user-1", nombre_completo: "Nuevo Nombre" }),
+    });
+    const res = await PATCH(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(serviceRoleFrom).toHaveBeenCalledWith("usuario_perfil");
+    expect(serviceRoleUpdateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ nombre_completo: "Nuevo Nombre" })
+    );
+    expect(currentChain.update).not.toHaveBeenCalled();
+  });
 });

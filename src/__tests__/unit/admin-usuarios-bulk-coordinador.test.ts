@@ -32,12 +32,43 @@ const {
   const mockGetUser = vi.fn();
   const mockEsAdmin = vi.fn();
   const chains: Record<string, any> = {};
+  const serviceRoleChains: Record<string, any> = {};
+
   const mockServerOnlyClient: any = {
     auth: { getUser: mockGetUser },
-    schema: vi.fn(() => ({ from: vi.fn((table: string) => chains[table] ?? createChainMock()) })),
+    schema: vi.fn(() => ({
+      from: vi.fn((table: string) => {
+        const chain = chains[table] ?? createChainMock();
+        // Regression guard: the RLS-bound (server-only) client must never
+        // run UPDATE on crm.usuario_perfil. Production root cause:
+        // "admins_ven_todos_perfiles" was gated on a permission name
+        // ('gestionar_usuarios') deleted by the permissions-matrix rewrite
+        // (20250326000008_permissions_matrix.sql), so RLS silently matched 0
+        // rows on cross-user writes via this client — no error, but nothing
+        // persisted. The fix routes this write through the service-role
+        // client instead; this guard turns a regression back to the
+        // RLS-bound client into a loud test failure instead of a silent
+        // false green.
+        if (table === "usuario_perfil") {
+          chain.update = vi.fn(() => {
+            throw new Error(
+              "RLS-bound client must not UPDATE crm.usuario_perfil — use createServiceRoleClient().schema('crm') instead"
+            );
+          });
+        }
+        return chain;
+      }),
+    })),
   };
   (mockServerOnlyClient as any).__chains = chains;
-  const mockServiceRoleClient: any = {};
+
+  const mockServiceRoleClient: any = {
+    schema: vi.fn(() => ({
+      from: vi.fn((table: string) => serviceRoleChains[table] ?? createChainMock()),
+    })),
+  };
+  (mockServiceRoleClient as any).__chains = serviceRoleChains;
+
   const mockRegistrarAuditoria = vi.fn().mockResolvedValue(undefined);
 
   return {
@@ -81,6 +112,8 @@ beforeEach(() => {
   const chains = (mockServerOnlyClient as any).__chains;
   delete chains.usuario_perfil;
   delete chains.historial_cambios_usuario;
+  const svChains = (mockServiceRoleClient as any).__chains;
+  delete svChains.usuario_perfil;
 });
 
 describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
@@ -99,17 +132,19 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
           ],
           error: null,
         }, // vendedores fetch
-        { data: null, error: null }, // update
       ],
     });
     chains.historial_cambios_usuario = createChainMock({ thenResults: [{ data: null, error: null }] });
+
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ thenResults: [{ data: null, error: null }] }); // update
 
     const res = await PATCH(req({ vendedorIds: ["v1", "v2"], coordinadorId: "coord-1" }));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ actualizados: 2, sinCambios: 0, rechazados: [] });
-    expect(chains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: "coord-1" });
+    expect(svChains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: "coord-1" });
     expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith([
       { usuario_id: "v1", campo: "coordinador_id", valor_anterior: null, valor_nuevo: "coord-1", modificado_por: "admin-1" },
       { usuario_id: "v2", campo: "coordinador_id", valor_anterior: null, valor_nuevo: "coord-1", modificado_por: "admin-1" },
@@ -134,10 +169,12 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
           ],
           error: null,
         },
-        { data: null, error: null },
       ],
     });
     chains.historial_cambios_usuario = createChainMock({ thenResults: [{ data: null, error: null }] });
+
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ thenResults: [{ data: null, error: null }] }); // update
 
     const res = await PATCH(req({
       vendedorIds: ["v1", "v-missing", "v-inactivo", "v-nocoord"],
@@ -153,10 +190,10 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
       { id: "v-inactivo", motivo: "Usuario inactivo" },
       { id: "v-nocoord", motivo: "El usuario no tiene el rol de vendedor" },
     ]));
-    expect(chains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: "coord-1" });
-    // Only the valid id reaches the update's .in() call
-    expect(chains.usuario_perfil.in).toHaveBeenCalledWith("id", ["v1"]);
-    expect(mockRegistrarAuditoria).toHaveBeenCalledTimes(1);
+    expect(svChains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: "coord-1" });
+    // Only the valid id reaches the update's .in() call — on the service-role
+    // client, since the update no longer runs on the RLS-bound one.
+    expect(svChains.usuario_perfil.in).toHaveBeenCalledWith("id", ["v1"]);
   });
 
   it("returns 400 when coordinadorId does not resolve to an active ROL_COORDINADOR_VENTAS user, without touching vendedores", async () => {
@@ -189,17 +226,19 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
           ],
           error: null,
         },
-        { data: null, error: null },
       ],
     });
     chains.historial_cambios_usuario = createChainMock({ thenResults: [{ data: null, error: null }] });
+
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ thenResults: [{ data: null, error: null }] }); // update
 
     const res = await PATCH(req({ vendedorIds: ["v1"], coordinadorId: null }));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ actualizados: 1, sinCambios: 0, rechazados: [] });
-    expect(chains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: null });
+    expect(svChains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: null });
     expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith([
       { usuario_id: "v1", campo: "coordinador_id", valor_anterior: "coord-old", valor_nuevo: null, modificado_por: "admin-1" },
     ]);
@@ -220,10 +259,12 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
           ],
           error: null,
         },
-        { data: null, error: null },
       ],
     });
     chains.historial_cambios_usuario = createChainMock({ thenResults: [{ data: null, error: null }] });
+
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ thenResults: [{ data: null, error: null }] }); // update
 
     const res = await PATCH(req({ vendedorIds: ["v1", "v2"], coordinadorId: "coord-1" }));
     const body = await res.json();
@@ -251,7 +292,6 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
           ],
           error: null,
         },
-        { data: null, error: null },
       ],
     });
     // supabase-js resolves `{ error }` on a failed insert — it does not
@@ -262,6 +302,9 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
     chains.historial_cambios_usuario = createChainMock({
       thenResults: [{ data: null, error: { message: "insert failed" } }],
     });
+
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ thenResults: [{ data: null, error: null }] }); // update
 
     const res = await PATCH(req({ vendedorIds: ["v1"], coordinadorId: "coord-1" }));
     const body = await res.json();

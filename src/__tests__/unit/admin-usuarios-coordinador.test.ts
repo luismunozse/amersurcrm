@@ -11,15 +11,38 @@ const { mockGetUser, mockServerOnlyClient, mockServiceRoleClient, createChainMoc
 
   const mockGetUser = vi.fn();
   const chains: Record<string, any> = {};
+  const serviceRoleChains: Record<string, any> = {};
   const mockServerOnlyClient: any = {
     auth: { getUser: mockGetUser },
-    schema: vi.fn(() => ({ from: vi.fn((table: string) => chains[table] ?? createChainMock()) })),
+    schema: vi.fn(() => ({
+      from: vi.fn((table: string) => {
+        const chain = chains[table] ?? createChainMock();
+        // Regression guard: the RLS-bound client must never UPDATE
+        // crm.usuario_perfil. Production root cause: "admins_ven_todos_perfiles"
+        // was gated on a permission name ('gestionar_usuarios') deleted by the
+        // permissions-matrix rewrite (20250326000008_permissions_matrix.sql),
+        // so RLS silently matched 0 rows on cross-user writes via this client —
+        // no error, but nothing persisted. The fix routes this write through
+        // the service-role client instead; throwing here turns a regression
+        // back to the RLS-bound client into a loud test failure.
+        if (table === "usuario_perfil") {
+          chain.update = vi.fn(() => {
+            throw new Error(
+              "RLS-bound client must not UPDATE crm.usuario_perfil — use createServiceRoleClient().schema('crm') instead"
+            );
+          });
+        }
+        return chain;
+      }),
+    })),
   };
   const mockServiceRoleClient: any = {
     auth: { admin: { createUser: vi.fn(), updateUserById: vi.fn(), listUsers: vi.fn() } },
+    schema: vi.fn(() => ({ from: vi.fn((table: string) => serviceRoleChains[table] ?? createChainMock()) })),
   };
 
   (mockServerOnlyClient as any).__chains = chains;
+  (mockServiceRoleClient as any).__chains = serviceRoleChains;
 
   return { mockGetUser, mockServerOnlyClient, mockServiceRoleClient, createChainMock };
 });
@@ -63,6 +86,8 @@ beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
   mockGetUser.mockResolvedValue({ data: { user: { id: "admin-1" } }, error: null });
   const chains = (mockServerOnlyClient as any).__chains;
+  const svChains = (mockServiceRoleClient as any).__chains;
+  delete svChains.usuario_perfil;
   chains.usuario_perfil = createChainMock({
     data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: null, meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } },
     error: null,
@@ -130,6 +155,8 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
 
   it("accepts a valid active ROL_COORDINADOR_VENTAS, persists coordinador_id and calls update with it", async () => {
     const chains = (mockServerOnlyClient as any).__chains;
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ data: null, error: null }); // service-role update
     chains.usuario_perfil.single = vi.fn()
       .mockResolvedValueOnce({ data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: null, meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } }, error: null })
       .mockResolvedValueOnce({ data: { id: "coord-1", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null })
@@ -141,8 +168,10 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
     // Regression guard: previously this only asserted status/success without
-    // proving the value actually reached the DB update call.
-    expect(chains.usuario_perfil.update).toHaveBeenCalledWith(
+    // proving the value actually reached the DB update call. The update must
+    // run on the service-role client (RLS's admins_ven_todos_perfiles is
+    // stale — see supabase.server mock guard above).
+    expect(svChains.usuario_perfil.update).toHaveBeenCalledWith(
       expect.objectContaining({ coordinador_id: "coord-1" })
     );
   });
@@ -174,6 +203,8 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
 
   it("auto-clears coordinador_id to null when a PATCH promotes a vendedor away from ROL_VENDEDOR, and records it in history", async () => {
     const chains = (mockServerOnlyClient as any).__chains;
+    const svChains = (mockServiceRoleClient as any).__chains;
+    svChains.usuario_perfil = createChainMock({ data: null, error: null }); // service-role update
     chains.rol = createChainMock({ data: { id: "rol-admin", nombre: "ROL_ADMIN" }, error: null });
     chains.historial_cambios_usuario = createChainMock({ error: null });
     chains.usuario_perfil.single = vi.fn()
@@ -187,7 +218,7 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(chains.usuario_perfil.update).toHaveBeenCalledWith(
+    expect(svChains.usuario_perfil.update).toHaveBeenCalledWith(
       expect.objectContaining({ rol_id: "rol-admin", coordinador_id: null })
     );
     expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith(

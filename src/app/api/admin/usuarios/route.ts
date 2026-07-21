@@ -769,7 +769,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
     }
 
-    const { error: updError } = await supabase
+    // The RLS-bound client cannot UPDATE another user's usuario_perfil row:
+    // "admins_ven_todos_perfiles" is gated on a permission name
+    // ('gestionar_usuarios') deleted by the permissions-matrix rewrite
+    // (20250326000008_permissions_matrix.sql), so it silently matches 0 rows
+    // (no error) instead of persisting the change. Use the service-role
+    // client to bypass RLS for this write — this route is already
+    // esAdmin()-gated above. See
+    // supabase/migrations/20260721000000_fix_usuario_perfil_admin_policies.sql
+    // for the matching RLS-side fix.
+    const serviceRoleForUpdate = createServiceRoleClient();
+    const { error: updError } = await serviceRoleForUpdate
       .schema('crm')
       .from('usuario_perfil')
       .update(updatePayload)
