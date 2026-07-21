@@ -33,6 +33,7 @@ import ImportarUsuariosModal from "@/components/ImportarUsuariosModal";
 import ExportButton from "@/components/export/ExportButton";
 import BulkCoordinadorModal from "@/components/BulkCoordinadorModal";
 import SelectedVendedoresBar from "@/components/SelectedVendedoresBar";
+import EquipoDecisionModal from "@/components/EquipoDecisionModal";
 import { usePermissions } from "@/lib/permissions";
 import {
   cambiarEstadoUsuario,
@@ -41,6 +42,7 @@ import {
   restaurarUsuario,
   reasignarClientes,
   contarClientesAsignados,
+  type EquipoDecision,
 } from "./_actions";
 
 interface Usuario {
@@ -145,6 +147,14 @@ function GestionUsuarios() {
   const [historialOpen, setHistorialOpen] = useState(false);
   const [historialUser, setHistorialUser] = useState<Usuario | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
+
+  // Mandatory equipo-decision step (coordinador being deactivated/deleted
+  // still has an active team). No skip path — the pending action is only
+  // resumed once the admin makes a decision.
+  const [equipoDecisionOpen, setEquipoDecisionOpen] = useState(false);
+  const [equipoDecisionCoordinador, setEquipoDecisionCoordinador] = useState<Usuario | null>(null);
+  const [equipoDecisionEquipoSize, setEquipoDecisionEquipoSize] = useState(0);
+  const [equipoDecisionAction, setEquipoDecisionAction] = useState<((decision: EquipoDecision) => Promise<void>) | null>(null);
 
   // Debounce search
   const searchTimerRef = useRef<NodeJS.Timeout>(undefined);
@@ -270,28 +280,40 @@ function GestionUsuarios() {
     setEstadoModalOpen(true);
   };
 
+  const ejecutarCambioEstado = async (usuario: Usuario, motivo: string, equipoDecision?: EquipoDecision) => {
+    const result = await cambiarEstadoUsuario(usuario.id, !usuario.activo, motivo, equipoDecision);
+
+    if (result.success) {
+      toast.success(result.message || "Estado cambiado correctamente");
+      await cargarUsuarios();
+      setEstadoModalOpen(false);
+      setUserCambiandoEstado(null);
+      return;
+    }
+
+    if (result.needsEquipoDecision) {
+      setEquipoDecisionCoordinador(usuario);
+      setEquipoDecisionEquipoSize(result.equipoSize || 0);
+      setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarCambioEstado(usuario, motivo, decision));
+      setEquipoDecisionOpen(true);
+      setEstadoModalOpen(false);
+      return;
+    }
+
+    toast.error(result.error || "Error cambiando estado");
+  };
+
   const handleCambiarEstado = async (motivo: string) => {
     if (!userCambiandoEstado) return;
+    const usuario = userCambiandoEstado;
 
-    // Si se va a desactivar, verificar clientes asignados
-    if (userCambiandoEstado.activo) {
-      const count = await contarClientesAsignados(userCambiandoEstado.id);
+    // Si se va a desactivar, verificar clientes asignados (unchanged gate)
+    if (usuario.activo) {
+      const count = await contarClientesAsignados(usuario.id);
       if (count > 0) {
-        setReasignarUser(userCambiandoEstado);
+        setReasignarUser(usuario);
         setReasignarClientesCount(count);
-        setReasignarCallback(() => async () => {
-          const result = await cambiarEstadoUsuario(
-            userCambiandoEstado.id,
-            false,
-            motivo
-          );
-          if (result.success) {
-            toast.success(result.message || "Estado cambiado correctamente");
-            await cargarUsuarios();
-          } else {
-            toast.error(result.error || "Error cambiando estado");
-          }
-        });
+        setReasignarCallback(() => () => ejecutarCambioEstado(usuario, motivo));
         setReasignarModalOpen(true);
         setEstadoModalOpen(false);
         setUserCambiandoEstado(null);
@@ -299,20 +321,7 @@ function GestionUsuarios() {
       }
     }
 
-    const result = await cambiarEstadoUsuario(
-      userCambiandoEstado.id,
-      !userCambiandoEstado.activo,
-      motivo
-    );
-
-    if (result.success) {
-      toast.success(result.message || "Estado cambiado correctamente");
-      await cargarUsuarios();
-      setEstadoModalOpen(false);
-      setUserCambiandoEstado(null);
-    } else {
-      toast.error(result.error || "Error cambiando estado");
-    }
+    await ejecutarCambioEstado(usuario, motivo);
   };
 
   const handleResetPassword = async (u: Usuario) => {
@@ -350,8 +359,11 @@ function GestionUsuarios() {
     setDeleteModalOpen(true);
   };
 
-  const confirmDeleteUser = async (userId: string) => {
-    const result = await eliminarUsuario(userId);
+  const ejecutarEliminarUsuario = async (
+    userId: string,
+    equipoDecision?: EquipoDecision
+  ): Promise<{ success: boolean; error?: string }> => {
+    const result = await eliminarUsuario(userId, undefined, equipoDecision);
 
     if (result.success) {
       toast.success(result.message || "Usuario eliminado exitosamente");
@@ -359,11 +371,23 @@ function GestionUsuarios() {
       setDeleteModalOpen(false);
       setUserToDelete(null);
       return { success: true };
-    } else {
-      toast.error(result.error || "Error eliminando usuario");
+    }
+
+    if (result.needsEquipoDecision) {
+      const usuario = usuarios.find((u) => u.id === userId) ?? userToDelete;
+      setEquipoDecisionCoordinador(usuario ?? null);
+      setEquipoDecisionEquipoSize(result.equipoSize || 0);
+      setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarEliminarUsuario(userId, decision).then(() => {}));
+      setEquipoDecisionOpen(true);
+      setDeleteModalOpen(false);
       return { success: false, error: result.error };
     }
+
+    toast.error(result.error || "Error eliminando usuario");
+    return { success: false, error: result.error };
   };
+
+  const confirmDeleteUser = ejecutarEliminarUsuario;
 
   const handleRestaurar = async (u: Usuario) => {
     const result = await restaurarUsuario(u.id);
@@ -394,6 +418,14 @@ function GestionUsuarios() {
     reasignarCallback?.();
     setReasignarUser(null);
     setReasignarCallback(null);
+  };
+
+  const handleEquipoDecisionConfirm = async (decision: EquipoDecision) => {
+    if (!equipoDecisionAction) return;
+    await equipoDecisionAction(decision);
+    setEquipoDecisionOpen(false);
+    setEquipoDecisionCoordinador(null);
+    setEquipoDecisionAction(null);
   };
 
   // Vendedores activos para reasignación
@@ -993,6 +1025,15 @@ function GestionUsuarios() {
         userId={historialUser?.id || ""}
         userName={historialUser?.nombre_completo || ""}
         onClose={() => { setHistorialOpen(false); setHistorialUser(null); }}
+      />
+
+      <EquipoDecisionModal
+        open={equipoDecisionOpen}
+        coordinadorNombre={equipoDecisionCoordinador?.nombre_completo || equipoDecisionCoordinador?.email || ""}
+        equipoSize={equipoDecisionEquipoSize}
+        coordinadoresDisponibles={coordinadores.filter((c) => c.id !== equipoDecisionCoordinador?.id)}
+        onConfirm={handleEquipoDecisionConfirm}
+        onClose={() => { setEquipoDecisionOpen(false); setEquipoDecisionCoordinador(null); setEquipoDecisionAction(null); }}
       />
 
       <ImportarUsuariosModal
