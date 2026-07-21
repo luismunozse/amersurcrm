@@ -124,10 +124,17 @@ export async function PATCH(request: NextRequest) {
         modificado_por: user.id,
       }));
 
-      try {
-        await supabase.schema("crm").from("historial_cambios_usuario").insert(historialRows);
-      } catch (histErr) {
-        console.warn("[bulk-coordinador] Error registrando historial de cambios:", histErr);
+      // supabase-js resolves `{ error }` on a failed insert — it never
+      // throws — so a bare try/catch here can never observe an insert
+      // failure. Destructure the error explicitly instead (same pattern as
+      // resolverEquipoDelCoordinador in _actions.ts). Historial is
+      // best-effort: it does not block the response either way.
+      const { error: historialError } = await supabase
+        .schema("crm")
+        .from("historial_cambios_usuario")
+        .insert(historialRows);
+      if (historialError) {
+        console.warn("[bulk-coordinador] Error registrando historial de cambios:", historialError);
       }
 
       const serviceRole = createServiceRoleClient();

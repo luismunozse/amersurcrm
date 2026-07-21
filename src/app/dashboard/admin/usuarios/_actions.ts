@@ -285,6 +285,13 @@ export async function cambiarEstadoUsuario(
     if (!activo) {
       const rolRaw = (usuarioExistente as any).rol;
       const rolNombre = Array.isArray(rolRaw) ? rolRaw[0]?.nombre ?? null : rolRaw?.nombre ?? null;
+      // Not transactional: the team-move UPDATE (inside
+      // resolverEquipoDelCoordinador) and the usuario_perfil UPDATE below run
+      // as two separate statements. If the process dies after the team move
+      // but before this deactivation persists, a retry is still safe — the
+      // team is already empty, so resolverEquipoDelCoordinador short-circuits
+      // to `{ ok: true, moved: 0 }` and the deactivation UPDATE simply runs
+      // again.
       const equipoOutcome = await resolverEquipoDelCoordinador(serviceRole, userId, rolNombre, equipoDecision, admin);
       if (!equipoOutcome.ok) {
         if (equipoOutcome.needsDecision) {
@@ -468,6 +475,12 @@ export async function eliminarUsuario(userId: string, motivo?: string, equipoDec
 
     const rolRaw = (usuarioExistente as any).rol;
     const rolNombre = Array.isArray(rolRaw) ? rolRaw[0]?.nombre ?? null : rolRaw?.nombre ?? null;
+    // Not transactional: the team-move UPDATE (inside
+    // resolverEquipoDelCoordinador) and the soft-delete UPDATE below run as
+    // two separate statements. If the process dies after the team move but
+    // before the soft delete persists, a retry is still safe — the team is
+    // already empty, so resolverEquipoDelCoordinador short-circuits to
+    // `{ ok: true, moved: 0 }` and the soft-delete UPDATE simply runs again.
     const equipoOutcome = await resolverEquipoDelCoordinador(serviceRole, userId, rolNombre, equipoDecision, admin);
     if (!equipoOutcome.ok) {
       if (equipoOutcome.needsDecision) {

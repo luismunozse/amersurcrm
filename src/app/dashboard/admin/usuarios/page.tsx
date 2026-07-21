@@ -384,7 +384,14 @@ function GestionUsuarios() {
 
     if (result.success) {
       toast.success(result.message || "Usuario eliminado exitosamente");
-      setUsuarios((prev) => prev.filter((u) => u.id !== userId));
+      // Refetch instead of only filtering the deleted user out of local
+      // state: a delete on a coordinador with a team resolves the
+      // transfer/dejar-sin-coordinador equipo decision server-side first
+      // (resolverEquipoDelCoordinador in _actions.ts), which can change
+      // OTHER rows' coordinador_id — a local filter alone would leave the
+      // team members' "Coordinador" column stale. Parity with
+      // ejecutarCambioEstado above.
+      await cargarUsuarios();
       setDeleteModalOpen(false);
       setUserToDelete(null);
       return "completed";

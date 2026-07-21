@@ -237,6 +237,43 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
     ]);
   });
 
+  it("logs a warning when the historial insert errors, without failing the request (historial is best-effort)", async () => {
+    const chains = (mockServerOnlyClient as any).__chains;
+    chains.usuario_perfil = createChainMock({
+      singleResults: [
+        { data: { id: "coord-1", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null },
+        { data: { nombre_completo: "Admin Uno" }, error: null },
+      ],
+      thenResults: [
+        {
+          data: [
+            { id: "v1", nombre_completo: "Vendedor Uno", coordinador_id: null, activo: true, deleted_at: null, rol: { nombre: "ROL_VENDEDOR" } },
+          ],
+          error: null,
+        },
+        { data: null, error: null },
+      ],
+    });
+    // supabase-js resolves `{ error }` on a failed insert — it does not
+    // throw — so a bare try/catch around `await ...insert(...)` can never
+    // observe this error. The route must destructure `{ error }` explicitly
+    // (same pattern as resolverEquipoDelCoordinador in _actions.ts) to
+    // actually surface it via console.warn.
+    chains.historial_cambios_usuario = createChainMock({
+      thenResults: [{ data: null, error: { message: "insert failed" } }],
+    });
+
+    const res = await PATCH(req({ vendedorIds: ["v1"], coordinadorId: "coord-1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ actualizados: 1, sinCambios: 0, rechazados: [] });
+    expect(console.warn).toHaveBeenCalledWith(
+      "[bulk-coordinador] Error registrando historial de cambios:",
+      { message: "insert failed" },
+    );
+  });
+
   it("rejects a non-admin request with 403 before running any query", async () => {
     mockEsAdmin.mockResolvedValue(false);
 
