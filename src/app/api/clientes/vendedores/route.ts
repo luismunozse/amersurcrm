@@ -18,8 +18,8 @@ export async function GET() {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
-    // Un coordinador solo debe ver a su propio equipo en este dropdown —
-    // nunca a otros coordinadores ni a vendedores de otro equipo.
+    // A coordinador should only see their own team in this dropdown —
+    // never other coordinadores or vendedores from another team.
     const esSoloCoordinador = await esCoordinador();
 
     const serviceSupabase = createServiceRoleClient();
@@ -40,7 +40,11 @@ export async function GET() {
       .eq("activo", true);
 
     if (esSoloCoordinador) {
-      query = query.eq("coordinador_id", user.id);
+      // Contract is "team members + self": the coordinador's own row has
+      // coordinador_id = null (or points at someone else), so a bare
+      // .eq("coordinador_id", user.id) would never match it. Include the
+      // caller's own row explicitly via .or().
+      query = query.or(`coordinador_id.eq.${user.id},id.eq.${user.id}`);
     }
 
     const { data, error } = await query;
@@ -64,10 +68,12 @@ export async function GET() {
           const rolNombre = Array.isArray(row?.rol)
             ? row.rol[0]?.nombre
             : row?.rol?.nombre;
-          // El filtro por coordinador_id ya acota el equipo a vendedores;
-          // un coordinador nunca debe ver a otro coordinador en su lista.
+          // The coordinador_id/id OR-filter already scopes the DB query to
+          // this coordinador's team + self; this post-filter is a defensive
+          // second layer: accept the caller's own row regardless of its
+          // role, and otherwise only vendedores — never another coordinador.
           if (esSoloCoordinador) {
-            return rolNombre === "ROL_VENDEDOR";
+            return row?.id === user.id || rolNombre === "ROL_VENDEDOR";
           }
           return ROLES_VENDEDORES.includes(String(rolNombre || ""));
         })
