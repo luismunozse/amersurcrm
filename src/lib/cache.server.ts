@@ -98,6 +98,16 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
   // an anonimo caller must never fall through to an unfiltered query, so it
   // is short-circuited here before any query is built.
   if (scope.tier === 'anonimo') return { data: [], total: 0 };
+
+  // App-layer team-bypass fix: a coordinador (equipo tier) filtering by a
+  // specific `vendedor` must only be able to pick someone on their own team
+  // — silently dropping an out-of-team vendedor and falling back to "whole
+  // team" would leak team members' data via an arbitrary vendedor param.
+  // RLS still bounds the actual rows, but this closes the app-layer gap.
+  if (scope.tier === 'equipo' && vendedor && vendedor.trim() !== '' && !scope.equipoUsernames.includes(vendedor)) {
+    return { data: [], total: 0 };
+  }
+
   const username = scope.tier === 'global' ? null : scope.username;
 
   // La vista optimizada `cliente_accesible` solo etiqueta filas por un ÚNICO
@@ -395,6 +405,13 @@ export const getCachedPipelineClientes = cache(
 
     const scope = await getEquipoScope();
     if (scope.tier === 'anonimo') return { clientes: [], totalesPorEstado: {} };
+
+    // App-layer team-bypass fix (same as getCachedClientes): a coordinador
+    // filtering by a specific `vendedor` must only be able to pick someone
+    // on their own team.
+    if (scope.tier === 'equipo' && vendedor && vendedor.trim() !== '' && !scope.equipoUsernames.includes(vendedor)) {
+      return { clientes: [], totalesPorEstado: {} };
+    }
 
     const ESTADOS_PIPELINE = [
       'por_contactar',
