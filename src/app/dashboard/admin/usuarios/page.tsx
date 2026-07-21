@@ -77,6 +77,15 @@ interface Rol {
   descripcion: string;
 }
 
+/**
+ * Discriminated result of the deactivate/delete executors below.
+ * "needs-decision" means the executor itself already opened
+ * EquipoDecisionModal with fresh state — callers must NOT clear
+ * equipo-decision state in that case, or they'd stomp it shut right after
+ * it reopens (see handleEquipoDecisionConfirm).
+ */
+type EquipoActionOutcome = "completed" | "needs-decision" | "error";
+
 function timeAgo(dateStr: string | null | undefined): { text: string; color: string } {
   if (!dateStr) return { text: "Nunca", color: "text-gray-400" };
   const now = new Date();
@@ -154,7 +163,7 @@ function GestionUsuarios() {
   const [equipoDecisionOpen, setEquipoDecisionOpen] = useState(false);
   const [equipoDecisionCoordinador, setEquipoDecisionCoordinador] = useState<Usuario | null>(null);
   const [equipoDecisionEquipoSize, setEquipoDecisionEquipoSize] = useState(0);
-  const [equipoDecisionAction, setEquipoDecisionAction] = useState<((decision: EquipoDecision) => Promise<void>) | null>(null);
+  const [equipoDecisionAction, setEquipoDecisionAction] = useState<((decision: EquipoDecision) => Promise<EquipoActionOutcome>) | null>(null);
 
   // Debounce search
   const searchTimerRef = useRef<NodeJS.Timeout>(undefined);
@@ -280,7 +289,11 @@ function GestionUsuarios() {
     setEstadoModalOpen(true);
   };
 
-  const ejecutarCambioEstado = async (usuario: Usuario, motivo: string, equipoDecision?: EquipoDecision) => {
+  const ejecutarCambioEstado = async (
+    usuario: Usuario,
+    motivo: string,
+    equipoDecision?: EquipoDecision
+  ): Promise<EquipoActionOutcome> => {
     const result = await cambiarEstadoUsuario(usuario.id, !usuario.activo, motivo, equipoDecision);
 
     if (result.success) {
@@ -288,7 +301,7 @@ function GestionUsuarios() {
       await cargarUsuarios();
       setEstadoModalOpen(false);
       setUserCambiandoEstado(null);
-      return;
+      return "completed";
     }
 
     if (result.needsEquipoDecision) {
@@ -297,10 +310,11 @@ function GestionUsuarios() {
       setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarCambioEstado(usuario, motivo, decision));
       setEquipoDecisionOpen(true);
       setEstadoModalOpen(false);
-      return;
+      return "needs-decision";
     }
 
     toast.error(result.error || "Error cambiando estado");
+    return "error";
   };
 
   const handleCambiarEstado = async (motivo: string) => {
@@ -362,7 +376,7 @@ function GestionUsuarios() {
   const ejecutarEliminarUsuario = async (
     userId: string,
     equipoDecision?: EquipoDecision
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<EquipoActionOutcome> => {
     const result = await eliminarUsuario(userId, undefined, equipoDecision);
 
     if (result.success) {
@@ -370,24 +384,31 @@ function GestionUsuarios() {
       setUsuarios((prev) => prev.filter((u) => u.id !== userId));
       setDeleteModalOpen(false);
       setUserToDelete(null);
-      return { success: true };
+      return "completed";
     }
 
     if (result.needsEquipoDecision) {
       const usuario = usuarios.find((u) => u.id === userId) ?? userToDelete;
       setEquipoDecisionCoordinador(usuario ?? null);
       setEquipoDecisionEquipoSize(result.equipoSize || 0);
-      setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarEliminarUsuario(userId, decision).then(() => {}));
+      setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarEliminarUsuario(userId, decision));
       setEquipoDecisionOpen(true);
       setDeleteModalOpen(false);
-      return { success: false, error: result.error };
+      return "needs-decision";
     }
 
     toast.error(result.error || "Error eliminando usuario");
-    return { success: false, error: result.error };
+    return "error";
   };
 
-  const confirmDeleteUser = ejecutarEliminarUsuario;
+  // Adapts the discriminated executor outcome to DeleteUserModal's
+  // { success, error } contract — the modal only cares whether it should
+  // close itself, which the executor already drives directly via
+  // setDeleteModalOpen for every outcome.
+  const confirmDeleteUser = async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    const outcome = await ejecutarEliminarUsuario(userId);
+    return { success: outcome === "completed" };
+  };
 
   const handleRestaurar = async (u: Usuario) => {
     const result = await restaurarUsuario(u.id);
@@ -422,9 +443,21 @@ function GestionUsuarios() {
 
   const handleEquipoDecisionConfirm = async (decision: EquipoDecision) => {
     if (!equipoDecisionAction) return;
-    await equipoDecisionAction(decision);
+    const outcome = await equipoDecisionAction(decision);
+
+    // The retried action re-triggered needsEquipoDecision — the executor
+    // already reopened the modal with fresh coordinador/equipoSize/action
+    // state, so clearing here would stomp it shut with no feedback. Surface
+    // a toast instead so the admin knows the previous choice did not go
+    // through and must pick again.
+    if (outcome === "needs-decision") {
+      toast.error("No se pudo completar la acción. Por favor, seleccione nuevamente.");
+      return;
+    }
+
     setEquipoDecisionOpen(false);
     setEquipoDecisionCoordinador(null);
+    setEquipoDecisionEquipoSize(0);
     setEquipoDecisionAction(null);
   };
 
@@ -1033,7 +1066,12 @@ function GestionUsuarios() {
         equipoSize={equipoDecisionEquipoSize}
         coordinadoresDisponibles={coordinadores.filter((c) => c.id !== equipoDecisionCoordinador?.id)}
         onConfirm={handleEquipoDecisionConfirm}
-        onClose={() => { setEquipoDecisionOpen(false); setEquipoDecisionCoordinador(null); setEquipoDecisionAction(null); }}
+        onClose={() => {
+          setEquipoDecisionOpen(false);
+          setEquipoDecisionCoordinador(null);
+          setEquipoDecisionEquipoSize(0);
+          setEquipoDecisionAction(null);
+        }}
       />
 
       <ImportarUsuariosModal
