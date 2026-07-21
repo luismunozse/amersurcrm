@@ -32,6 +32,7 @@ import HistorialCambiosUsuario from "@/components/HistorialCambiosUsuario";
 import ImportarUsuariosModal from "@/components/ImportarUsuariosModal";
 import ExportButton from "@/components/export/ExportButton";
 import BulkCoordinadorModal from "@/components/BulkCoordinadorModal";
+import SelectedVendedoresBar from "@/components/SelectedVendedoresBar";
 import { usePermissions } from "@/lib/permissions";
 import {
   cambiarEstadoUsuario,
@@ -117,8 +118,13 @@ function GestionUsuarios() {
   const { tieneRol } = usePermissions();
   const puedeAsignarCoordinador = tieneRol("ROL_ADMIN");
 
-  // Bulk coordinador assignment state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Bulk coordinador assignment state. Map<id, nombre_completo> instead of
+  // Set<id> so chips can still render the name of a vendedor selected on a
+  // previous page/search even after that row leaves the current result set.
+  // Survives search/page/filter changes across cargarUsuarios(); cleared only
+  // after a successful bulk assignment or via the explicit "Limpiar selección"
+  // action.
+  const [selectedVendedores, setSelectedVendedores] = useState<Map<string, string>>(new Map());
   const [bulkCoordinadorModalOpen, setBulkCoordinadorModalOpen] = useState(false);
 
   // Server-side pagination state
@@ -191,7 +197,6 @@ function GestionUsuarios() {
       const data = await res.json();
 
       setUsuarios(data.usuarios || []);
-      setSelectedIds(new Set());
       setTotal(data.total || 0);
     } catch {
       toast.error("Error cargando usuarios");
@@ -400,29 +405,52 @@ function GestionUsuarios() {
   // ROL_VENDEDOR, not soft-deleted — mirrors the endpoint's own per-id
   // validation so the UI never lets the admin select an id the API would
   // reject anyway.
-  const vendedoresSeleccionablesIds = usuarios
-    .filter((u) => u.rol?.nombre === "ROL_VENDEDOR" && u.activo && !u.deleted_at)
-    .map((u) => u.id);
+  const vendedoresSeleccionables = usuarios
+    .filter((u) => u.rol?.nombre === "ROL_VENDEDOR" && u.activo && !u.deleted_at);
+  const vendedoresSeleccionablesIds = vendedoresSeleccionables.map((u) => u.id);
 
   const isAllSelected = vendedoresSeleccionablesIds.length > 0 &&
-    vendedoresSeleccionablesIds.every((id) => selectedIds.has(id));
-  const isSomeSelected = !isAllSelected && vendedoresSeleccionablesIds.some((id) => selectedIds.has(id));
+    vendedoresSeleccionablesIds.every((id) => selectedVendedores.has(id));
+  const isSomeSelected = !isAllSelected && vendedoresSeleccionablesIds.some((id) => selectedVendedores.has(id));
 
+  // Header select-all only ADDS this page's eligible vendedores to the
+  // existing selection — it never replaces selections made on other
+  // pages/searches. Unchecking removes only this page's ids.
   const toggleSelectAll = () => {
-    setSelectedIds(isAllSelected ? new Set() : new Set(vendedoresSeleccionablesIds));
-  };
-
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+    setSelectedVendedores((prev) => {
+      const next = new Map(prev);
+      if (isAllSelected) {
+        vendedoresSeleccionablesIds.forEach((id) => next.delete(id));
+      } else {
+        vendedoresSeleccionables.forEach((u) => next.set(u.id, u.nombre_completo || u.username || "Sin nombre"));
+      }
       return next;
     });
   };
 
+  const toggleSelectOne = (id: string, nombre: string) => {
+    setSelectedVendedores((prev) => {
+      const next = new Map(prev);
+      if (next.has(id)) next.delete(id);
+      else next.set(id, nombre);
+      return next;
+    });
+  };
+
+  const quitarSeleccionado = (id: string) => {
+    setSelectedVendedores((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const limpiarSeleccion = () => {
+    setSelectedVendedores(new Map());
+  };
+
   const handleBulkAsignarCoordinador = async (coordinadorId: string | null) => {
-    const vendedorIds = Array.from(selectedIds);
+    const vendedorIds = Array.from(selectedVendedores.keys());
     try {
       const response = await fetch("/api/admin/usuarios/bulk-coordinador", {
         method: "PATCH",
@@ -445,7 +473,7 @@ function GestionUsuarios() {
       } else {
         toast.success(`Coordinador actualizado para ${actualizados} ${actualizados === 1 ? "vendedor" : "vendedores"}`);
       }
-      setSelectedIds(new Set());
+      setSelectedVendedores(new Map());
       setBulkCoordinadorModalOpen(false);
       await cargarUsuarios();
     } catch {
@@ -660,26 +688,13 @@ function GestionUsuarios() {
         )}
 
         {/* Bulk coordinador assignment bar */}
-        {puedeAsignarCoordinador && selectedIds.size > 0 && (
-          <div className="crm-card p-4 mb-4 bg-crm-card-hover border border-crm-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-semibold text-crm-text-primary">
-                {selectedIds.size} {selectedIds.size === 1 ? "vendedor seleccionado" : "vendedores seleccionados"}
-              </span>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="text-sm text-crm-text-muted hover:text-crm-primary transition-colors underline"
-              >
-                Deseleccionar todo
-              </button>
-            </div>
-            <button
-              onClick={() => setBulkCoordinadorModalOpen(true)}
-              className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
-            >
-              Asignar coordinador
-            </button>
-          </div>
+        {puedeAsignarCoordinador && selectedVendedores.size > 0 && (
+          <SelectedVendedoresBar
+            seleccionados={Array.from(selectedVendedores, ([id, nombre]) => ({ id, nombre }))}
+            onQuitar={quitarSeleccionado}
+            onLimpiar={limpiarSeleccion}
+            onAsignar={() => setBulkCoordinadorModalOpen(true)}
+          />
         )}
 
         <div className="overflow-x-auto">
@@ -758,8 +773,8 @@ function GestionUsuarios() {
                           {usuario.rol?.nombre === "ROL_VENDEDOR" && usuario.activo && !isDeleted && (
                             <input
                               type="checkbox"
-                              checked={selectedIds.has(usuario.id)}
-                              onChange={() => toggleSelectOne(usuario.id)}
+                              checked={selectedVendedores.has(usuario.id)}
+                              onChange={() => toggleSelectOne(usuario.id, usuario.nombre_completo || usuario.username || "Sin nombre")}
                               aria-label={`Seleccionar a ${usuario.nombre_completo || usuario.username || "vendedor"}`}
                               className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
                             />
@@ -990,7 +1005,7 @@ function GestionUsuarios() {
       <BulkCoordinadorModal
         open={bulkCoordinadorModalOpen}
         onClose={() => setBulkCoordinadorModalOpen(false)}
-        selectedCount={selectedIds.size}
+        selectedCount={selectedVendedores.size}
         coordinadores={coordinadores}
         onConfirm={handleBulkAsignarCoordinador}
       />
