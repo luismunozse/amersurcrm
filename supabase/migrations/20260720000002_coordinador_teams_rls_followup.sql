@@ -1,9 +1,9 @@
 -- supabase/migrations/20260720000002_coordinador_teams_rls_followup.sql
 -- Coordinador Teams follow-up: restore team-scoped (not zero) access on the
--- five policies that OR crm.es_visibilidad_global() directly instead of going
+-- six policies that OR crm.es_visibilidad_global() directly instead of going
 -- through crm.p1_puede_ver_cliente()/crm.usuario_puede_ver_cliente() — those
 -- two already picked up the coordinador-team branch from
--- 20260720000001_coordinador_teams_rls.sql automatically; these five did not:
+-- 20260720000001_coordinador_teams_rls.sql automatically; these six did not:
 --   1. proceso_update (crm.proceso_adquisicion, UPDATE)
 --   2. proceso_etapa_update (crm.proceso_etapa, UPDATE)
 --   3. meta_vendedor_select (crm.meta_vendedor, SELECT)
@@ -21,6 +21,15 @@
 --      TRUE only for ROL_ADMIN/ROL_GERENTE) or vendedor (equipo_usernames()
 --      for a non-coordinador uid returns only that uid's own username, a
 --      no-op given the pre-existing own-username/own-uid branches).
+--   6. proceso_checklist_item_update (crm.proceso_checklist_item, UPDATE) —
+--      scope decision (coordinator, in-session): same rationale as
+--      venta_select_policy — the feature contract is team-scoped access
+--      everywhere coordinador previously had global access. Same bug class
+--      as proceso_etapa_update: resolves its proceso_adquisicion row inline
+--      and ORs es_visibilidad_global() directly instead of routing through
+--      crm.p1_puede_ver_cliente(). Fixed the same way as proceso_etapa_update
+--      below (section 2): add OR crm.p1_puede_ver_cliente(p.cliente_id)
+--      inside the existing EXISTS subquery, both USING and WITH CHECK.
 
 -- ============================================================
 -- 1. proceso_adquisicion UPDATE: coordinador can still update a team
@@ -146,3 +155,46 @@ CREATE POLICY "venta_select_policy" ON crm.venta
 
 COMMENT ON POLICY "venta_select_policy" ON crm.venta IS
   'Original admin/gerente/personal-ownership/es_visibilidad_global conditions (20260706000000) left verbatim, plus two coordinador-team OR-branches (venta.vendedor_username and cliente.vendedor_username/vendedor_asignado IN crm.equipo_usernames(auth.uid())) so ROL_COORDINADOR_VENTAS keeps team-scoped venta visibility after 20260720000001 narrowed es_visibilidad_global() to admin/gerente only.';
+
+-- ============================================================
+-- 6. proceso_checklist_item UPDATE: same team branch as proceso_etapa_update
+-- (section 2), via the same parent proceso_adquisicion row's cliente_id.
+-- In scope (coordinator decision): identical bug class to proceso_etapa_update
+-- — resolves its proceso_adquisicion row inline via an EXISTS/JOIN and ORs
+-- es_visibilidad_global() directly instead of routing through
+-- crm.p1_puede_ver_cliente(). Fixed the same way: add
+-- OR crm.p1_puede_ver_cliente(p.cliente_id) inside the existing EXISTS
+-- subquery (USING and WITH CHECK). Purely additive — the two pre-existing
+-- OR-terms (es_visibilidad_global(), p.vendedor_username = own username) are
+-- untouched, so admin/gerente and vendedor behavior is unchanged.
+-- ============================================================
+
+DROP POLICY IF EXISTS "proceso_checklist_item_update" ON crm.proceso_checklist_item;
+CREATE POLICY "proceso_checklist_item_update" ON crm.proceso_checklist_item
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM crm.proceso_etapa e
+      JOIN crm.proceso_adquisicion p ON p.id = e.proceso_id
+      WHERE e.id = etapa_id
+        AND (
+          crm.es_visibilidad_global()
+          OR p.vendedor_username = crm.get_current_username()
+          OR crm.p1_puede_ver_cliente(p.cliente_id)
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM crm.proceso_etapa e
+      JOIN crm.proceso_adquisicion p ON p.id = e.proceso_id
+      WHERE e.id = etapa_id
+        AND (
+          crm.es_visibilidad_global()
+          OR p.vendedor_username = crm.get_current_username()
+          OR crm.p1_puede_ver_cliente(p.cliente_id)
+        )
+    )
+  );
