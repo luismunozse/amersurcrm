@@ -54,6 +54,7 @@ interface Usuario {
   };
   activo: boolean;
   created_at: string;
+  coordinador_id?: string | null;
   meta_mensual?: number;
   comision_porcentaje?: number;
   requiere_cambio_password?: boolean;
@@ -146,6 +147,19 @@ function GestionUsuarios() {
       .then((r) => r.json())
       .then((d) => setRoles(d.roles || []))
       .catch(() => toast.error("Error cargando roles"));
+  }, []);
+
+  const [coordinadores, setCoordinadores] = useState<{ id: string; username: string; nombre_completo: string }[]>([]);
+
+  // Cargar coordinadores activos (para el selector de asignación de vendedores)
+  useEffect(() => {
+    fetch("/api/clientes/vendedores", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const soloCoordinadores = (d.vendedores || []).filter((v: any) => v.rol === "ROL_COORDINADOR_VENTAS");
+        setCoordinadores(soloCoordinadores);
+      })
+      .catch(() => {});
   }, []);
 
   // Cargar usuarios con paginación y ordenamiento server-side
@@ -486,6 +500,18 @@ function GestionUsuarios() {
                       <input type="tel" name="telefono" pattern="[9][0-9]{8}" maxLength={9} className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary" placeholder="987654321" title="Debe ser un número de 9 dígitos que comience con 9" />
                       <p className="text-xs text-crm-text-muted mt-1">Formato: 9 dígitos comenzando con 9</p>
                     </div>
+                    {roles.find((r) => r.id === rolSeleccionado)?.nombre === "ROL_VENDEDOR" && (
+                      <div>
+                        <label className="block text-sm font-medium text-crm-text-primary mb-2">Coordinador</label>
+                        <select name="coordinador_id" className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary">
+                          <option value="">Sin coordinador asignado</option>
+                          {coordinadores.map((c) => (
+                            <option key={c.id} value={c.id}>{c.nombre_completo || c.username}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-crm-text-muted mt-1">El vendedor solo será visible para este coordinador y para administradores/gerentes.</p>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-crm-text-primary mb-2">Email <span className="text-red-500">*</span></label>
                       <input type="email" name="email" required className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary placeholder-crm-text-muted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary" placeholder="usuario@gmail.com" />
@@ -782,6 +808,7 @@ function GestionUsuarios() {
         onClose={() => { setModalOpen(false); setUserEditing(null); }}
         user={userEditing}
         roles={roles}
+        coordinadores={coordinadores}
         onSave={async (payload) => {
           const ok = await patchUsuario(payload);
           if (ok) {

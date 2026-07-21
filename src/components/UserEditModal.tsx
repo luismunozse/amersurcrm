@@ -21,6 +21,7 @@ type UsuarioEditable = {
   activo: boolean;
   meta_mensual?: number;
   comision_porcentaje?: number;
+  coordinador_id?: string | null;
 };
 
 interface UserEditModalProps {
@@ -28,6 +29,7 @@ interface UserEditModalProps {
   onClose: () => void;
   user: UsuarioEditable | null;
   roles: Rol[];
+  coordinadores: { id: string; username: string; nombre_completo: string }[];
   onSave: (payload: {
     id: string;
     username?: string;
@@ -39,16 +41,18 @@ interface UserEditModalProps {
     meta_mensual?: number | null;
     comision_porcentaje?: number | null;
     activo?: boolean;
+    coordinador_id?: string | null;
   }) => Promise<boolean>;
 }
 
-export default function UserEditModal({ open, onClose, user, roles, onSave }: UserEditModalProps) {
+export default function UserEditModal({ open, onClose, user, roles, coordinadores, onSave }: UserEditModalProps) {
   const [username, setUsername] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [nombre, setNombre] = useState<string>("");
   const [dni, setDni] = useState<string>("");
   const [telefono, setTelefono] = useState<string>("");
   const [rolId, setRolId] = useState<string>("");
+  const [coordinadorId, setCoordinadorId] = useState<string>("");
   const [meta, setMeta] = useState<string>("");
   const [comision, setComision] = useState<string>("");
   const [activo, setActivo] = useState<boolean>(true);
@@ -62,6 +66,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
     dni: user?.dni || "",
     telefono: user?.telefono || "",
     rolId: user?.rol?.id || "",
+    coordinadorId: user?.coordinador_id || "",
     meta: user?.meta_mensual != null ? String(user.meta_mensual) : "",
     comision: user?.comision_porcentaje != null ? String(user.comision_porcentaje) : "",
     activo: user?.activo ?? true,
@@ -75,6 +80,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
       setDni(initial.dni);
       setTelefono(initial.telefono);
       setRolId(initial.rolId);
+      setCoordinadorId(initial.coordinadorId);
       setMeta(initial.meta);
       setComision(initial.comision);
       setActivo(initial.activo);
@@ -93,6 +99,7 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
     if (dni !== initial.dni) payload.dni = dni;
     if (telefono !== initial.telefono) payload.telefono = telefono === "" ? null : telefono;
     if (rolId !== initial.rolId && rolId) payload.rol_id = rolId;
+    if (coordinadorId !== initial.coordinadorId) payload.coordinador_id = coordinadorId === "" ? null : coordinadorId;
     if (meta !== initial.meta) payload.meta_mensual = meta === "" ? null : parseInt(meta, 10);
     if (comision !== initial.comision) payload.comision_porcentaje = comision === "" ? null : Number(comision);
     if (activo !== initial.activo) payload.activo = activo;
@@ -197,6 +204,21 @@ export default function UserEditModal({ open, onClose, user, roles, onSave }: Us
                 ))}
               </select>
             </div>
+            {roles.find((r) => r.id === rolId)?.nombre === "ROL_VENDEDOR" && (
+              <div>
+                <label className="block text-sm font-medium text-crm-text-primary mb-2">Coordinador</label>
+                <select
+                  value={coordinadorId}
+                  onChange={(e) => setCoordinadorId(e.target.value)}
+                  className="w-full px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+                >
+                  <option value="">Sin coordinador asignado</option>
+                  {coordinadores.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre_completo || c.username}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-crm-text-primary mb-2">Meta Mensual (S/.)</label>
               <input

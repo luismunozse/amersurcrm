@@ -6,6 +6,42 @@ import { crearNotificacion } from "@/app/_actionsNotifications";
 import { registrarAuditoriaUsuario } from "@/lib/auditoria-usuarios";
 export const dynamic = 'force-dynamic';
 
+/**
+ * Validates that coordinadorId (if provided and non-null) resolves to an
+ * active ROL_COORDINADOR_VENTAS user. Returns null when valid (including
+ * when coordinadorId is undefined/null/"" — "no coordinador" is always valid),
+ * or an error message string when invalid.
+ */
+async function validarCoordinadorId(
+  supabase: any,
+  coordinadorId: unknown,
+): Promise<string | null> {
+  if (coordinadorId === undefined || coordinadorId === null || coordinadorId === "") {
+    return null;
+  }
+  if (typeof coordinadorId !== "string") {
+    return "El coordinador especificado no es válido";
+  }
+
+  const { data: coordinador, error } = await supabase
+    .schema("crm")
+    .from("usuario_perfil")
+    .select("id, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+    .eq("id", coordinadorId)
+    .single();
+
+  if (error || !coordinador || !coordinador.activo) {
+    return "El coordinador especificado no existe o está inactivo";
+  }
+
+  const rolNombre = Array.isArray(coordinador.rol) ? coordinador.rol[0]?.nombre : coordinador.rol?.nombre;
+  if (rolNombre !== "ROL_COORDINADOR_VENTAS") {
+    return "El usuario seleccionado no tiene el rol de coordinador";
+  }
+
+  return null;
+}
+
 // GET - Obtener lista de usuarios con paginación server-side.
 // Lectura: ROL_ADMIN y ROL_GERENTE (gerente ve /dashboard/admin/usuarios en
 // modo solo-lectura). El historial de cambios sigue siendo exclusivo de
@@ -57,6 +93,7 @@ export async function GET(request: NextRequest) {
         telefono,
         email,
         rol_id,
+        coordinador_id,
         meta_mensual_ventas,
         comision_porcentaje,
         activo,
@@ -255,6 +292,7 @@ export async function POST(request: NextRequest) {
     const rol_id = formData.get("rol_id") as string;
     const meta_mensual = formData.get("meta_mensual") as string;
     const comision_porcentaje = formData.get("comision_porcentaje") as string;
+    const coordinador_id = (formData.get("coordinador_id") as string) || null;
     let username = formData.get("username") as string;
 
     if (!password || password.length < 6 || !rol_id) {
@@ -291,6 +329,13 @@ export async function POST(request: NextRequest) {
       }
       if (!username) {
         username = generarUsername(nombre_completo);
+      }
+    }
+
+    if (coordinador_id) {
+      const errorCoordinador = await validarCoordinadorId(supabase, coordinador_id);
+      if (errorCoordinador) {
+        return NextResponse.json({ error: errorCoordinador }, { status: 400 });
       }
     }
 
@@ -415,6 +460,7 @@ export async function POST(request: NextRequest) {
         dni: dni || null,
         telefono: telefono || null,
         rol_id: rol.id,
+        coordinador_id: coordinador_id || null,
         meta_mensual_ventas: metaValue,
         comision_porcentaje: comisionValue,
         activo: true,
@@ -526,6 +572,7 @@ export async function PATCH(request: NextRequest) {
       meta_mensual,
       comision_porcentaje,
       activo,
+      coordinador_id,
     } = body || {};
 
     if (!id) {
@@ -622,6 +669,13 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    if (typeof coordinador_id !== 'undefined') {
+      const errorCoordinador = await validarCoordinadorId(supabase, coordinador_id);
+      if (errorCoordinador) {
+        return NextResponse.json({ error: errorCoordinador }, { status: 400 });
+      }
+    }
+
     // Validar DNI
     if (typeof dni === 'string' && dni && !/^\d{8}$/.test(dni)) {
       return NextResponse.json({ error: "El DNI debe contener exactamente 8 dígitos numéricos" }, { status: 400 });
@@ -653,6 +707,7 @@ export async function PATCH(request: NextRequest) {
     if (typeof meta_mensual !== 'undefined') updatePayload.meta_mensual_ventas = meta_mensual === null ? null : parseInt(String(meta_mensual), 10);
     if (typeof comision_porcentaje !== 'undefined') updatePayload.comision_porcentaje = comision_porcentaje === null ? null : Number(comision_porcentaje);
     if (typeof activo === 'boolean') updatePayload.activo = activo;
+    if (typeof coordinador_id !== 'undefined') updatePayload.coordinador_id = coordinador_id === null || coordinador_id === '' ? null : coordinador_id;
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
@@ -681,6 +736,7 @@ export async function PATCH(request: NextRequest) {
       meta_mensual_ventas: 'meta_mensual',
       comision_porcentaje: 'comision_porcentaje',
       activo: 'activo',
+      coordinador_id: 'coordinador_id',
     };
 
     for (const [dbField, displayName] of Object.entries(fieldMap)) {
