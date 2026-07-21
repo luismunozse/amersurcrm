@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGetUser, mockServerActionClient, createChainMock } = vi.hoisted(() => {
+const { mockGetUser, mockServerActionClient, createChainMock, mockClienteChain } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = ["select", "insert", "update", "delete", "eq", "neq", "is", "or", "order", "range", "single", "in", "limit", "head", "maybeSingle", "not", "gte", "lte"];
@@ -11,12 +11,18 @@ const { mockGetUser, mockServerActionClient, createChainMock } = vi.hoisted(() =
     return chain;
   }
   const mockGetUser = vi.fn();
+  // Separate chain for `supabase.schema('crm').from('cliente')` — the
+  // linked-cliente team-arm lookup (`getClienteIdsEquipo`, reused from
+  // command-center.server.ts) queries `cliente` through `.schema()`, never
+  // through the bare `.from()` the v_cobranza queries use below.
+  const mockClienteChain = createChainMock({ data: [], error: null });
   const mockServerActionClient = {
     auth: { getUser: mockGetUser },
     from: vi.fn().mockReturnValue(createChainMock()),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    schema: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue(mockClienteChain) }),
   };
-  return { mockGetUser, mockServerActionClient, createChainMock };
+  return { mockGetUser, mockServerActionClient, createChainMock, mockClienteChain };
 });
 
 vi.mock("@/lib/supabase.server-actions", () => ({
@@ -76,7 +82,13 @@ describe("obtenerResumenCobranza", () => {
 });
 
 describe("obtenerResumenCobranzaScoped", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: team owns no clientes — tests that only care about the
+    // vendedor_username arm don't need to set this up explicitly.
+    (mockClienteChain as any).then = (resolve: any) =>
+      Promise.resolve({ data: [], error: null }).then(resolve);
+  });
 
   it("returns a zeroed summary without querying for propio/anonimo tiers (MoraAlertasBlock is never rendered for them)", async () => {
     const propio: EquipoScope = { tier: "propio", userId: "u1", username: "vend1" };
@@ -119,7 +131,59 @@ describe("obtenerResumenCobranzaScoped", () => {
     const equipo: EquipoScope = { tier: "equipo", userId: "coord-1", username: "coord1", equipoUsernames: ["coord1", "vend1"], equipoUserIds: ["coord-1", "vend-1"] };
     await obtenerResumenCobranzaScoped(equipo);
 
-    expect(selectChain.in).toHaveBeenCalledWith("vendedor_username", ["coord1", "vend1"]);
+    // The team filter is now an `.or()` (vendedor_username arm plus the
+    // linked-cliente arm below), not a bare `.in()` — mirrors
+    // getAlertasSinGestionarCount/getVentasMensuales in command-center.server.ts.
+    expect(selectChain.or).toHaveBeenCalledWith('vendedor_username.in.("coord1","vend1")');
+    expect(selectChain.in).not.toHaveBeenCalled();
+  });
+
+  it("includes the linked-cliente team arm in the mora total for tier: equipo", async () => {
+    (mockClienteChain as any).then = (resolve: any) =>
+      Promise.resolve({ data: [{ id: "c1" }, { id: "c2" }], error: null }).then(resolve);
+
+    const selectChain = createChainMock();
+    (selectChain as any).then = (resolve: any) =>
+      Promise.resolve({
+        data: [{ estado_cobranza: "en_mora", monto_programado: 1000, monto_pagado: 200, monto_mora: 50, dias_atraso: 10 }],
+        error: null,
+      }).then(resolve);
+    mockServerActionClient.from.mockReturnValue(selectChain);
+
+    const equipo: EquipoScope = { tier: "equipo", userId: "coord-1", username: "coord1", equipoUsernames: ["coord1", "vend1"], equipoUserIds: ["coord-1", "vend-1"] };
+    const resultado = await obtenerResumenCobranzaScoped(equipo);
+
+    expect(selectChain.or).toHaveBeenCalledWith(
+      'vendedor_username.in.("coord1","vend1"),cliente_id.in.("c1","c2")',
+    );
+    expect(resultado.success).toBe(true);
+    expect(resultado.data!.monto_mora_total).toBe(50);
+  });
+
+  it("fails CLOSED to a zeroed summary without querying v_cobranza when the team has no valid usernames and owns no clientes", async () => {
+    (mockClienteChain as any).then = (resolve: any) =>
+      Promise.resolve({ data: [], error: null }).then(resolve);
+
+    const selectChain = createChainMock();
+    mockServerActionClient.from.mockReturnValue(selectChain);
+
+    const equipoSinUsernames: EquipoScope = {
+      tier: "equipo",
+      userId: "coord-1",
+      username: "",
+      equipoUsernames: [],
+      equipoUserIds: ["coord-1"],
+    };
+    const resultado = await obtenerResumenCobranzaScoped(equipoSinUsernames);
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual({
+      total_cuotas: 0, por_vencer: 0, vencidas: 0, en_mora: 0, monto_por_cobrar: 0, monto_mora_total: 0,
+    });
+    // v_cobranza must never be queried unfiltered — proves the doubly-empty
+    // team filter short-circuits BEFORE the query is built (same fail-closed
+    // guarantee as getAlertasSinGestionarCount/getVentasMensuales).
+    expect(mockServerActionClient.from).not.toHaveBeenCalled();
   });
 });
 

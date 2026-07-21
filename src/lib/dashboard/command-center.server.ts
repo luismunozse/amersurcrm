@@ -363,8 +363,12 @@ const ALERTA_SIN_GESTIONAR_SELECT = `
  * cliente IS team-owned, is still counted — the gap `venta_select_policy`
  * closed at the RLS level (review of the coordinador-teams follow-up) but
  * these two app-level fetchers had not.
+ *
+ * Exported so `_actions-cobranza.ts` (`obtenerResumenCobranzaScoped`) can
+ * reuse the SAME resolution instead of re-implementing it — keeps the
+ * mora total's team scope identical to `getAlertasSinGestionarCount`'s.
  */
-async function getClienteIdsEquipo(
+export async function getClienteIdsEquipo(
   supabase: Awaited<ReturnType<typeof createOptimizedServerClient>>,
   scope: Extract<EquipoScope, { tier: "equipo" }>,
 ): Promise<string[]> {
@@ -396,8 +400,12 @@ async function getClienteIdsEquipo(
  * pre-existing `cuota.venta.vendedor_username`/`cuota.venta.estado`
  * filters on that fetcher, just combined via `.or()` instead of
  * `.in()`/`.not()`).
+ *
+ * Exported for the same reason as `getClienteIdsEquipo` above — reused by
+ * `obtenerResumenCobranzaScoped` (`_actions-cobranza.ts`) with `prefix ""`
+ * against the flat `v_cobranza` view.
  */
-function buildVentaEquipoOrFilter(
+export function buildVentaEquipoOrFilter(
   scope: Extract<EquipoScope, { tier: "equipo" }>,
   clienteIdsEquipo: string[],
   prefix: string,

@@ -7,6 +7,7 @@ import { requierePermiso, tienePermiso } from "@/lib/permissions/server";
 import { handleSupabaseError } from "@/lib/errors";
 import { obtenerUsernameActual } from "../clientes/_actions-crm-helpers";
 import { limaToday } from "@/lib/cobranza/tiers";
+import { getClienteIdsEquipo, buildVentaEquipoOrFilter } from "@/lib/dashboard/command-center.server";
 import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 export type MedioGestionCobranza = "llamada" | "whatsapp" | "email" | "visita" | "mensaje";
@@ -153,6 +154,20 @@ export async function obtenerResumenCobranza() {
  * (`getResumenGeneral`, `getAgingLeads`, etc. all key off `EquipoScope`, not
  * a permission check), and intentionally supersedes the old permission gate
  * for THIS block only. Do not "fix" this back to a `tienePermiso()` call.
+ *
+ * The `tier: "equipo"` filter reuses `getClienteIdsEquipo` +
+ * `buildVentaEquipoOrFilter` from `command-center.server.ts` (`prefix ""`,
+ * since `v_cobranza` exposes `vendedor_username`/`cliente_id` as flat
+ * columns — see supabase/migrations/20260406000000_cobranza.sql) instead of
+ * a bare `.in('vendedor_username', ...)`. This is the SAME team-scope
+ * resolution `getAlertasSinGestionarCount` uses, so the mora total actually
+ * matches the alertasSinGestionar count rendered next to it: a cuota whose
+ * venta's OWN vendedor_username isn't on the team, but whose linked cliente
+ * IS team-owned, is still counted here — the same gap
+ * `getAlertasSinGestionarCount`/`getVentasMensuales` closed earlier for
+ * their own fetchers. Also fails CLOSED (returns the zeroed summary with no
+ * query) when the team filter is doubly empty, mirroring those two
+ * fetchers' guard.
  */
 export async function obtenerResumenCobranzaScoped(scope: EquipoScope) {
   if (scope.tier !== 'global' && scope.tier !== 'equipo') {
@@ -162,12 +177,19 @@ export async function obtenerResumenCobranzaScoped(scope: EquipoScope) {
   const supabase = await createServerActionClient();
 
   try {
+    let filtroEquipo: string | null = null;
+    if (scope.tier === 'equipo') {
+      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
+      filtroEquipo = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, '');
+      if (!filtroEquipo) return { success: true, data: agregarResumenCobranza([]) };
+    }
+
     let query = supabase
       .from('v_cobranza')
       .select('estado_cobranza, monto_programado, monto_pagado, monto_mora, dias_atraso');
 
-    if (scope.tier === 'equipo') {
-      query = query.in('vendedor_username', scope.equipoUsernames);
+    if (filtroEquipo) {
+      query = query.or(filtroEquipo);
     }
 
     const { data, error } = await query;
