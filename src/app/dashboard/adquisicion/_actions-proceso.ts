@@ -908,6 +908,7 @@ export async function cerrarProcesoYCrearVenta(input: CerrarVentaInput): Promise
         ventaId: result.venta_id as string,
         codigoVenta: (result.codigo_venta as string) ?? '',
         url: proceso.cliente_id ? `/dashboard/clientes/${proceso.cliente_id}` : undefined,
+        vendedorUsername: proceso.vendedor_username,
       });
     } catch (notifError) {
       console.warn('Error notificando venta creada desde cierre de proceso:', notifError);

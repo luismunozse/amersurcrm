@@ -225,6 +225,7 @@ export async function convertirReservaEnVenta(data: {
         ventaId: venta.id,
         codigoVenta: venta.codigo_venta,
         url: `/dashboard/clientes/${reserva.cliente_id}`,
+        vendedorUsername: reserva.vendedor_username,
       });
     } catch (notifError) {
       console.warn('Error notificando venta creada:', notifError);

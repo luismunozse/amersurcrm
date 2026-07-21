@@ -63,14 +63,12 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
     throw new Error("No tienes permisos para asignar vendedores masivamente");
   }
 
-  let vendedor: { id: string; username: string; nombre_completo: string } | null = null;
-
   // Validar que el vendedor existe (solo si se está asignando, no desasignando)
   if (vendedorUsername) {
     const { data: vendedorData, error: vendedorError } = await supabase
       .schema('crm')
       .from('usuario_perfil')
-      .select('id, username, nombre_completo')
+      .select('id')
       .eq('username', vendedorUsername)
       .eq('activo', true)
       .single();
@@ -78,16 +76,9 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
     if (vendedorError || !vendedorData) {
       throw new Error("Vendedor no encontrado o inactivo");
     }
-    vendedor = vendedorData;
   }
 
   const supabaseAdmin = createServiceRoleClient();
-
-  const { data: clientesSeleccionados } = await supabaseAdmin
-    .schema("crm")
-    .from("cliente")
-    .select("id, nombre")
-    .in("id", ids);
 
   // Actualizar ambos campos (null para desasignar)
   const payload: Record<string, string | null> = {
@@ -113,31 +104,20 @@ export async function asignarVendedorMasivo(ids: string[], vendedorUsername: str
 
   revalidatePath("/dashboard/clientes");
 
-  // Notificación no-bloqueante
-  if (vendedor?.id) {
-    const vendedorId = vendedor.id;
-    const nombresClientes = (clientesSeleccionados ?? []).map((c) => c?.nombre);
-    const totalIds = ids.length;
-    const idsClientes = [...ids];
-    after(async () => {
-      try {
-        const resumen = buildNombreResumen(nombresClientes);
-        const descripcionExtra = resumen ? ` (${resumen})` : "";
-        await crearNotificacion(
-          vendedorId,
-          "cliente",
-          "Asignación de clientes",
-          `Se te asignaron ${totalIds} cliente${totalIds === 1 ? "" : "s"}${descripcionExtra}.`,
-          {
-            cliente_ids: idsClientes,
-            url: "/dashboard/clientes?vista=asignados",
-          },
-        );
-      } catch (notifyError) {
-        console.warn("No se pudo crear notificación para asignación masiva:", notifyError);
-      }
-    });
-  }
+  // No app-level "lead asignado" notification here: the DB trigger
+  // `trigger_notificar_lead_asignado` (supabase/migrations/20251216_trigger_notificar_lead_asignado.sql)
+  // fires per row on this same `vendedor_asignado` UPDATE, so it already
+  // notifies the vendedor for each reassigned cliente — it is the single
+  // source of that notification (covers manual assignment, this bulk path,
+  // the WhatsApp RPC, the Meta webhook and imports). Emitting it here too
+  // double-notified the vendedor.
+  // KNOWN EXCEPTIONS (out of scope here): proyectos/[id]/_actions.ts
+  // (crearReserva) writes an EMAIL into `vendedor_asignado`, so the
+  // trigger's username lookup misses and never notifies on that path; and
+  // admin/usuarios/_actions.ts (reasignarClientes) updates only
+  // `vendedor_asignado`, leaving `vendedor_username` stale.
+  // KNOWN LIMITATION: trigger-created notifications are in-app only (no
+  // push) — accepted for now.
 
   return { success: true, count: ids.length };
 }

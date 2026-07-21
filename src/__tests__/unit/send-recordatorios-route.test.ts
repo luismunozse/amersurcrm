@@ -43,6 +43,7 @@ function makeRecordatorioChain(
   chain.select = vi.fn().mockReturnValue(chain);
   chain.eq = vi.fn().mockReturnValue(chain);
   chain.lte = vi.fn().mockReturnValue(chain);
+  chain.order = vi.fn().mockReturnValue(chain);
   chain.limit = vi.fn().mockResolvedValue(pendingResult);
   chain.update = vi.fn().mockImplementation((payload: any) => {
     chain.updateCalls.push({ payload });
@@ -170,5 +171,102 @@ describe("send-recordatorios — truthful push counters", () => {
     expect(body.failures).toEqual([
       { id: "rec-boom", error: "No se pudieron obtener suscripciones push: boom" },
     ]);
+  });
+});
+
+describe("send-recordatorios — no pierde recordatorios cuando falla el insert in-app", () => {
+  it("no marca enviado=true cuando el insert en notificacion falla (deja enviado=false para reintento)", async () => {
+    tableChains.recordatorio = makeRecordatorioChain({
+      data: [
+        recordatorio({ id: "rec-1", notificar_push: false }),
+        recordatorio({ id: "rec-2", notificar_push: false }),
+      ],
+      error: null,
+    });
+    tableChains.notificacion = makeNotifChain({
+      data: null,
+      error: { message: "insert failed: connection reset" },
+    });
+    mockFrom.mockImplementation((table: string) => tableChains[table]);
+
+    const res = await GET(bearerRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // The batch insert failed entirely — nothing was marked sent, so the
+    // `recordatorio.update` chain must never have been invoked.
+    expect(tableChains.recordatorio.update).not.toHaveBeenCalled();
+    expect(body.inApp).toBe(0);
+    expect(body.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "rec-1" }),
+        expect.objectContaining({ id: "rec-2" }),
+      ]),
+    );
+    expect(body.failures).toHaveLength(2);
+  });
+
+  it("marca enviado=true solo cuando el insert en notificacion tuvo éxito", async () => {
+    tableChains.recordatorio = makeRecordatorioChain({
+      data: [
+        recordatorio({ id: "rec-ok-1", notificar_push: false }),
+        recordatorio({ id: "rec-ok-2", notificar_push: false }),
+      ],
+      error: null,
+    });
+    tableChains.notificacion = makeNotifChain({ data: null, error: null });
+    mockFrom.mockImplementation((table: string) => tableChains[table]);
+
+    const res = await GET(bearerRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(tableChains.recordatorio.update).toHaveBeenCalledWith(
+      expect.objectContaining({ enviado: true }),
+    );
+    const lastUpdateCall =
+      tableChains.recordatorio.updateCalls[tableChains.recordatorio.updateCalls.length - 1];
+    expect(lastUpdateCall.ids).toEqual(["rec-ok-1", "rec-ok-2"]);
+    expect(body.inApp).toBe(2);
+    expect(body.failures).toEqual([]);
+  });
+
+  it("responde 5xx si el insert tuvo éxito pero falla marcar enviado (ventana de duplicados)", async () => {
+    // Notifications were already inserted and can't be un-sent, but the
+    // recordatorios still read enviado=false — the next run WILL re-insert
+    // duplicates. That state must surface loudly as a 5xx, not a quiet 200.
+    tableChains.recordatorio = makeRecordatorioChain(
+      { data: [recordatorio({ id: "rec-x", notificar_push: false })], error: null },
+      { data: null, error: { message: "update failed" } },
+    );
+    tableChains.notificacion = makeNotifChain({ data: null, error: null });
+    mockFrom.mockImplementation((table: string) => tableChains[table]);
+
+    const res = await GET(bearerRequest());
+    expect(res.status).toBe(500);
+    const body = await res.json();
+
+    expect(body.inApp).toBe(0);
+    expect(body.error).toContain("update failed");
+    expect(body.failures).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "rec-x" })]),
+    );
+  });
+});
+
+describe("send-recordatorios — orden de procesamiento", () => {
+  it("lee los pendientes en FIFO por fecha_recordatorio ascendente", async () => {
+    tableChains.recordatorio = makeRecordatorioChain({
+      data: [recordatorio({ id: "rec-1", notificar_push: false })],
+      error: null,
+    });
+    mockFrom.mockImplementation((table: string) => tableChains[table]);
+
+    const res = await GET(bearerRequest());
+    expect(res.status).toBe(200);
+
+    expect(tableChains.recordatorio.order).toHaveBeenCalledWith("fecha_recordatorio", {
+      ascending: true,
+    });
   });
 });

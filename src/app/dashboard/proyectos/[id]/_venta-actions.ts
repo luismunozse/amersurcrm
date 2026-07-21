@@ -233,6 +233,7 @@ export async function convertirReservaAVenta(
         codigoVenta,
         proyectoId: lote.proyecto_id,
         url: `/dashboard/proyectos/${lote.proyecto_id}`,
+        vendedorUsername: reservaActiva.vendedor_username,
       });
     } catch (notifError) {
       console.warn("Error notificando venta:", notifError);

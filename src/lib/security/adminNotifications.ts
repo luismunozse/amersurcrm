@@ -1,9 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+interface RolRelacion {
+  nombre: string | null;
+}
+
 interface AdminUser {
   id: string;
   email: string | null;
   nombre_completo: string | null;
+  rol: RolRelacion | RolRelacion[] | null;
 }
 
 export async function notifyAdminsOfSecurityEvent(
@@ -13,18 +18,28 @@ export async function notifyAdminsOfSecurityEvent(
   metadata?: Record<string, unknown>
 ) {
   try {
-    const { data: admins, error } = await supabase
+    // Callers pass the raw service-role client (no schema preset), so this
+    // must scope to "crm" itself — otherwise it silently queries "public".
+    const { data: rows, error } = await supabase
+      .schema("crm")
       .from("usuario_perfil")
-      .select("id, email, nombre_completo")
-      .eq("activo", true)
-      .eq("rol:rol!usuario_perfil_rol_id_fkey(nombre)", "ROL_ADMIN");
+      .select("id, email, nombre_completo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+      .eq("activo", true);
 
     if (error) {
       console.error("No se pudieron obtener administradores para la alerta de seguridad:", error);
       return;
     }
 
-    if (!admins || admins.length === 0) {
+    // `.eq()` can't filter on an embedded relation expression — resolve the
+    // rol name in JS instead (same pattern as getResumenGeneral / the
+    // reportes-alertas cron).
+    const admins = (rows ?? []).filter((row: AdminUser) => {
+      const rolObj = Array.isArray(row.rol) ? row.rol[0] : row.rol;
+      return rolObj?.nombre === "ROL_ADMIN";
+    });
+
+    if (admins.length === 0) {
       console.warn("No hay administradores activos para recibir la alerta de seguridad.");
       return;
     }
@@ -44,7 +59,7 @@ export async function notifyAdminsOfSecurityEvent(
       },
     }));
 
-    const { error: insertError } = await supabase.from("notificacion").insert(payload);
+    const { error: insertError } = await supabase.schema("crm").from("notificacion").insert(payload);
 
     if (insertError) {
       console.error("Error creando notificaciones de alerta de seguridad:", insertError);

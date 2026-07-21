@@ -431,7 +431,7 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
 
   const { data: cliente } = await supabase
     .from("cliente")
-    .select("nombre, vendedor_username")
+    .select("vendedor_username")
     .eq("id", clienteId)
     .maybeSingle();
 
@@ -464,23 +464,19 @@ export async function asignarVendedorCliente(clienteId: string, vendedorUsername
   revalidatePath(`/dashboard/clientes/${clienteId}`);
   revalidatePath("/dashboard/clientes");
 
-  // Notificación no-bloqueante
-  if (vendedorUsername) {
-    const clienteNombre = cliente?.nombre;
-    after(async () => {
-      const supabaseAfter = await createServerActionClient();
-      await notifyVendedorAsignado(
-        supabaseAfter,
-        vendedorUsername,
-        "Nuevo cliente asignado",
-        `Se te asignó el cliente ${clienteNombre ?? ""}.`,
-        {
-          cliente_id: clienteId,
-          url: `/dashboard/clientes/${clienteId}`,
-        },
-      );
-    });
-  }
+  // No app-level "lead asignado" notification here: the DB trigger
+  // `trigger_notificar_lead_asignado` (supabase/migrations/20251216_trigger_notificar_lead_asignado.sql)
+  // already fires on this same `vendedor_asignado` UPDATE and is the single
+  // source of that notification — it covers this manual path, bulk
+  // assignment, the WhatsApp RPC, the Meta webhook and imports. Emitting it
+  // here too double-notified the vendedor.
+  // KNOWN EXCEPTIONS (out of scope here): proyectos/[id]/_actions.ts
+  // (crearReserva) writes an EMAIL into `vendedor_asignado`, so the
+  // trigger's username lookup misses and never notifies on that path; and
+  // admin/usuarios/_actions.ts (reasignarClientes) updates only
+  // `vendedor_asignado`, leaving `vendedor_username` stale.
+  // KNOWN LIMITATION: trigger-created notifications are in-app only (no
+  // push) — accepted for now.
 }
 
 export async function eliminarCliente(id: string) {

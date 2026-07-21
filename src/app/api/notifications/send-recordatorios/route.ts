@@ -50,6 +50,11 @@ async function handleRequest(req: NextRequest) {
     .eq("completado", false)
     .eq("enviado", false)
     .lte("fecha_recordatorio", nowIso)
+    // Deterministic FIFO: failed batches stay enviado=false and get retried
+    // by the next run, so without an explicit order a backlog larger than
+    // the limit could starve the oldest recordatorios (mirrors the
+    // cobranza-alertas cron's retry read ordering).
+    .order("fecha_recordatorio", { ascending: true })
     .limit(100);
 
   if (error) {
@@ -88,7 +93,19 @@ async function handleRequest(req: NextRequest) {
     data: dataPayload,
   }));
 
-  await supabaseCrm.from("notificacion").insert(notificacionesInsert);
+  const { error: notifInsertError } = await supabaseCrm
+    .from("notificacion")
+    .insert(notificacionesInsert);
+
+  if (notifInsertError) {
+    // Safe failure: nothing was inserted, rows stay enviado=false and the
+    // next 5-min run retries the whole batch. Log and keep going so the
+    // response still reports per-recordatorio failures.
+    console.error(
+      "Error insertando notificaciones de recordatorios (se reintentará en el próximo cron):",
+      notifInsertError.message,
+    );
+  }
 
   // 2. Push (solo si habilitado en config)
   const pushSuccessIds: string[] = [];
@@ -151,18 +168,63 @@ async function handleRequest(req: NextRequest) {
     });
   }
 
-  // 3. Marcar todos como enviados (in-app insertada)
+  // 3. Mark as enviado ONLY the recordatorios whose in-app insert succeeded.
+  // The insert above is a single batch for every pending row, so success or
+  // failure applies to the whole lot: on failure nothing gets marked
+  // `enviado=true` — rows stay `enviado=false` so the next cron run (every
+  // 5 min) retries them instead of silently losing them.
   const allIds = pendientes.map((r) => r.id);
-  if (allIds.length > 0) {
-    await supabaseCrm
+  let sentIds: string[] = [];
+
+  if (notifInsertError) {
+    failures.push(
+      ...allIds.map((id) => ({
+        id,
+        error: `No se pudo crear la notificación in-app: ${notifInsertError.message}`,
+      })),
+    );
+  } else if (allIds.length > 0) {
+    const { error: updateError } = await supabaseCrm
       .from("recordatorio")
       .update({ enviado: true, updated_at: new Date().toISOString() })
       .in("id", allIds);
+
+    if (updateError) {
+      // Unavoidable duplicate-risk window: the notifications above were
+      // already inserted and cannot be un-sent, yet these recordatorios
+      // still read `enviado=false`, so the next run WILL pick them up again
+      // and insert duplicate notifications (crm.notificacion has no unique
+      // constraint that would dedupe them). There is no way to roll this
+      // back from here — surfacing it loudly (500 + a response that reflects
+      // reality instead of pretending success) is the only mitigation, so an
+      // operator can investigate immediately instead of the duplication
+      // silently recurring every 5 minutes (same treatment as the
+      // cobranza-alertas cron).
+      console.error("Error marcando recordatorios como enviados:", updateError.message);
+      failures.push(
+        ...allIds.map((id) => ({
+          id,
+          error: `Notificación creada pero no se pudo marcar como enviada: ${updateError.message}`,
+        })),
+      );
+      return NextResponse.json(
+        {
+          processed: pendientes.length,
+          inApp: 0,
+          pushDispatched: pushSuccessIds.length,
+          failures,
+          error: `No se pudo persistir el estado enviado de los recordatorios: ${updateError.message}`,
+        },
+        { status: 500 },
+      );
+    }
+
+    sentIds = allIds;
   }
 
   return NextResponse.json({
     processed: pendientes.length,
-    inApp: allIds.length,
+    inApp: sentIds.length,
     pushDispatched: pushSuccessIds.length,
     failures,
   });
