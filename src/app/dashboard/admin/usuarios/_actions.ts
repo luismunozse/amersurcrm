@@ -6,6 +6,128 @@ import { createServiceRoleClient } from "@/lib/supabase.server";
 import { revalidatePath } from "next/cache";
 import { esAdmin } from "@/lib/permissions/server";
 import { registrarAuditoriaUsuario } from "@/lib/auditoria-usuarios";
+import { validarCoordinadorId } from "@/app/api/admin/usuarios/_shared/coordinador-validation";
+
+/**
+ * Decision the admin must make when deactivating/deleting a coordinador
+ * who still has team members (`usuario_perfil.coordinador_id = target`).
+ * Mirrors the existing "reassign clientes on delete" pattern one level up
+ * the org chart.
+ */
+export type EquipoDecision = { transferirA: string } | { dejarSinCoordinador: true };
+
+type EquipoDecisionOutcome =
+  | { ok: true; moved: number }
+  | { ok: false; needsDecision: true; equipoSize: number }
+  | { ok: false; needsDecision: false; error: string };
+
+/**
+ * If `coordinadorId` is a ROL_COORDINADOR_VENTAS user with team members
+ * (usuario_perfil.coordinador_id = coordinadorId, excluding soft-deleted
+ * rows), resolves what happens to that team before the coordinador is
+ * deactivated/deleted:
+ *   - no `equipoDecision` given → returns `needsDecision: true` so the
+ *     caller can surface the mandatory decision step (never silently
+ *     proceeds).
+ *   - `{ transferirA }` → validates the target via the SAME shared
+ *     validator the bulk-coordinador endpoint uses, rejects transferring
+ *     to the coordinador being removed, then moves the whole team in one
+ *     atomic UPDATE.
+ *   - `{ dejarSinCoordinador: true }` → sets the whole team's
+ *     coordinador_id to NULL (orphans, visible only to admin/gerente).
+ * Every moved vendedor gets one historial_cambios_usuario row + one
+ * registrarAuditoriaUsuario call (same mechanism as the bulk-coordinador
+ * endpoint's `cambiados` loop).
+ * Returns `{ ok: true, moved: 0 }` immediately when the target is not a
+ * coordinador or has no team — the caller proceeds unchanged.
+ */
+async function resolverEquipoDelCoordinador(
+  serviceRole: ReturnType<typeof createServiceRoleClient>,
+  coordinadorId: string,
+  rolNombre: string | null,
+  equipoDecision: EquipoDecision | undefined,
+  admin: { id: string; nombre: string } | null,
+): Promise<EquipoDecisionOutcome> {
+  if (rolNombre !== "ROL_COORDINADOR_VENTAS") {
+    return { ok: true, moved: 0 };
+  }
+
+  const { data: equipoData, error: equipoError } = await serviceRole
+    .schema("crm")
+    .from("usuario_perfil")
+    .select("id, nombre_completo")
+    .eq("coordinador_id", coordinadorId)
+    .is("deleted_at", null);
+
+  if (equipoError) {
+    return { ok: false, needsDecision: false, error: `Error verificando el equipo: ${equipoError.message}` };
+  }
+
+  const equipo = (equipoData || []) as { id: string; nombre_completo: string | null }[];
+  if (equipo.length === 0) {
+    return { ok: true, moved: 0 };
+  }
+
+  if (!equipoDecision) {
+    return { ok: false, needsDecision: true, equipoSize: equipo.length };
+  }
+
+  let nuevoCoordinadorId: string | null;
+  if ("transferirA" in equipoDecision) {
+    if (equipoDecision.transferirA === coordinadorId) {
+      return { ok: false, needsDecision: false, error: "No puede transferir el equipo al mismo coordinador que está desactivando/eliminando" };
+    }
+    const errorCoordinador = await validarCoordinadorId(serviceRole, equipoDecision.transferirA);
+    if (errorCoordinador) {
+      return { ok: false, needsDecision: false, error: errorCoordinador };
+    }
+    nuevoCoordinadorId = equipoDecision.transferirA;
+  } else if ("dejarSinCoordinador" in equipoDecision && equipoDecision.dejarSinCoordinador) {
+    nuevoCoordinadorId = null;
+  } else {
+    return { ok: false, needsDecision: false, error: "Decisión de equipo inválida" };
+  }
+
+  const { error: updateError } = await serviceRole
+    .schema("crm")
+    .from("usuario_perfil")
+    .update({ coordinador_id: nuevoCoordinadorId })
+    .eq("coordinador_id", coordinadorId)
+    .is("deleted_at", null);
+
+  if (updateError) {
+    return { ok: false, needsDecision: false, error: `Error moviendo el equipo: ${updateError.message}` };
+  }
+
+  const historialRows = equipo.map((v) => ({
+    usuario_id: v.id,
+    campo: "coordinador_id",
+    valor_anterior: coordinadorId,
+    valor_nuevo: nuevoCoordinadorId,
+    modificado_por: admin?.id || coordinadorId,
+  }));
+
+  try {
+    await serviceRole.schema("crm").from("historial_cambios_usuario").insert(historialRows);
+  } catch (histErr) {
+    console.warn("[resolverEquipoDelCoordinador] Error registrando historial de cambios:", histErr);
+  }
+
+  if (admin) {
+    for (const v of equipo) {
+      await registrarAuditoriaUsuario(serviceRole, {
+        adminId: admin.id,
+        adminNombre: admin.nombre,
+        usuarioId: v.id,
+        usuarioNombre: v.nombre_completo || v.id,
+        accion: "editar",
+        detalles: { campos_modificados: ["coordinador_id"], origen: "lifecycle_coordinador" },
+      });
+    }
+  }
+
+  return { ok: true, moved: equipo.length };
+}
 
 /**
  * Helper: obtiene admin actual (id + nombre) para auditoría
@@ -127,7 +249,8 @@ export async function resetearPasswordUsuario(userId: string) {
 export async function cambiarEstadoUsuario(
   userId: string,
   activo: boolean,
-  motivo: string
+  motivo: string,
+  equipoDecision?: EquipoDecision
 ) {
   const isAdmin = await esAdmin();
   if (!isAdmin) {
@@ -149,12 +272,29 @@ export async function cambiarEstadoUsuario(
     const { data: usuarioExistente, error: fetchError } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
-      .select('id, nombre_completo')
+      .select('id, nombre_completo, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
       .eq('id', userId)
       .single();
 
     if (fetchError || !usuarioExistente) {
       return { success: false, error: 'Usuario no encontrado' };
+    }
+
+    if (!activo) {
+      const rolRaw = (usuarioExistente as any).rol;
+      const rolNombre = Array.isArray(rolRaw) ? rolRaw[0]?.nombre ?? null : rolRaw?.nombre ?? null;
+      const equipoOutcome = await resolverEquipoDelCoordinador(serviceRole, userId, rolNombre, equipoDecision, admin);
+      if (!equipoOutcome.ok) {
+        if (equipoOutcome.needsDecision) {
+          return {
+            success: false,
+            needsEquipoDecision: true,
+            equipoSize: equipoOutcome.equipoSize,
+            error: 'Este coordinador tiene un equipo asignado. Debe indicar qué hacer con sus vendedores antes de continuar.',
+          };
+        }
+        return { success: false, error: equipoOutcome.error };
+      }
     }
 
     const { error } = await serviceRole
@@ -291,7 +431,7 @@ export async function cambiarPasswordPerfil(
  * Soft-delete de un usuario (marca deleted_at en vez de eliminar).
  * Invalida la sesión y desactiva al usuario.
  */
-export async function eliminarUsuario(userId: string, motivo?: string) {
+export async function eliminarUsuario(userId: string, motivo?: string, equipoDecision?: EquipoDecision) {
   const isAdmin = await esAdmin();
   if (!isAdmin) {
     return { success: false, error: "Solo administradores pueden eliminar usuarios" };
@@ -312,7 +452,7 @@ export async function eliminarUsuario(userId: string, motivo?: string) {
     const { data: usuarioExistente, error: fetchError } = await serviceRole
       .schema('crm')
       .from('usuario_perfil')
-      .select('id, username, nombre_completo, deleted_at')
+      .select('id, username, nombre_completo, deleted_at, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
       .eq('id', userId)
       .single();
 
@@ -322,6 +462,21 @@ export async function eliminarUsuario(userId: string, motivo?: string) {
 
     if (usuarioExistente.deleted_at) {
       return { success: false, error: 'Este usuario ya fue eliminado' };
+    }
+
+    const rolRaw = (usuarioExistente as any).rol;
+    const rolNombre = Array.isArray(rolRaw) ? rolRaw[0]?.nombre ?? null : rolRaw?.nombre ?? null;
+    const equipoOutcome = await resolverEquipoDelCoordinador(serviceRole, userId, rolNombre, equipoDecision, admin);
+    if (!equipoOutcome.ok) {
+      if (equipoOutcome.needsDecision) {
+        return {
+          success: false,
+          needsEquipoDecision: true,
+          equipoSize: equipoOutcome.equipoSize,
+          error: 'Este coordinador tiene un equipo asignado. Debe indicar qué hacer con sus vendedores antes de continuar.',
+        };
+      }
+      return { success: false, error: equipoOutcome.error };
     }
 
     // Soft delete: marcar como eliminado + desactivar
