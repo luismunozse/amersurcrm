@@ -333,6 +333,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (coordinador_id) {
+      if (rol.nombre !== 'ROL_VENDEDOR') {
+        return NextResponse.json({ error: "Solo los vendedores pueden tener un coordinador asignado" }, { status: 400 });
+      }
       const errorCoordinador = await validarCoordinadorId(supabase, coordinador_id);
       if (errorCoordinador) {
         return NextResponse.json({ error: errorCoordinador }, { status: 400 });
@@ -583,13 +586,16 @@ export async function PATCH(request: NextRequest) {
     const { data: currentUser, error: currentError } = await supabase
       .schema('crm')
       .from('usuario_perfil')
-      .select('username, nombre_completo, dni, telefono, email, rol_id, meta_mensual_ventas, comision_porcentaje, activo')
+      .select('username, nombre_completo, dni, telefono, email, rol_id, coordinador_id, meta_mensual_ventas, comision_porcentaje, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
       .eq('id', id)
       .single();
 
     if (currentError || !currentUser) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
+
+    const currentRolRaw = (currentUser as any).rol;
+    const currentRolNombre = Array.isArray(currentRolRaw) ? currentRolRaw[0]?.nombre : currentRolRaw?.nombre;
 
     // Si se proporciona email, actualizar en Supabase Auth primero
     if (typeof email === 'string' && email.trim()) {
@@ -647,6 +653,7 @@ export async function PATCH(request: NextRequest) {
     // Verificar username y rol en paralelo
     const needsUsernameCheck = typeof username === 'string' && username.trim();
     const needsRolCheck = typeof rol_id === 'string' && rol_id.trim();
+    let nuevoRolNombre: string | undefined;
 
     if (needsUsernameCheck || needsRolCheck) {
       const [usernameResult, rolResult] = await Promise.all([
@@ -667,9 +674,21 @@ export async function PATCH(request: NextRequest) {
       if (needsRolCheck && (rolResult.error || !rolResult.data)) {
         return NextResponse.json({ error: "El rol especificado no existe o no está activo" }, { status: 400 });
       }
+
+      if (needsRolCheck) {
+        nuevoRolNombre = (rolResult.data as any)?.nombre;
+      }
     }
 
     if (typeof coordinador_id !== 'undefined') {
+      // Effective role is the incoming rol_id (if this PATCH is changing it)
+      // or the subject's current role otherwise — a coordinador can only be
+      // assigned to someone who is (or is becoming) ROL_VENDEDOR.
+      const effectiveRolNombre = needsRolCheck ? nuevoRolNombre : currentRolNombre;
+      const seEstaAsignando = coordinador_id !== null && coordinador_id !== '';
+      if (seEstaAsignando && effectiveRolNombre !== 'ROL_VENDEDOR') {
+        return NextResponse.json({ error: "Solo los vendedores pueden tener un coordinador asignado" }, { status: 400 });
+      }
       const errorCoordinador = await validarCoordinadorId(supabase, coordinador_id);
       if (errorCoordinador) {
         return NextResponse.json({ error: errorCoordinador }, { status: 400 });
@@ -708,6 +727,13 @@ export async function PATCH(request: NextRequest) {
     if (typeof comision_porcentaje !== 'undefined') updatePayload.comision_porcentaje = comision_porcentaje === null ? null : Number(comision_porcentaje);
     if (typeof activo === 'boolean') updatePayload.activo = activo;
     if (typeof coordinador_id !== 'undefined') updatePayload.coordinador_id = coordinador_id === null || coordinador_id === '' ? null : coordinador_id;
+
+    // Auto-clear coordinador_id when this PATCH moves the subject away from
+    // ROL_VENDEDOR — even if the client didn't send coordinador_id at all —
+    // so no stale team link survives a promotion/role change.
+    if (needsRolCheck && nuevoRolNombre && nuevoRolNombre !== 'ROL_VENDEDOR') {
+      updatePayload.coordinador_id = null;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
