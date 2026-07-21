@@ -31,6 +31,8 @@ import ReasignarClientesModal from "@/components/ReasignarClientesModal";
 import HistorialCambiosUsuario from "@/components/HistorialCambiosUsuario";
 import ImportarUsuariosModal from "@/components/ImportarUsuariosModal";
 import ExportButton from "@/components/export/ExportButton";
+import BulkCoordinadorModal from "@/components/BulkCoordinadorModal";
+import { usePermissions } from "@/lib/permissions";
 import {
   cambiarEstadoUsuario,
   resetearPasswordUsuario,
@@ -112,6 +114,13 @@ function GestionUsuarios() {
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null);
   const [mostrarPassword, setMostrarPassword] = useState(false);
 
+  const { tieneRol } = usePermissions();
+  const puedeAsignarCoordinador = tieneRol("ROL_ADMIN");
+
+  // Bulk coordinador assignment state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCoordinadorModalOpen, setBulkCoordinadorModalOpen] = useState(false);
+
   // Server-side pagination state
   const [busqueda, setBusqueda] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -182,6 +191,7 @@ function GestionUsuarios() {
       const data = await res.json();
 
       setUsuarios(data.usuarios || []);
+      setSelectedIds(new Set());
       setTotal(data.total || 0);
     } catch {
       toast.error("Error cargando usuarios");
@@ -385,6 +395,63 @@ function GestionUsuarios() {
   const vendedoresActivos = usuarios
     .filter((u) => u.activo && !u.deleted_at)
     .map((u) => ({ id: u.id, username: u.username || "", nombre_completo: u.nombre_completo || "" }));
+
+  // Vendedores selectable for bulk coordinador assignment: active,
+  // ROL_VENDEDOR, not soft-deleted — mirrors the endpoint's own per-id
+  // validation so the UI never lets the admin select an id the API would
+  // reject anyway.
+  const vendedoresSeleccionablesIds = usuarios
+    .filter((u) => u.rol?.nombre === "ROL_VENDEDOR" && u.activo && !u.deleted_at)
+    .map((u) => u.id);
+
+  const isAllSelected = vendedoresSeleccionablesIds.length > 0 &&
+    vendedoresSeleccionablesIds.every((id) => selectedIds.has(id));
+  const isSomeSelected = !isAllSelected && vendedoresSeleccionablesIds.some((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(isAllSelected ? new Set() : new Set(vendedoresSeleccionablesIds));
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkAsignarCoordinador = async (coordinadorId: string | null) => {
+    const vendedorIds = Array.from(selectedIds);
+    try {
+      const response = await fetch("/api/admin/usuarios/bulk-coordinador", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendedorIds, coordinadorId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data?.error || "Error asignando coordinador");
+        return;
+      }
+      const actualizados = data.actualizados ?? 0;
+      const rechazados: { id: string; motivo: string }[] = data.rechazados ?? [];
+      if (rechazados.length > 0) {
+        const resumenRechazo = `${actualizados} ${actualizados === 1 ? "vendedor actualizado" : "vendedores actualizados"}, ${rechazados.length} rechazado${rechazados.length === 1 ? "" : "s"}`;
+        const detalleMotivos = rechazados.length <= 3
+          ? `: ${rechazados.map((r) => r.motivo).join("; ")}`
+          : "";
+        toast.error(`${resumenRechazo}${detalleMotivos}`);
+      } else {
+        toast.success(`Coordinador actualizado para ${actualizados} ${actualizados === 1 ? "vendedor" : "vendedores"}`);
+      }
+      setSelectedIds(new Set());
+      setBulkCoordinadorModalOpen(false);
+      await cargarUsuarios();
+    } catch {
+      toast.error("Error asignando coordinador");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -592,10 +659,50 @@ function GestionUsuarios() {
           </p>
         )}
 
+        {/* Bulk coordinador assignment bar */}
+        {puedeAsignarCoordinador && selectedIds.size > 0 && (
+          <div className="crm-card p-4 mb-4 bg-crm-card-hover border border-crm-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-semibold text-crm-text-primary">
+                {selectedIds.size} {selectedIds.size === 1 ? "vendedor seleccionado" : "vendedores seleccionados"}
+              </span>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-sm text-crm-text-muted hover:text-crm-primary transition-colors underline"
+              >
+                Deseleccionar todo
+              </button>
+            </div>
+            <button
+              onClick={() => setBulkCoordinadorModalOpen(true)}
+              className="crm-button-primary px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              Asignar coordinador
+            </button>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-crm-border">
+                {puedeAsignarCoordinador && (
+                  <th className="py-3 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = isSomeSelected;
+                        }
+                      }}
+                      onChange={toggleSelectAll}
+                      disabled={vendedoresSeleccionablesIds.length === 0}
+                      aria-label="Seleccionar todos los vendedores de esta página"
+                      className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                    />
+                  </th>
+                )}
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Usuario</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">DNI</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary hidden md:table-cell">Teléfono</th>
@@ -629,13 +736,13 @@ function GestionUsuarios() {
             <tbody>
               {cargando ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-crm-text-muted">
+                  <td colSpan={puedeAsignarCoordinador ? 9 : 8} className="py-8 text-center text-crm-text-muted">
                     <div className="animate-pulse">Cargando usuarios...</div>
                   </td>
                 </tr>
               ) : usuarios.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-crm-text-muted">
+                  <td colSpan={puedeAsignarCoordinador ? 9 : 8} className="py-8 text-center text-crm-text-muted">
                     {debouncedSearch ? `No se encontraron usuarios para "${debouncedSearch}"` : "No hay usuarios registrados"}
                   </td>
                 </tr>
@@ -646,6 +753,19 @@ function GestionUsuarios() {
 
                   return (
                     <tr key={usuario.id} className={`border-b border-crm-border/50 ${isDeleted ? "opacity-50" : ""}`}>
+                      {puedeAsignarCoordinador && (
+                        <td className="py-3 px-4">
+                          {usuario.rol?.nombre === "ROL_VENDEDOR" && usuario.activo && !isDeleted && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(usuario.id)}
+                              onChange={() => toggleSelectOne(usuario.id)}
+                              aria-label={`Seleccionar a ${usuario.nombre_completo || usuario.username || "vendedor"}`}
+                              className="w-4 h-4 text-crm-primary bg-crm-card border-crm-border rounded focus:ring-crm-primary focus:ring-2 cursor-pointer"
+                            />
+                          )}
+                        </td>
+                      )}
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-3">
                           {usuario.avatar_url ? (
@@ -865,6 +985,14 @@ function GestionUsuarios() {
         roles={roles}
         onClose={() => setImportModalOpen(false)}
         onImportComplete={cargarUsuarios}
+      />
+
+      <BulkCoordinadorModal
+        open={bulkCoordinadorModalOpen}
+        onClose={() => setBulkCoordinadorModalOpen(false)}
+        selectedCount={selectedIds.size}
+        coordinadores={coordinadores}
+        onConfirm={handleBulkAsignarCoordinador}
       />
     </div>
   );
