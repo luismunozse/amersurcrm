@@ -31,7 +31,12 @@ vi.mock("@/lib/supabase.server", () => ({
   createServiceRoleClient: vi.fn(() => mockServiceRoleClient),
 }));
 
+vi.mock("@/lib/auth/equipo-scope.server", () => ({
+  resolveEquipoScope: vi.fn(),
+}));
+
 import { getSidebarBadges } from "@/app/dashboard/actions/sidebar-badges";
+import { resolveEquipoScope } from "@/lib/auth/equipo-scope.server";
 
 function setupChains(opts: {
   rolNombre: string;
@@ -78,6 +83,28 @@ function setupChains(opts: {
   mockServiceRoleClient.schema = vi.fn(() => ({
     from: vi.fn(() => createChainMock({ data: opts.equipo ?? [], error: null })),
   }));
+
+  // Mock resolveEquipoScope to return appropriate tier
+  let scopeToReturn: any;
+  if (opts.rolNombre === "ROL_ADMIN" || opts.rolNombre === "ROL_GERENTE") {
+    scopeToReturn = { tier: "global" };
+  } else if (opts.rolNombre === "ROL_COORDINADOR_VENTAS") {
+    const equipo = opts.equipo ?? [];
+    const equipoUserIds = equipo.map((e) => e.id);
+    equipoUserIds.push("user-1");
+    const equipoUsernames = equipo.map((e) => e.username);
+    equipoUsernames.push(username);
+    scopeToReturn = {
+      tier: "equipo",
+      userId: "user-1",
+      username,
+      equipoUserIds,
+      equipoUsernames,
+    };
+  } else {
+    scopeToReturn = { tier: "propio", userId: "user-1", username };
+  }
+  (resolveEquipoScope as any).mockResolvedValue(scopeToReturn);
 
   return { cobranzaChain, eventoChain, recordatorioChain, username };
 }
@@ -148,5 +175,48 @@ describe("getSidebarBadges: badge de agenda (eventos + recordatorios)", () => {
 
     expect(eventoChain.eq).toHaveBeenCalledWith("vendedor_id", "user-1");
     expect(recordatorioChain.eq).toHaveBeenCalledWith("vendedor_id", "user-1");
+  });
+});
+
+describe("getSidebarBadges: anonimo short-circuit", () => {
+  it("returns empty badges and skips all queries when scope tier is anonimo", async () => {
+    // Create chains for the queries that should NOT be called
+    const eventoChain = createChainMock({ data: null, error: null, count: 0 });
+    const recordatorioChain = createChainMock({ data: null, error: null, count: 0 });
+    const cobranzaChain = createChainMock({ data: null, error: null, count: 5 });
+
+    mockServerOnlyClient.schema = vi.fn((schemaName: string) => ({
+      from: vi.fn((table: string) => {
+        if (schemaName !== "crm") return createChainMock();
+        switch (table) {
+          case "usuario_perfil":
+            return createChainMock({
+              data: { username: "vend1", rol: { nombre: "ROL_VENDEDOR" } },
+              error: null,
+            });
+          case "evento":
+            return eventoChain;
+          case "recordatorio":
+            return recordatorioChain;
+          case "v_cobranza":
+            return cobranzaChain;
+          default:
+            return createChainMock();
+        }
+      }),
+    }));
+
+    // Mock resolveEquipoScope to return anonimo tier
+    (resolveEquipoScope as any).mockResolvedValue({ tier: "anonimo" });
+
+    const res = await getSidebarBadges();
+
+    // Should return empty object (short-circuit before any badge queries)
+    expect(res).toEqual({});
+
+    // Verify no badge table queries were called
+    expect(eventoChain.select).not.toHaveBeenCalled();
+    expect(recordatorioChain.select).not.toHaveBeenCalled();
+    expect(cobranzaChain.select).not.toHaveBeenCalled();
   });
 });

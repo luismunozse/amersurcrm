@@ -11,10 +11,10 @@ export type SidebarBadges = {
 };
 
 /**
- * Conteos para badges del sidebar — se ejecuta por polling cada ~60s.
- * Agenda y cobranza son globales para admin/gerente, ACOTADAS AL EQUIPO
- * para coordinador (su equipo, no toda la organización — coordinador-teams
- * change), y propias para el resto de roles.
+ * Badge counts for sidebar — polled every ~60s.
+ * Agenda and cobranza are global for admin/gerente, SCOPED TO TEAM
+ * for coordinador (their team, not the entire organization — coordinador-teams
+ * change), and personal for other roles.
  */
 export async function getSidebarBadges(): Promise<SidebarBadges> {
   try {
@@ -27,7 +27,7 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
     const { data: perfil } = await s
       .schema("crm")
       .from("usuario_perfil")
-      .select("username, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+      .select("username")
       .eq("id", userId)
       .maybeSingle();
 
@@ -35,6 +35,10 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
     if (!username) return {};
 
     const scope = await resolveEquipoScope(s, userId);
+
+    // Short-circuit for anonimo tier: no badges, no queries
+    if (scope.tier === "anonimo") return {};
+
     const esGlobal = scope.tier === "global";
     const equipoUserIds = scope.tier === "equipo" ? scope.equipoUserIds : null;
     const equipoUsernames = scope.tier === "equipo" ? scope.equipoUsernames : null;
@@ -45,7 +49,7 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
 
     const [clientesRes, interaccionesRes, eventosRes, recordatoriosRes, cuotasRes] =
       await Promise.all([
-        // Clientes por contactar asignados al vendedor
+        // Clients to contact assigned to the salesperson
         s
           .schema("crm")
           .from("cliente")
@@ -53,7 +57,7 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           .eq("estado_cliente", "por_contactar")
           .eq("vendedor_username", username),
 
-        // Pipeline — clientes con fecha_proxima_accion vencida o hoy
+        // Pipeline — clients with next action overdue or today
         s
           .schema("crm")
           .from("cliente_interaccion")
@@ -62,8 +66,8 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           .not("fecha_proxima_accion", "is", null)
           .lte("fecha_proxima_accion", endOfDay),
 
-        // Agenda — eventos de hoy no cancelados. Admin/gerente ven todos;
-        // coordinador ve los de su equipo; el resto solo los propios.
+        // Agenda — today's non-cancelled events. Admin/gerente see all;
+        // coordinador sees their team's; others see only their own.
         (() => {
           const q = s
             .schema("crm")
@@ -77,7 +81,7 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           return q.eq("vendedor_id", userId);
         })(),
 
-        // Agenda — recordatorios de hoy pendientes. Mismo alcance que eventos.
+        // Agenda — today's pending reminders. Same scope as events.
         (() => {
           const q = s
             .schema("crm")
@@ -91,8 +95,8 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           return q.eq("vendedor_id", userId);
         })(),
 
-        // Cobranza — cuotas vencidas/en mora. Admin/gerente ven todas;
-        // coordinador ve las de su equipo; el resto solo las propias.
+        // Collections — overdue/in-arrears payments. Admin/gerente see all;
+        // coordinador sees their team's; others see only their own.
         (() => {
           const q = s
             .schema("crm")
