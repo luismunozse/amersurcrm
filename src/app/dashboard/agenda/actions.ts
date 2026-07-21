@@ -9,6 +9,7 @@ import {
 } from "@/lib/types/agenda";
 import { crearNotificacion } from "@/app/_actionsNotifications";
 import { obtenerPermisosUsuario } from "@/lib/permissions/server";
+import { getEquipoScope } from "@/lib/auth/equipo-scope.server";
 import {
   startOfMonth,
   endOfMonth,
@@ -409,6 +410,15 @@ export async function obtenerEventos(
       return [];
     }
 
+    // Resolve the caller's team-visibility tier once, up front, so an
+    // "anonimo" caller (authenticated but no resolvable usuario_perfil row)
+    // short-circuits before any query runs — matches the sidebar-badges and
+    // clientes fetchers pattern (see @/lib/auth/equipo-scope.server).
+    const scope = await getEquipoScope();
+    if (scope.tier === 'anonimo') {
+      return [];
+    }
+
     let inicioRango: Date;
     let finRango: Date;
 
@@ -493,16 +503,17 @@ export async function obtenerEventos(
 
     // Filtro por vendedor:
     // - Si se pasa un vendedorFiltroId específico, filtrar por ese vendedor
-    // - Si no, los admins/gerentes ven todos; los vendedores solo los suyos
+    // - Si no, se aplica el scope de visibilidad del llamante: admin/gerente
+    //   ven todos (global), coordinador ve el vendedor_id de su equipo
+    //   (equipo), y el resto solo lo suyo (propio) — sin cambios.
     if (vendedorFiltroId) {
       query = query.eq('vendedor_id', vendedorFiltroId);
-    } else {
-      const permisos = await obtenerPermisosUsuario();
-      const esAdminOGerente = permisos && ['ROL_ADMIN', 'ROL_GERENTE', 'ROL_COORDINADOR_VENTAS'].includes(permisos.rol);
-      if (!esAdminOGerente) {
-        query = query.eq('vendedor_id', user.id);
-      }
+    } else if (scope.tier === 'equipo') {
+      query = query.in('vendedor_id', scope.equipoUserIds);
+    } else if (scope.tier === 'propio') {
+      query = query.eq('vendedor_id', user.id);
     }
+    // scope.tier === 'global': sin filtro, comportamiento org-wide sin cambios.
 
     if (lotesPermitidos) {
       query = query.in('propiedad_id', lotesPermitidos);

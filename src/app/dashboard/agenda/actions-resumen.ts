@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerOnlyClient } from "@/lib/supabase.server";
+import { getEquipoScope } from "@/lib/auth/equipo-scope.server";
 import { startOfDay, endOfDay } from "date-fns";
 
 export type ItemAgendaResumen = {
@@ -30,21 +31,16 @@ export async function obtenerResumenAgendaHoy(): Promise<ResumenAgendaHoy> {
     } = await supabase.auth.getUser();
     if (!user) return empty;
 
+    // Resolve the caller's team-visibility tier once, up front, so an
+    // "anonimo" caller (authenticated but no resolvable usuario_perfil row)
+    // short-circuits before any query runs — matches the sidebar-badges and
+    // clientes fetchers pattern (see @/lib/auth/equipo-scope.server).
+    const scope = await getEquipoScope();
+    if (scope.tier === "anonimo") return empty;
+
     const ahora = new Date();
     const inicio = startOfDay(ahora);
     const fin = endOfDay(ahora);
-
-    const { data: perfil } = await supabase
-      .schema("crm")
-      .from("usuario_perfil")
-      .select("rol:rol!usuario_perfil_rol_id_fkey(nombre)")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const rolNombre = Array.isArray((perfil as any)?.rol)
-      ? (perfil as any).rol[0]?.nombre
-      : (perfil as any)?.rol?.nombre;
-    const esPrivilegiado = ["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"].includes(rolNombre);
 
     const eventosQuery = supabase
       .from("evento")
@@ -70,9 +66,20 @@ export async function obtenerResumenAgendaHoy(): Promise<ResumenAgendaHoy> {
       .order("fecha_recordatorio", { ascending: true })
       .limit(10);
 
+    // Scope de visibilidad: admin/gerente ven todo (global), coordinador ve
+    // el vendedor_id de su equipo (equipo), y el resto solo lo suyo (propio)
+    // — comportamiento de vendedor sin cambios.
     const [eventosRes, recordatoriosRes] = await Promise.all([
-      esPrivilegiado ? eventosQuery : eventosQuery.eq("vendedor_id", user.id),
-      esPrivilegiado ? recordatoriosQuery : recordatoriosQuery.eq("vendedor_id", user.id),
+      scope.tier === "global"
+        ? eventosQuery
+        : scope.tier === "equipo"
+          ? eventosQuery.in("vendedor_id", scope.equipoUserIds)
+          : eventosQuery.eq("vendedor_id", user.id),
+      scope.tier === "global"
+        ? recordatoriosQuery
+        : scope.tier === "equipo"
+          ? recordatoriosQuery.in("vendedor_id", scope.equipoUserIds)
+          : recordatoriosQuery.eq("vendedor_id", user.id),
     ]);
 
     const eventos: ItemAgendaResumen[] = (eventosRes.data ?? []).map((e: any) => {
