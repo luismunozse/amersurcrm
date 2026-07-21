@@ -11,7 +11,14 @@ const { mockGetUser, mockServerOnlyClient, mockServiceRoleClient, createChainMoc
 
   const mockGetUser = vi.fn();
   const mockServerOnlyClient: any = { auth: { getUser: mockGetUser } };
-  const mockServiceRoleClient: any = { from: vi.fn() };
+  // Schema-aware mock (mirrors equipo-scope.test.ts / clientes-search-route.test.ts):
+  // createServiceRoleClient() has no default schema (see supabase.server.ts),
+  // so the route MUST call .schema("crm").from(...) — there is no top-level
+  // .from() here on purpose. A route that calls serviceSupabase.from(...)
+  // directly (the real production bug — PGRST205, table not found in
+  // 'public') will throw, which is caught by the route's outer catch and
+  // surfaces as the same 500 the bug report describes.
+  const mockServiceRoleClient: any = { schema: vi.fn() };
 
   return { mockGetUser, mockServerOnlyClient, mockServiceRoleClient, createChainMock };
 });
@@ -38,8 +45,23 @@ function rows() {
   ];
 }
 
+function mockCrmChain(finalResult: any) {
+  const chain = createChainMock(finalResult);
+  mockServiceRoleClient.schema.mockImplementation((schemaName: string) => {
+    if (schemaName !== "crm") {
+      throw new Error(`Unexpected schema "${schemaName}" — route must query the crm schema`);
+    }
+    return { from: vi.fn(() => chain) };
+  });
+  return chain;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Reset implementation (not just call history) so a prior test's
+  // mockCrmChain() wiring never leaks into the next test — mockClear()
+  // alone would leave mockImplementation in place.
+  mockServiceRoleClient.schema.mockReset();
   mockGetUser.mockResolvedValue({ data: { user: { id: "coord-1" } }, error: null });
 });
 
@@ -47,14 +69,14 @@ describe("GET /api/clientes/vendedores", () => {
   it("returns the full vendedor+coordinador list for admin/gerente", async () => {
     vi.mocked(esAdminOCoordinador).mockResolvedValue(true);
     vi.mocked(esCoordinador).mockResolvedValue(false);
-    const chain = createChainMock({ data: rows(), error: null });
-    mockServiceRoleClient.from = vi.fn(() => chain);
+    const chain = mockCrmChain({ data: rows(), error: null });
 
     const res = await GET();
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.vendedores.map((v: any) => v.username).sort()).toEqual(["coord1", "coord2", "vend1", "vend2"]);
+    void chain;
   });
 
   it("scopes the list to the caller's own team PLUS the caller themselves when the caller is a coordinador", async () => {
@@ -63,8 +85,7 @@ describe("GET /api/clientes/vendedores", () => {
     // pre-filtered by .or('coordinador_id.eq.coord-1,id.eq.coord-1') — includes
     // team member v1 AND the caller's own coord-1 row, excludes v2 (belongs to
     // coord-2's team) and coord-2 (a different coordinador's own row).
-    const chain = createChainMock({ data: [rows()[0], rows()[2]], error: null });
-    mockServiceRoleClient.from = vi.fn(() => chain);
+    const chain = mockCrmChain({ data: [rows()[0], rows()[2]], error: null });
 
     const res = await GET();
     const body = await res.json();
@@ -79,8 +100,7 @@ describe("GET /api/clientes/vendedores", () => {
     // Simulate the DB *not* pre-filtering (defensive check on the app-level
     // post-filter): even if coord-2's row somehow came back, it must never
     // appear in coord-1's list.
-    const chain = createChainMock({ data: rows(), error: null });
-    mockServiceRoleClient.from = vi.fn(() => chain);
+    mockCrmChain({ data: rows(), error: null });
 
     const res = await GET();
     const body = await res.json();

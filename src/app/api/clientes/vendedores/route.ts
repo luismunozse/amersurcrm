@@ -35,6 +35,7 @@ export async function GET() {
     };
 
     let query = serviceSupabase
+      .schema("crm")
       .from("usuario_perfil")
       .select("id, username, nombre_completo, telefono, email, coordinador_id, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
       .eq("activo", true);
