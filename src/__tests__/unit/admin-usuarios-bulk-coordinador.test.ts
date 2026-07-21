@@ -108,7 +108,7 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body).toEqual({ actualizados: 2, rechazados: [] });
+    expect(body).toEqual({ actualizados: 2, sinCambios: 0, rechazados: [] });
     expect(chains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: "coord-1" });
     expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith([
       { usuario_id: "v1", campo: "coordinador_id", valor_anterior: null, valor_nuevo: "coord-1", modificado_por: "admin-1" },
@@ -147,6 +147,7 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
 
     expect(res.status).toBe(200);
     expect(body.actualizados).toBe(1);
+    expect(body.sinCambios).toBe(0);
     expect(body.rechazados).toEqual(expect.arrayContaining([
       { id: "v-missing", motivo: "Usuario no encontrado" },
       { id: "v-inactivo", motivo: "Usuario inactivo" },
@@ -197,10 +198,42 @@ describe("PATCH /api/admin/usuarios/bulk-coordinador", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body).toEqual({ actualizados: 1, rechazados: [] });
+    expect(body).toEqual({ actualizados: 1, sinCambios: 0, rechazados: [] });
     expect(chains.usuario_perfil.update).toHaveBeenCalledWith({ coordinador_id: null });
     expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith([
       { usuario_id: "v1", campo: "coordinador_id", valor_anterior: "coord-old", valor_nuevo: null, modificado_por: "admin-1" },
+    ]);
+  });
+
+  it("counts vendedores already assigned to the target coordinador as sinCambios, not actualizados", async () => {
+    const chains = (mockServerOnlyClient as any).__chains;
+    chains.usuario_perfil = createChainMock({
+      singleResults: [
+        { data: { id: "coord-1", activo: true, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null },
+        { data: { nombre_completo: "Admin Uno" }, error: null },
+      ],
+      thenResults: [
+        {
+          data: [
+            { id: "v1", nombre_completo: "Vendedor Uno", coordinador_id: null, activo: true, deleted_at: null, rol: { nombre: "ROL_VENDEDOR" } },
+            { id: "v2", nombre_completo: "Vendedor Dos", coordinador_id: "coord-1", activo: true, deleted_at: null, rol: { nombre: "ROL_VENDEDOR" } },
+          ],
+          error: null,
+        },
+        { data: null, error: null },
+      ],
+    });
+    chains.historial_cambios_usuario = createChainMock({ thenResults: [{ data: null, error: null }] });
+
+    const res = await PATCH(req({ vendedorIds: ["v1", "v2"], coordinadorId: "coord-1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ actualizados: 1, sinCambios: 1, rechazados: [] });
+    // Only the ACTUALLY-changed vendedor gets a historial row + audit entry —
+    // v2 was already assigned to coord-1, so it's a no-op (unchanged logic).
+    expect(chains.historial_cambios_usuario.insert).toHaveBeenCalledWith([
+      { usuario_id: "v1", campo: "coordinador_id", valor_anterior: null, valor_nuevo: "coord-1", modificado_por: "admin-1" },
     ]);
   });
 

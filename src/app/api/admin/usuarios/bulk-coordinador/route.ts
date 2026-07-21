@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (validos.length === 0) {
-      return NextResponse.json({ actualizados: 0, rechazados });
+      return NextResponse.json({ actualizados: 0, sinCambios: 0, rechazados });
     }
 
     const idsAActualizar = validos.map((v) => v.id);
@@ -152,7 +152,11 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ actualizados: idsAActualizar.length, rechazados });
+    return NextResponse.json({
+      actualizados: cambiados.length,
+      sinCambios: validos.length - cambiados.length,
+      rechazados,
+    });
   } catch (error) {
     console.error("Error en PATCH /api/admin/usuarios/bulk-coordinador:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

@@ -531,15 +531,20 @@ function GestionUsuarios() {
         return;
       }
       const actualizados = data.actualizados ?? 0;
+      const sinCambios = data.sinCambios ?? 0;
       const rechazados: { id: string; motivo: string }[] = data.rechazados ?? [];
+
+      const resumenAsignacion = sinCambios > 0
+        ? `${actualizados} asignado${actualizados === 1 ? "" : "s"}, ${sinCambios} ya estaba${sinCambios === 1 ? "" : "n"} asignado${sinCambios === 1 ? "" : "s"}`
+        : `Coordinador actualizado para ${actualizados} ${actualizados === 1 ? "vendedor" : "vendedores"}`;
+
       if (rechazados.length > 0) {
-        const resumenRechazo = `${actualizados} ${actualizados === 1 ? "vendedor actualizado" : "vendedores actualizados"}, ${rechazados.length} rechazado${rechazados.length === 1 ? "" : "s"}`;
         const detalleMotivos = rechazados.length <= 3
           ? `: ${rechazados.map((r) => r.motivo).join("; ")}`
           : "";
-        toast.error(`${resumenRechazo}${detalleMotivos}`);
+        toast.error(`${resumenAsignacion}, ${rechazados.length} rechazado${rechazados.length === 1 ? "" : "s"}${detalleMotivos}`);
       } else {
-        toast.success(`Coordinador actualizado para ${actualizados} ${actualizados === 1 ? "vendedor" : "vendedores"}`);
+        toast.success(resumenAsignacion);
       }
       setSelectedVendedores(new Map());
       setBulkCoordinadorModalOpen(false);
