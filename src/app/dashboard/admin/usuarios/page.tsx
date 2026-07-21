@@ -187,16 +187,27 @@ function GestionUsuarios() {
 
   const [coordinadores, setCoordinadores] = useState<{ id: string; username: string; nombre_completo: string }[]>([]);
 
-  // Cargar coordinadores activos (para el selector de asignación de vendedores)
-  useEffect(() => {
-    fetch("/api/clientes/vendedores", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        const soloCoordinadores = (d.vendedores || []).filter((v: any) => v.rol === "ROL_COORDINADOR_VENTAS");
-        setCoordinadores(soloCoordinadores);
-      })
-      .catch(() => {});
+  // Cargar coordinadores activos (para el selector de asignación de vendedores).
+  // Re-invoked — not just fetched once on mount — whenever a modal that
+  // consumes this list opens (EquipoDecisionModal, BulkCoordinadorModal) and
+  // after lifecycle mutations that can change who is a coordinador
+  // (activar/desactivar, eliminar, crear). Otherwise the dropdown/transfer
+  // target list can go stale mid-session (e.g. a just-deactivated
+  // coordinador still showing up as a valid transfer target).
+  const cargarCoordinadores = useCallback(async () => {
+    try {
+      const res = await fetch("/api/clientes/vendedores", { cache: "no-store" });
+      const data = await res.json();
+      const soloCoordinadores = (data.vendedores || []).filter((v: any) => v.rol === "ROL_COORDINADOR_VENTAS");
+      setCoordinadores(soloCoordinadores);
+    } catch {
+      // Best-effort UI data — silently keep the previous list on failure.
+    }
   }, []);
+
+  useEffect(() => {
+    cargarCoordinadores();
+  }, [cargarCoordinadores]);
 
   // Cargar usuarios con paginación y ordenamiento server-side
   const cargarUsuarios = useCallback(async () => {
@@ -250,6 +261,7 @@ function GestionUsuarios() {
         setRolSeleccionado("");
         setMostrarPassword(false);
         await cargarUsuarios();
+        void cargarCoordinadores();
       } else {
         toast.error(data.error || data.message || "Error creando usuario");
       }
@@ -292,6 +304,21 @@ function GestionUsuarios() {
     setEstadoModalOpen(true);
   };
 
+  // Single point where EquipoDecisionModal's state is set — both the
+  // deactivate and delete trigger sites route through here, so the
+  // coordinadores list refresh only needs to be wired in once.
+  const abrirEquipoDecisionModal = (
+    coordinador: Usuario | null,
+    equipoSize: number,
+    action: (decision: EquipoDecision) => Promise<EquipoActionOutcome>
+  ) => {
+    setEquipoDecisionCoordinador(coordinador);
+    setEquipoDecisionEquipoSize(equipoSize);
+    setEquipoDecisionAction(() => action);
+    setEquipoDecisionOpen(true);
+    void cargarCoordinadores();
+  };
+
   const ejecutarCambioEstado = async (
     usuario: Usuario,
     motivo: string,
@@ -302,16 +329,14 @@ function GestionUsuarios() {
     if (result.success) {
       toast.success(result.message || "Estado cambiado correctamente");
       await cargarUsuarios();
+      void cargarCoordinadores();
       setEstadoModalOpen(false);
       setUserCambiandoEstado(null);
       return "completed";
     }
 
     if (result.needsEquipoDecision) {
-      setEquipoDecisionCoordinador(usuario);
-      setEquipoDecisionEquipoSize(result.equipoSize || 0);
-      setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarCambioEstado(usuario, motivo, decision));
-      setEquipoDecisionOpen(true);
+      abrirEquipoDecisionModal(usuario, result.equipoSize || 0, (decision: EquipoDecision) => ejecutarCambioEstado(usuario, motivo, decision));
       setEstadoModalOpen(false);
       return "needs-decision";
     }
@@ -392,6 +417,7 @@ function GestionUsuarios() {
       // team members' "Coordinador" column stale. Parity with
       // ejecutarCambioEstado above.
       await cargarUsuarios();
+      void cargarCoordinadores();
       setDeleteModalOpen(false);
       setUserToDelete(null);
       return "completed";
@@ -399,10 +425,7 @@ function GestionUsuarios() {
 
     if (result.needsEquipoDecision) {
       const usuario = usuarios.find((u) => u.id === userId) ?? userToDelete;
-      setEquipoDecisionCoordinador(usuario ?? null);
-      setEquipoDecisionEquipoSize(result.equipoSize || 0);
-      setEquipoDecisionAction(() => (decision: EquipoDecision) => ejecutarEliminarUsuario(userId, decision));
-      setEquipoDecisionOpen(true);
+      abrirEquipoDecisionModal(usuario ?? null, result.equipoSize || 0, (decision: EquipoDecision) => ejecutarEliminarUsuario(userId, decision));
       setDeleteModalOpen(false);
       return "needs-decision";
     }
@@ -784,7 +807,10 @@ function GestionUsuarios() {
             seleccionados={Array.from(selectedVendedores, ([id, nombre]) => ({ id, nombre }))}
             onQuitar={quitarSeleccionado}
             onLimpiar={limpiarSeleccion}
-            onAsignar={() => setBulkCoordinadorModalOpen(true)}
+            onAsignar={() => {
+              void cargarCoordinadores();
+              setBulkCoordinadorModalOpen(true);
+            }}
           />
         )}
 

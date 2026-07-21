@@ -310,6 +310,34 @@ describe("cambiarEstadoUsuario — equipo decision (coordinador with a team)", (
     expect(result.success).toBe(true);
     expect(callCount).toBe(2);
   });
+
+  it("fails closed (no team UPDATE, no audit) when the acting admin cannot be resolved", async () => {
+    // getAdminInfo() returns null when supabase.auth.getUser() has no user —
+    // e.g. a session race. Previously resolverEquipoDelCoordinador silently
+    // fell back to `admin?.id || coordinadorId` for modificado_por and
+    // skipped registrarAuditoriaUsuario entirely instead of refusing the move.
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const srFrom = vi.fn();
+    const chains = [
+      createChainMock({ data: { id: "coord-1", nombre_completo: "Coord Uno", rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null }), // usuarioExistente
+      createChainMock({ data: [{ id: "v1", nombre_completo: "Vendedor Uno" }], error: null }), // team fetch
+    ];
+    let callCount = 0;
+    srFrom.mockImplementation(() => chains[callCount++]);
+    mockServiceRoleClient.schema.mockReturnValue({ from: srFrom });
+
+    const result = await cambiarEstadoUsuario("coord-1", false, "El coordinador deja la empresa", { dejarSinCoordinador: true });
+
+    expect(result.success).toBe(false);
+    expect((result as any).needsEquipoDecision).toBeUndefined();
+    expect(result.error).toMatch(/administrador/i);
+    // Only the usuarioExistente fetch + team fetch happened — the fail-closed
+    // check must run BEFORE the atomic team UPDATE, so no further
+    // serviceRole call (UPDATE/insert/final activo UPDATE) was ever made.
+    expect(callCount).toBe(2);
+    expect(registrarAuditoriaUsuario).not.toHaveBeenCalled();
+  });
 });
 
 describe("eliminarUsuario", () => {
@@ -433,6 +461,29 @@ describe("eliminarUsuario — equipo decision (coordinador with a team)", () => 
     expect(result.success).toBe(true);
     expect(chains[3].update).toHaveBeenCalledWith({ coordinador_id: "coord-2" });
     expect(mockServiceRoleClient.auth.admin.signOut).toHaveBeenCalledWith("coord-1");
+  });
+
+  it("fails closed (no team UPDATE, no soft-delete, no signOut) when the acting admin cannot be resolved", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const srFrom = vi.fn();
+    const chains = [
+      createChainMock({ data: { id: "coord-1", username: "coord1", nombre_completo: "Coord Uno", deleted_at: null, rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null }), // usuarioExistente
+      createChainMock({ data: [{ id: "v1", nombre_completo: "Vendedor Uno" }], error: null }), // team fetch
+    ];
+    let callCount = 0;
+    srFrom.mockImplementation(() => chains[callCount++]);
+    mockServiceRoleClient.schema.mockReturnValue({ from: srFrom });
+
+    const result = await eliminarUsuario("coord-1", "Renuncia", { dejarSinCoordinador: true });
+
+    expect(result.success).toBe(false);
+    expect((result as any).needsEquipoDecision).toBeUndefined();
+    expect(result.error).toMatch(/administrador/i);
+    // Fail-closed check runs before the atomic team UPDATE — no further
+    // serviceRole calls (UPDATE/insert/soft-delete) were made.
+    expect(callCount).toBe(2);
+    expect(mockServiceRoleClient.auth.admin.signOut).not.toHaveBeenCalled();
   });
 });
 

@@ -72,6 +72,15 @@ async function resolverEquipoDelCoordinador(
     return { ok: false, needsDecision: true, equipoSize: equipo.length };
   }
 
+  // Fail closed: the team move below is attributed to and audited under the
+  // acting admin. Without a resolved admin there is no one to attribute the
+  // change to, so refuse before touching the team instead of silently
+  // falling back to the coordinador being removed (previous behavior) or
+  // skipping the audit trail entirely.
+  if (!admin) {
+    return { ok: false, needsDecision: false, error: "No se pudo verificar el administrador que ejecuta esta acción. Por favor, intente nuevamente." };
+  }
+
   let nuevoCoordinadorId: string | null;
   if ("transferirA" in equipoDecision) {
     if (!equipoDecision.transferirA) {
@@ -107,7 +116,7 @@ async function resolverEquipoDelCoordinador(
     campo: "coordinador_id",
     valor_anterior: coordinadorId,
     valor_nuevo: nuevoCoordinadorId,
-    modificado_por: admin?.id || coordinadorId,
+    modificado_por: admin.id,
   }));
 
   const { error: historialError } = await serviceRole.schema("crm").from("historial_cambios_usuario").insert(historialRows);
@@ -115,17 +124,15 @@ async function resolverEquipoDelCoordinador(
     console.warn("[resolverEquipoDelCoordinador] Error registrando historial de cambios:", historialError);
   }
 
-  if (admin) {
-    for (const v of equipo) {
-      await registrarAuditoriaUsuario(serviceRole, {
-        adminId: admin.id,
-        adminNombre: admin.nombre,
-        usuarioId: v.id,
-        usuarioNombre: v.nombre_completo || v.id,
-        accion: "editar",
-        detalles: { campos_modificados: ["coordinador_id"], origen: "lifecycle_coordinador" },
-      });
-    }
+  for (const v of equipo) {
+    await registrarAuditoriaUsuario(serviceRole, {
+      adminId: admin.id,
+      adminNombre: admin.nombre,
+      usuarioId: v.id,
+      usuarioNombre: v.nombre_completo || v.id,
+      accion: "editar",
+      detalles: { campos_modificados: ["coordinador_id"], origen: "lifecycle_coordinador" },
+    });
   }
 
   return { ok: true, moved: equipo.length };
