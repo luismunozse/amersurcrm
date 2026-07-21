@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
-import { validateBearerAndEnsureGlobalRole } from "@/lib/auth/extension-auth";
+import { validateBearerAndEnsureClientAccess } from "@/lib/auth/extension-auth";
 import { crearNotificacionSistema } from "@/lib/notifications/system";
 import { getEstadoClienteLabel, type EstadoCliente } from "@/lib/types/clientes";
 
@@ -38,7 +38,7 @@ export async function PATCH(
     if (authHeader?.startsWith("Bearer ")) {
       // Token desde header (extensión de Chrome) — role-checked via shared helper
       const token = authHeader.slice(7);
-      const auth = await validateBearerAndEnsureGlobalRole(token);
+      const auth = await validateBearerAndEnsureClientAccess(token, id);
       if (!auth.ok) {
         return NextResponse.json({ error: auth.error }, { status: auth.status, headers: corsHeaders });
       }

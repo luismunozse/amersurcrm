@@ -374,10 +374,10 @@ describe("GET /api/cron/cobranza-alertas — notification fan-out", () => {
     });
     tableChains.usuario_perfil = makePerfilChain({
       data: [
-        { id: "uid-owner1", username: "owner1", rol: { nombre: "ROL_VENDEDOR" } },
-        { id: "uid-coord1", username: "coord1", rol: { nombre: "ROL_COORDINADOR_VENTAS" } },
-        { id: "uid-coord2", username: "coord2", rol: { nombre: "ROL_COORDINADOR_VENTAS" } },
-        { id: "uid-admin1", username: "admin1", rol: { nombre: "ROL_ADMIN" } },
+        { id: "uid-owner1", username: "owner1", rol: { nombre: "ROL_VENDEDOR" }, coordinador_id: "uid-coord1" },
+        { id: "uid-coord1", username: "coord1", rol: { nombre: "ROL_COORDINADOR_VENTAS" }, coordinador_id: null },
+        { id: "uid-coord2", username: "coord2", rol: { nombre: "ROL_COORDINADOR_VENTAS" }, coordinador_id: null },
+        { id: "uid-admin1", username: "admin1", rol: { nombre: "ROL_ADMIN" }, coordinador_id: null },
       ],
       error: null,
     });
@@ -389,12 +389,53 @@ describe("GET /api/cron/cobranza-alertas — notification fan-out", () => {
     const notifChain = tableChains.notificacion;
     expect(notifChain.insertCalls).toHaveLength(1);
     const recipientIds = notifChain.insertCalls[0].map((row: any) => row.usuario_id).sort();
-    // After coordinador-teams: coordinadores are team-scoped (not global),
-    // so only admin and the cliente owner (vendedor) receive notifications.
-    // Coordinador notification routing is pending follow-up (Task 6b).
     expect(recipientIds).toEqual(
-      ["uid-admin1", "uid-owner1"].sort(),
+      ["uid-admin1", "uid-coord1", "uid-owner1"].sort(),
     );
+  });
+
+  it("notifies the owning vendedor's coordinador (via coordinador_id), not an unrelated coordinador", async () => {
+    const tableChains = (mockFrom as any)._tableChains;
+    tableChains.cuota = makeCuotaChain({
+      data: [
+        cuota({
+          id: "cuota-a",
+          fecha_vencimiento: "2026-07-19",
+          venta: {
+            estado: "activa",
+            cliente: {
+              id: "cliente-1",
+              nombre: "Cliente Uno",
+              vendedor_username: "owner1",
+              vendedor_asignado: null,
+              created_by: null,
+            },
+          },
+        }),
+      ],
+      error: null,
+    });
+    tableChains.alerta_cobranza = makeAlertaChain({
+      data: [{ id: "alerta-a", cuota_id: "cuota-a", tipo_alerta: "por_vencer_15d" }],
+      error: null,
+    });
+    tableChains.usuario_perfil = makePerfilChain({
+      data: [
+        { id: "uid-owner1", username: "owner1", rol: { nombre: "ROL_VENDEDOR" }, coordinador_id: "uid-coord1" },
+        { id: "uid-coord1", username: "coord1", rol: { nombre: "ROL_COORDINADOR_VENTAS" }, coordinador_id: null },
+        { id: "uid-coord-unrelated", username: "coord-unrelated", rol: { nombre: "ROL_COORDINADOR_VENTAS" }, coordinador_id: null },
+      ],
+      error: null,
+    });
+    mockFrom.mockImplementation((table: string) => tableChains[table]);
+
+    const res = await GET(bearerRequest());
+    expect(res.status).toBe(200);
+
+    const notifChain = tableChains.notificacion;
+    const recipientIds = notifChain.insertCalls[0].map((row: any) => row.usuario_id);
+    expect(recipientIds).toContain("uid-coord1");
+    expect(recipientIds).not.toContain("uid-coord-unrelated");
   });
 
   it("de-dupes when the cliente owner is also a global-role holder (no double notification)", async () => {

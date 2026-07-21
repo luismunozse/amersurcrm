@@ -81,6 +81,7 @@ interface PerfilRow {
   id: string;
   username: string;
   rol: { nombre: string } | { nombre: string }[] | null;
+  coordinador_id: string | null;
 }
 
 function rolNombreDe(perfil: PerfilRow): string | undefined {
@@ -253,7 +254,7 @@ async function handleRequest(req: NextRequest) {
   // guarantees an empty fan-out while still (falsely) reporting success.
   const { data: perfilesData, error: perfilesError } = await supabaseCrm
     .from("usuario_perfil")
-    .select("id, username, rol:rol_id(nombre)")
+    .select("id, username, rol:rol_id(nombre), coordinador_id")
     .eq("activo", true);
 
   if (perfilesError) {
@@ -270,11 +271,18 @@ async function handleRequest(req: NextRequest) {
   // inactive created_by would otherwise poison the single all-or-nothing
   // notification insert for the whole cohort).
   const perfilIds = new Set(perfilesActivos.map((p) => p.id));
+  // Maps a vendedor's username to their coordinador's auth.users id (if
+  // assigned) — used below so the owning vendedor's coordinador is notified
+  // for their team's cobranza alerts, team-scoped (not every coordinador).
+  const usernameToCoordinadorId = new Map<string, string>();
   for (const perfil of perfilesActivos) {
     usernameToId.set(perfil.username, perfil.id);
     const rolNombre = rolNombreDe(perfil);
     if (rolNombre && (GLOBAL_ROLES as readonly string[]).includes(rolNombre)) {
       globalRoleIds.push(perfil.id);
+    }
+    if (perfil.coordinador_id) {
+      usernameToCoordinadorId.set(perfil.username, perfil.coordinador_id);
     }
   }
 
@@ -310,6 +318,11 @@ async function handleRequest(req: NextRequest) {
     if (cliente?.created_by && perfilIds.has(cliente.created_by)) {
       recipientIds.add(cliente.created_by);
     }
+    // Team-scoped coordinador notification: the owning vendedor's OWN
+    // coordinador (via coordinador_id), not every active coordinador —
+    // restores what GLOBAL_ROLES used to do broadly, now correctly scoped.
+    const coordinadorId = ownerUsername ? usernameToCoordinadorId.get(ownerUsername) : undefined;
+    if (coordinadorId) recipientIds.add(coordinadorId);
 
     alertaTuvoDestinatarios.set(alerta.id, recipientIds.size > 0);
 

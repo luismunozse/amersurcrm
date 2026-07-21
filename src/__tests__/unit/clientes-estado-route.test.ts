@@ -42,7 +42,7 @@ const {
 });
 
 vi.mock("@/lib/auth/extension-auth", () => ({
-  validateBearerAndEnsureGlobalRole: mockValidateBearer,
+  validateBearerAndEnsureClientAccess: mockValidateBearer,
 }));
 
 vi.mock("@/lib/supabase.server", () => ({
