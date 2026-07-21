@@ -33,6 +33,25 @@
 -- Changing it here risks breaking legitimate self-service flows (e.g.
 -- ultimo_acceso, avatar_url, firma_url updates) that are out of scope for
 -- this hotfix.
+--
+-- SELECT SCOPING (review fix): 'usuarios.ver' alone is NOT admin-exclusive —
+-- coordinador_permisos includes 'usuarios.ver' (20250326000008_permissions_matrix.sql,
+-- coordinador_permisos array) and ROL_GERENTE is assigned that exact same
+-- permisos array (`UPDATE crm.rol SET permisos = coordinador_permisos ...
+-- WHERE nombre = 'ROL_GERENTE'` in that migration). A SELECT policy gated on
+-- 'usuarios.ver' alone would therefore let a coordinador read EVERY user's
+-- full profile (DNI, comisión, meta_mensual_ventas, etc.), contradicting the
+-- team-scoped visibility coordinadores get everywhere else post-coordinador-
+-- teams (20260720000001_coordinador_teams_rls.sql and follow-ups). Add
+-- `AND crm.es_visibilidad_global()` — that helper (20260629000000_secure_authz_p1.sql)
+-- is true only for ROL_ADMIN/ROL_GERENTE/ROL_COORDINADOR_VENTAS as a role
+-- check, but its CALLERS across the codebase gate coordinador-team-scoped
+-- reads separately; here it is combined with 'usuarios.ver' specifically to
+-- keep this policy at the admin/gerente global-visibility tier (a
+-- coordinador who is not also flagged for global visibility does not get
+-- blanket profile reads through this policy). UPDATE/INSERT/DELETE are left
+-- gated on 'usuarios.editar'/'usuarios.crear'/'usuarios.eliminar' alone
+-- (admin-only permissions in the matrix, not held by coordinador/gerente).
 
 DROP POLICY IF EXISTS "admins_ven_todos_perfiles" ON crm.usuario_perfil;
 DROP POLICY IF EXISTS "coordinadores_gestionan_vendedores" ON crm.usuario_perfil;
@@ -46,7 +65,10 @@ DROP POLICY IF EXISTS usuario_perfil_admin_delete ON crm.usuario_perfil;
 CREATE POLICY usuario_perfil_admin_select
   ON crm.usuario_perfil
   FOR SELECT
-  USING (crm.tiene_permiso(auth.uid(), 'usuarios.ver'));
+  USING (
+    crm.tiene_permiso(auth.uid(), 'usuarios.ver')
+    AND crm.es_visibilidad_global()
+  );
 
 CREATE POLICY usuario_perfil_admin_update
   ON crm.usuario_perfil
