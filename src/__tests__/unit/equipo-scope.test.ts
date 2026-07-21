@@ -127,7 +127,7 @@ describe("equipoOrFilter", () => {
     expect(equipoOrFilter({ tier: "anonimo" })).toBeNull();
   });
 
-  it("builds an .in() filter over team usernames plus own created_by for tier=equipo", () => {
+  it("builds .in() filters over team UUIDs and usernames for tier=equipo (RLS-aligned, Issue #1/#2)", () => {
     const filtro = equipoOrFilter({
       tier: "equipo",
       userId: "coord-uuid",
@@ -135,10 +135,14 @@ describe("equipoOrFilter", () => {
       equipoUsernames: ["coord1", "vend1", "vend2"],
       equipoUserIds: ["coord-uuid", "vend-1", "vend-2"],
     });
-    expect(filtro).toBe('created_by.eq.coord-uuid,vendedor_username.in.("coord1","vend1","vend2")');
+    // Issue #1: created_by must use .in() over ALL team UUIDs (RLS allows any team member as creator)
+    expect(filtro).toContain("created_by.in.(coord-uuid,vend-1,vend-2)");
+    // Issue #2: must include vendedor_asignado arms alongside vendedor_username
+    expect(filtro).toContain('vendedor_username.in.("coord1","vend1","vend2")');
+    expect(filtro).toContain('vendedor_asignado.in.("coord1","vend1","vend2")');
   });
 
-  it("falls back to created_by-only when the coordinador's team list is empty", () => {
+  it("falls back to created_by-only when the coordinador's team list is empty (Issue #1)", () => {
     const filtro = equipoOrFilter({
       tier: "equipo",
       userId: "coord-uuid",
@@ -146,16 +150,57 @@ describe("equipoOrFilter", () => {
       equipoUsernames: [],
       equipoUserIds: ["coord-uuid"],
     });
-    expect(filtro).toBe("created_by.eq.coord-uuid");
+    // When team is empty, still use .in() for RLS consistency
+    expect(filtro).toBe("created_by.in.(coord-uuid)");
   });
 
-  it("builds the own-ownership filter for tier=propio", () => {
+  it("builds the own-ownership filter for tier=propio with vendedor_asignado arm (Issue #2)", () => {
     const filtro = equipoOrFilter({ tier: "propio", userId: "vend-uuid", username: "vend1" });
-    expect(filtro).toBe("created_by.eq.vend-uuid,vendedor_username.eq.vend1");
+    // Issue #2: propio tier must also include vendedor_asignado arm
+    expect(filtro).toContain("created_by.eq.vend-uuid");
+    expect(filtro).toContain("vendedor_username.eq.vend1");
+    expect(filtro).toContain("vendedor_asignado.eq.vend1");
   });
 
   it("falls back to created_by-only for tier=propio with no username", () => {
     const filtro = equipoOrFilter({ tier: "propio", userId: "vend-uuid", username: null });
     expect(filtro).toBe("created_by.eq.vend-uuid");
+  });
+
+  it("filters out usernames with invalid characters before interpolation (Issue #3)", () => {
+    // Issue #3: malicious username with comma/parens/quotes should be excluded & warned
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const filtro = equipoOrFilter({
+      tier: "equipo",
+      userId: "coord-uuid",
+      username: "coord1",
+      equipoUsernames: ["coord1", 'evil,or(id.gt.0)', "vend2"], // invalid username in middle
+      equipoUserIds: ["coord-uuid", "vend-invalid-1", "vend-2"],
+    });
+    // Only valid usernames should appear in the filter
+    expect(filtro).toContain('"coord1"');
+    expect(filtro).toContain('"vend2"');
+    expect(filtro).not.toContain("evil"); // malicious username filtered out
+    expect(consoleSpy).toHaveBeenCalled(); // warn logged for invalid username
+    consoleSpy.mockRestore();
+  });
+
+  it("logs perfil-query error before returning anonimo (Issue #4)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Setup an error response on the perfil query
+    chains.usuario_perfil = createChainMock({
+      data: null,
+      error: { message: "RLS violation" },
+    });
+
+    const scope = await resolveEquipoScope(mockOptimizedClient, "user-1");
+
+    // Issue #4: error should be logged with [equipo-scope] context prefix
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[equipo-scope]"),
+      expect.anything()
+    );
+    expect(scope).toEqual({ tier: "anonimo" });
+    consoleSpy.mockRestore();
   });
 });

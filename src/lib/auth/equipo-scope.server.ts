@@ -17,6 +17,17 @@ export type EquipoScope =
   | { tier: "anonimo" };
 
 /**
+ * Issue #3: Guard against username injection in PostgREST filter DSL.
+ * Usernames must match [A-Za-z0-9_.\-]+ to be safe for interpolation into
+ * the .or() string. Invalid usernames are filtered out and a warning is logged.
+ */
+const VALID_USERNAME_PATTERN = /^[A-Za-z0-9_.\-]+$/;
+
+function isValidUsername(username: string): boolean {
+  return VALID_USERNAME_PATTERN.test(username);
+}
+
+/**
  * Resolves the visibility tier for an already-authenticated user, given an
  * already-resolved supabase client (cookie-session OR service-role — both
  * work: the self-profile lookup is either RLS-allowed as "own row" or
@@ -28,14 +39,20 @@ export async function resolveEquipoScope(
   supabase: SupabaseClient<any, any, any>,
   userId: string,
 ): Promise<EquipoScope> {
-  const { data: perfil } = await supabase
+  const { data: perfil, error } = await supabase
     .schema("crm")
     .from("usuario_perfil")
     .select("username, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
     .eq("id", userId)
     .single();
 
-  if (!perfil) return { tier: "anonimo" };
+  if (!perfil) {
+    // Issue #4: Log perfil-query error before returning anonimo
+    if (error) {
+      console.error("[equipo-scope] Error consultando perfil del usuario:", error);
+    }
+    return { tier: "anonimo" };
+  }
 
   const rolData = (perfil as any).rol;
   const rolNombre: string | null = Array.isArray(rolData) ? rolData[0]?.nombre ?? null : rolData?.nombre ?? null;
@@ -95,17 +112,50 @@ export const getEquipoScope = cache(async (): Promise<EquipoScope> => {
  * Returns `null` when no ownership filter is needed (global tier) or when
  * there is no authenticated user (anonimo — callers should already have
  * short-circuited before reaching a query in that case).
+ *
+ * Filters and validates usernames to prevent injection into PostgREST DSL.
+ * Issue #1: Uses .in() over all team UUIDs for equipo tier (RLS-aligned).
+ * Issue #2: Includes vendedor_asignado arms alongside vendedor_username.
+ * Issue #3: Sanitizes usernames before interpolation.
  */
 export function equipoOrFilter(scope: EquipoScope): string | null {
   if (scope.tier === "global" || scope.tier === "anonimo") return null;
 
   if (scope.tier === "equipo") {
-    if (scope.equipoUsernames.length === 0) return `created_by.eq.${scope.userId}`;
-    const usernamesCsv = scope.equipoUsernames.map((u) => `"${u}"`).join(",");
-    return `created_by.eq.${scope.userId},vendedor_username.in.(${usernamesCsv})`;
+    // Issue #1: Always use .in() over all team UUIDs (RLS allows any team member as creator)
+    const uuidsCsv = scope.equipoUserIds.join(",");
+    const createdByArm = `created_by.in.(${uuidsCsv})`;
+
+    // Issue #3: Filter & validate usernames before interpolation
+    const validUsernames = scope.equipoUsernames.filter((u) => {
+      const valid = isValidUsername(u);
+      if (!valid) {
+        console.warn(`[equipo-scope] Filtered out invalid username from equipo filter: "${u}"`);
+      }
+      return valid;
+    });
+
+    // If no valid usernames remain, return created_by-only arm
+    if (validUsernames.length === 0) return createdByArm;
+
+    // Issue #2: Include both vendedor_username and vendedor_asignado arms
+    const usernamesCsv = validUsernames.map((u) => `"${u}"`).join(",");
+    const vendedorUsernameArm = `vendedor_username.in.(${usernamesCsv})`;
+    const vendedorAsignadoArm = `vendedor_asignado.in.(${usernamesCsv})`;
+
+    return `${createdByArm},${vendedorUsernameArm},${vendedorAsignadoArm}`;
   }
 
   // propio
   if (!scope.username) return `created_by.eq.${scope.userId}`;
-  return `created_by.eq.${scope.userId},vendedor_username.eq.${scope.username}`;
+
+  // Issue #3: Validate username before interpolation
+  const validUsername = isValidUsername(scope.username);
+  if (!validUsername) {
+    console.warn(`[equipo-scope] Invalid username in propio filter: "${scope.username}"`);
+    return `created_by.eq.${scope.userId}`;
+  }
+
+  // Issue #2: Include vendedor_asignado arm for propio tier
+  return `created_by.eq.${scope.userId},vendedor_username.eq.${scope.username},vendedor_asignado.eq.${scope.username}`;
 }
