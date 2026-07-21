@@ -43,13 +43,14 @@
 -- full profile (DNI, comisión, meta_mensual_ventas, etc.), contradicting the
 -- team-scoped visibility coordinadores get everywhere else post-coordinador-
 -- teams (20260720000001_coordinador_teams_rls.sql and follow-ups). Add
--- `AND crm.es_visibilidad_global()` — that helper (20260629000000_secure_authz_p1.sql)
--- is true only for ROL_ADMIN/ROL_GERENTE/ROL_COORDINADOR_VENTAS as a role
--- check, but its CALLERS across the codebase gate coordinador-team-scoped
--- reads separately; here it is combined with 'usuarios.ver' specifically to
--- keep this policy at the admin/gerente global-visibility tier (a
--- coordinador who is not also flagged for global visibility does not get
--- blanket profile reads through this policy). UPDATE/INSERT/DELETE are left
+-- `AND crm.es_visibilidad_global()` — that helper was redefined by
+-- 20260720000001_coordinador_teams_rls.sql (which supersedes the original
+-- 20260629000000_secure_authz_p1.sql definition) and is now true ONLY for
+-- ROL_ADMIN and ROL_GERENTE; ROL_COORDINADOR_VENTAS was deliberately dropped
+-- from it as part of coordinador team scoping. Combining it with
+-- 'usuarios.ver' keeps this policy at the admin/gerente global-visibility
+-- tier: a coordinador holds 'usuarios.ver' but fails the role check, so they
+-- get no blanket profile reads through this policy. UPDATE/INSERT/DELETE are left
 -- gated on 'usuarios.editar'/'usuarios.crear'/'usuarios.eliminar' alone
 -- (admin-only permissions in the matrix, not held by coordinador/gerente).
 
