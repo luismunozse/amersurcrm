@@ -74,6 +74,9 @@ async function resolverEquipoDelCoordinador(
 
   let nuevoCoordinadorId: string | null;
   if ("transferirA" in equipoDecision) {
+    if (!equipoDecision.transferirA) {
+      return { ok: false, needsDecision: false, error: "Debe seleccionar un coordinador de destino" };
+    }
     if (equipoDecision.transferirA === coordinadorId) {
       return { ok: false, needsDecision: false, error: "No puede transferir el equipo al mismo coordinador que está desactivando/eliminando" };
     }
@@ -107,10 +110,9 @@ async function resolverEquipoDelCoordinador(
     modificado_por: admin?.id || coordinadorId,
   }));
 
-  try {
-    await serviceRole.schema("crm").from("historial_cambios_usuario").insert(historialRows);
-  } catch (histErr) {
-    console.warn("[resolverEquipoDelCoordinador] Error registrando historial de cambios:", histErr);
+  const { error: historialError } = await serviceRole.schema("crm").from("historial_cambios_usuario").insert(historialRows);
+  if (historialError) {
+    console.warn("[resolverEquipoDelCoordinador] Error registrando historial de cambios:", historialError);
   }
 
   if (admin) {

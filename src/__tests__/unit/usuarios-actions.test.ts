@@ -259,6 +259,24 @@ describe("cambiarEstadoUsuario — equipo decision (coordinador with a team)", (
     expect(result.error).toMatch(/mismo coordinador/i);
   });
 
+  it("rejects an empty-string transferirA and leaves the team untouched", async () => {
+    const srFrom = vi.fn();
+    const chains = [
+      createChainMock({ data: { id: "coord-1", nombre_completo: "Coord Uno", rol: { nombre: "ROL_COORDINADOR_VENTAS" } }, error: null }),
+      createChainMock({ data: [{ id: "v1", nombre_completo: "Vendedor Uno" }], error: null }),
+    ];
+    let callCount = 0;
+    srFrom.mockImplementation(() => chains[callCount++]);
+    mockServiceRoleClient.schema.mockReturnValue({ from: srFrom });
+
+    const result = await cambiarEstadoUsuario("coord-1", false, "El coordinador deja la empresa", { transferirA: "" });
+
+    expect(result.success).toBe(false);
+    expect((result as any).needsEquipoDecision).toBeUndefined();
+    expect(result.error).toMatch(/debe seleccionar un coordinador/i);
+    expect(callCount).toBe(2); // never reached validarCoordinadorId or the UPDATE
+  });
+
   it("rejects an invalid transfer target and leaves the team untouched", async () => {
     const srFrom = vi.fn();
     const chains = [
