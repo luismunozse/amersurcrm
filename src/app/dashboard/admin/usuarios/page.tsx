@@ -60,6 +60,7 @@ interface Usuario {
   activo: boolean;
   created_at: string;
   coordinador_id?: string | null;
+  coordinador?: { id: string; nombre_completo: string | null } | null;
   meta_mensual?: number;
   comision_porcentaje?: number;
   requiere_cambio_password?: boolean;
@@ -145,6 +146,7 @@ function GestionUsuarios() {
   const [total, setTotal] = useState(0);
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [filtroRol, setFiltroRol] = useState("");
+  const [filtroCoordinador, setFiltroCoordinador] = useState("");
   const [sortLastAccess, setSortLastAccess] = useState<"none" | "asc" | "desc">("none");
   const USUARIOS_POR_PAGINA = 10;
 
@@ -207,6 +209,7 @@ function GestionUsuarios() {
       });
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (filtroRol) params.set("rol", filtroRol);
+      if (filtroCoordinador) params.set("coordinador", filtroCoordinador);
       if (sortLastAccess !== "none") {
         params.set("sortBy", "ultimo_acceso");
         params.set("sortDir", sortLastAccess);
@@ -222,7 +225,7 @@ function GestionUsuarios() {
     } finally {
       setCargando(false);
     }
-  }, [paginaActual, debouncedSearch, includeDeleted, filtroRol, sortLastAccess]);
+  }, [paginaActual, debouncedSearch, includeDeleted, filtroRol, filtroCoordinador, sortLastAccess]);
 
   useEffect(() => {
     cargarUsuarios();
@@ -735,6 +738,17 @@ function GestionUsuarios() {
               <option key={r.id} value={r.id}>{{ ROL_ADMIN: "Administrador", ROL_COORDINADOR_VENTAS: "Coordinador", ROL_GERENTE_VENTAS: "Gerente", ROL_VENDEDOR: "Vendedor" }[r.nombre] || r.nombre}</option>
             ))}
           </select>
+          <select
+            value={filtroCoordinador}
+            onChange={(e) => { setFiltroCoordinador(e.target.value); setPaginaActual(1); }}
+            className="px-3 py-2 border border-crm-border rounded-lg bg-crm-card text-crm-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-crm-primary"
+          >
+            <option value="">Todos los coordinadores</option>
+            {coordinadores.map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre_completo || c.username}</option>
+            ))}
+            <option value="sin">Sin coordinador</option>
+          </select>
           <label className="inline-flex items-center gap-2 text-sm text-crm-text-muted cursor-pointer select-none whitespace-nowrap">
             <input
               type="checkbox"
@@ -787,6 +801,7 @@ function GestionUsuarios() {
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">DNI</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary hidden md:table-cell">Teléfono</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary">Rol</th>
+                <th className="text-left py-3 px-4 font-medium text-crm-text-primary hidden lg:table-cell">Coordinador</th>
                 <th className="text-left py-3 px-4 font-medium text-crm-text-primary hidden lg:table-cell">Meta/Comisión</th>
                 <th
                   className="text-left py-3 px-4 font-medium text-crm-text-primary hidden lg:table-cell cursor-pointer select-none hover:text-crm-primary transition-colors"
@@ -816,13 +831,13 @@ function GestionUsuarios() {
             <tbody>
               {cargando ? (
                 <tr>
-                  <td colSpan={puedeAsignarCoordinador ? 9 : 8} className="py-8 text-center text-crm-text-muted">
+                  <td colSpan={puedeAsignarCoordinador ? 10 : 9} className="py-8 text-center text-crm-text-muted">
                     <div className="animate-pulse">Cargando usuarios...</div>
                   </td>
                 </tr>
               ) : usuarios.length === 0 ? (
                 <tr>
-                  <td colSpan={puedeAsignarCoordinador ? 9 : 8} className="py-8 text-center text-crm-text-muted">
+                  <td colSpan={puedeAsignarCoordinador ? 10 : 9} className="py-8 text-center text-crm-text-muted">
                     {debouncedSearch ? `No se encontraron usuarios para "${debouncedSearch}"` : "No hay usuarios registrados"}
                   </td>
                 </tr>
@@ -893,6 +908,11 @@ function GestionUsuarios() {
                             : usuario.rol?.nombre === "ROL_COORDINADOR_VENTAS" ? "Coordinador"
                             : "Vendedor"}
                         </span>
+                      </td>
+                      <td className="py-3 px-4 hidden lg:table-cell text-sm text-crm-text-primary">
+                        {usuario.rol?.nombre === "ROL_VENDEDOR"
+                          ? (usuario.coordinador?.nombre_completo || <span className="text-crm-text-muted">Sin coordinador</span>)
+                          : "—"}
                       </td>
                       <td className="py-3 px-4 hidden lg:table-cell">
                         <div className="space-y-1">

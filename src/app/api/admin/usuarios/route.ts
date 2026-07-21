@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || ''; // 'ultimo_acceso'
     const sortDir = searchParams.get('sortDir') || 'desc'; // 'asc' | 'desc'
     const historialUserId = searchParams.get('historial') || '';
+    const coordinadorFiltro = searchParams.get('coordinador') || ''; // coordinador id, or "sin" for orphan vendedores
 
     // Si se pide historial de un usuario específico (exclusivo de ROL_ADMIN)
     if (historialUserId) {
@@ -99,6 +100,26 @@ export async function GET(request: NextRequest) {
       query = query.eq('activo', true);
     } else if (estado === 'inactivo') {
       query = query.eq('activo', false);
+    }
+
+    // Filtro de coordinador (team visibility — Task 3)
+    if (coordinadorFiltro === 'sin') {
+      // Scope orphans to ROL_VENDEDOR so admins/gerentes — whose
+      // coordinador_id is always null — don't pollute this filter.
+      const { data: rolVendedor } = await supabase
+        .schema('crm')
+        .from('rol')
+        .select('id')
+        .eq('nombre', 'ROL_VENDEDOR')
+        .eq('activo', true)
+        .single();
+
+      if (rolVendedor?.id) {
+        query = query.eq('rol_id', rolVendedor.id);
+      }
+      query = query.is('coordinador_id', null);
+    } else if (coordinadorFiltro) {
+      query = query.eq('coordinador_id', coordinadorFiltro);
     }
 
     // Paginación
@@ -182,6 +203,39 @@ export async function GET(request: NextRequest) {
         last_sign_in_at: lastAccess,
       };
     });
+
+    // Batch-resolve coordinador names — one extra query total, never N+1.
+    const coordinadorIds = Array.from(
+      new Set(
+        usuariosCompat
+          .map((u: any) => u.coordinador_id as string | null)
+          .filter((id: string | null): id is string => Boolean(id))
+      )
+    );
+
+    const coordinadorNombrePorId: Record<string, string | null> = {};
+    if (coordinadorIds.length > 0) {
+      const { data: coordinadoresData, error: coordError } = await supabase
+        .schema('crm')
+        .from('usuario_perfil')
+        .select('id, nombre_completo')
+        .in('id', coordinadorIds);
+
+      if (coordError) {
+        console.warn('[GET usuarios] Error resolviendo nombres de coordinador:', coordError);
+      } else {
+        for (const c of coordinadoresData || []) {
+          coordinadorNombrePorId[c.id] = c.nombre_completo;
+        }
+      }
+    }
+
+    usuariosCompat = usuariosCompat.map((u: any) => ({
+      ...u,
+      coordinador: u.coordinador_id
+        ? { id: u.coordinador_id, nombre_completo: coordinadorNombrePorId[u.coordinador_id] ?? null }
+        : null,
+    }));
 
     // Si se ordena por ultimo_acceso, ordenar en memoria con el valor real y paginar manualmente
     if (sortByAcceso) {
