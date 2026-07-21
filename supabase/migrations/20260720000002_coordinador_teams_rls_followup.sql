@@ -13,14 +13,19 @@
 --      ORs es_visibilidad_global() directly and was missed by the original
 --      plan. Fixed additively below: every existing OR-branch is left
 --      byte-identical, with two new team-scope OR-branches appended (venta's
---      own vendedor_username, and the linked cliente's vendedor_username/
---      vendedor_asignado), mirroring how meta_vendedor_select/comision_select
---      extend their own-field check with an equipo_usernames() branch. This
---      is a pure OR-superset, so it cannot regress admin/gerente (still
---      gated by crm.es_admin_o_gerente() / crm.es_visibilidad_global(), both
---      TRUE only for ROL_ADMIN/ROL_GERENTE) or vendedor (equipo_usernames()
---      for a non-coordinador uid returns only that uid's own username, a
---      no-op given the pre-existing own-username/own-uid branches).
+--      own vendedor_username, and the linked cliente's team-scope, which
+--      mirrors crm.p1_puede_ver_cliente()'s own coordinador-team branch
+--      EXACTLY — three conditions, not two: c.vendedor_username IN equipo,
+--      c.vendedor_asignado IN equipo, OR EXISTS(... owner.id = c.created_by
+--      AND owner.username IN equipo)). Reviewer round 2 caught an initial
+--      version of this fix that only carried the first two conditions,
+--      missing a team venta whose linked cliente is team-owned solely via
+--      created_by — corrected below. This is a pure OR-superset, so it
+--      cannot regress admin/gerente (still gated by crm.es_admin_o_gerente()
+--      / crm.es_visibilidad_global(), both TRUE only for ROL_ADMIN/
+--      ROL_GERENTE) or vendedor (equipo_usernames() for a non-coordinador
+--      uid returns only that uid's own username, a no-op given the
+--      pre-existing own-username/own-uid branches).
 --   6. proceso_checklist_item_update (crm.proceso_checklist_item, UPDATE) —
 --      scope decision (coordinator, in-session): same rationale as
 --      venta_select_policy — the feature contract is team-scoped access
@@ -120,11 +125,13 @@ CREATE POLICY "comision_select" ON crm.comision
 -- existing OR-branch untouched) and appends two team-scope OR-branches:
 --   - vendedor_username IN equipo_usernames(): the venta's own vendedor is
 --     on the caller's team.
---   - cliente_id IN (... vendedor_username/vendedor_asignado IN
---     equipo_usernames() ...): the linked cliente's vendedor is on the
---     caller's team — the same two columns crm.p1_puede_ver_cliente() and
---     crm.usuario_puede_ver_cliente() already use for their own team branch
---     (20260720000001_coordinador_teams_rls.sql).
+--   - cliente_id IN (... c.vendedor_username IN equipo, OR
+--     c.vendedor_asignado IN equipo, OR EXISTS(owner.id = c.created_by AND
+--     owner.username IN equipo) ...): the linked cliente's team-scope,
+--     mirroring crm.p1_puede_ver_cliente()'s own coordinador-team branch
+--     EXACTLY — THREE conditions (reviewer round 2 fix: an earlier version
+--     of this migration carried only the first two, missing a team venta
+--     whose cliente is team-owned solely via created_by).
 -- Purely additive (OR-superset of the current policy): cannot regress
 -- admin/gerente (es_admin_o_gerente()/es_visibilidad_global(), both TRUE
 -- only for ROL_ADMIN/ROL_GERENTE, untouched) or vendedor (own-username/
@@ -147,14 +154,19 @@ CREATE POLICY "venta_select_policy" ON crm.venta
     OR crm.es_visibilidad_global()
     OR vendedor_username IN (SELECT crm.equipo_usernames(auth.uid()))
     OR cliente_id IN (
-      SELECT id FROM crm.cliente
-      WHERE vendedor_username IN (SELECT crm.equipo_usernames(auth.uid()))
-         OR vendedor_asignado IN (SELECT crm.equipo_usernames(auth.uid()))
+      SELECT c.id FROM crm.cliente c
+      WHERE c.vendedor_username IN (SELECT crm.equipo_usernames(auth.uid()))
+         OR c.vendedor_asignado IN (SELECT crm.equipo_usernames(auth.uid()))
+         OR EXISTS (
+           SELECT 1 FROM crm.usuario_perfil owner
+           WHERE owner.id = c.created_by
+             AND owner.username IN (SELECT crm.equipo_usernames(auth.uid()))
+         )
     )
   );
 
 COMMENT ON POLICY "venta_select_policy" ON crm.venta IS
-  'Original admin/gerente/personal-ownership/es_visibilidad_global conditions (20260706000000) left verbatim, plus two coordinador-team OR-branches (venta.vendedor_username and cliente.vendedor_username/vendedor_asignado IN crm.equipo_usernames(auth.uid())) so ROL_COORDINADOR_VENTAS keeps team-scoped venta visibility after 20260720000001 narrowed es_visibilidad_global() to admin/gerente only.';
+  'Original admin/gerente/personal-ownership/es_visibilidad_global conditions (20260706000000) left verbatim, plus two coordinador-team OR-branches: venta.vendedor_username IN crm.equipo_usernames(auth.uid()), and a cliente team-scope subquery mirroring crm.p1_puede_ver_cliente()''s own coordinador-team branch exactly (vendedor_username IN equipo, OR vendedor_asignado IN equipo, OR EXISTS(owner.id = created_by AND owner.username IN equipo)) so ROL_COORDINADOR_VENTAS keeps team-scoped venta visibility after 20260720000001 narrowed es_visibilidad_global() to admin/gerente only.';
 
 -- ============================================================
 -- 6. proceso_checklist_item UPDATE: same team branch as proceso_etapa_update
