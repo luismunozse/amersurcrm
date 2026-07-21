@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerOnlyClient } from "@/lib/supabase.server";
+import { resolveEquipoScope } from "@/lib/auth/equipo-scope.server";
 
 export type SidebarBadges = {
   clientes?: number;
@@ -11,8 +12,9 @@ export type SidebarBadges = {
 
 /**
  * Conteos para badges del sidebar — se ejecuta por polling cada ~60s.
- * Agenda y cobranza son globales para admin/gerente/coordinador; el resto de
- * roles y las demás queries filtran siempre por el usuario actual (vendedor).
+ * Agenda y cobranza son globales para admin/gerente, ACOTADAS AL EQUIPO
+ * para coordinador (su equipo, no toda la organización — coordinador-teams
+ * change), y propias para el resto de roles.
  */
 export async function getSidebarBadges(): Promise<SidebarBadges> {
   try {
@@ -32,10 +34,10 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
     const username = perfil?.username;
     if (!username) return {};
 
-    const rolNombre = Array.isArray((perfil as any)?.rol)
-      ? (perfil as any).rol[0]?.nombre
-      : (perfil as any)?.rol?.nombre;
-    const esPrivilegiado = ["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"].includes(rolNombre);
+    const scope = await resolveEquipoScope(s, userId);
+    const esGlobal = scope.tier === "global";
+    const equipoUserIds = scope.tier === "equipo" ? scope.equipoUserIds : null;
+    const equipoUsernames = scope.tier === "equipo" ? scope.equipoUsernames : null;
 
     const today = new Date().toISOString().slice(0, 10);
     const startOfDay = `${today}T00:00:00`;
@@ -52,7 +54,6 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           .eq("vendedor_username", username),
 
         // Pipeline — clientes con fecha_proxima_accion vencida o hoy
-        // (contamos distinct cliente_id, no filas)
         s
           .schema("crm")
           .from("cliente_interaccion")
@@ -61,7 +62,8 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
           .not("fecha_proxima_accion", "is", null)
           .lte("fecha_proxima_accion", endOfDay),
 
-        // Agenda — eventos de hoy no cancelados. Admin ve todos; vendedor solo propios.
+        // Agenda — eventos de hoy no cancelados. Admin/gerente ven todos;
+        // coordinador ve los de su equipo; el resto solo los propios.
         (() => {
           const q = s
             .schema("crm")
@@ -70,10 +72,12 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
             .neq("estado", "cancelado")
             .gte("fecha_inicio", startOfDay)
             .lte("fecha_inicio", endOfDay);
-          return esPrivilegiado ? q : q.eq("vendedor_id", userId);
+          if (esGlobal) return q;
+          if (equipoUserIds) return q.in("vendedor_id", equipoUserIds);
+          return q.eq("vendedor_id", userId);
         })(),
 
-        // Agenda — recordatorios de hoy pendientes. Admin ve todos; vendedor solo propios.
+        // Agenda — recordatorios de hoy pendientes. Mismo alcance que eventos.
         (() => {
           const q = s
             .schema("crm")
@@ -82,17 +86,22 @@ export async function getSidebarBadges(): Promise<SidebarBadges> {
             .eq("completado", false)
             .gte("fecha_recordatorio", startOfDay)
             .lte("fecha_recordatorio", endOfDay);
-          return esPrivilegiado ? q : q.eq("vendedor_id", userId);
+          if (esGlobal) return q;
+          if (equipoUserIds) return q.in("vendedor_id", equipoUserIds);
+          return q.eq("vendedor_id", userId);
         })(),
 
-        // Cobranza — cuotas vencidas/en mora. Admin/gerente/coordinador ven todas; vendedor solo las propias.
+        // Cobranza — cuotas vencidas/en mora. Admin/gerente ven todas;
+        // coordinador ve las de su equipo; el resto solo las propias.
         (() => {
           const q = s
             .schema("crm")
             .from("v_cobranza")
             .select("id", { count: "exact", head: true })
             .in("estado_cobranza", ["vencida", "en_mora"]);
-          return esPrivilegiado ? q : q.eq("vendedor_username", username);
+          if (esGlobal) return q;
+          if (equipoUsernames) return q.in("vendedor_username", equipoUsernames);
+          return q.eq("vendedor_username", username);
         })(),
       ]);
 
