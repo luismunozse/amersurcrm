@@ -86,7 +86,13 @@ describe("GET /api/admin/usuarios — coordinador visibility", () => {
 
   it('filters orphan vendedores when ?coordinador=sin is passed', async () => {
     const listChain = createChainMock({ data: [], error: null, count: 0 });
-    mockSchemaFrom.mockReturnValue(listChain);
+    // The "sin" branch resolves ROL_VENDEDOR's id via a separate lookup
+    // before applying the orphan filter (fail-closed if it can't resolve —
+    // see the dedicated fail-closed tests below), so it needs its own chain.
+    const rolChain = createChainMock({ data: { id: "rol-vendedor-id", nombre: "ROL_VENDEDOR" }, error: null });
+
+    let callCount = 0;
+    mockSchemaFrom.mockImplementation(() => (callCount++ === 0 ? listChain : rolChain));
 
     const req = new NextRequest("http://localhost:3000/api/admin/usuarios?coordinador=sin");
     await GET(req);
@@ -108,5 +114,58 @@ describe("GET /api/admin/usuarios — coordinador visibility", () => {
 
     expect(listChain.is).toHaveBeenCalledWith("coordinador_id", null);
     expect(listChain.eq).toHaveBeenCalledWith("rol_id", "rol-vendedor-id");
+  });
+
+  it('fails closed (no rows leaked) when the ROL_VENDEDOR lookup errors on ?coordinador=sin', async () => {
+    // If the list query's canned data were returned as-is here, an admin row
+    // (coordinador_id always null) would leak into the "sin" result — the
+    // exact leak the ROL_VENDEDOR scope exists to prevent. A degrade-to-
+    // is('coordinador_id', null)-only fallback would return this row; the
+    // route must instead fail closed and return an empty page.
+    const listChain = createChainMock({
+      data: [{ id: "admin-1", nombre_completo: "Admin Uno", coordinador_id: null }],
+      error: null,
+      count: 1,
+    });
+    const rolChain = createChainMock({ data: null, error: { message: "boom" } });
+
+    let callCount = 0;
+    mockSchemaFrom.mockImplementation(() => (callCount++ === 0 ? listChain : rolChain));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const req = new NextRequest("http://localhost:3000/api/admin/usuarios?coordinador=sin");
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.usuarios).toEqual([]);
+    expect(body.total).toBe(0);
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('fails closed (no rows leaked) when ROL_VENDEDOR resolves but has no id on ?coordinador=sin', async () => {
+    const listChain = createChainMock({
+      data: [{ id: "admin-1", nombre_completo: "Admin Uno", coordinador_id: null }],
+      error: null,
+      count: 1,
+    });
+    const rolChain = createChainMock({ data: null, error: null });
+
+    let callCount = 0;
+    mockSchemaFrom.mockImplementation(() => (callCount++ === 0 ? listChain : rolChain));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const req = new NextRequest("http://localhost:3000/api/admin/usuarios?coordinador=sin");
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.usuarios).toEqual([]);
+    expect(body.total).toBe(0);
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 });

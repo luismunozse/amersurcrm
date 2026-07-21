@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     if (coordinadorFiltro === 'sin') {
       // Scope orphans to ROL_VENDEDOR so admins/gerentes — whose
       // coordinador_id is always null — don't pollute this filter.
-      const { data: rolVendedor } = await supabase
+      const { data: rolVendedor, error: rolError } = await supabase
         .schema('crm')
         .from('rol')
         .select('id')
@@ -114,10 +114,21 @@ export async function GET(request: NextRequest) {
         .eq('activo', true)
         .single();
 
-      if (rolVendedor?.id) {
-        query = query.eq('rol_id', rolVendedor.id);
+      if (rolError || !rolVendedor?.id) {
+        // Fail closed: if ROL_VENDEDOR can't be resolved (query error, role
+        // renamed/deactivated), do NOT degrade to a bare
+        // is('coordinador_id', null) — that would leak admins/gerentes
+        // (whose coordinador_id is also always null) back into the "orphan
+        // vendedores" filter, unlogged. Return an empty page instead.
+        console.warn('[GET usuarios] No se pudo resolver ROL_VENDEDOR para el filtro "sin coordinador":', rolError);
+        return NextResponse.json({ success: true, usuarios: [], total: 0, page, limit });
       }
-      query = query.is('coordinador_id', null);
+
+      // Note: if `?rol=<otro-rol-id>` is also passed alongside
+      // `coordinador=sin`, this .eq('rol_id', ...) ANDs with the earlier
+      // "Filtro de rol" .eq('rol_id', rol) on a different value, yielding an
+      // empty result set by design (a row's rol_id can't equal both).
+      query = query.eq('rol_id', rolVendedor.id).is('coordinador_id', null);
     } else if (coordinadorFiltro) {
       query = query.eq('coordinador_id', coordinadorFiltro);
     }
