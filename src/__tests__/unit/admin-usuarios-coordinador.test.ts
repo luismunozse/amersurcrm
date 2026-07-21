@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { mockGetUser, mockServerOnlyClient, mockServiceRoleClient, createChainMock } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
-    const methods = ["select", "eq", "neq", "single", "insert", "update"];
+    const methods = ["select", "eq", "neq", "is", "single", "insert", "update"];
     for (const method of methods) chain[method] = vi.fn().mockReturnValue(chain);
     chain.then = (resolve: any, reject: any) => Promise.resolve(finalResult).then(resolve, reject);
     return chain;
@@ -82,6 +82,24 @@ describe("PATCH /api/admin/usuarios — coordinador_id validation", () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toMatch(/coordinador/i);
+  });
+
+  it("rejects a coordinador_id that resolves to a soft-deleted user (deleted_at set, activo still true)", async () => {
+    const chains = (mockServerOnlyClient as any).__chains;
+    chains.usuario_perfil.single = vi.fn()
+      .mockResolvedValueOnce({ data: { username: "vend1", nombre_completo: "Vendedor Uno", dni: "12345678", telefono: null, email: "v@test.com", rol_id: "rol-vend", coordinador_id: null, meta_mensual_ventas: 0, comision_porcentaje: 0, activo: true, rol: { nombre: "ROL_VENDEDOR" } }, error: null })
+      // Soft-deleted coordinador: activo is still true (deleted_at is set
+      // instead), so a lookup that only checks .activo would wrongly accept
+      // it. The route's coordinador query must add .is("deleted_at", null),
+      // which — in this mock — filters the row out entirely (data: null).
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    const res = await PATCH(req({ id: "vend-1", coordinador_id: "deleted-coord" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/coordinador/i);
+    expect(chains.usuario_perfil.is).toHaveBeenCalledWith("deleted_at", null);
   });
 
   it("rejects a coordinador_id that resolves to an inactive user", async () => {

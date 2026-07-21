@@ -28,6 +28,7 @@ async function validarCoordinadorId(
     .from("usuario_perfil")
     .select("id, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
     .eq("id", coordinadorId)
+    .is("deleted_at", null)
     .single();
 
   if (error || !coordinador || !coordinador.activo) {
