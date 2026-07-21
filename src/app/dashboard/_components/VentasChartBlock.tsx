@@ -2,9 +2,10 @@ import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { getVentasMensuales } from "@/lib/dashboard/command-center.server";
 import VentasMensualesChart from "@/app/dashboard/proyectos/[id]/reportes/_VentasMensualesChart";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 interface VentasChartBlockProps {
-  esGlobal: boolean;
+  scope: EquipoScope;
 }
 
 /**
@@ -15,10 +16,10 @@ interface VentasChartBlockProps {
  * boundary; no `next/dynamic`/`ssr:false` needed, matching exactly how
  * `reportes/page.tsx` wires it in).
  */
-export async function VentasChartBlock({ esGlobal }: VentasChartBlockProps) {
+export async function VentasChartBlock({ scope }: VentasChartBlockProps) {
   let data: Awaited<ReturnType<typeof getVentasMensuales>>;
   try {
-    data = await getVentasMensuales(esGlobal);
+    data = await getVentasMensuales(scope);
   } catch (error) {
     console.error("Error cargando ventas mensuales:", error);
     return (

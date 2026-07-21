@@ -4,9 +4,10 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { obtenerResumenCobranza } from "@/app/dashboard/cobranza/_actions-cobranza";
 import { getAlertasSinGestionarCount } from "@/lib/dashboard/command-center.server";
 import { formatearMoneda } from "@/lib/types/crm-flujo";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 interface MoraAlertasBlockProps {
-  esGlobal: boolean;
+  scope: EquipoScope;
 }
 
 type ResumenCobranza = {
@@ -23,13 +24,13 @@ type ResumenCobranza = {
  * underlying `v_cobranza` aggregate has no per-row `moneda` column, so the
  * cobranza hub itself already renders this total hardcoded to PEN.
  */
-export async function MoraAlertasBlock({ esGlobal }: MoraAlertasBlockProps) {
+export async function MoraAlertasBlock({ scope }: MoraAlertasBlockProps) {
   let resumen: ResumenCobranza;
   let alertasSinGestionar: number;
   try {
     const [resultResumen, resultAlertas] = await Promise.all([
       obtenerResumenCobranza(),
-      getAlertasSinGestionarCount(esGlobal),
+      getAlertasSinGestionarCount(scope),
     ]);
     resumen = resultResumen.success
       ? (resultResumen.data as ResumenCobranza)

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { LayoutGrid, UserPlus, Users, Building2, Package, UserCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { getResumenGeneral } from "@/lib/dashboard/command-center.server";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 interface ResumenGeneralBlockProps {
-  esGlobal: boolean;
+  scope: EquipoScope;
 }
 
 // Static class-name map — Tailwind's JIT scans source for literal class
@@ -71,10 +72,10 @@ function KpiTile({
  * dashboard is a navigation hub, not just a readout) — see each tile's
  * `href` below for the destination and why.
  */
-export async function ResumenGeneralBlock({ esGlobal }: ResumenGeneralBlockProps) {
+export async function ResumenGeneralBlock({ scope }: ResumenGeneralBlockProps) {
   let resumen: Awaited<ReturnType<typeof getResumenGeneral>>;
   try {
-    resumen = await getResumenGeneral(esGlobal);
+    resumen = await getResumenGeneral(scope);
   } catch (error) {
     console.error("Error cargando resumen general:", error);
     return (
@@ -92,9 +93,14 @@ export async function ResumenGeneralBlock({ esGlobal }: ResumenGeneralBlockProps
     );
   }
 
+  // Both privileged tiers now render real (non-empty) data from
+  // getResumenGeneral — the grid layout and the "vendedores activos" tile
+  // should show for coordinador too, not just admin/gerente.
+  const puedeVerDatosPrivilegiados = scope.tier === "global" || scope.tier === "equipo";
+
   return (
     <div
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${esGlobal ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4"}`}
+      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${puedeVerDatosPrivilegiados ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4"}`}
     >
       <KpiTile
         icon={<UserPlus className="h-4 w-4" aria-hidden="true" />}
@@ -125,7 +131,7 @@ export async function ResumenGeneralBlock({ esGlobal }: ResumenGeneralBlockProps
         color="primary"
         href="/dashboard/proyectos"
       />
-      {esGlobal && (
+      {puedeVerDatosPrivilegiados && (
         <KpiTile
           icon={<UserCheck className="h-4 w-4" aria-hidden="true" />}
           value={resumen.vendedoresActivos}

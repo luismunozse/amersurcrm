@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { getPerfilRol } from "@/lib/dashboard/scope.server";
+import { getEquipoScope } from "@/lib/auth/equipo-scope.server";
 import { ResumenGeneralBlock } from "./ResumenGeneralBlock";
 import { ResumenGeneralBlockSkeleton } from "./ResumenGeneralBlock.Skeleton";
 import { FunnelAgingBlock } from "./FunnelAgingBlock";
@@ -22,16 +23,15 @@ import { MoraAlertasBlockSkeleton } from "./MoraAlertasBlock.Skeleton";
  * a sales-trend pair, and an inventory pair — each block streaming
  * independently via its own `Suspense`.
  *
- * `esGlobal` is resolved once here via `getPerfilRol()` (design.md ADR-1)
+ * `scope` (see `src/lib/auth/equipo-scope.server.ts`) is resolved once here
  * and passed down so every command-center fetcher skips its own profile
- * lookup. By construction this composition only renders for admin/gerente/
- * coordinador (`resolveComposition` in `page.tsx`), so `esGlobal` is
- * expected to always be `true` here — resolving it explicitly (rather than
- * hardcoding the literal) keeps the fetchers' defense-in-depth guard
- * meaningful and fails closed if a role ever resolves unexpectedly.
- * `getPerfilRol` is `React.cache`-wrapped and takes no arguments, so calling
- * it here does not add a second network round-trip if anything else in the
- * request tree also calls it.
+ * lookup — admin/gerente get `tier: "global"`, coordinador gets
+ * `tier: "equipo"` (their team's data). By construction this composition
+ * only renders for those three roles (`resolveComposition` in `page.tsx`),
+ * so `scope.tier` is expected to always be one of the two here.
+ * `getEquipoScope`/`getPerfilRol` are both `React.cache`-wrapped and take no
+ * arguments, so calling them here does not add a second network round-trip
+ * if anything else in the request tree also calls them.
  */
 function ZoneLabel({ children }: { children: ReactNode }) {
   return (
@@ -42,7 +42,7 @@ function ZoneLabel({ children }: { children: ReactNode }) {
 }
 
 export async function CommandCenter() {
-  const { esGlobal, nombreCompleto } = await getPerfilRol();
+  const [{ nombreCompleto }, scope] = await Promise.all([getPerfilRol(), getEquipoScope()]);
   // First name only — the full name is available on hover surfaces elsewhere.
   const primerNombre = nombreCompleto?.trim().split(/\s+/)[0] ?? null;
 
@@ -55,7 +55,7 @@ export async function CommandCenter() {
       <div>
         <ZoneLabel>Resumen</ZoneLabel>
         <Suspense fallback={<ResumenGeneralBlockSkeleton />}>
-          <ResumenGeneralBlock esGlobal={esGlobal} />
+          <ResumenGeneralBlock scope={scope} />
         </Suspense>
       </div>
 
@@ -64,12 +64,12 @@ export async function CommandCenter() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <Suspense fallback={<FunnelAgingBlockSkeleton />}>
-              <FunnelAgingBlock esGlobal={esGlobal} />
+              <FunnelAgingBlock scope={scope} />
             </Suspense>
           </div>
           <div className="lg:col-span-4">
             <Suspense fallback={<MoraAlertasBlockSkeleton />}>
-              <MoraAlertasBlock esGlobal={esGlobal} />
+              <MoraAlertasBlock scope={scope} />
             </Suspense>
           </div>
         </div>
@@ -80,7 +80,7 @@ export async function CommandCenter() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="lg:col-span-7">
             <Suspense fallback={<VentasChartBlockSkeleton />}>
-              <VentasChartBlock esGlobal={esGlobal} />
+              <VentasChartBlock scope={scope} />
             </Suspense>
           </div>
           <div className="lg:col-span-5">
@@ -96,12 +96,12 @@ export async function CommandCenter() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="lg:col-span-7">
             <Suspense fallback={<InventarioLotesBlockSkeleton />}>
-              <InventarioLotesBlock esGlobal={esGlobal} />
+              <InventarioLotesBlock scope={scope} />
             </Suspense>
           </div>
           <div className="lg:col-span-5">
             <Suspense fallback={<LotesDonutBlockSkeleton />}>
-              <LotesDonutBlock esGlobal={esGlobal} />
+              <LotesDonutBlock scope={scope} />
             </Suspense>
           </div>
         </div>

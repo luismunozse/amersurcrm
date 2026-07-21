@@ -38,6 +38,17 @@ import {
   ROLES_VENDEDOR_ACTIVOS,
 } from "@/lib/dashboard/command-center.server";
 import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
+import { equipoOrFilter, type EquipoScope } from "@/lib/auth/equipo-scope.server";
+
+const GLOBAL_SCOPE: EquipoScope = { tier: "global" };
+const PROPIO_SCOPE: EquipoScope = { tier: "propio", userId: "user-1", username: "vend1" };
+const EQUIPO_SCOPE: EquipoScope = {
+  tier: "equipo",
+  userId: "coord-1",
+  username: "coord1",
+  equipoUsernames: ["coord1", "vend1"],
+  equipoUserIds: ["coord-1", "vend-1"],
+};
 
 function clienteRow(id: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -69,7 +80,7 @@ afterEach(() => {
 
 describe("getAgingLeads", () => {
   it("returns an empty exact result without querying anything when esGlobal is false", async () => {
-    const resultado = await getAgingLeads(false);
+    const resultado = await getAgingLeads(PROPIO_SCOPE);
 
     expect(resultado).toEqual({ count: 0, isExact: true, top: [] });
     expect(mockSupabase.schema).not.toHaveBeenCalled();
@@ -82,7 +93,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: [], error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    await getAgingLeads(true);
+    await getAgingLeads(GLOBAL_SCOPE);
 
     expect(chains.cliente.not).toHaveBeenCalledWith(
       "estado_cliente",
@@ -100,7 +111,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: [], error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    await getAgingLeads(true);
+    await getAgingLeads(GLOBAL_SCOPE);
 
     expect(chains.cliente.or).toHaveBeenCalledWith(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO);
   });
@@ -110,7 +121,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: rows, count: 537, error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    await getAgingLeads(true);
+    await getAgingLeads(GLOBAL_SCOPE);
 
     const exclusionCalls = chains.cliente.or.mock.calls.filter(
       ([filtro]: [string]) => filtro === EXCLUIR_IMPORTACION_NUNCA_CONTACTADO,
@@ -129,7 +140,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: rows, count: 537, error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    await getAgingLeads(true);
+    await getAgingLeads(GLOBAL_SCOPE);
 
     const cutoffCalls = chains.cliente.gte.mock.calls.filter(([campo]: [string]) => campo === "fecha_alta");
     expect(cutoffCalls).toHaveLength(2);
@@ -141,7 +152,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: [], error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    const resultado = await getAgingLeads(true);
+    const resultado = await getAgingLeads(GLOBAL_SCOPE);
 
     expect(chains.cliente_interaccion.in).not.toHaveBeenCalled();
     expect(resultado).toEqual({ count: 0, isExact: true, top: [] });
@@ -157,7 +168,7 @@ describe("getAgingLeads", () => {
       error: null,
     });
 
-    const resultado = await getAgingLeads(true);
+    const resultado = await getAgingLeads(GLOBAL_SCOPE);
 
     expect(chains.cliente_interaccion.in).toHaveBeenCalledWith("cliente_id", ["c1", "c2"]);
     expect(resultado.count).toBe(1);
@@ -170,7 +181,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: rows, error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    const resultado = await getAgingLeads(true);
+    const resultado = await getAgingLeads(GLOBAL_SCOPE);
 
     expect(resultado.count).toBe(7);
     expect(resultado.isExact).toBe(true);
@@ -187,7 +198,7 @@ describe("getAgingLeads", () => {
     });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    const resultado = await getAgingLeads(true);
+    const resultado = await getAgingLeads(GLOBAL_SCOPE);
 
     expect(resultado.count).toBe(0);
     expect(resultado.top).toEqual([]);
@@ -202,7 +213,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: rows, count: 537, error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    const resultado = await getAgingLeads(true);
+    const resultado = await getAgingLeads(GLOBAL_SCOPE);
 
     expect(resultado.isExact).toBe(false);
     expect(resultado.count).toBe(537);
@@ -214,7 +225,7 @@ describe("getAgingLeads", () => {
     chains.cliente = createChainMock({ data: rows, count: null, error: null });
     chains.cliente_interaccion = createChainMock({ data: [], error: null });
 
-    const resultado = await getAgingLeads(true);
+    const resultado = await getAgingLeads(GLOBAL_SCOPE);
 
     expect(resultado.isExact).toBe(false);
     expect(resultado.count).toBe(200);
@@ -223,7 +234,7 @@ describe("getAgingLeads", () => {
 
 describe("getInventarioLotesPorProyecto", () => {
   it("returns an empty inventory without querying when esGlobal is false", async () => {
-    const resultado = await getInventarioLotesPorProyecto(false);
+    const resultado = await getInventarioLotesPorProyecto(PROPIO_SCOPE);
 
     expect(resultado).toEqual({
       proyectos: [],
@@ -243,7 +254,7 @@ describe("getInventarioLotesPorProyecto", () => {
       error: null,
     });
 
-    const resultado = await getInventarioLotesPorProyecto(true);
+    const resultado = await getInventarioLotesPorProyecto(GLOBAL_SCOPE);
 
     const p1 = resultado.proyectos.find((p) => p.proyectoId === "p1");
     expect(p1).toMatchObject({
@@ -269,7 +280,7 @@ describe("getInventarioLotesPorProyecto", () => {
       error: null,
     });
 
-    const resultado = await getInventarioLotesPorProyecto(true);
+    const resultado = await getInventarioLotesPorProyecto(GLOBAL_SCOPE);
 
     expect(resultado.totales).toEqual({ disponible: 1, reservado: 1, vendido: 1, total: 3, pctVendido: 33 });
   });
@@ -277,7 +288,7 @@ describe("getInventarioLotesPorProyecto", () => {
 
 describe("getAlertasSinGestionarCount", () => {
   it("returns 0 without querying when esGlobal is false", async () => {
-    const resultado = await getAlertasSinGestionarCount(false);
+    const resultado = await getAlertasSinGestionarCount(PROPIO_SCOPE);
 
     expect(resultado).toBe(0);
     expect(mockSupabase.schema).not.toHaveBeenCalled();
@@ -286,7 +297,7 @@ describe("getAlertasSinGestionarCount", () => {
   it("counts unmanaged alerts excluding resolved cuotas/ventas, scoped globally", async () => {
     chains.alerta_cobranza = createChainMock({ data: null, error: null, count: 4 });
 
-    const resultado = await getAlertasSinGestionarCount(true);
+    const resultado = await getAlertasSinGestionarCount(GLOBAL_SCOPE);
 
     expect(chains.alerta_cobranza.eq).toHaveBeenCalledWith("gestionada", false);
     expect(chains.alerta_cobranza.neq).toHaveBeenCalledWith("cuota.estado", "pagada");
@@ -299,7 +310,7 @@ describe("getAlertasSinGestionarCount", () => {
   it("returns 0 when the count query errors", async () => {
     chains.alerta_cobranza = createChainMock({ data: null, error: new Error("boom"), count: null });
 
-    const resultado = await getAlertasSinGestionarCount(true);
+    const resultado = await getAlertasSinGestionarCount(GLOBAL_SCOPE);
 
     expect(resultado).toBe(0);
   });
@@ -307,7 +318,7 @@ describe("getAlertasSinGestionarCount", () => {
 
 describe("getResumenGeneral", () => {
   it("returns a zeroed default without querying anything when esGlobal is false", async () => {
-    const resultado = await getResumenGeneral(false);
+    const resultado = await getResumenGeneral(PROPIO_SCOPE);
 
     expect(resultado).toEqual({
       clientesNuevosMes: 0,
@@ -333,7 +344,7 @@ describe("getResumenGeneral", () => {
     });
     chains.usuario_perfil = createChainMock({ data: null, error: null, count: 5 });
 
-    const resultado = await getResumenGeneral(true);
+    const resultado = await getResumenGeneral(GLOBAL_SCOPE);
 
     expect(chains.cliente.gte).toHaveBeenCalledWith("fecha_alta", expect.any(String));
     expect(chains.cliente.gte).not.toHaveBeenCalledWith("created_at", expect.anything());
@@ -353,7 +364,7 @@ describe("getResumenGeneral", () => {
     chains.lote = createChainMock({ data: [], error: null });
     chains.usuario_perfil = createChainMock({ data: null, error: null, count: 5 });
 
-    const resultado = await getResumenGeneral(true);
+    const resultado = await getResumenGeneral(GLOBAL_SCOPE);
 
     expect(resultado.clientesNuevosMes).toBe(0);
     expect(resultado.clientesTotales).toBe(0);
@@ -366,7 +377,7 @@ describe("getResumenGeneral", () => {
     chains.lote = createChainMock({ data: [], error: null });
     chains.usuario_perfil = createChainMock({ data: null, error: null, count: 7 });
 
-    const resultado = await getResumenGeneral(true);
+    const resultado = await getResumenGeneral(GLOBAL_SCOPE);
 
     expect(chains.usuario_perfil.eq).toHaveBeenCalledWith("activo", true);
     expect(chains.usuario_perfil.in).toHaveBeenCalledWith("rol.nombre", ROLES_VENDEDOR_ACTIVOS);
@@ -385,7 +396,7 @@ describe("getResumenGeneral", () => {
     chains.lote = createChainMock({ data: [], error: null });
     chains.usuario_perfil = createChainMock({ data: null, error: new Error("boom"), count: null });
 
-    const resultado = await getResumenGeneral(true);
+    const resultado = await getResumenGeneral(GLOBAL_SCOPE);
 
     expect(resultado.vendedoresActivos).toBe(0);
     expect(resultado.clientesNuevosMes).toBe(12);
@@ -395,7 +406,7 @@ describe("getResumenGeneral", () => {
 
 describe("getVentasMensuales", () => {
   it("returns an empty object without querying when esGlobal is false", async () => {
-    const resultado = await getVentasMensuales(false);
+    const resultado = await getVentasMensuales(PROPIO_SCOPE);
 
     expect(resultado).toEqual({});
     expect(mockSupabase.schema).not.toHaveBeenCalled();
@@ -414,7 +425,7 @@ describe("getVentasMensuales", () => {
       error: null,
     });
 
-    const resultado = await getVentasMensuales(true);
+    const resultado = await getVentasMensuales(GLOBAL_SCOPE);
 
     expect(chains.venta.eq).toHaveBeenCalledWith("estado", "finalizada");
     expect(Object.keys(resultado)).toEqual([
@@ -428,8 +439,84 @@ describe("getVentasMensuales", () => {
   it("returns an empty object when the query errors", async () => {
     chains.venta = createChainMock({ data: null, error: new Error("boom") });
 
-    const resultado = await getVentasMensuales(true);
+    const resultado = await getVentasMensuales(GLOBAL_SCOPE);
 
     expect(resultado).toEqual({});
+  });
+});
+
+describe("getAgingLeads — equipo (coordinador) team scope", () => {
+  it("applies the team ownership filter to both the candidate query and the at-cap count query", async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => clienteRow(`c${i + 1}`));
+    chains.cliente = createChainMock({ data: rows, count: 537, error: null });
+    chains.cliente_interaccion = createChainMock({ data: [], error: null });
+
+    await getAgingLeads(EQUIPO_SCOPE);
+
+    const teamCalls = chains.cliente.or.mock.calls.filter(([filtro]: [string]) =>
+      filtro.includes("vendedor_username.in."),
+    );
+    expect(teamCalls).toHaveLength(2); // candidate query + at-cap count query
+    // NOTE: divergence from task-4b-brief.md's inline snippet, which predates
+    // equipo-scope.server.ts gaining .in()-over-all-team-UUIDs +
+    // vendedor_asignado arms (see that file's `equipoOrFilter` doc comment,
+    // Issues #1/#2). The authoritative filter contract is that helper, not
+    // the brief — so this asserts against its real output rather than a
+    // stale hardcoded string.
+    expect(teamCalls[0][0]).toBe(equipoOrFilter(EQUIPO_SCOPE));
+  });
+});
+
+describe("getInventarioLotesPorProyecto — equipo (coordinador) sees the SAME full inventory as global", () => {
+  it("does not scope the lote query for equipo — lotes have no per-vendedor ownership", async () => {
+    chains.lote = createChainMock({
+      data: [{ proyecto_id: "p1", estado: "disponible", proyecto: { nombre: "Proyecto Uno" } }],
+      error: null,
+    });
+
+    const resultado = await getInventarioLotesPorProyecto(EQUIPO_SCOPE);
+
+    expect(resultado.proyectos).toHaveLength(1);
+    expect(resultado.totales.disponible).toBe(1);
+  });
+});
+
+describe("getAlertasSinGestionarCount — equipo (coordinador) team scope", () => {
+  it("filters by the team's venta.vendedor_username", async () => {
+    chains.alerta_cobranza = createChainMock({ data: null, error: null, count: 2 });
+
+    const resultado = await getAlertasSinGestionarCount(EQUIPO_SCOPE);
+
+    expect(chains.alerta_cobranza.in).toHaveBeenCalledWith("cuota.venta.vendedor_username", ["coord1", "vend1"]);
+    expect(resultado).toBe(2);
+  });
+});
+
+describe("getResumenGeneral — equipo (coordinador) team scope", () => {
+  it("scopes clientesNuevosMes/clientesTotales by team, leaves proyectosActivos org-wide, and scopes vendedoresActivos to the coordinador's own team", async () => {
+    chains.cliente = createChainMock({ data: null, error: null, count: 3 });
+    chains.proyecto = createChainMock({ data: null, error: null, count: 5 });
+    chains.lote = createChainMock({ data: [], error: null });
+    chains.usuario_perfil = createChainMock({ data: null, error: null, count: 2 });
+
+    const resultado = await getResumenGeneral(EQUIPO_SCOPE);
+
+    const teamCalls = chains.cliente.or.mock.calls.filter(([filtro]: [string]) =>
+      filtro.includes("vendedor_username.in."),
+    );
+    expect(teamCalls.length).toBeGreaterThanOrEqual(2); // clientesNuevos + clientesTotales
+    expect(resultado.proyectosActivos).toBe(5);
+    expect(chains.usuario_perfil.or).toHaveBeenCalledWith("coordinador_id.eq.coord-1,id.eq.coord-1");
+    expect(resultado.vendedoresActivos).toBe(2);
+  });
+});
+
+describe("getVentasMensuales — equipo (coordinador) team scope", () => {
+  it("filters ventas by the team's vendedor_username", async () => {
+    chains.venta = createChainMock({ data: [], error: null });
+
+    await getVentasMensuales(EQUIPO_SCOPE);
+
+    expect(chains.venta.in).toHaveBeenCalledWith("vendedor_username", ["coord1", "vend1"]);
   });
 });

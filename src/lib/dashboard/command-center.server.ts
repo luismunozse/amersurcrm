@@ -1,6 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { createOptimizedServerClient } from "@/lib/supabase.server";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
+import { equipoOrFilter } from "@/lib/auth/equipo-scope.server";
 import {
   isAgingLead,
   AGING_THRESHOLD_DAYS,
@@ -11,20 +13,31 @@ import {
 
 /**
  * Command-center data layer (design.md §2 "New fetchers — explicit flags").
- * Three genuinely new fetchers, all accepting `esGlobal` resolved once
- * by the caller (via `getPerfilRol()` in `scope.server.ts`) so they skip
- * their own `usuario_perfil` lookup. When `esGlobal` is false they return
- * empty defensively — the command center is already role-gated at the page
- * and DB RLS (`crm.p1_puede_ver_cliente` / `es_visibilidad_global()`) is the
- * real backstop, mirroring the existing coordinador-global behavior in
- * `getCachedPipelineClientes` and `sidebar-badges`.
+ * Each fetcher takes the shared `EquipoScope` (see
+ * src/lib/auth/equipo-scope.server.ts) instead of a bare `esGlobal: boolean`
+ * — coordinador (`tier: "equipo"`) now sees their TEAM's data on every
+ * fetcher where that's a meaningful subset (aging leads, unmanaged cobranza
+ * alerts, resumen's cliente/vendedor counts, monthly ventas), not an empty
+ * default. `tier: "propio"` (vendedor) and `tier: "anonimo"` still return the
+ * empty/zeroed default, unchanged — the command center is not part of the
+ * vendedor ("cockpit") composition, this is defense-in-depth only; DB RLS
+ * (`crm.p1_puede_ver_cliente()` / `crm.es_visibilidad_global()`) remains the
+ * real backstop.
  *
- * Each fetcher takes a single primitive argument (`esGlobal: boolean`), not
- * `{ esGlobal }`. `React.cache` dedupes by `Object.is` on the arguments — a
- * fresh object literal is a new reference on every call site, so wrapping
- * the flag in an object made `cache()` inert (every call was a miss). A
- * primitive argument lets two calls with the same boolean actually dedupe
- * within a request (dashboard-rol PR2a review round 1, fix 4).
+ * `getInventarioLotesPorProyecto` (and the `lotesTotales`/`lotesPct*` fields
+ * it feeds into `getResumenGeneral`) is the one exception: lote/proyecto
+ * inventory is NOT owned by an individual vendedor or team in this schema
+ * (lotes belong to a proyecto, not a vendedor), so `tier: "equipo"` renders
+ * the SAME full inventory as `tier: "global"` — there is no team subset to
+ * restrict to. This is a deliberate design choice, documented inline below,
+ * not an oversight.
+ *
+ * `React.cache` dedupes by `Object.is` on the arguments. `getEquipoScope()`
+ * is itself `React.cache`-memoized per request, so every call site that does
+ * `await getEquipoScope()` receives the SAME object reference within one
+ * request — passing that object straight through preserves the dedup this
+ * module relied on when the argument was a bare boolean (dashboard-rol PR2a
+ * review round 1, fix 4).
  */
 
 /* ========= Aging leads (ADR-3) ========= */
@@ -70,8 +83,10 @@ const AGING_TOP_LIMIT = 5;
 const ESTADOS_EXCLUIDOS_SQL = '("desestimado","transferido","propietario")';
 
 export const getAgingLeads = cache(
-  async (esGlobal: boolean): Promise<AgingLeadsResult> => {
-    if (!esGlobal) return { count: 0, isExact: true, top: [] };
+  async (scope: EquipoScope): Promise<AgingLeadsResult> => {
+    if (scope.tier !== 'global' && scope.tier !== 'equipo') {
+      return { count: 0, isExact: true, top: [] };
+    }
 
     const supabase = await createOptimizedServerClient();
     const now = new Date();
@@ -86,11 +101,16 @@ export const getAgingLeads = cache(
     // second independent copy of this filter too.
     const cutoffFechaAlta = new Date(now.getTime() - AGING_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+    // Team scope (coordinador): same ownership filter every other
+    // cliente-backed fetcher uses, via the shared equipoOrFilter() helper.
+    // `null` for tier 'global' — no extra filter needed.
+    const filtroEquipo = scope.tier === 'equipo' ? equipoOrFilter(scope) : null;
+
     // Step 1: candidate clientes by state + stale/null ultimo_contacto +
     // recency window. PostgREST has no NOT EXISTS, so the future-action
     // exclusion (step 2) runs as a separate query — same two-step pattern as
     // getCachedPipelineClientes / getCachedSeguimientosHoy (ADR-3, design.md).
-    const { data: candidatos, error: errorCandidatos } = await supabase
+    let candidatosQuery = supabase
       .schema('crm')
       .from('cliente')
       .select('id, nombre, estado_cliente, ultimo_contacto, fecha_alta')
@@ -104,7 +124,12 @@ export const getAgingLeads = cache(
       // constant (not a locally re-derived string) keeps this query and the
       // at-cap head-count query below in lockstep, same as cutoffFechaAlta.
       .or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO)
-      .gte('fecha_alta', cutoffFechaAlta)
+      .gte('fecha_alta', cutoffFechaAlta);
+    if (filtroEquipo) {
+      candidatosQuery = candidatosQuery.or(filtroEquipo);
+    }
+
+    const { data: candidatos, error: errorCandidatos } = await candidatosQuery
       .order('ultimo_contacto', { ascending: true, nullsFirst: true })
       .limit(AGING_CANDIDATE_LIMIT);
 
@@ -165,7 +190,7 @@ export const getAgingLeads = cache(
       return { count: aging.length, isExact: true, top };
     }
 
-    const { count: totalCandidatos, error: errorCount } = await supabase
+    let countQuery = supabase
       .schema('crm')
       .from('cliente')
       .select('id', { count: 'exact', head: true })
@@ -176,6 +201,11 @@ export const getAgingLeads = cache(
       // the visible candidate pool already reflects.
       .or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO)
       .gte('fecha_alta', cutoffFechaAlta);
+    if (filtroEquipo) {
+      countQuery = countQuery.or(filtroEquipo);
+    }
+
+    const { count: totalCandidatos, error: errorCount } = await countQuery;
 
     if (errorCount || totalCandidatos == null) {
       console.error('Error obteniendo conteo total de candidatos aging:', errorCount);
@@ -214,8 +244,12 @@ function pct(numerador: number, denominador: number): number {
 }
 
 export const getInventarioLotesPorProyecto = cache(
-  async (esGlobal: boolean): Promise<InventarioLotesResult> => {
-    if (!esGlobal) return INVENTARIO_VACIO;
+  async (scope: EquipoScope): Promise<InventarioLotesResult> => {
+    if (scope.tier !== 'global' && scope.tier !== 'equipo') return INVENTARIO_VACIO;
+    // See the module doc comment above: lote/proyecto inventory has no
+    // per-vendedor ownership in this schema, so 'equipo' intentionally runs
+    // the exact same unfiltered query as 'global' — there is nothing to
+    // scope down to.
 
     const supabase = await createOptimizedServerClient();
     // Single query — lote(proyecto_id, estado) joined to proyecto(nombre) —
@@ -313,22 +347,35 @@ const ALERTA_SIN_GESTIONAR_SELECT = `
   id,
   cuota:cuota!cuota_id!inner(
     id, estado,
-    venta:venta!venta_id!inner(id, estado)
+    venta:venta!venta_id!inner(id, estado, vendedor_username)
   )
 `;
 
 export const getAlertasSinGestionarCount = cache(
-  async (esGlobal: boolean): Promise<number> => {
-    if (!esGlobal) return 0;
+  async (scope: EquipoScope): Promise<number> => {
+    if (scope.tier !== 'global' && scope.tier !== 'equipo') return 0;
 
     const supabase = await createOptimizedServerClient();
-    const { count, error } = await supabase
+    let query = supabase
       .schema('crm')
       .from('alerta_cobranza')
       .select(ALERTA_SIN_GESTIONAR_SELECT, { count: 'exact', head: true })
       .eq('gestionada', false)
       .neq('cuota.estado', 'pagada')
       .not('cuota.venta.estado', 'in', '("cancelada","suspendida")');
+
+    // Team scope (coordinador): this table has no direct cliente_id — the
+    // ownership signal lives on venta.vendedor_username, reached via the
+    // nested embed (same dotted-path filter mechanism as the existing
+    // `cuota.venta.estado` filter above). This is a nested/embedded column,
+    // not a top-level cliente/venta column, so it cannot reuse
+    // equipoOrFilter() (which returns bare unqualified column names) —
+    // filtered directly by team usernames instead.
+    if (scope.tier === 'equipo') {
+      query = query.in('cuota.venta.vendedor_username', scope.equipoUsernames);
+    }
+
+    const { count, error } = await query;
 
     if (error) {
       console.error('Error obteniendo conteo de alertas sin gestionar:', error);
@@ -368,29 +415,53 @@ const RESUMEN_GENERAL_VACIO: ResumenGeneral = {
 export const ROLES_VENDEDOR_ACTIVOS = ['ROL_VENDEDOR', 'ROL_COORDINADOR_VENTAS'] as const;
 
 export const getResumenGeneral = cache(
-  async (esGlobal: boolean): Promise<ResumenGeneral> => {
-    if (!esGlobal) return RESUMEN_GENERAL_VACIO;
+  async (scope: EquipoScope): Promise<ResumenGeneral> => {
+    if (scope.tier !== 'global' && scope.tier !== 'equipo') return RESUMEN_GENERAL_VACIO;
 
     const supabase = await createOptimizedServerClient();
     const ahora = new Date();
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
+    const filtroEquipo = scope.tier === 'equipo' ? equipoOrFilter(scope) : null;
+
+    // "Clientes nuevos este mes" uses `cliente.fecha_alta`, NOT `created_at`.
+    // `fecha_alta` (added by 2025-09-14_060_clientes_mejorados, DEFAULT NOW())
+    // is the column every CURRENT reportes fetcher treats as "cuándo entró
+    // el lead" — see funnel.ts:45 (`cliente` filters on `fecha_alta`) vs :54
+    // (`reserva`, a different table, still keys off `created_at`), and
+    // clientes-etapa-funnel.ts's "leads captados" step. The deleted
+    // DashboardStats.tsx (git show 7d5cf39~1) queried `cliente.created_at`,
+    // which predates `fecha_alta` and would silently disagree with every
+    // other report's "nuevos" count — not reused here on purpose.
+    let clientesNuevosQuery = supabase
+      .schema('crm')
+      .from('cliente')
+      .select('id', { count: 'exact', head: true })
+      .gte('fecha_alta', inicioMes);
+    let clientesTotalesQuery = supabase.schema('crm').from('cliente').select('id', { count: 'exact', head: true });
+    if (filtroEquipo) {
+      clientesNuevosQuery = clientesNuevosQuery.or(filtroEquipo);
+      clientesTotalesQuery = clientesTotalesQuery.or(filtroEquipo);
+    }
+
+    // vendedoresActivos: 'global' counts every active vendedor/coordinador
+    // org-wide (unchanged). 'equipo' narrows to the coordinador's own team +
+    // themself — a coordinador's headcount tile should show THEIR team, not
+    // the whole org's.
+    let vendedoresActivosQuery = supabase
+      .schema('crm')
+      .from('usuario_perfil')
+      .select('id, rol:rol!usuario_perfil_rol_id_fkey!inner(nombre)', { count: 'exact', head: true })
+      .eq('activo', true)
+      .in('rol.nombre', ROLES_VENDEDOR_ACTIVOS);
+    if (scope.tier === 'equipo') {
+      vendedoresActivosQuery = vendedoresActivosQuery.or(`coordinador_id.eq.${scope.userId},id.eq.${scope.userId}`);
+    }
 
     const [clientesNuevosRes, clientesTotalesRes, proyectosActivosRes, inventario, vendedoresActivosRes] = await Promise.all([
-      // "Clientes nuevos este mes" uses `cliente.fecha_alta`, NOT `created_at`.
-      // `fecha_alta` (added by 2025-09-14_060_clientes_mejorados, DEFAULT NOW())
-      // is the column every CURRENT reportes fetcher treats as "cuándo entró
-      // el lead" — see funnel.ts:45 (`cliente` filters on `fecha_alta`) vs :54
-      // (`reserva`, a different table, still keys off `created_at`), and
-      // clientes-etapa-funnel.ts's "leads captados" step. The deleted
-      // DashboardStats.tsx (git show 7d5cf39~1) queried `cliente.created_at`,
-      // which predates `fecha_alta` and would silently disagree with every
-      // other report's "nuevos" count — not reused here on purpose.
-      supabase
-        .schema('crm')
-        .from('cliente')
-        .select('id', { count: 'exact', head: true })
-        .gte('fecha_alta', inicioMes),
-      supabase.schema('crm').from('cliente').select('id', { count: 'exact', head: true }),
+      clientesNuevosQuery,
+      clientesTotalesQuery,
+      // proyectosActivos is org-wide, same reasoning as
+      // getInventarioLotesPorProyecto — not scoped for 'equipo'.
       supabase
         .schema('crm')
         .from('proyecto')
@@ -399,8 +470,8 @@ export const getResumenGeneral = cache(
       // Reuse getInventarioLotesPorProyecto's already-computed totals instead
       // of running a second full `lote` scan — React.cache dedupes this call
       // against InventarioLotesBlock's/LotesDonutBlock's own call to the same
-      // fetcher within the same request (same primitive `esGlobal` arg).
-      getInventarioLotesPorProyecto(esGlobal),
+      // fetcher within the same request (same object reference `scope` arg).
+      getInventarioLotesPorProyecto(scope),
       // Head-count of active vendedores/coordinador — PostgREST can filter a
       // head-count on an embedded column, but only when the embed is declared
       // `!inner` (same mechanism as ALERTA_SIN_GESTIONAR_SELECT above); without
@@ -408,12 +479,7 @@ export const getResumenGeneral = cache(
       // `rol` object, not exclude non-matching `usuario_perfil` rows from the
       // count. `usuario_perfil` is small (tens of rows), so this single
       // head-count query is cheap — no need to fetch rows and filter in JS.
-      supabase
-        .schema('crm')
-        .from('usuario_perfil')
-        .select('id, rol:rol!usuario_perfil_rol_id_fkey!inner(nombre)', { count: 'exact', head: true })
-        .eq('activo', true)
-        .in('rol.nombre', ROLES_VENDEDOR_ACTIVOS),
+      vendedoresActivosQuery,
     ]);
 
     if (clientesNuevosRes.error) {
@@ -446,20 +512,25 @@ export const getResumenGeneral = cache(
 export type VentasMensuales = Record<string, number>;
 
 export const getVentasMensuales = cache(
-  async (esGlobal: boolean): Promise<VentasMensuales> => {
-    if (!esGlobal) return {};
+  async (scope: EquipoScope): Promise<VentasMensuales> => {
+    if (scope.tier !== 'global' && scope.tier !== 'equipo') return {};
 
     const supabase = await createOptimizedServerClient();
     const ahora = new Date();
     const hace6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1).toISOString();
 
-    const { data, error } = await supabase
+    let query = supabase
       .schema('crm')
       .from('venta')
       .select('fecha_venta')
       .eq('estado', 'finalizada')
-      .gte('fecha_venta', hace6Meses)
-      .order('fecha_venta', { ascending: true });
+      .gte('fecha_venta', hace6Meses);
+
+    if (scope.tier === 'equipo') {
+      query = query.in('vendedor_username', scope.equipoUsernames);
+    }
+
+    const { data, error } = await query.order('fecha_venta', { ascending: true });
 
     if (error) {
       console.error('Error obteniendo ventas mensuales:', error);

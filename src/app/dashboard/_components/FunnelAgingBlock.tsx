@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { getCachedFunnelClientes, getCachedImportadosSinTrabajar } from "@/lib/cache.server";
 import { getAgingLeads } from "@/lib/dashboard/command-center.server";
 import { getEstadoClienteLabel, type EstadoCliente } from "@/lib/types/clientes";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 interface FunnelAgingBlockProps {
-  esGlobal: boolean;
+  scope: EquipoScope;
 }
 
 function contactoLabel(ultimoContacto: string | null): string {
@@ -44,14 +45,14 @@ function ErrorCard() {
  * unfiltered `/dashboard/pipeline` instead so the label and destination
  * agree (same reasoning as PR1b's `LeadsSinContactar` link deviation).
  */
-export async function FunnelAgingBlock({ esGlobal }: FunnelAgingBlockProps) {
+export async function FunnelAgingBlock({ scope }: FunnelAgingBlockProps) {
   let funnel: Record<string, number>;
   let aging: Awaited<ReturnType<typeof getAgingLeads>>;
   let importadosSinTrabajar: number;
   try {
     [funnel, aging, importadosSinTrabajar] = await Promise.all([
       getCachedFunnelClientes(),
-      getAgingLeads(esGlobal),
+      getAgingLeads(scope),
       getCachedImportadosSinTrabajar(),
     ]);
   } catch (error) {

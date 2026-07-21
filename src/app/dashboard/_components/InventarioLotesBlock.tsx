@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ChevronRight, Package } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { getInventarioLotesPorProyecto } from "@/lib/dashboard/command-center.server";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 interface InventarioLotesBlockProps {
-  esGlobal: boolean;
+  scope: EquipoScope;
 }
 
 const PROYECTOS_VISIBLES = 5;
@@ -16,10 +17,10 @@ const PROYECTOS_VISIBLES = 5;
  * a different color meaning than the operational lote list (`_LotesList.tsx`),
  * which flags `vendido` in red to mean "no longer sellable".
  */
-export async function InventarioLotesBlock({ esGlobal }: InventarioLotesBlockProps) {
+export async function InventarioLotesBlock({ scope }: InventarioLotesBlockProps) {
   let inventario: Awaited<ReturnType<typeof getInventarioLotesPorProyecto>>;
   try {
-    inventario = await getInventarioLotesPorProyecto(esGlobal);
+    inventario = await getInventarioLotesPorProyecto(scope);
   } catch (error) {
     console.error("Error cargando inventario de lotes por proyecto:", error);
     return (

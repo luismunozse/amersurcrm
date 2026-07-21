@@ -2,9 +2,10 @@ import { PieChart } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getInventarioLotesPorProyecto } from "@/lib/dashboard/command-center.server";
 import EstadoLotesChart from "@/app/dashboard/proyectos/[id]/reportes/_EstadoLotesChart";
+import type { EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 interface LotesDonutBlockProps {
-  esGlobal: boolean;
+  scope: EquipoScope;
 }
 
 /**
@@ -15,10 +16,10 @@ interface LotesDonutBlockProps {
  * `React.cache` dedupes this call against `InventarioLotesBlock`'s (and
  * `ResumenGeneralBlock`'s) own call to the same fetcher within one request.
  */
-export async function LotesDonutBlock({ esGlobal }: LotesDonutBlockProps) {
+export async function LotesDonutBlock({ scope }: LotesDonutBlockProps) {
   let inventario: Awaited<ReturnType<typeof getInventarioLotesPorProyecto>>;
   try {
-    inventario = await getInventarioLotesPorProyecto(esGlobal);
+    inventario = await getInventarioLotesPorProyecto(scope);
   } catch (error) {
     console.error("Error cargando estado de lotes:", error);
     return (
