@@ -420,6 +420,23 @@ export const getAlertasSinGestionarCount = cache(
     if (scope.tier !== 'global' && scope.tier !== 'equipo') return 0;
 
     const supabase = await createOptimizedServerClient();
+
+    // Fail-CLOSED, not fail-open: for tier 'equipo' the team filter must be
+    // resolved BEFORE the alerta_cobranza query is ever built. A doubly-empty
+    // filter (no valid team usernames AND no team-owned clientes — e.g. a
+    // freshly-created coordinador with no username on file yet and no
+    // clientes assigned) used to fall through to an UNFILTERED query
+    // (`if (filtro) query.or(filtro)` silently skipped), which returned
+    // ORG-WIDE counts instead of zero — the opposite of what 'equipo' scope
+    // means. The old `.in()` mechanism this replaced failed closed (an empty
+    // array matches nothing); this restores that same fail-closed guarantee.
+    let filtroEquipo: string | null = null;
+    if (scope.tier === 'equipo') {
+      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
+      filtroEquipo = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, 'cuota.venta.');
+      if (!filtroEquipo) return 0;
+    }
+
     let query = supabase
       .schema('crm')
       .from('alerta_cobranza')
@@ -428,10 +445,8 @@ export const getAlertasSinGestionarCount = cache(
       .neq('cuota.estado', 'pagada')
       .not('cuota.venta.estado', 'in', '("cancelada","suspendida")');
 
-    if (scope.tier === 'equipo') {
-      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
-      const filtro = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, 'cuota.venta.');
-      if (filtro) query = query.or(filtro);
+    if (filtroEquipo) {
+      query = query.or(filtroEquipo);
     }
 
     const { count, error } = await query;
@@ -575,6 +590,18 @@ export const getVentasMensuales = cache(
     if (scope.tier !== 'global' && scope.tier !== 'equipo') return {};
 
     const supabase = await createOptimizedServerClient();
+
+    // Fail-CLOSED, not fail-open: see the identical guard in
+    // getAlertasSinGestionarCount above — a doubly-empty team filter must
+    // short-circuit to the empty result BEFORE the venta query is built,
+    // never fall through to an unfiltered (org-wide) query.
+    let filtroEquipo: string | null = null;
+    if (scope.tier === 'equipo') {
+      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
+      filtroEquipo = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, '');
+      if (!filtroEquipo) return {};
+    }
+
     const ahora = new Date();
     const hace6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1).toISOString();
 
@@ -585,10 +612,8 @@ export const getVentasMensuales = cache(
       .eq('estado', 'finalizada')
       .gte('fecha_venta', hace6Meses);
 
-    if (scope.tier === 'equipo') {
-      const clienteIdsEquipo = await getClienteIdsEquipo(supabase, scope);
-      const filtro = buildVentaEquipoOrFilter(scope, clienteIdsEquipo, '');
-      if (filtro) query = query.or(filtro);
+    if (filtroEquipo) {
+      query = query.or(filtroEquipo);
     }
 
     const { data, error } = await query.order('fecha_venta', { ascending: true });

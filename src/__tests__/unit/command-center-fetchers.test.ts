@@ -49,6 +49,17 @@ const EQUIPO_SCOPE: EquipoScope = {
   equipoUsernames: ["coord1", "vend1"],
   equipoUserIds: ["coord-1", "vend-1"],
 };
+// A freshly-created coordinador: no username on file yet (nothing valid to
+// push into equipoUsernames) and, combined with owning no clientes yet, this
+// is the doubly-empty edge case that must fail CLOSED (zero result), not
+// fail open (unfiltered org-wide query).
+const EQUIPO_SCOPE_SIN_USERNAMES: EquipoScope = {
+  tier: "equipo",
+  userId: "coord-1",
+  username: "",
+  equipoUsernames: [],
+  equipoUserIds: ["coord-1"],
+};
 
 function clienteRow(id: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -505,6 +516,20 @@ describe("getAlertasSinGestionarCount — equipo (coordinador) team scope", () =
       'cuota.venta.vendedor_username.in.("coord1","vend1")',
     );
   });
+
+  it("fails CLOSED to zero without querying alerta_cobranza when the team has no valid usernames and owns no clientes", async () => {
+    chains.cliente = createChainMock({ data: [], error: null });
+    chains.alerta_cobranza = createChainMock({ data: null, error: null, count: 999 });
+
+    const resultado = await getAlertasSinGestionarCount(EQUIPO_SCOPE_SIN_USERNAMES);
+
+    expect(resultado).toBe(0);
+    // The base query chain (.eq/.neq/.not) must never even be started when
+    // the team filter is doubly empty — proves the alerta_cobranza/venta
+    // table was never queried unfiltered (which would silently leak
+    // org-wide data, count: 999, to a coordinador with no team yet).
+    expect(chains.alerta_cobranza.eq).not.toHaveBeenCalled();
+  });
 });
 
 describe("getResumenGeneral — equipo (coordinador) team scope", () => {
@@ -545,5 +570,21 @@ describe("getVentasMensuales — equipo (coordinador) team scope", () => {
     await getVentasMensuales(EQUIPO_SCOPE);
 
     expect(chains.venta.or).toHaveBeenCalledWith('vendedor_username.in.("coord1","vend1")');
+  });
+
+  it("fails CLOSED to an empty object without querying venta when the team has no valid usernames and owns no clientes", async () => {
+    chains.cliente = createChainMock({ data: [], error: null });
+    chains.venta = createChainMock({
+      data: [{ fecha_venta: new Date().toISOString() }],
+      error: null,
+    });
+
+    const resultado = await getVentasMensuales(EQUIPO_SCOPE_SIN_USERNAMES);
+
+    expect(resultado).toEqual({});
+    // Proves the venta table was never queried unfiltered — the mock's
+    // fixture data (which would otherwise leak org-wide sales into the
+    // count) is never read because .eq() is never called on this chain.
+    expect(chains.venta.eq).not.toHaveBeenCalled();
   });
 });

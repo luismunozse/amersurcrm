@@ -90,14 +90,6 @@ describe("obtenerResumenCobranzaScoped", () => {
   });
 
   it("queries without a vendedor_username filter for tier: global", async () => {
-    const chain = createChainMock();
-    chain.order.mockImplementation(() => Promise.resolve({
-      data: [{ estado_cobranza: "en_mora", monto_programado: 1000, monto_pagado: 200, monto_mora: 50, dias_atraso: 10 }],
-      error: null,
-    }));
-    // v_cobranza has no .order() in the real query — reuse the generic
-    // chain's thenable-less shape by resolving directly on the select/eq
-    // no-op chain instead:
     const selectChain = createChainMock();
     mockServerActionClient.from.mockReturnValue(selectChain);
     (selectChain as any).then = (resolve: any) => Promise.resolve({
@@ -111,7 +103,12 @@ describe("obtenerResumenCobranzaScoped", () => {
     expect(resultado.success).toBe(true);
     expect(resultado.data!.en_mora).toBe(1);
     expect(resultado.data!.monto_mora_total).toBe(50);
-    expect(selectChain.eq).not.toHaveBeenCalledWith("vendedor_username", expect.anything());
+    // The only team-scoping mechanism this function has is `.in()` (used by
+    // the equipo tier below) — asserting it was never called on this chain
+    // is the real proof that tier: "global" ran unfiltered, unlike the old
+    // `.eq('vendedor_username', ...)` assertion which no tier ever uses (a
+    // tautology that would pass even if the global branch were broken).
+    expect(selectChain.in).not.toHaveBeenCalled();
   });
 
   it("filters by the team's usernames for tier: equipo", async () => {

@@ -145,6 +145,14 @@ export async function obtenerResumenCobranza() {
  * `CommandCenter.tsx` only ever renders MoraAlertasBlock for tier "global"
  * or "equipo" — "propio"/"anonimo" return a zeroed default here purely as
  * defense-in-depth, same convention as every command-center fetcher.
+ *
+ * `tier: "global"` here is ROLE-derived (resolved once in
+ * `equipo-scope.server.ts` from ROL_ADMIN/ROL_GERENTE), NOT re-derived from
+ * `PERMISOS.PAGOS.VER_TODOS` the way `obtenerResumenCobranza` does — this is
+ * the deliberate convention every command-center block already follows
+ * (`getResumenGeneral`, `getAgingLeads`, etc. all key off `EquipoScope`, not
+ * a permission check), and intentionally supersedes the old permission gate
+ * for THIS block only. Do not "fix" this back to a `tienePermiso()` call.
  */
 export async function obtenerResumenCobranzaScoped(scope: EquipoScope) {
   if (scope.tier !== 'global' && scope.tier !== 'equipo') {
