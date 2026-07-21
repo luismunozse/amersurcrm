@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockSupabase, chains, createChainMock } = vi.hoisted(() => {
+const { mockSupabase, mockServiceRoleClient, chains, serviceChains, createChainMock } = vi.hoisted(() => {
   function createChainMock(finalResult: any = { data: null, error: null }) {
     const chain: any = {};
     const methods = [
@@ -14,18 +14,25 @@ const { mockSupabase, chains, createChainMock } = vi.hoisted(() => {
   }
 
   const chains: Record<string, any> = {};
+  const serviceChains: Record<string, any> = {};
 
   const mockSupabase: any = {
     schema: vi.fn(() => ({
       from: vi.fn((table: string) => chains[table] ?? createChainMock()),
     })),
   };
+  const mockServiceRoleClient: any = {
+    schema: vi.fn(() => ({
+      from: vi.fn((table: string) => serviceChains[table] ?? createChainMock({ data: [], error: null })),
+    })),
+  };
 
-  return { mockSupabase, chains, createChainMock };
+  return { mockSupabase, mockServiceRoleClient, chains, serviceChains, createChainMock };
 });
 
 vi.mock("@/lib/supabase.server", () => ({
   createOptimizedServerClient: vi.fn().mockResolvedValue(mockSupabase),
+  createServiceRoleClient: vi.fn(() => mockServiceRoleClient),
   getCachedUserId: vi.fn().mockResolvedValue("user-1"),
 }));
 
@@ -48,6 +55,7 @@ function setupPerfil(rolNombre: string, username = "user1") {
 beforeEach(() => {
   vi.clearAllMocks();
   delete chains.cliente;
+  delete serviceChains.usuario_perfil;
 });
 
 describe("getCachedFunnelClientes — fix 1: per-estado head-count queries (no bulk fetch)", () => {
@@ -93,21 +101,24 @@ describe("getCachedFunnelClientes — fix 1: per-estado head-count queries (no b
   });
 });
 
-describe("getCachedFunnelClientes — ADR-2 coordinador global scope", () => {
-  // NOTE: since the data-provenance fix, `.or()` is called at least once per
-  // estado for EVERY role (the imported-never-contacted exclusion below), so
-  // these no longer assert "`.or` not called at all" — they assert the
-  // OWNERSHIP `.or()` group specifically is absent for privileged roles.
-  it("does not scope any per-estado query by ownership for ROL_COORDINADOR_VENTAS (spec: coordinador sees global funnel, not own-only)", async () => {
+describe("getCachedFunnelClientes — coordinador team-scoped visibility (supersedes ADR-2 global scope)", () => {
+  it("scopes every per-estado query to the coordinador's team, not the full table", async () => {
     setupPerfil("ROL_COORDINADOR_VENTAS", "coord1");
+    serviceChains.usuario_perfil = createChainMock({ data: [{ id: "vend-1", username: "vend1" }], error: null });
     chains.cliente = createChainMock({ data: null, count: 0, error: null });
 
     await getCachedFunnelClientes();
 
-    const ownershipCalls = chains.cliente.or.mock.calls.filter(([filtro]: [string]) =>
-      filtro.includes("created_by"),
+    const teamCalls = chains.cliente.or.mock.calls.filter(([filtro]: [string]) =>
+      filtro.includes('vendedor_username.in.'),
     );
-    expect(ownershipCalls).toHaveLength(0);
+    expect(teamCalls).toHaveLength(ESTADOS_FUNNEL.length);
+    // Matches the real equipoOrFilter contract (equipo-scope.server.ts):
+    // created_by.in.() over ALL team UUIDs (coordinador's own id included),
+    // plus vendedor_username/vendedor_asignado .in() arms over team usernames.
+    expect(teamCalls[0][0]).toBe(
+      'created_by.in.(vend-1,user-1),vendedor_username.in.("vend1","coord1"),vendedor_asignado.in.("vend1","coord1")',
+    );
   });
 
   it.each(["ROL_ADMIN", "ROL_GERENTE"])(
@@ -136,7 +147,9 @@ describe("getCachedFunnelClientes — ADR-2 coordinador global scope", () => {
     );
     expect(ownershipCalls).toHaveLength(ESTADOS_FUNNEL.length);
     for (const [filtro] of ownershipCalls) {
-      expect(filtro).toBe("created_by.eq.user-1,vendedor_username.eq.vend1");
+      // Real equipoOrFilter propio-tier contract adds a vendedor_asignado arm
+      // alongside vendedor_username (Issue #2 in equipo-scope.server.ts).
+      expect(filtro).toBe("created_by.eq.user-1,vendedor_username.eq.vend1,vendedor_asignado.eq.vend1");
     }
   });
 });
@@ -159,7 +172,7 @@ describe("getCachedFunnelClientes — data-provenance fix: exclude imported clie
 });
 
 describe("getCachedImportadosSinTrabajar — imported backlog stat (complement of EXCLUIR_IMPORTACION_NUNCA_CONTACTADO)", () => {
-  it.each(["ROL_ADMIN", "ROL_GERENTE", "ROL_COORDINADOR_VENTAS"])(
+  it.each(["ROL_ADMIN", "ROL_GERENTE"])(
     "counts imported clientes never contacted, without an ownership scope, for %s",
     async (rolNombre) => {
       setupPerfil(rolNombre, "user1");
@@ -177,13 +190,26 @@ describe("getCachedImportadosSinTrabajar — imported backlog stat (complement o
     },
   );
 
+  it("scopes the count by the coordinador's team (equipo tier), not the full table, for ROL_COORDINADOR_VENTAS", async () => {
+    setupPerfil("ROL_COORDINADOR_VENTAS", "coord1");
+    serviceChains.usuario_perfil = createChainMock({ data: [{ id: "vend-1", username: "vend1" }], error: null });
+    chains.cliente = createChainMock({ data: null, count: 22000, error: null });
+
+    const resultado = await getCachedImportadosSinTrabajar();
+
+    expect(chains.cliente.or).toHaveBeenCalledWith(
+      'created_by.in.(vend-1,user-1),vendedor_username.in.("vend1","coord1"),vendedor_asignado.in.("vend1","coord1")',
+    );
+    expect(resultado).toBe(22000);
+  });
+
   it("scopes the count by ownership for ROL_VENDEDOR (own-scope predicate, same as getCachedFunnelClientes)", async () => {
     setupPerfil("ROL_VENDEDOR", "vend1");
     chains.cliente = createChainMock({ data: null, count: 3, error: null });
 
     const resultado = await getCachedImportadosSinTrabajar();
 
-    expect(chains.cliente.or).toHaveBeenCalledWith("created_by.eq.user-1,vendedor_username.eq.vend1");
+    expect(chains.cliente.or).toHaveBeenCalledWith("created_by.eq.user-1,vendedor_username.eq.vend1,vendedor_asignado.eq.vend1");
     expect(resultado).toBe(3);
   });
 

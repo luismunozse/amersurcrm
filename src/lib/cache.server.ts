@@ -8,6 +8,7 @@ import type {
   NotificacionNoLeida,
 } from "@/types/crm";
 import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
+import { getEquipoScope, equipoOrFilter } from "@/lib/auth/equipo-scope.server";
 
 // DEPRECATED: Usar getCachedUserId() directamente en su lugar
 // Mantener por compatibilidad temporal
@@ -91,21 +92,18 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
 
   const selectedColumns = mode === 'dashboard' ? CLIENTE_DASHBOARD_COLUMNS : CLIENTE_LIST_COLUMNS;
 
-  // Obtener el rol y username del usuario
-  // NOTA: No usar .schema('crm') porque el cliente ya tiene db: { schema: "crm" } configurado
-  const { data: perfil } = await supabase
-    .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
-    .eq('id', userId)
-    .single();
+  // Resolver el nivel de visibilidad del usuario (global/equipo/propio).
+  const scope = await getEquipoScope();
+  // CRITICAL: equipoOrFilter() returns null for BOTH 'global' and 'anonimo' —
+  // an anonimo caller must never fall through to an unfiltered query, so it
+  // is short-circuited here before any query is built.
+  if (scope.tier === 'anonimo') return { data: [], total: 0 };
+  const username = scope.tier === 'global' ? null : scope.username;
 
-  const rolData = perfil?.rol as any;
-  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-  const esAdmin = rolNombre === 'ROL_ADMIN';
-  const esGerente = rolNombre === 'ROL_GERENTE';
-  const username = perfil?.username;
-
-  const usarVistaAccesible = !esAdmin && !esGerente && !vendedor && username;
+  // La vista optimizada `cliente_accesible` solo etiqueta filas por un ÚNICO
+  // usuario (ver crm.cliente_accesible) — no sirve para el alcance de equipo
+  // de un coordinador, así que solo se usa para vendedores individuales.
+  const usarVistaAccesible = scope.tier === 'propio' && !vendedor && !!username;
   const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
 
   // Pre-filtro: obtener IDs de clientes por proyecto de interés (si aplica)
@@ -181,18 +179,20 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
       return query;
     }
 
-    // Determinar qué filtros necesitamos
-    const necesitaFiltroPermisos = !esAdmin && !esGerente && username && !vendedor;
-    const necesitaFiltroVendedor = !!vendedor && vendedor.trim() !== '' && (esAdmin || esGerente);
+    // 1. PRIMERO aplicar filtros de permisos/equipo (AND) - restringen el acceso
+    const puedeFiltrarPorVendedor = (scope.tier === 'global' || scope.tier === 'equipo')
+      && !!vendedor && vendedor.trim() !== '';
 
-    // 1. PRIMERO aplicar filtros de permisos (AND) - estos restringen el acceso
-    if (necesitaFiltroPermisos) {
-      // Vendedores solo ven clientes que crearon o que tienen asignados
-      query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+    if (!puedeFiltrarPorVendedor) {
+      const filtroEquipo = equipoOrFilter(scope);
+      if (filtroEquipo) {
+        query = query.or(filtroEquipo);
+      }
     }
 
-    // 2. Filtro por vendedor específico (admins pueden filtrar por cualquier vendedor)
-    if (necesitaFiltroVendedor && vendedor && vendedor.trim() !== '') {
+    // 2. Filtro por vendedor específico (global y equipo pueden filtrar; el
+    //    equipo de un coordinador ya está acotado por /api/clientes/vendedores)
+    if (puedeFiltrarPorVendedor) {
       query = query.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
     }
 
@@ -393,19 +393,8 @@ export const getCachedPipelineClientes = cache(
 
     const { vendedor = '', origen = '' } = params || {};
 
-    const { data: perfil } = await supabase
-      .from('usuario_perfil')
-      .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
-      .eq('id', userId)
-      .single();
-
-    const rolData = perfil?.rol as any;
-    const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-    const esAdmin = rolNombre === 'ROL_ADMIN';
-    const esGerente = rolNombre === 'ROL_GERENTE';
-    const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
-    const puedeVerTodos = esAdmin || esGerente || esCoordinador;
-    const username = perfil?.username;
+    const scope = await getEquipoScope();
+    if (scope.tier === 'anonimo') return { clientes: [], totalesPorEstado: {} };
 
     const ESTADOS_PIPELINE = [
       'por_contactar',
@@ -418,14 +407,19 @@ export const getCachedPipelineClientes = cache(
     ] as const;
     const PER_ESTADO_LIMIT = 300;
 
+    const puedeFiltrarPorVendedor = scope.tier === 'global' || scope.tier === 'equipo';
+
     const aplicarFiltros = (q: any) => {
       if (origen && origen.trim() !== '') {
         q = q.eq('origen_lead', origen);
       }
-      if (!puedeVerTodos && username) {
-        q = q.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
-      } else if (puedeVerTodos && vendedor && vendedor.trim() !== '') {
+      if (puedeFiltrarPorVendedor && vendedor && vendedor.trim() !== '') {
         q = q.or(`vendedor_asignado.eq.${vendedor},vendedor_username.eq.${vendedor}`);
+      } else {
+        const filtroEquipo = equipoOrFilter(scope);
+        if (filtroEquipo) {
+          q = q.or(filtroEquipo);
+        }
       }
       return q;
     };
@@ -739,24 +733,8 @@ export const getCachedFunnelClientes = cache(async (): Promise<Record<string, nu
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return {};
 
-  const { data: perfil } = await supabase
-    .schema('crm')
-    .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
-    .eq('id', userId)
-    .single();
-
-  const rolData = perfil?.rol as any;
-  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-  const esAdmin = rolNombre === 'ROL_ADMIN';
-  const esGerente = rolNombre === 'ROL_GERENTE';
-  // ADR-2 (dashboard-rol): ROL_COORDINADOR_VENTAS has global visibility per
-  // crm.es_visibilidad_global() — getCachedPipelineClientes and
-  // sidebar-badges already treat coordinador as global. This fetcher backs
-  // the command-center funnel block, so it must match.
-  const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
-  const esPrivilegiado = esAdmin || esGerente || esCoordinador;
-  const username = perfil?.username;
+  const scope = await getEquipoScope();
+  if (scope.tier === 'anonimo') return {};
 
   // Fix 1: per-estado head-count queries instead of a bulk row fetch grouped
   // in JS. PostgREST silently caps result sets at ~1000 rows, so on a large
@@ -782,11 +760,12 @@ export const getCachedFunnelClientes = cache(async (): Promise<Record<string, nu
       // param per call; PostgREST ANDs distinct query params together).
       query = query.or(EXCLUIR_IMPORTACION_NUNCA_CONTACTADO);
 
-      // Vendedores solo ven sus clientes — same own-scope predicate as
-      // before, now applied to EVERY per-estado query (not once to a single
-      // bulk fetch).
-      if (!esPrivilegiado && username) {
-        query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+      // Ownership/team scope: global (admin/gerente) gets no extra filter;
+      // equipo (coordinador) and propio (vendedor) both get an ownership
+      // `.or()`, via the single shared helper.
+      const filtroEquipo = equipoOrFilter(scope);
+      if (filtroEquipo) {
+        query = query.or(filtroEquipo);
       }
 
       const { count, error } = await query;
@@ -816,20 +795,8 @@ export const getCachedImportadosSinTrabajar = cache(async (): Promise<number> =>
   const userId = await getUserIdOrNull(supabase);
   if (!userId) return 0;
 
-  const { data: perfil } = await supabase
-    .schema('crm')
-    .from('usuario_perfil')
-    .select('username, rol:rol!usuario_perfil_rol_id_fkey(nombre)')
-    .eq('id', userId)
-    .single();
-
-  const rolData = perfil?.rol as any;
-  const rolNombre = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
-  const esAdmin = rolNombre === 'ROL_ADMIN';
-  const esGerente = rolNombre === 'ROL_GERENTE';
-  const esCoordinador = rolNombre === 'ROL_COORDINADOR_VENTAS';
-  const esPrivilegiado = esAdmin || esGerente || esCoordinador;
-  const username = perfil?.username;
+  const scope = await getEquipoScope();
+  if (scope.tier === 'anonimo') return 0;
 
   let query = supabase
     .schema('crm')
@@ -838,10 +805,12 @@ export const getCachedImportadosSinTrabajar = cache(async (): Promise<number> =>
     .eq('origen_lead', 'importacion')
     .is('ultimo_contacto', null);
 
-  // Vendedores solo ven su propio backlog importado — same own-scope
-  // predicate as getCachedFunnelClientes.
-  if (!esPrivilegiado && username) {
-    query = query.or(`created_by.eq.${userId},vendedor_username.eq.${username}`);
+  // Ownership/team scope: global (admin/gerente) gets no extra filter;
+  // equipo (coordinador) and propio (vendedor) both get an ownership
+  // `.or()`, via the single shared helper — same as getCachedFunnelClientes.
+  const filtroEquipo = equipoOrFilter(scope);
+  if (filtroEquipo) {
+    query = query.or(filtroEquipo);
   }
 
   const { count, error } = await query;
