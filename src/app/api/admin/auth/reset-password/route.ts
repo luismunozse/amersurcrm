@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
 
     // 1) Obtener el perfil por DNI (mismo schema crm)
     const { data: perfil, error: perfilError } = await supabase
+      .schema("crm")
       .from("usuario_perfil")
       .select("id, email, dni")
       .eq("dni", dni.trim())

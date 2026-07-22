@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
     const vendedoresMap = new Map<string, { username: string }>();
     if (vendorInputs.size > 0) {
       const { data: vendedoresData, error: vendedoresError } = await serviceSupabase
+        .schema("crm")
         .from("usuario_perfil")
         .select("id, username, nombre_completo, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)");
 

@@ -104,6 +104,7 @@ type Vendedor = {
 
 async function selectVendedorDisponible(supabase: ReturnType<typeof createServiceRoleClient>) {
   const { data, error } = await supabase
+    .schema("crm")
     .from("usuario_perfil")
     .select("id, username, nombre_completo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
     .eq("activo", true);
