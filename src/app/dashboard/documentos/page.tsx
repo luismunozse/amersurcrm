@@ -28,6 +28,7 @@ export default async function DocumentosPage() {
     const serviceRole = createServiceRoleClient();
 
     const { data, error } = await serviceRole
+      .schema('crm')
       .from('google_drive_sync_config')
       .select('access_token, ultima_sincronizacion_at')
       .eq('activo', true)

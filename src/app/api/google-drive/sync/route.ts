@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       }
 
       const { data: existing, error: existingError } = await serviceSupabase
+        .schema("crm")
         .from("carpeta_documento")
         .select("id, nombre, carpeta_padre_id, google_drive_folder_id")
         .eq("google_drive_folder_id", folderGoogleId)
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
         if (Object.keys(updates).length > 0) {
           updates.updated_at = new Date().toISOString();
           const { error: updateError } = await serviceSupabase
+            .schema("crm")
             .from("carpeta_documento")
             .update(updates)
             .eq("id", existing.id);
@@ -113,6 +115,7 @@ export async function POST(request: NextRequest) {
       };
 
       const { data: inserted, error: insertError } = await serviceSupabase
+        .schema("crm")
         .from("carpeta_documento")
         .insert(insertPayload)
         .select("id")
@@ -131,6 +134,7 @@ export async function POST(request: NextRequest) {
     // Si es sincronización completa, eliminar documentos existentes de Google Drive
     if (fullSync) {
       const { error: deleteError } = await serviceSupabase
+        .schema("crm")
         .from('documento')
         .delete()
         .eq('storage_tipo', 'google_drive');
@@ -156,6 +160,7 @@ export async function POST(request: NextRequest) {
     // OPTIMIZADO: Obtener todos los documentos existentes de Google Drive en una sola query
     const googleDriveFileIds = archivos.map(f => f.id);
     const { data: existingDocs } = await serviceSupabase
+      .schema("crm")
       .from('documento')
       .select('id, google_drive_file_id')
       .in('google_drive_file_id', googleDriveFileIds);
@@ -226,6 +231,7 @@ export async function POST(request: NextRequest) {
     // OPTIMIZADO: Batch insert de documentos nuevos
     if (docsToInsert.length > 0) {
       const { error: insertError } = await serviceSupabase
+        .schema("crm")
         .from('documento')
         .insert(docsToInsert);
 
@@ -243,6 +249,7 @@ export async function POST(request: NextRequest) {
       const updateResults = await Promise.allSettled(
         docsToUpdate.map(({ id, data }) =>
           serviceSupabase
+            .schema("crm")
             .from('documento')
             .update(data)
             .eq('id', id)
@@ -265,6 +272,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizar timestamp de última sincronización en la configuración
     await serviceSupabase
+      .schema("crm")
       .from('google_drive_sync_config')
       .update({
         ultima_sincronizacion_at: new Date().toISOString(),

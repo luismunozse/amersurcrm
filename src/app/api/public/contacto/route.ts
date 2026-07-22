@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
 
     // Crear lead usando RPC con asignación automática round-robin
     const { data, error } = await supabase
+      .schema("crm")
       .rpc("create_whatsapp_lead", {
         p_nombre: nombre,
         p_telefono: telefono || "",

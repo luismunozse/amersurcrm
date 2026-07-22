@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
     // Insertar lead usando función RPC (bypasea RLS con SECURITY DEFINER)
     // El vendedor se asigna automáticamente usando la lista de vendedores activos
     const { data, error } = await supabase
+      .schema("crm")
       .rpc("create_whatsapp_lead", {
         p_nombre: nombre,
         p_telefono: body.telefono,

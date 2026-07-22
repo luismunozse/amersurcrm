@@ -34,6 +34,7 @@ export async function GET() {
     try {
       const serviceClient = createServiceRoleClient();
       const { data: driveConfigs } = await serviceClient
+        .schema("crm")
         .from("google_drive_sync_config")
         .select("id, access_token")
         .eq("activo", true)

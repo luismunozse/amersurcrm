@@ -135,6 +135,7 @@ async function selectVendedorDisponible(supabase: ReturnType<typeof createServic
   const conteos = await Promise.all(
     vendedores.map(async (vend) => {
       const { count, error } = await supabase
+        .schema("crm")
         .from("cliente")
         .select("id", { count: "exact", head: true })
         .eq("vendedor_asignado", vend.username);
@@ -213,7 +214,7 @@ async function persistLead(lead: MetaLeadPayload, supabase: ReturnType<typeof cr
     notas,
   };
 
-  const { error } = await supabase.from("cliente").insert(insertPayload);
+  const { error } = await supabase.schema("crm").from("cliente").insert(insertPayload);
 
   if (error) {
     const message = String(error.message ?? "");

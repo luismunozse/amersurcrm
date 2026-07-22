@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Obtener plantillas activas ordenadas
     const { data: templates, error } = await supabase
+      .schema("crm")
       .from("extension_template")
       .select("id, titulo, mensaje, categoria, orden")
       .eq("activo", true)

@@ -228,6 +228,7 @@ export async function POST(request: NextRequest) {
       const chunkResults = await Promise.all(
         phoneChunks.map(chunk =>
           serviceSupabase
+            .schema("crm")
             .from("cliente")
             .select("telefono_e164")
             .in("telefono_e164", chunk)
@@ -270,6 +271,7 @@ export async function POST(request: NextRequest) {
         const batchPayload = batch.map(stripMetadata);
 
         const { data: inserted, error } = await serviceSupabase
+          .schema("crm")
           .from("cliente")
           .insert(batchPayload)
           .select('id');
@@ -281,6 +283,7 @@ export async function POST(request: NextRequest) {
               const clienteData = stripMetadata(cliente);
               const { _proyecto_id, _proyecto_nombre } = cliente;
               const { data: nuevoCliente, error: singleError } = await serviceSupabase
+                .schema("crm")
                 .from("cliente")
                 .insert(clienteData)
                 .select('id')
@@ -301,6 +304,7 @@ export async function POST(request: NextRequest) {
 
               if (nuevoCliente && _proyecto_id) {
                 await serviceSupabase
+                  .schema("crm")
                   .from("cliente_propiedad_interes")
                   .insert({
                     cliente_id: nuevoCliente.id,
@@ -347,6 +351,7 @@ export async function POST(request: NextRequest) {
 
           if (intereses.length > 0) {
             await serviceSupabase
+              .schema("crm")
               .from("cliente_propiedad_interes")
               .insert(intereses);
           }

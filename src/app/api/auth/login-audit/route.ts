@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       payload.dni = identifier.trim();
     }
 
-    const { error } = await supabase.from("login_audit").insert(payload);
+    const { error } = await supabase.schema("crm").from("login_audit").insert(payload);
     if (handleLoginAuditError(error, "login-audit:insert")) {
       return NextResponse.json({ success: true });
     }

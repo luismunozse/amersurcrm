@@ -47,6 +47,7 @@ export async function getConfiguredGoogleDriveClient({
 
     // Obtener configuración activa de Google Drive
     const { data: configs, error } = await supabase
+      .schema('crm')
       .from('google_drive_sync_config')
       .select('*')
       .eq('activo', true)
@@ -101,6 +102,7 @@ export async function getConfiguredGoogleDriveClient({
         // Guardar el nuevo token en la base de datos
         const newExpiryDate = new Date(newTokens.expiry_date);
         const { error: updateError } = await supabase
+          .schema('crm')
           .from('google_drive_sync_config')
           .update({
             access_token: newTokens.access_token,

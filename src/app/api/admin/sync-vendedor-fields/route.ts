@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
     const srv = createServiceRoleClient();
     
     // Verificar inconsistencias
-    const { data: inconsistencias, error } = await srv.rpc('verificar_inconsistencias_vendedor');
+    const { data: inconsistencias, error } = await srv.schema('crm').rpc('verificar_inconsistencias_vendedor');
 
     if (error) {
       console.error("Error verificando inconsistencias:", error);
@@ -75,7 +75,7 @@ export async function POST(_request: NextRequest) {
     const srv = createServiceRoleClient();
     
     // Ejecutar sincronización
-    const { data: resultado, error } = await srv.rpc('sync_all_vendedor_fields');
+    const { data: resultado, error } = await srv.schema('crm').rpc('sync_all_vendedor_fields');
 
     if (error) {
       console.error("Error sincronizando campos:", error);
