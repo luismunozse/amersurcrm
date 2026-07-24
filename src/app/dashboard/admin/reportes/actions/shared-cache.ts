@@ -39,6 +39,12 @@ export function buildCachedReportFetcher<TArgs extends readonly unknown[], TData
 ): (...args: TArgs) => Promise<TData> {
   return unstable_cache(
     async (...args: TArgs) => {
+      // OJO: createServiceRoleClient() NO trae schema por defecto. El tipo
+      // SupabaseClient<any, "crm"> de abajo es un cast optimista — NO significa
+      // que el cliente esté scoped a crm en runtime. Todo fetcher DEBE encadenar
+      // .schema("crm") en cada .from()/.rpc(); si se olvida → PGRST205 silencioso
+      // (tabla public.* inexistente). No pre-scopeamos acá a propósito: rompería
+      // el contrato de "el fetcher scopea una sola vez" (doble .schema()).
       const supabase = createServiceRoleClient() as unknown as SupabaseClient<any, "crm">;
       return fetcher(supabase, ...args);
     },
