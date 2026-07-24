@@ -645,16 +645,23 @@ export async function obtenerVendedores() {
     throw new Error(error.message);
   }
 
-  // Filtrar solo vendedores y coordinadores y mapear a la estructura esperada
+  // Filtrar solo vendedores y coordinadores y mapear a la estructura esperada.
+  // Incluimos el rol para que el form pueda agrupar por <optgroup>
+  // (Vendedores / Coordinadores) sin volver a consultar.
   const vendedoresFiltrados = (vendedores || [])
+    .map((v: any) => ({
+      ...v,
+      rolNombre: Array.isArray(v.rol) ? v.rol[0]?.nombre : v.rol?.nombre,
+    }))
     .filter((v: any) =>
-      v.rol?.nombre === 'ROL_VENDEDOR' || v.rol?.nombre === 'ROL_COORDINADOR_VENTAS'
+      v.rolNombre === 'ROL_VENDEDOR' || v.rolNombre === 'ROL_COORDINADOR_VENTAS'
     )
     .map((v: any) => ({
       id: v.id,
       username: v.username,
       nombre_completo: v.nombre_completo,
-      email: v.email
+      email: v.email,
+      rol: v.rolNombre,
     }));
 
   return vendedoresFiltrados;

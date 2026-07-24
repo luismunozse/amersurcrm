@@ -4,6 +4,7 @@ import { useState, FormEvent, useRef, useEffect } from "react";
 import { User, MapPin, BarChart3, AlertTriangle } from "lucide-react";
 import { Spinner } from '@/components/ui/Spinner';
 import { crearCliente, actualizarCliente, obtenerVendedores, obtenerProximoVendedorSugerido } from "@/app/dashboard/clientes/_actions";
+import { agruparVendedoresPorRol } from "@/lib/clientes/agrupar-vendedores";
 import { detectarDuplicados } from "@/app/dashboard/clientes/_actions-duplicates";
 import type { DuplicadoEncontrado } from "@/app/dashboard/clientes/_actions-helpers";
 import DuplicateWarning from "./DuplicateWarning";
@@ -67,6 +68,7 @@ export default function ClienteForm({
     username: string;
     nombre_completo: string;
     email: string;
+    rol?: string | null;
   }>>([]);
   const [loadingVendedores, setLoadingVendedores] = useState(true);
   const [errorVendedores, setErrorVendedores] = useState(false);
@@ -577,12 +579,30 @@ export default function ClienteForm({
                       <option value="">
                         {loadingVendedores ? "Cargando vendedores..." : "Sin asignar"}
                       </option>
-                      {vendedores.map((vendedor) => (
-                        <option key={vendedor.id} value={vendedor.username}>
-                          {vendedor.nombre_completo}
-                          {sugerencia && vendedor.username === sugerencia.username ? " — Sugerido" : ""}
-                        </option>
-                      ))}
+                      {(() => {
+                        const renderOpcion = (persona: (typeof vendedores)[number]) => (
+                          <option key={persona.id} value={persona.username}>
+                            {persona.nombre_completo}
+                            {sugerencia && persona.username === sugerencia.username ? " — Sugerido" : ""}
+                          </option>
+                        );
+                        const { vendedores: soloVendedores, coordinadores } =
+                          agruparVendedoresPorRol(vendedores);
+                        return (
+                          <>
+                            {soloVendedores.length > 0 && (
+                              <optgroup label="Vendedores">
+                                {soloVendedores.map(renderOpcion)}
+                              </optgroup>
+                            )}
+                            {coordinadores.length > 0 && (
+                              <optgroup label="Coordinadores">
+                                {coordinadores.map(renderOpcion)}
+                              </optgroup>
+                            )}
+                          </>
+                        );
+                      })()}
                     </select>
                   ) : (
                     <>
