@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     // Parsear body
     const body = await request.json();
-    const { telefono, nombre, mensaje_inicial, origen_lead } = body;
+    const { telefono, nombre, mensaje_inicial, origen_lead, asignado_a } = body;
 
     if (!telefono) {
       return NextResponse.json(
@@ -144,6 +144,31 @@ export async function POST(request: NextRequest) {
       pais: "Perú",
     };
 
+    // Resolver a quién se asigna el lead.
+    // Por defecto (y única vía para usuarios no privilegiados): NULL = round-robin
+    // automático. Un admin/gerente puede fijar el lead a un COORDINADOR activo:
+    // el coordinador queda como dueño (vendedor_asignado = su username) y luego
+    // lo reparte a su equipo. Cualquier valor inválido o no autorizado cae
+    // silenciosamente al round-robin.
+    let vendedorAsignadoParam: string | null = null;
+    const asignadoALimpio = typeof asignado_a === "string" ? asignado_a.trim() : "";
+
+    if (asignadoALimpio && ["ROL_ADMIN", "ROL_GERENTE"].includes(callerRol)) {
+      const { data: coordinador } = await supabaseAdmin
+        .schema("crm")
+        .from("usuario_perfil")
+        .select("username, activo, rol:rol!usuario_perfil_rol_id_fkey(nombre)")
+        .eq("username", asignadoALimpio)
+        .maybeSingle();
+
+      const coordRolData = (coordinador as any)?.rol;
+      const coordRol = Array.isArray(coordRolData) ? coordRolData[0]?.nombre : coordRolData?.nombre;
+
+      if (coordinador?.activo === true && coordRol === "ROL_COORDINADOR_VENTAS") {
+        vendedorAsignadoParam = coordinador.username ?? asignadoALimpio;
+      }
+    }
+
     // Crear el lead usando la función RPC con asignación automática round-robin
     // Si vendedor_asignado es NULL, la función asigna automáticamente al siguiente vendedor activo
     const rpcResult = await supabaseAdmin
@@ -153,7 +178,7 @@ export async function POST(request: NextRequest) {
         p_telefono: telefonoLimpio,
         p_telefono_whatsapp: telefonoLimpio,
         p_origen_lead: origen_lead || "whatsapp_web",
-        p_vendedor_asignado: null, // NULL = asignación automática round-robin
+        p_vendedor_asignado: vendedorAsignadoParam, // NULL = round-robin; username = coordinador dueño
         p_created_by: user.id,
         p_notas: notas,
         p_direccion: direccion,
