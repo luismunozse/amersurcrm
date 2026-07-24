@@ -15,6 +15,62 @@ export interface ChangelogVersion {
 // Agregar nuevas versiones al inicio del array
 export const changelog: ChangelogVersion[] = [
   {
+    version: "1.10.0",
+    date: "2026-07-24",
+    title: "Coordinadores en la extensión y estabilidad",
+    changes: [
+      { type: "feature", description: "Asigne los leads de WhatsApp a un coordinador directamente desde la extensión AmersurChat" },
+      { type: "feature", description: "Selector de coordinador en el formulario de captura de leads de la extensión" },
+      { type: "improvement", description: "El desplegable para asignar responsable ahora agrupa a las personas por rol (coordinadores y vendedores)" },
+      { type: "improvement", description: "AmersurChat v1.2.4: su sesión se mantiene abierta aunque cierre y vuelva a abrir el navegador" },
+      { type: "fix", description: "Correcciones de estabilidad en importación de clientes, sincronización con Google Drive y plantillas de la extensión" },
+    ],
+  },
+  {
+    version: "1.9.0",
+    date: "2026-07-21",
+    title: "Equipos de coordinador",
+    changes: [
+      { type: "feature", description: "Asigne vendedores a un coordinador para formar equipos de trabajo" },
+      { type: "feature", description: "Cada coordinador ve únicamente los clientes, ventas y cobranzas de su equipo" },
+      { type: "feature", description: "Asignación masiva: seleccione varios vendedores a la vez y asígnelos a un coordinador en un solo paso" },
+      { type: "feature", description: "Al desactivar o eliminar a un coordinador, decida qué hacer con su equipo: transferirlo a otro coordinador o dejarlo sin asignar" },
+      { type: "improvement", description: "Nueva columna de coordinador y filtro por equipo en la lista de usuarios" },
+      { type: "improvement", description: "La selección de vendedores se mantiene aunque busque, filtre o cambie de página" },
+      { type: "improvement", description: "Notificaciones más confiables: un mismo evento avisa a las mismas personas sin importar desde dónde se registre" },
+      { type: "fix", description: "Se reparó el envío de notificaciones push al navegador de extremo a extremo" },
+    ],
+  },
+  {
+    version: "1.8.0",
+    date: "2026-07-07",
+    title: "Centro de comando y Reportes renovados",
+    changes: [
+      { type: "feature", description: "Nuevo inicio según su rol: tablero de comando para administradores y panel de trabajo diario para vendedores, con tareas y prioridades a la vista" },
+      { type: "feature", description: "Reportes con tabla de rendimiento por vendedor (scorecard), ordenable por cada indicador" },
+      { type: "feature", description: "Cobranza con alertas automáticas: recordatorios de cuotas por WhatsApp y registro de cada gestión" },
+      { type: "feature", description: "Panel de mora del sistema y seguimiento de la gestión de cobranza dentro de Reportes" },
+      { type: "feature", description: "Modo presentación del plano a pantalla completa y sin precios, ideal para mostrar el proyecto al cliente" },
+      { type: "feature", description: "Los Gerentes pueden consultar la Gestión de Usuarios en modo de solo lectura" },
+      { type: "improvement", description: "Comparación real contra el período anterior y metas tomadas de la meta asignada a cada vendedor" },
+      { type: "improvement", description: "Embudo de conversión con las 8 etapas completas y conteos exactos incluso con grandes volúmenes de datos" },
+      { type: "improvement", description: "Editor del plano mejorado: cárguelo en imagen o PDF, con zoom, desplazamiento y edición de puntos" },
+      { type: "fix", description: "Asignación de clientes por turnos (round-robin) sin duplicados, y teléfonos normalizados a formato internacional" },
+    ],
+  },
+  {
+    version: "1.7.0",
+    date: "2026-06-29",
+    title: "Plano interactivo y seguridad reforzada",
+    changes: [
+      { type: "feature", description: "Plano interactivo del proyecto: visualice el masterplan con cada lote marcado sobre el plano" },
+      { type: "feature", description: "Editor de plano para administradores: suba el plano y dibuje el contorno de cada lote para asignarlo" },
+      { type: "security", description: "Refuerzo de los permisos de acceso en todos los módulos: cada usuario ve solo la información que le corresponde" },
+      { type: "security", description: "Protección reforzada del acceso desde la extensión AmersurChat" },
+      { type: "security", description: "Se protegieron los tokens de Google y se ocultaron credenciales sensibles del sistema" },
+    ],
+  },
+  {
     version: "1.6.0",
     date: "2026-05-07",
     title: "Flujo unificado de separación y eliminación de procesos",
