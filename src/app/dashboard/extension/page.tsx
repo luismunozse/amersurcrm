@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.2.3
+                Descargar AmersurChat v1.2.4
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: 10 Julio 2026
+                Última actualización: 24 Julio 2026
               </p>
             </div>
           </li>
@@ -125,23 +125,15 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.2.3 */}
+      {/* Novedades v1.2.4 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.2.3
+          🎉 Novedades v1.2.4
         </h3>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Su sesión ya no se cierra:</strong> puede cerrar y volver a abrir Chrome sin tener que iniciar sesión de nuevo; la extensión mantiene su sesión activa</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Información de contacto corregida:</strong> se solucionó un error que impedía mostrar los datos del cliente cuando faltaba la fecha de registro</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Versión siempre correcta:</strong> el pie del panel ahora muestra la versión real que tiene instalada</span>
+            <span><strong>Asignar el lead a un coordinador:</strong> si usted es administrador o gerente, ahora puede elegir un coordinador al crear el lead. Ese coordinador queda a cargo y luego lo reparte a su equipo. Si no elige ninguno, el lead se asigna automáticamente como siempre.</span>
           </li>
         </ul>
         <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
