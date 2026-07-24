@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { WhatsAppContact, Cliente } from '@/types/crm';
+import { WhatsAppContact, Cliente, Coordinador } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
 import { InlineAlert } from './InlineAlert';
@@ -37,6 +37,11 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   const [warning, setWarning] = useState<string | null>(null);
   const [vendedorAsignado, setVendedorAsignado] = useState<string | null>(null);
 
+  // Asignación a coordinador (solo admin/gerente). Vacío = round-robin automático.
+  const [puedeAsignarCoordinador, setPuedeAsignarCoordinador] = useState(false);
+  const [coordinadores, setCoordinadores] = useState<Coordinador[]>([]);
+  const [selectedCoordinador, setSelectedCoordinador] = useState<string>('');
+
   // Estado para origen del lead
   const [origenLead, setOrigenLead] = useState<string>('whatsapp_web');
 
@@ -70,6 +75,32 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   // Cargar proyectos al montar
   useEffect(() => {
     loadProyectos();
+  }, []);
+
+  // Detectar si el usuario puede asignar a un coordinador (admin/gerente) y,
+  // en ese caso, precargar la lista de coordinadores. El backend gatea el
+  // endpoint, así que un no-privilegiado recibe [] y nunca ve el selector.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const currentUser = await apiClient.getCurrentUser();
+        const rolData = currentUser?.rol;
+        const rol = Array.isArray(rolData) ? rolData[0]?.nombre : rolData?.nombre;
+        const puede = rol === 'ROL_ADMIN' || rol === 'ROL_GERENTE';
+        if (cancelled) return;
+        setPuedeAsignarCoordinador(puede);
+        if (puede) {
+          const lista = await apiClient.getCoordinadores();
+          if (!cancelled) setCoordinadores(lista);
+        }
+      } catch (err) {
+        console.error('[CreateLeadForm] Error detectando rol / cargando coordinadores:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Cargar lotes cuando cambia el proyecto (no aplica a consulta general)
@@ -178,6 +209,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         canal: 'whatsapp_extension',
         mensaje_inicial: mensaje || undefined,
         chat_id: contact.chatId,
+        asignado_a: selectedCoordinador || undefined,
       });
 
       if (result.success) {
@@ -357,6 +389,27 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           </select>
         </div>
 
+        {/* Selector de Coordinador (solo admin/gerente) */}
+        {puedeAsignarCoordinador && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Asignar a coordinador (opcional)
+            </label>
+            <select
+              value={selectedCoordinador}
+              onChange={(e) => setSelectedCoordinador(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-crm-primary text-sm"
+            >
+              <option value="">— Automático (round-robin) —</option>
+              {coordinadores.map((c) => (
+                <option key={c.username} value={c.username}>
+                  {c.nombre_completo || c.username}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Selector de Proyecto de Interés */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -472,7 +525,12 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
 
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          El lead será asignado automáticamente a un vendedor disponible
+          {selectedCoordinador
+            ? `Se asignará al coordinador: ${
+                coordinadores.find((c) => c.username === selectedCoordinador)?.nombre_completo ||
+                selectedCoordinador
+              }`
+            : 'El lead será asignado automáticamente a un vendedor disponible'}
         </p>
       </div>
     </div>

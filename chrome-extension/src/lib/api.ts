@@ -2,7 +2,7 @@
  * Cliente API para comunicación con Amersur CRM
  */
 
-import { AuthState, Cliente, CreateLeadPayload, CreateLeadResponse } from '@/types/crm';
+import { AuthState, Cliente, Coordinador, CreateLeadPayload, CreateLeadResponse } from '@/types/crm';
 import { createLogger } from './logger';
 
 const logger = createLogger('CRMApiClient');
@@ -286,6 +286,20 @@ export class CRMApiClient {
    */
   async getCurrentUser(): Promise<any> {
     return this.request('/api/auth/me');
+  }
+
+  /**
+   * Obtener coordinadores activos para asignación de leads.
+   * Solo admin/gerente: el backend responde 403 para el resto → devolvemos [].
+   */
+  async getCoordinadores(): Promise<Coordinador[]> {
+    try {
+      const response = await this.request<{ coordinadores: Coordinador[] }>('/api/clientes/coordinadores');
+      return response.coordinadores || [];
+    } catch (error) {
+      console.error('[CRMApiClient] Error obteniendo coordinadores:', error);
+      return [];
+    }
   }
 
   /**

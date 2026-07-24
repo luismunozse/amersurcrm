@@ -44,6 +44,15 @@ export interface CreateLeadPayload {
   canal: string;
   mensaje_inicial?: string;
   chat_id?: string;
+  // Username of a coordinador to assign the lead to (admin/gerente only).
+  // Empty/omitted → automatic round-robin. Honored server-side only for
+  // privileged callers pointing at an active coordinador.
+  asignado_a?: string;
+}
+
+export interface Coordinador {
+  username: string;
+  nombre_completo: string | null;
 }
 
 export interface CreateLeadResponse {
