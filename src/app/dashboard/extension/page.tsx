@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.2.4
+                Descargar AmersurChat v1.3.0
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: 24 Julio 2026
+                Última actualización: 13 Agosto 2026
               </p>
             </div>
           </li>
@@ -125,15 +125,31 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.2.4 */}
+      {/* Novedades v1.3.0 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.2.4
+          🎉 Novedades v1.3.0
         </h3>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Asignar el lead a un coordinador:</strong> si usted es administrador o gerente, ahora puede elegir un coordinador al crear el lead. Ese coordinador queda a cargo y luego lo reparte a su equipo. Si no elige ninguno, el lead se asigna automáticamente como siempre.</span>
+            <span><strong>Soporte para contactos con nombre de usuario:</strong> WhatsApp ahora permite que algunos clientes escriban usando un nombre de usuario (@usuario) en vez de mostrar su número. AmersurChat reconoce estos chats y crea el lead igual, aunque el número no esté disponible.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Leads sin teléfono, completados después:</strong> si el número del contacto está oculto, el lead se crea igual y queda vinculado al chat. Cuando WhatsApp lo revela más adelante, la extensión se lo ofrece guardar con un click.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Detección de número compartido en el chat:</strong> si el cliente escribe su número en un mensaje, aparece un aviso para guardarlo en el CRM. Usted confirma o descarta — nunca se guarda automáticamente.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Nueva plantilla para solicitar el número:</strong> un mensaje listo para pedirle el número al contacto cuando sigue oculto y no lo compartió en el chat.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Popup con detección de pestaña:</strong> el ícono de la extensión ahora indica si tiene WhatsApp Web abierto y lo lleva directo a esa pestaña.</span>
           </li>
         </ul>
         <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
