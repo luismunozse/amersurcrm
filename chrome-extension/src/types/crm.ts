@@ -28,22 +28,34 @@ export interface Cliente {
   vendedor_asignado?: string | null;
   created_at?: string;
   notas?: string | null;
+  // Username de WhatsApp del contacto (sin @). WhatsApp usernames (jun 2026):
+  // los chats iniciados por username no exponen el teléfono real.
+  whatsapp_username?: string | null;
+  // Chat ID crudo: "<dígitos>@lid" (pseudónimo, no es el teléfono) para
+  // chats por username, o dígitos del teléfono para chats clásicos.
+  whatsapp_chat_id?: string | null;
 }
 
 export interface WhatsAppContact {
-  phone: string;
+  // null cuando WhatsApp oculta el número real (chat iniciado por username).
+  phone: string | null;
+  // Username de WhatsApp del contacto (sin @), si el chat expone uno.
+  username: string | null;
   name: string;
   chatId: string;
 }
 
 export interface CreateLeadPayload {
   nombre: string;
-  telefono: string;
-  telefono_whatsapp: string;
+  // Opcionales: un contacto identificado solo por chat_id/username (LID)
+  // puede no tener teléfono real disponible.
+  telefono?: string;
+  telefono_whatsapp?: string;
   origen_lead: string;
   canal: string;
   mensaje_inicial?: string;
   chat_id?: string;
+  whatsapp_username?: string;
   // Username of a coordinador to assign the lead to (admin/gerente only).
   // Empty/omitted → automatic round-robin. Honored server-side only for
   // privileged callers pointing at an active coordinador.

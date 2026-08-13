@@ -3,7 +3,7 @@
  * Inyecta el sidebar de AmersurChat
  */
 
-import { extractContactInfo, getLastReceivedMessage, insertTextIntoWhatsApp, observeChatChanges } from './lib/whatsapp';
+import { detectSharedPhone, extractContactInfo, getLastReceivedMessage, insertTextIntoWhatsApp, observeChatChanges } from './lib/whatsapp';
 
 const EXTENSION_ORIGIN = new URL(chrome.runtime.getURL('')).origin;
 let sidebarWindow: Window | null = null;
@@ -236,6 +236,12 @@ window.addEventListener('message', (event) => {
     case 'AMERSURCHAT_GET_LAST_MESSAGE': {
       const message = getLastReceivedMessage();
       reply({ type: 'AMERSURCHAT_LAST_MESSAGE', message });
+      break;
+    }
+
+    case 'AMERSURCHAT_DETECT_SHARED_PHONE': {
+      const detection = detectSharedPhone();
+      reply({ type: 'AMERSURCHAT_SHARED_PHONE', detection });
       break;
     }
   }

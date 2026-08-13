@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WhatsAppContact, Cliente, Coordinador } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
+import { esChatIdReal } from '@/lib/chatId';
 import { InlineAlert } from './InlineAlert';
 
 interface Proyecto {
@@ -23,6 +24,28 @@ interface CreateLeadFormProps {
   contact: WhatsAppContact;
   apiClient: CRMApiClient;
   onLeadCreated: (cliente?: Cliente) => void;
+}
+
+/**
+ * Nombre por defecto del lead según qué identificador de WhatsApp esté
+ * disponible: teléfono > username > genérico. Con WhatsApp usernames (Meta,
+ * jun 2026) un chat puede no exponer el teléfono real del contacto.
+ */
+function defaultLeadName(contact: WhatsAppContact): string {
+  if (contact.phone) return `Lead WhatsApp ${contact.phone.slice(-4)}`;
+  if (contact.username) return `Lead WhatsApp @${contact.username}`;
+  return 'Lead WhatsApp';
+}
+
+/**
+ * chat_id a enviar a la API: SOLO cuando `contact.chatId` es un
+ * identificador real (LID o teléfono). `contact.chatId` puede caer a
+ * `username` cuando todavía no hay LID/teléfono (ver extractContactInfo) —
+ * ese valor de relleno sirve para keying interno de UI, pero nunca debe
+ * persistirse como whatsapp_chat_id (ver esChatIdReal).
+ */
+function chatIdParaPayload(contact: WhatsAppContact): string | undefined {
+  return esChatIdReal(contact.chatId) ? contact.chatId : undefined;
 }
 
 export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLeadFormProps) {
@@ -202,13 +225,15 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
 
     try {
       const result = await apiClient.createLead({
-        nombre: nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`,
-        telefono: contact.phone,
-        telefono_whatsapp: contact.phone,
+        nombre: nombre || defaultLeadName(contact),
+        // Solo se manda si hay teléfono real — nunca el sentinel 'unknown'
+        // ni un LID: el backend distingue "sin teléfono" de "teléfono vacío".
+        ...(contact.phone ? { telefono: contact.phone, telefono_whatsapp: contact.phone } : {}),
         origen_lead: origenLead,
         canal: 'whatsapp_extension',
         mensaje_inicial: mensaje || undefined,
-        chat_id: contact.chatId,
+        chat_id: chatIdParaPayload(contact),
+        whatsapp_username: contact.username || undefined,
         asignado_a: selectedCoordinador || undefined,
       });
 
@@ -249,13 +274,17 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         // Usar el cliente completo que devuelve el servidor
         const clienteCreado: Cliente = result.cliente || {
           id: result.clienteId!,
-          nombre: nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`,
+          nombre: nombre || defaultLeadName(contact),
           telefono: contact.phone,
           telefono_whatsapp: contact.phone,
           estado_cliente: 'por_contactar',
           origen_lead: origenLead,
           vendedor_asignado: result.vendedor || null,
           created_at: new Date().toISOString(),
+          whatsapp_username: contact.username,
+          // Refleja lo que realmente se mandó en el payload (nunca un
+          // chatId de relleno caído a username).
+          whatsapp_chat_id: chatIdParaPayload(contact) ?? null,
         };
 
         console.log('[CreateLeadForm] Cliente creado (que se pasará al Sidebar):', clienteCreado);
@@ -308,7 +337,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           Lead creado exitosamente
         </h3>
         <p className="text-sm text-green-700 dark:text-green-200 mb-2">
-          {nombre || `Lead WhatsApp ${contact.phone.slice(-4)}`}
+          {nombre || defaultLeadName(contact)}
         </p>
         {vendedorAsignado && (
           <p className="text-sm text-green-700 dark:text-green-200 mb-2 font-medium">
@@ -364,11 +393,16 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           </label>
           <input
             type="text"
-            value={contact.phone}
+            value={contact.phone || (contact.username ? `@${contact.username}` : contact.chatId)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-sm cursor-not-allowed opacity-70"
             disabled
             aria-readonly="true"
           />
+          {!contact.phone && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Número oculto por WhatsApp
+            </p>
+          )}
         </div>
 
         {/* Selector de Origen del Lead */}

@@ -16,6 +16,23 @@ function getThrottleKey(method: string, endpoint: string): string {
   return `${method}:${endpoint}`;
 }
 
+/**
+ * `CRMApiClient.request()` solo lanza un Error genérico con el status y el
+ * body crudo ("API Error: 409 - {...}") — no preserva el body parseado. Acá
+ * lo recuperamos para poder mostrar el mensaje específico del server (y
+ * campos como telefono_actual/cliente_existente) en vez de un genérico.
+ */
+function parseApiErrorBody(error: unknown): Record<string, unknown> | null {
+  if (!(error instanceof Error)) return null;
+  const match = error.message.match(/^API Error: \d+ - ([\s\S]*)$/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export class CRMApiClient {
   private baseUrl: string;
   private token: string | null;
@@ -253,21 +270,79 @@ export class CRMApiClient {
   }
 
   /**
-   * Buscar cliente por teléfono
+   * Buscar cliente por teléfono, chat ID (LID de WhatsApp) o username.
+   * Con WhatsApp usernames (Meta, jun 2026) un chat puede no exponer el
+   * teléfono real del contacto, así que se acepta cualquiera de los tres.
    * @returns Cliente encontrado, null si no existe, o objeto con asignadoAOtro si está asignado a otro vendedor
    */
-  async searchClienteByPhone(phone: string): Promise<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string; error?: string }> {
+  async searchCliente(params: {
+    phone?: string | null;
+    chatId?: string | null;
+    username?: string | null;
+  }): Promise<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string; error?: string }> {
     try {
-      // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
-      const cleanPhone = phone.replace(/[^\d]/g, '');
+      const query = new URLSearchParams();
+
+      if (params.phone) {
+        // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
+        const cleanPhone = params.phone.replace(/[^\d]/g, '');
+        if (cleanPhone) query.set('phone', cleanPhone);
+      }
+      // 'unknown' es el sentinel de chatId sin dato real, nunca se envía.
+      if (params.chatId && params.chatId !== 'unknown') {
+        query.set('chat_id', params.chatId);
+      }
+      if (params.username) {
+        query.set('username', params.username);
+      }
+
+      if ([...query.keys()].length === 0) {
+        return { cliente: null, error: 'No hay teléfono, chat ID ni username para buscar.' };
+      }
+
       const response = await this.request<{ cliente: Cliente | null; asignadoAOtro?: boolean; mensaje?: string }>(
-        `/api/clientes/search?phone=${encodeURIComponent(cleanPhone)}`
+        `/api/clientes/search?${query.toString()}`
       );
       return response;
     } catch (error) {
       console.error('[CRMApiClient] Error buscando cliente:', error);
       // No tragarse el error: el caller lo muestra con opción de reintentar.
       return { cliente: null, error: 'No se pudo buscar el cliente en el CRM.' };
+    }
+  }
+
+  /**
+   * Actualiza el teléfono de un cliente con un número detectado en el chat
+   * y confirmado por el vendedor (ver SharedPhoneBanner). NUNCA se llama
+   * automáticamente al detectar — solo tras un click explícito.
+   * @returns cliente actualizado, o error (409: ya tiene teléfono / colisión con otro cliente)
+   */
+  async updateClientePhone(
+    clienteId: string,
+    telefono: string
+  ): Promise<{
+    cliente?: Cliente;
+    error?: string;
+    telefono_actual?: string | null;
+    cliente_existente?: { id: string; nombre: string };
+  }> {
+    try {
+      const response = await this.request<{ cliente: Cliente }>('/api/clientes/update-phone', {
+        method: 'POST',
+        body: JSON.stringify({ cliente_id: clienteId, telefono }),
+      });
+      return response;
+    } catch (error) {
+      const body = parseApiErrorBody(error);
+      if (body && typeof body.error === 'string') {
+        return {
+          error: body.error,
+          telefono_actual: (body.telefono_actual as string | null | undefined) ?? undefined,
+          cliente_existente: body.cliente_existente as { id: string; nombre: string } | undefined,
+        };
+      }
+      logger.error('Error actualizando teléfono del cliente', error instanceof Error ? error : undefined);
+      return { error: 'No se pudo actualizar el teléfono del cliente.' };
     }
   }
 

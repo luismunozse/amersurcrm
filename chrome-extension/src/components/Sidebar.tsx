@@ -4,6 +4,7 @@ import { CRMApiClient, getCRMConfig, clearCRMConfig } from '@/lib/api';
 import { LoginForm } from './LoginForm';
 import { ContactInfo } from './ContactInfo';
 import { CreateLeadForm } from './CreateLeadForm';
+import { SharedPhoneBanner } from './SharedPhoneBanner';
 import { MessageTemplates } from './MessageTemplates';
 import { ClientHistory } from './ClientHistory';
 import { UpdateLeadStatus } from './UpdateLeadStatus';
@@ -12,6 +13,7 @@ import { QuickNotes } from './QuickNotes';
 import { ConnectionStatus } from './ConnectionStatus';
 import { InlineAlert } from './InlineAlert';
 import { WHATSAPP_WEB_ORIGIN } from '@/lib/constants';
+import { esChatIdReal } from '@/lib/chatId';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('Sidebar');
@@ -28,8 +30,10 @@ export function Sidebar() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [sesionExpirada, setSesionExpirada] = useState(false);
 
-  // Ref para tracking de último teléfono procesado (evita re-renders innecesarios)
-  const lastProcessedPhoneRef = useRef<string | null>(null);
+  // Ref para tracking del último chat procesado (evita re-renders innecesarios).
+  // Se usa chatId (LID o teléfono) en vez de phone: phone puede ser null en
+  // chats iniciados por username, pero chatId siempre identifica al chat.
+  const lastProcessedChatIdRef = useRef<string | null>(null);
   // Ref para saber si el componente está montado (previene memory leaks)
   const mountedRef = useRef(true);
 
@@ -61,15 +65,15 @@ export function Sidebar() {
   // Buscar cliente cuando cambia el contacto
   useEffect(() => {
     if (contact && apiClient) {
-      // Solo buscar si el teléfono cambió (evita búsquedas redundantes)
-      if (contact.phone !== lastProcessedPhoneRef.current) {
-        logger.info('Nuevo contacto detectado', { phone: contact.phone });
-        lastProcessedPhoneRef.current = contact.phone;
-        searchCliente(contact.phone);
+      // Solo buscar si el chat cambió (evita búsquedas redundantes)
+      if (contact.chatId !== lastProcessedChatIdRef.current) {
+        logger.info('Nuevo contacto detectado', { chatId: contact.chatId, phone: contact.phone, username: contact.username });
+        lastProcessedChatIdRef.current = contact.chatId;
+        searchCliente(contact);
       }
     } else if (!contact) {
       setCliente(null);
-      lastProcessedPhoneRef.current = null;
+      lastProcessedChatIdRef.current = null;
       setClienteAsignadoAOtro(null);
     }
   }, [contact, apiClient]);
@@ -127,23 +131,31 @@ export function Sidebar() {
     window.parent.postMessage({ type: 'AMERSURCHAT_GET_CONTACT' }, WHATSAPP_WEB_ORIGIN);
   }
 
-  async function searchCliente(phone: string) {
-    if (!apiClient || !phone) {
-      logger.debug('Búsqueda de cliente cancelada', { hasApiClient: !!apiClient, hasPhone: !!phone });
+  async function searchCliente(contact: WhatsAppContact) {
+    const tieneIdentificador = !!(contact.phone || contact.username || (contact.chatId && contact.chatId !== 'unknown'));
+    if (!apiClient || !tieneIdentificador) {
+      logger.debug('Búsqueda de cliente cancelada', { hasApiClient: !!apiClient, tieneIdentificador });
       return;
     }
 
-    logger.info('Buscando cliente', { phone });
+    logger.info('Buscando cliente', { phone: contact.phone, chatId: contact.chatId, username: contact.username });
     setSearchingCliente(true);
     setClienteAsignadoAOtro(null);
     setSearchError(null);
 
     try {
-      const result = await apiClient.searchClienteByPhone(phone);
+      const result = await apiClient.searchCliente({
+        phone: contact.phone,
+        // chatId cae a username cuando aún no hay LID/teléfono (ver
+        // extractContactInfo); ese valor de relleno nunca debe mandarse
+        // como chat_id — se manda username por separado igual.
+        chatId: esChatIdReal(contact.chatId) ? contact.chatId : null,
+        username: contact.username,
+      });
       if (!mountedRef.current) return;
 
       if (result.error) {
-        logger.error('Error buscando cliente (API)', undefined, { phone, error: result.error });
+        logger.error('Error buscando cliente (API)', undefined, { phone: contact.phone, chatId: contact.chatId, error: result.error });
         setCliente(null);
         setSearchError(result.error);
       } else if (result.cliente) {
@@ -158,15 +170,15 @@ export function Sidebar() {
           return { ...prev, name: normalizedName };
         });
       } else if (result.asignadoAOtro) {
-        logger.info('Cliente asignado a otro vendedor', { phone, mensaje: result.mensaje });
+        logger.info('Cliente asignado a otro vendedor', { chatId: contact.chatId, mensaje: result.mensaje });
         setCliente(null);
         setClienteAsignadoAOtro(result.mensaje || 'Cliente asignado a otro vendedor');
       } else {
-        logger.info('Cliente no encontrado, mostrar formulario de creación', { phone });
+        logger.info('Cliente no encontrado, mostrar formulario de creación', { chatId: contact.chatId });
         setCliente(null);
       }
     } catch (error) {
-      logger.error('Error buscando cliente', error instanceof Error ? error : undefined, { phone });
+      logger.error('Error buscando cliente', error instanceof Error ? error : undefined, { chatId: contact.chatId });
       if (mountedRef.current) setCliente(null);
     } finally {
       if (mountedRef.current) setSearchingCliente(false);
@@ -231,7 +243,7 @@ export function Sidebar() {
     setApiClient(null);
     setContact(null);
     setCliente(null);
-    lastProcessedPhoneRef.current = null;
+    lastProcessedChatIdRef.current = null;
   }
 
   async function handleLeadCreated(nuevoCliente?: Cliente) {
@@ -248,14 +260,14 @@ export function Sidebar() {
       // Fallback: buscar el cliente
       logger.info('Lead creado, buscando cliente...');
       await new Promise(resolve => setTimeout(resolve, 500));
-      await searchCliente(contact.phone);
+      await searchCliente(contact);
     }
   }
 
   async function handleClientUpdate() {
     // Refrescar información del cliente después de actualización
     if (contact && apiClient) {
-      await searchCliente(contact.phone);
+      await searchCliente(contact);
     }
   }
 
@@ -336,7 +348,7 @@ export function Sidebar() {
               <InlineAlert
                 variant="error"
                 message={searchError}
-                onRetry={() => searchCliente(contact.phone)}
+                onRetry={() => searchCliente(contact)}
               />
             )}
 
@@ -374,6 +386,24 @@ export function Sidebar() {
 
             {cliente && (
               <>
+                {/* Sugerencia de teléfono cuando el cliente todavía no tiene uno
+                    registrado: cubre tanto el número ya visible en contact.phone
+                    (chat clásico, o revelado por Meta tras la excepción de ~30
+                    días) como la detección en mensajes cuando sigue oculto — ver
+                    SharedPhoneBanner. key por chatId: estado de "descartado"/
+                    detección fresco por cada chat. */}
+                {!cliente.telefono && (
+                  <SharedPhoneBanner
+                    key={contact.chatId}
+                    contact={contact}
+                    clienteId={cliente.id}
+                    apiClient={apiClient!}
+                    userName={userName}
+                    onPhoneSaved={handleClientUpdate}
+                    onInsertMessage={handleSelectTemplate}
+                  />
+                )}
+
                 {/* Herramientas para cliente existente */}
                 <UpdateLeadStatus
                   cliente={cliente}
@@ -389,7 +419,7 @@ export function Sidebar() {
                 <QuickNotes
                   clienteId={cliente.id}
                   apiClient={apiClient!}
-                  onNotaAdded={() => searchCliente(contact.phone)}
+                  onNotaAdded={() => searchCliente(contact)}
                 />
 
                 <ClientHistory

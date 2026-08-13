@@ -1,8 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 
 function Popup() {
+  // null = detectando, false = sin pestaña de WhatsApp, objeto = pestaña encontrada
+  const [whatsappTab, setWhatsappTab] = useState<chrome.tabs.Tab | null | false>(null);
+
+  useEffect(() => {
+    // La query por URL funciona sin permiso "tabs" gracias al host_permission
+    // de web.whatsapp.com declarado en el manifest.
+    chrome.tabs.query({ url: 'https://web.whatsapp.com/*' }, (tabs) => {
+      setWhatsappTab(tabs[0] ?? false);
+    });
+  }, []);
+
+  const irAWhatsApp = () => {
+    if (whatsappTab && whatsappTab.id !== undefined) {
+      chrome.tabs.update(whatsappTab.id, { active: true });
+      if (whatsappTab.windowId !== undefined) {
+        chrome.windows.update(whatsappTab.windowId, { focused: true });
+      }
+      window.close();
+    }
+  };
+
   return (
     <div className="w-80 p-4">
       <div className="text-center">
@@ -11,19 +32,35 @@ function Popup() {
           Extensión de Chrome para WhatsApp Web
         </p>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <p className="text-sm text-blue-800">
-            Para usar AmersurChat, abre{' '}
-            <a
-              href="https://web.whatsapp.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline"
+        {whatsappTab ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-green-800 mb-2">
+              WhatsApp Web ya está abierto. Use el botón flotante con el logo
+              de Amersur, en la esquina superior derecha de WhatsApp, para
+              abrir el panel.
+            </p>
+            <button
+              onClick={irAWhatsApp}
+              className="w-full rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
             >
-              WhatsApp Web
-            </a>
-          </p>
-        </div>
+              Ir a WhatsApp Web
+            </button>
+          </div>
+        ) : whatsappTab === false ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              Para usar AmersurChat, abra{' '}
+              <a
+                href="https://web.whatsapp.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline"
+              >
+                WhatsApp Web
+              </a>
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-2 text-left">
           <div className="flex items-start gap-2">

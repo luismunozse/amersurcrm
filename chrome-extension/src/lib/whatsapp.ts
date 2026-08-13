@@ -77,6 +77,15 @@ const SELECTORS = {
     '[contenteditable="true"][data-tab="10"]',
     'div[contenteditable="true"][role="textbox"]',
   ],
+  /**
+   * Elementos con data-id dentro del chat activo. Los mensajes de un chat
+   * iniciado por username traen el LID del contacto embebido ahí
+   * (ej. "true_123456789012345@lid_ABCDEF"), que es el único lugar estable
+   * donde se puede leer ese identificador.
+   */
+  messageDataId: [
+    '#main [data-id]',
+  ],
 } as const;
 
 // ─── Helpers de selectores ───────────────────────────────────────────────
@@ -121,8 +130,12 @@ function queryAll(selectors: readonly string[], parent: ParentNode = document): 
  */
 export function extractPhoneNumber(): string | null {
   // 1. Desde la URL (más confiable - no depende del DOM)
-  const urlMatch = window.location.href.match(/\/(\d{10,15})(@|$)/);
-  if (urlMatch?.[1]) {
+  // OJO: un LID ("<dígitos>@lid") NUNCA es un teléfono real — es el
+  // pseudónimo que WhatsApp asigna a contactos que escriben por username
+  // (Meta, jun 2026). El grupo 2 captura el sufijo exacto para poder
+  // excluir "@lid" sin dejar de aceptar "@c.us" o fin de string como antes.
+  const urlMatch = window.location.href.match(/\/(\d{10,15})(@lid|@|$)/);
+  if (urlMatch?.[1] && urlMatch[2] !== '@lid') {
     return '+' + urlMatch[1];
   }
 
@@ -175,6 +188,7 @@ function findPhoneInHeaderSpans(): string | null {
 function normalizarNombre(text: string | null | undefined): string | null {
   const limpio = (text || '').replace(/^~\s*/, '').trim();
   if (!limpio) return null;
+  if (limpio.startsWith('@')) return null;                 // username, no es un nombre
   if (/^\+?[\d\s()-]+$/.test(limpio)) return null;        // teléfono puro
   if (!/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(limpio)) return null;   // sin letras (hora/fecha)
   return limpio;
@@ -203,16 +217,129 @@ export function extractContactName(): string | null {
 }
 
 /**
+ * Extrae el username de WhatsApp del contacto activo, si el header lo
+ * muestra en vez de un nombre guardado (chats iniciados por username,
+ * Meta jun 2026). Devuelve el username sin "@", en minúsculas.
+ */
+export function extractUsername(): string | null {
+  const spans = queryAll(SELECTORS.headerContactSpan);
+
+  for (const span of spans) {
+    const text = span.textContent?.trim();
+    if (!text) continue;
+
+    const match = text.match(/^@([a-z0-9._]{3,30})$/i);
+    if (match) return match[1].toLowerCase();
+  }
+
+  return null;
+}
+
+/**
+ * Busca el LID ("<dígitos>@lid") del contacto activo en el DOM.
+ * Los mensajes de un chat iniciado por username traen el LID embebido en
+ * su atributo data-id (ej. "true_123456789012345@lid_ABCDEF") — es el
+ * único lugar estable donde se puede leer ese identificador.
+ *
+ * OJO: esta lectura es cruda/sin correlacionar con el chat activo — puede
+ * devolver un LID que ya no corresponde al header actual (ver
+ * leerLidEstable, que es quien realmente llama a esta función).
+ */
+function findLidEnDom(): string | null {
+  const nodos = queryAll(SELECTORS.messageDataId);
+
+  for (const nodo of nodos) {
+    const dataId = nodo.getAttribute('data-id') || '';
+    const match = dataId.match(/(\d{6,20})@lid/);
+    if (match) return `${match[1]}@lid`;
+  }
+
+  return null;
+}
+
+/** "Huella" barata del header actual (su primer span) para detectar si #main ya repintó. */
+function headerKeyActualDom(): string {
+  return queryAll(SELECTORS.headerContactSpan)[0]?.textContent?.trim() || '';
+}
+
+// Cache a nivel de módulo para la guarda de doble lectura de leerLidEstable.
+let lidCacheHeaderKey: string | null = null;
+let lidCacheValor: string | null = null;
+
+/**
+ * Lee el LID del DOM con una guarda de doble lectura estable.
+ *
+ * Por qué: findLidEnDom() escanea "#main [data-id]" sin correlacionarlo con
+ * el chat activo. En un switch de chat username→username (ambos SIN
+ * teléfono, el único caso donde este camino se usa — ver extractChatId) el
+ * MutationObserver del header dispara ANTES de que WhatsApp termine de
+ * repintar #main: en ese instante #main todavía puede tener los nodos del
+ * chat ANTERIOR, y findLidEnDom() devolvería su LID — un contacto ajeno.
+ * Sin esta guarda eso llega directo al sidebar (cliente equivocado) y a
+ * CreateLeadForm (chat_id equivocado en el lead nuevo).
+ *
+ * Estrategia (barata, sin timers nuevos — solo compara con la lectura
+ * anterior): cachea a nivel de módulo el último (headerKey, lid) leído,
+ * donde headerKey es el título actual del header (mismo span que usan
+ * extractContactName/extractUsername). Solo se devuelve el LID si ESTA
+ * lectura tiene el mismo headerKey Y el mismo LID que la lectura cacheada
+ * — dos ticks consecutivos coincidiendo significa que #main ya terminó de
+ * repintar para este chat. Si el headerKey (o el LID) cambió respecto del
+ * cache, se guarda la lectura nueva como candidata y se devuelve null en
+ * este tick; el próximo tick (nueva mutación del header o el interval de
+ * respaldo de 3s en observeChatChanges) la confirma.
+ *
+ * Nota: un null transitorio acá NO deja al contacto entero en null — en un
+ * chat por username, extractContactInfo() cae a `username` como chatId (ver
+ * WhatsAppContact.chatId), y extractUsername() lee del header, que ya
+ * está actualizado en este mismo tick. El sidebar identifica al cliente por
+ * username en el primer tick y el LID real llega un tick después.
+ */
+function leerLidEstable(): string | null {
+  const headerKeyActual = headerKeyActualDom();
+  const lidActual = findLidEnDom();
+
+  if (!lidActual) {
+    // Todavía no hay nodos con LID (#main sin renderizar aún) — no tocar el
+    // cache, esperar al próximo tick.
+    return null;
+  }
+
+  const esLecturaEstable = lidCacheHeaderKey === headerKeyActual && lidCacheValor === lidActual;
+
+  lidCacheHeaderKey = headerKeyActual;
+  lidCacheValor = lidActual;
+
+  return esLecturaEstable ? lidActual : null;
+}
+
+/**
  * Extrae el chat ID del chat activo.
+ *
+ * Prioridad: número desde la URL/header (chats clásicos, barato y
+ * confiable) > LID del DOM (SOLO cuando no hay teléfono extraíble).
+ *
+ * El escaneo de LID (#main [data-id], corre en cada mutación del header +
+ * el interval de respaldo de 3s) es más costoso y, durante un switch de
+ * chat, puede leer nodos todavía no actualizados del chat anterior y
+ * devolver un LID ajeno. Priorizar el teléfono achica esa ventana de
+ * "stale read" y evita el costo del escaneo en la mayoría de los chats
+ * (clásicos, con teléfono), reservando el LID para cuando es la única
+ * pista disponible. La lectura del LID en sí pasa por leerLidEstable(), que
+ * agrega una guarda de doble lectura contra ese mismo stale-read residual.
  */
 export function extractChatId(): string | null {
-  // 1. Desde la URL
-  const urlMatch = window.location.href.match(/\/(\d{10,15})(@|$)/);
-  if (urlMatch?.[1]) return urlMatch[1];
+  // 1. Desde la URL (chats clásicos, con teléfono real)
+  const urlMatch = window.location.href.match(/\/(\d{10,15})(@lid|@|$)/);
+  if (urlMatch?.[1] && urlMatch[2] !== '@lid') return urlMatch[1];
 
   // 2. Desde el número del header
   const phone = findPhoneInHeaderSpans();
   if (phone) return phone.replace(/[^\d]/g, '');
+
+  // 3. LID desde el DOM: solo si no hay teléfono extraíble.
+  const lid = leerLidEstable();
+  if (lid) return lid;
 
   logger.debug('No se pudo extraer chat ID');
   return null;
@@ -232,17 +359,24 @@ function parseRemitentePrePlain(pre: string | null): string {
 /**
  * Determina si un remitente corresponde al contacto abierto (mensaje entrante).
  * Primario: últimos 8 dígitos del teléfono (tolera prefijos/formato distinto).
- * Fallback: igualdad de nombre para contactos guardados (sin teléfono visible).
+ * Fallback: contacto sin teléfono visible (chat por username/LID) — compara
+ * contra el "@username" (el data-pre-plain-text puede traer el username como
+ * remitente) y, si no, contra el nombre para contactos guardados.
  */
 function esRemitenteDelContacto(
   remitente: string,
   contactoDigits: string,
   contactoNombre: string,
+  contactoUsername: string,
 ): boolean {
   if (!remitente) return false;
   const rd = soloDigitos(remitente);
   if (contactoDigits && rd.length >= 8) {
     return rd.slice(-8) === contactoDigits.slice(-8);
+  }
+  if (contactoUsername) {
+    const remitenteNormalizado = remitente.replace(/^@/, '').toLowerCase();
+    if (remitenteNormalizado === contactoUsername.toLowerCase()) return true;
   }
   return !!contactoNombre && remitente === contactoNombre;
 }
@@ -267,12 +401,13 @@ function limpiarTextoMensaje(texto: string): string {
 export function getLastReceivedMessage(): string | null {
   const contactoDigits = soloDigitos(extractPhoneNumber());
   const contactoNombre = (extractContactName() || '').trim();
+  const contactoUsername = extractUsername() || '';
 
   // Camino actual: bloques con data-pre-plain-text, de más reciente a más viejo.
   const bloques = queryAll(SELECTORS.messageMeta);
   for (let i = bloques.length - 1; i >= 0; i--) {
     const remitente = parseRemitentePrePlain(bloques[i].getAttribute('data-pre-plain-text'));
-    if (!esRemitenteDelContacto(remitente, contactoDigits, contactoNombre)) continue;
+    if (!esRemitenteDelContacto(remitente, contactoDigits, contactoNombre, contactoUsername)) continue;
 
     const textEl = queryFirst(SELECTORS.selectableText, bloques[i]) || bloques[i];
     const texto = limpiarTextoMensaje((textEl.textContent || '').trim());
@@ -319,6 +454,116 @@ function isRealMessageText(text: string): boolean {
   return true;
 }
 
+/** Resultado de detectSharedPhone: número candidato + el mensaje donde apareció. */
+export interface SharedPhoneDetection {
+  phone: string;
+  sourceText: string;
+}
+
+/** Cuántos bloques de mensaje (más recientes primero) se revisan buscando un teléfono. */
+const MAX_BLOQUES_TELEFONO_COMPARTIDO = 30;
+/** Largo máximo del sourceText mostrado en el banner del sidebar. */
+const SOURCE_TEXT_MAX = 120;
+
+/** Números de 7-18 caracteres (dígitos + separadores comunes), con + opcional. */
+const PHONE_MATCH_PATTERN = /\+?\d[\d\s().-]{6,17}\d/g;
+
+/**
+ * Normaliza un match crudo de teléfono a formato E.164-ish.
+ * Perú: 9 dígitos que empiezan en 9 (celular sin código de país) → prefija +51.
+ * Si el match ya traía "+" (código de país explícito) → se conserva el "+".
+ * Cualquier otro largo sin "+": se devuelve solo en dígitos (sin inventar el +).
+ * Devuelve null si, tras limpiar, no quedan entre 8 y 15 dígitos.
+ */
+function normalizarTelefonoDetectado(raw: string): { phone: string; digits: string } | null {
+  const teniaMasSigno = raw.trim().startsWith('+');
+  const digitos = raw.replace(/\D/g, '');
+  if (digitos.length < 8 || digitos.length > 15) return null;
+
+  if (digitos.length === 9 && digitos.startsWith('9')) {
+    return { phone: `+51${digitos}`, digits: digitos };
+  }
+  if (teniaMasSigno) {
+    return { phone: `+${digitos}`, digits: digitos };
+  }
+  return { phone: digitos, digits: digitos };
+}
+
+/**
+ * Busca el primer teléfono válido dentro de un texto de mensaje, descartando
+ * falsos positivos comunes: montos con separador de miles (S/, $ o coma cerca
+ * del match) y DNIs (8 dígitos SIN formato de teléfono con "dni" cerca).
+ */
+function extraerTelefonoDeTexto(texto: string): string | null {
+  const matches = texto.matchAll(PHONE_MATCH_PATTERN);
+
+  for (const match of matches) {
+    const raw = match[0];
+    const idx = match.index ?? texto.indexOf(raw);
+    // Ventana de contexto alrededor del match (no todo el mensaje): un
+    // "S/" o "," lejos del número no debería descartarlo.
+    const entorno = texto.slice(Math.max(0, idx - 12), idx + raw.length + 12);
+
+    if (/S\/|\$|,/.test(entorno)) continue; // monto con separador de miles
+
+    const normalizado = normalizarTelefonoDetectado(raw);
+    if (!normalizado) continue;
+
+    const esFormatoPlano = /^\d+$/.test(raw.trim());
+    if (normalizado.digits.length === 8 && esFormatoPlano && /dni/i.test(entorno)) {
+      continue; // DNI (8 dígitos sin formato de teléfono + "dni" cerca)
+    }
+
+    return normalizado.phone;
+  }
+
+  return null;
+}
+
+/** Recorta el texto fuente para mostrarlo como cita en el banner del sidebar. */
+function truncarSourceText(texto: string): string {
+  return texto.length > SOURCE_TEXT_MAX ? `${texto.slice(0, SOURCE_TEXT_MAX)}…` : texto;
+}
+
+/**
+ * Detecta un posible número de teléfono compartido VOLUNTARIAMENTE por el
+ * contacto en sus mensajes entrantes más recientes. Reusa el mismo camino de
+ * data-pre-plain-text + esRemitenteDelContacto que getLastReceivedMessage.
+ *
+ * IMPORTANTE: esto NUNCA guarda nada — solo detecta y devuelve un candidato.
+ * El sidebar decide si mostrarlo (banner) y el vendedor confirma o descarta.
+ *
+ * TODO(vCard): compartir una tarjeta de contacto (vCard) es otra vía por la
+ * que un contacto puede compartir su número, pero no se encontró un selector
+ * robusto y estable en el DOM actual de WhatsApp Web para leer el número
+ * visible de una vCard sin abrir el mensaje. Queda fuera a propósito — no
+ * vale la pena invertir más de un intento en un selector frágil.
+ */
+export function detectSharedPhone(): SharedPhoneDetection | null {
+  const contactoDigits = soloDigitos(extractPhoneNumber());
+  const contactoNombre = (extractContactName() || '').trim();
+  const contactoUsername = extractUsername() || '';
+
+  const bloques = queryAll(SELECTORS.messageMeta);
+  const desde = Math.max(0, bloques.length - MAX_BLOQUES_TELEFONO_COMPARTIDO);
+
+  for (let i = bloques.length - 1; i >= desde; i--) {
+    const remitente = parseRemitentePrePlain(bloques[i].getAttribute('data-pre-plain-text'));
+    if (!esRemitenteDelContacto(remitente, contactoDigits, contactoNombre, contactoUsername)) continue;
+
+    const textEl = queryFirst(SELECTORS.selectableText, bloques[i]) || bloques[i];
+    const texto = limpiarTextoMensaje((textEl.textContent || '').trim());
+    if (!texto || !isRealMessageText(texto)) continue;
+
+    const telefono = extraerTelefonoDeTexto(texto);
+    if (telefono) {
+      return { phone: telefono, sourceText: truncarSourceText(texto) };
+    }
+  }
+
+  return null;
+}
+
 /**
  * Obtiene información completa del contacto activo.
  */
@@ -326,13 +571,16 @@ export function extractContactInfo(): WhatsAppContact | null {
   const phone = extractPhoneNumber();
   const name = extractContactName();
   const chatId = extractChatId();
+  const username = extractUsername();
 
-  if (!phone && !chatId) return null;
+  if (!phone && !chatId && !username) return null;
 
   return {
-    phone: phone || 'unknown',
+    // null real (no sentinel 'unknown'): un LID nunca es el teléfono.
+    phone,
     name: name || 'Sin nombre',
-    chatId: chatId || 'unknown',
+    chatId: chatId || username || 'unknown',
+    username,
   };
 }
 

@@ -1,12 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CRMApiClient } from '@/lib/api';
 
-interface MessageTemplate {
+export interface MessageTemplate {
   id: string;
   titulo: string;
   mensaje: string;
   categoria: string;
 }
+
+/**
+ * Plantilla para pedirle el número al contacto cuando WhatsApp lo oculta
+ * (chat por username). Exportada aparte porque SharedPhoneBanner la reusa
+ * para el botón "Insertar mensaje" del hint de solicitud — mismo texto,
+ * una sola fuente de verdad.
+ */
+export const SOLICITAR_NUMERO_TEMPLATE: MessageTemplate = {
+  id: '9',
+  titulo: 'Solicitar número de contacto',
+  mensaje: 'Para coordinar mejor y enviarte la información completa, ¿me compartes tu número de contacto? Soy {vendedor} de Amersur Inmobiliaria.',
+  categoria: 'consulta',
+};
 
 // Plantillas por defecto (fallback si el backend no responde)
 const TEMPLATES_DEFAULT: MessageTemplate[] = [
@@ -18,6 +31,7 @@ const TEMPLATES_DEFAULT: MessageTemplate[] = [
   { id: '6', titulo: 'Seguimiento post-visita', mensaje: 'Hola {cliente}! ¿Qué te pareció el terreno que visitamos? ¿Te gustaría que conversemos sobre las opciones de financiamiento?', categoria: 'seguimiento' },
   { id: '7', titulo: 'Propuesta comercial', mensaje: 'Hola {cliente}! Tengo una excelente propuesta para ti. El terreno que te interesa tiene una promoción especial este mes con facilidades de pago. ¿Conversamos los detalles?', categoria: 'cierre' },
   { id: '8', titulo: 'Despedida', mensaje: 'Gracias por tu tiempo {cliente}! Cualquier consulta adicional, no dudes en escribirme. Soy {vendedor}, estoy disponible de Lunes a Sábado de 9am a 6pm. ¡Saludos!', categoria: 'cierre' },
+  SOLICITAR_NUMERO_TEMPLATE,
 ];
 
 interface MessageTemplatesProps {

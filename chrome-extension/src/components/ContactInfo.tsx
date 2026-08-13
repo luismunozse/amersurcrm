@@ -113,7 +113,16 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
             <h2 className="font-semibold text-lg">
               {cliente?.nombre || contact.name}
             </h2>
-            <p className="text-sm opacity-90">{contact.phone}</p>
+            {contact.phone ? (
+              <p className="text-sm opacity-90">{contact.phone}</p>
+            ) : contact.username ? (
+              <div>
+                <p className="text-sm opacity-90">@{contact.username}</p>
+                <p className="text-xs opacity-75">Número oculto por WhatsApp</p>
+              </div>
+            ) : (
+              <p className="text-sm opacity-90">{contact.chatId}</p>
+            )}
           </div>
         </div>
       </div>
