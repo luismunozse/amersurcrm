@@ -1,7 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerOnlyClient } from "@/lib/supabase.server";
+import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
 
 export const dynamic = "force-dynamic";
+
+// CORS headers para extensión de Chrome
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handler OPTIONS para preflight CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
+/**
+ * Autentica por Bearer token (extensión de Chrome) o cookies (sesión web).
+ * Devuelve el cliente supabase a usar y el usuario, o null si no autenticado.
+ */
+async function autenticar(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    const supabaseAdmin = createServiceRoleClient();
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) return null;
+    return { supabase: supabaseAdmin, user };
+  }
+
+  const supabase = await createServerOnlyClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  return { supabase, user };
+}
 
 /**
  * POST /api/metrics/extension
@@ -9,12 +42,11 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const auth = await autenticar(request);
+    if (!auth) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401, headers: corsHeaders });
     }
+    const { supabase, user } = auth;
 
     const body = await request.json();
     const { metric_type, metric_name, value, unit, metadata } = body;
@@ -23,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (!metric_type || !metric_name || value === undefined) {
       return NextResponse.json(
         { error: "metric_type, metric_name y value son requeridos" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -44,11 +76,11 @@ export async function POST(request: NextRequest) {
       console.error('[Extension Metrics] Error insertando métrica:', insertError);
       return NextResponse.json(
         { error: "Error guardando métrica" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (error) {
     console.error('[Extension Metrics] Error:', error);
     return NextResponse.json(
@@ -56,7 +88,7 @@ export async function POST(request: NextRequest) {
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -67,12 +99,11 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerOnlyClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const auth = await autenticar(request);
+    if (!auth) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401, headers: corsHeaders });
     }
+    const { supabase, user } = auth;
 
     // Verificar si es administrador
     const { data: perfil } = await supabase
@@ -123,7 +154,7 @@ export async function GET(request: NextRequest) {
       console.error('[Extension Metrics] Error obteniendo métricas:', error);
       return NextResponse.json(
         { error: "Error obteniendo métricas" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -174,7 +205,7 @@ export async function GET(request: NextRequest) {
       metrics: metrics || [],
       aggregated,
       days,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('[Extension Metrics] Error:', error);
     return NextResponse.json(
@@ -182,7 +213,7 @@ export async function GET(request: NextRequest) {
         error: "Error interno del servidor",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
