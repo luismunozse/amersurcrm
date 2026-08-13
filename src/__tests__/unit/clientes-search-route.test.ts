@@ -10,6 +10,7 @@ const {
   mockPerfilSingle,
   mockPerfilThen,
   mockClienteMaybeSingle,
+  mockClienteThen,
   mockClienteEq,
   mockClienteOr,
   mockServiceRoleClient,
@@ -18,6 +19,11 @@ const {
   const mockPerfilSingle = vi.fn();
   const mockPerfilThen = vi.fn();
   const mockClienteMaybeSingle = vi.fn();
+  // The combined-filter lookup (buscarClientesPorFiltro) awaits the query
+  // chain directly — like the real supabase-js PostgrestFilterBuilder, it
+  // is thenable and resolves to { data: Row[], error } without a terminal
+  // .single()/.maybeSingle() call. mockClienteThen backs that bare await.
+  const mockClienteThen = vi.fn();
   const mockClienteEq = vi.fn();
   const mockClienteOr = vi.fn();
 
@@ -31,6 +37,7 @@ const {
     mockPerfilSingle,
     mockPerfilThen,
     mockClienteMaybeSingle,
+    mockClienteThen,
     mockClienteEq,
     mockClienteOr,
     mockServiceRoleClient,
@@ -63,6 +70,11 @@ beforeEach(() => {
   clienteChain.order = vi.fn().mockReturnValue(clienteChain);
   clienteChain.limit = vi.fn().mockReturnValue(clienteChain);
   clienteChain.maybeSingle = mockClienteMaybeSingle;
+  clienteChain.single = vi.fn().mockResolvedValue({ data: null, error: null });
+  // Bare `await chain` (no terminal .single()/.maybeSingle()) — the combined
+  // .or() lookup in buscarClientesPorFiltro relies on this, same pattern as
+  // perfilChain.then below.
+  clienteChain.then = (resolve: any, reject: any) => Promise.resolve(mockClienteThen()).then(resolve, reject);
   // eq/or must return the chain itself so further chaining works
   mockClienteEq.mockReturnValue(clienteChain);
   mockClienteOr.mockReturnValue(clienteChain);
@@ -86,6 +98,7 @@ beforeEach(() => {
   mockPerfilSingle.mockResolvedValue({ data: null, error: null }); // no profile by default
   mockPerfilThen.mockReturnValue({ data: [], error: null }); // no team by default
   mockClienteMaybeSingle.mockResolvedValue({ data: null, error: null }); // no client found
+  mockClienteThen.mockReturnValue({ data: [], error: null }); // combined lookup: no rows by default
 });
 
 // ============================================================

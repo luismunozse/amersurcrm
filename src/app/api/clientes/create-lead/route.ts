@@ -16,6 +16,18 @@ export async function OPTIONS() {
 }
 
 /**
+ * Normaliza un username de WhatsApp: quita el "@" inicial, pasa a
+ * minúsculas y valida el formato. Si no valida, devuelve null en vez de
+ * lanzar — un username inválido se ignora silenciosamente, no bloquea la
+ * creación del lead.
+ */
+function normalizarWhatsappUsername(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const limpio = raw.trim().replace(/^@/, "").toLowerCase();
+  return /^[a-z0-9._]{3,30}$/.test(limpio) ? limpio : null;
+}
+
+/**
  * POST /api/clientes/create-lead
  *
  * Crea un nuevo lead desde la extensión de Chrome (AmersurChat)
@@ -87,11 +99,27 @@ export async function POST(request: NextRequest) {
 
     // Parsear body
     const body = await request.json();
-    const { telefono, nombre, mensaje_inicial, origen_lead, asignado_a } = body;
+    const { telefono, telefono_whatsapp, chat_id, whatsapp_username, nombre, mensaje_inicial, origen_lead, asignado_a } = body;
 
-    if (!telefono) {
+    // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
+    const telefonoLimpio = typeof telefono === "string" ? telefono.replace(/[^\d]/g, "") : "";
+    const tieneTelefono = telefonoLimpio.length >= 8;
+
+    // telefono_whatsapp puede venir distinto del teléfono principal; si no
+    // viene o queda vacío tras limpiar, cae al mismo valor que telefono.
+    const telefonoWhatsappLimpio = typeof telefono_whatsapp === "string" ? telefono_whatsapp.replace(/[^\d]/g, "") : "";
+    const telefonoWhatsappFinal = telefonoWhatsappLimpio || telefonoLimpio;
+
+    const chatIdLimpio = typeof chat_id === "string" ? chat_id.trim() : "";
+    const whatsappUsernameNormalizado = normalizarWhatsappUsername(whatsapp_username);
+
+    // Con WhatsApp usernames (Meta, jun 2026) un chat puede no exponer el
+    // teléfono real del contacto: se identifica con un LID pseudónimo
+    // (chat_id) o con su username. Se acepta cualquiera de los tres, pero
+    // se requiere al menos uno.
+    if (!tieneTelefono && !chatIdLimpio && !whatsappUsernameNormalizado) {
       return NextResponse.json(
-        { error: "El campo 'telefono' es requerido" },
+        { error: "Se requiere 'telefono' (mínimo 8 dígitos), 'chat_id' o 'whatsapp_username'" },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -103,18 +131,52 @@ export async function POST(request: NextRequest) {
     // The CRM profile gate above guarantees only known CRM users reach this point.
     const supabaseAdmin = createServiceRoleClient();
 
-    // Verificar si ya existe un cliente con este teléfono
-    // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
-    const telefonoLimpio = telefono.replace(/[^\d]/g, '');
-    const telefonoConPlus = `+${telefonoLimpio}`;
+    // Verificar si ya existe un cliente con este teléfono/chat_id/username.
+    // Orden: teléfono (dedup histórico) > chat_id (LID estable) > username.
+    // Cascada POR MISS (cada paso corre si el anterior NO encontró nada),
+    // no else-if por presencia: un contacto puede tener chat_id Y username
+    // a la vez, y si el chat_id no matchea (ej. el lead se creó antes de
+    // que WhatsApp expusiera el LID real, cuando solo había username) hay
+    // que seguir intentando por username — si esto fuera else-if, el
+    // branch de username nunca se alcanzaría y se crearía un duplicado.
+    // NUNCA se ejecuta el .or() de teléfonos con cleanPhone vacío — PostgREST
+    // interpretaría "telefono.eq." como filtro por string vacío, no como
+    // "sin filtro", y matchearía filas con telefono = "".
+    let clienteExistente: { id: string; nombre: string; estado_cliente: string } | null = null;
 
-    const { data: clienteExistente } = await supabaseAdmin
-      .schema("crm")
-      .from("cliente")
-      .select("id, nombre, estado_cliente")
-      .or(`telefono.eq.${telefonoLimpio},telefono.eq.${telefonoConPlus},telefono_whatsapp.eq.${telefonoLimpio},telefono_whatsapp.eq.${telefonoConPlus}`)
-      .limit(1)
-      .maybeSingle();
+    if (tieneTelefono) {
+      const telefonoConPlus = `+${telefonoLimpio}`;
+      const { data } = await supabaseAdmin
+        .schema("crm")
+        .from("cliente")
+        .select("id, nombre, estado_cliente")
+        .or(`telefono.eq.${telefonoLimpio},telefono.eq.${telefonoConPlus},telefono_whatsapp.eq.${telefonoLimpio},telefono_whatsapp.eq.${telefonoConPlus}`)
+        .limit(1)
+        .maybeSingle();
+      clienteExistente = data;
+    }
+
+    if (!clienteExistente && chatIdLimpio) {
+      const { data } = await supabaseAdmin
+        .schema("crm")
+        .from("cliente")
+        .select("id, nombre, estado_cliente")
+        .eq("whatsapp_chat_id", chatIdLimpio)
+        .limit(1)
+        .maybeSingle();
+      clienteExistente = data;
+    }
+
+    if (!clienteExistente && whatsappUsernameNormalizado) {
+      const { data } = await supabaseAdmin
+        .schema("crm")
+        .from("cliente")
+        .select("id, nombre, estado_cliente")
+        .eq("whatsapp_username", whatsappUsernameNormalizado)
+        .limit(1)
+        .maybeSingle();
+      clienteExistente = data;
+    }
 
     if (clienteExistente) {
       console.log(`[CreateLead] Cliente ya existe: ${clienteExistente.id}`);
@@ -127,8 +189,13 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
-    // Preparar datos del lead
-    const nombreLead = nombre || `Lead WhatsApp ${telefonoLimpio.slice(-4)}`;
+    // Preparar datos del lead. Nombre por defecto según qué identificador
+    // esté disponible: teléfono > username > genérico.
+    const nombreLead = nombre || (tieneTelefono
+      ? `Lead WhatsApp ${telefonoLimpio.slice(-4)}`
+      : whatsappUsernameNormalizado
+        ? `Lead WhatsApp @${whatsappUsernameNormalizado}`
+        : "Lead WhatsApp");
 
     let notas = "Lead capturado automáticamente desde WhatsApp Web";
     if (mensaje_inicial) {
@@ -175,13 +242,17 @@ export async function POST(request: NextRequest) {
       .schema("crm")
       .rpc("create_whatsapp_lead", {
         p_nombre: nombreLead,
-        p_telefono: telefonoLimpio,
-        p_telefono_whatsapp: telefonoLimpio,
+        // NULL (no string vacío) cuando no hay dígitos de teléfono — el
+        // contacto se identifica solo por chat_id/username.
+        p_telefono: tieneTelefono ? telefonoLimpio : null,
+        p_telefono_whatsapp: telefonoWhatsappFinal || null,
         p_origen_lead: origen_lead || "whatsapp_web",
         p_vendedor_asignado: vendedorAsignadoParam, // NULL = round-robin; username = coordinador dueño
         p_created_by: user.id,
         p_notas: notas,
         p_direccion: direccion,
+        p_whatsapp_username: whatsappUsernameNormalizado,
+        p_whatsapp_chat_id: chatIdLimpio || null,
       })
       .single();
 
@@ -216,7 +287,7 @@ export async function POST(request: NextRequest) {
     const { data: clienteCreado } = await supabaseAdmin
       .schema("crm")
       .from("cliente")
-      .select("id, nombre, telefono, telefono_whatsapp, email, estado_cliente, origen_lead, vendedor_asignado, created_at, notas")
+      .select("id, nombre, telefono, telefono_whatsapp, email, estado_cliente, origen_lead, vendedor_asignado, created_at, notas, whatsapp_username, whatsapp_chat_id")
       .eq("id", nuevoCliente.id)
       .single();
 
@@ -238,14 +309,16 @@ export async function POST(request: NextRequest) {
     const clienteData = {
       id: clienteCreado?.id || nuevoCliente.id,
       nombre: clienteCreado?.nombre || nombreLead,
-      telefono: clienteCreado?.telefono || telefonoLimpio,
-      telefono_whatsapp: clienteCreado?.telefono_whatsapp || telefonoLimpio,
+      telefono: clienteCreado?.telefono ?? (tieneTelefono ? telefonoLimpio : null),
+      telefono_whatsapp: clienteCreado?.telefono_whatsapp ?? (telefonoWhatsappFinal || null),
       email: clienteCreado?.email || null,
       estado_cliente: clienteCreado?.estado_cliente || 'por_contactar',
       origen_lead: clienteCreado?.origen_lead || origen_lead || 'whatsapp_web',
       vendedor_asignado: vendedorNombre,
       created_at: clienteCreado?.created_at || new Date().toISOString(),
       notas: clienteCreado?.notas || null,
+      whatsapp_username: clienteCreado?.whatsapp_username ?? whatsappUsernameNormalizado,
+      whatsapp_chat_id: clienteCreado?.whatsapp_chat_id ?? (chatIdLimpio || null),
     };
 
     console.log(`✅ [CreateLead] Lead creado: ${clienteData.id}, vendedor: ${vendedorNombre}`);

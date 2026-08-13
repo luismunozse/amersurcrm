@@ -173,6 +173,113 @@ describe("POST /api/clientes/create-lead — CRM profile gate", () => {
 });
 
 // ============================================================
+// Tests — WhatsApp username/LID dedup cascade (Fix 1b)
+// ============================================================
+
+describe("POST /api/clientes/create-lead — WhatsApp username/LID dedup cascade", () => {
+  it("dedup falls through from a chat_id miss to a username hit — does not create a duplicate", async () => {
+    // Regression test for the else-if-by-presence bug: a contact can carry
+    // BOTH chat_id and whatsapp_username (e.g. the chat_id is a LID that
+    // doesn't match any existing row — say the lead was originally created
+    // when only the username was known). If the dedup were else-if by
+    // presence, the chat_id branch alone (a miss) would short-circuit and
+    // the username branch would never run, creating a duplicate lead.
+    mockPerfilSingle.mockResolvedValue({
+      data: { username: "vendor1", rol: [{ nombre: "ROL_VENDEDOR" }] },
+      error: null,
+    });
+
+    const dedupeChain: any = {
+      select: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      eq: vi.fn((col: string) => {
+        dedupeChain._lastEqCol = col;
+        return dedupeChain;
+      }),
+      maybeSingle: vi.fn(() => {
+        // Only the whatsapp_username lookup finds a match — whatsapp_chat_id
+        // must miss first for this test to prove the cascade works.
+        if (dedupeChain._lastEqCol === "whatsapp_username") {
+          return Promise.resolve({
+            data: { id: "existing-999", nombre: "Alice", estado_cliente: "por_contactar" },
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
+      }),
+    };
+    const perfilChain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: mockPerfilSingle,
+    };
+    mockServiceRoleClient.schema.mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => (table === "usuario_perfil" ? perfilChain : dedupeChain)),
+      rpc: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: null, error: null }) }),
+    });
+
+    const res = await POST(
+      bearerPostRequest({
+        chat_id: "999999999@lid",
+        whatsapp_username: "alice92",
+        nombre: "Alice Lead",
+      }),
+    );
+
+    const body = await res.json();
+    expect(body.existente).toBe(true);
+    expect(body.clienteId).toBe("existing-999");
+    // Both dedup lookups ran — chat_id first (missed), then username (hit).
+    expect(dedupeChain.eq).toHaveBeenCalledWith("whatsapp_chat_id", "999999999@lid");
+    expect(dedupeChain.eq).toHaveBeenCalledWith("whatsapp_username", "alice92");
+  });
+
+  it("accepts a request with only whatsapp_username (no telefono, no chat_id) and dedups by username", async () => {
+    // Mirrors the extension case where a chat started by username has no
+    // LID yet and no real telefono — chat_id is intentionally absent from
+    // the payload (see chatIdParaPayload in the extension).
+    mockPerfilSingle.mockResolvedValue({
+      data: { username: "vendor1", rol: [{ nombre: "ROL_VENDEDOR" }] },
+      error: null,
+    });
+
+    const dedupeChain: any = {
+      select: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: "existing-42", nombre: "Bob", estado_cliente: "por_contactar" },
+        error: null,
+      }),
+    };
+    const perfilChain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: mockPerfilSingle,
+    };
+    mockServiceRoleClient.schema.mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => (table === "usuario_perfil" ? perfilChain : dedupeChain)),
+      rpc: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: null, error: null }) }),
+    });
+
+    const res = await POST(bearerPostRequest({ whatsapp_username: "bob77", nombre: "Bob Lead" }));
+
+    // No telefono and no chat_id must NOT be rejected with 400 — username alone is enough.
+    expect(res.status).not.toBe(400);
+    const body = await res.json();
+    expect(body.existente).toBe(true);
+
+    // Never runs the phone .or() dedup with an empty cleanPhone.
+    expect(dedupeChain.or).not.toHaveBeenCalled();
+    expect(dedupeChain.eq).toHaveBeenCalledWith("whatsapp_username", "bob77");
+  });
+});
+
+// ============================================================
 // Tests — coordinador assignment (admin/gerente only)
 // ============================================================
 

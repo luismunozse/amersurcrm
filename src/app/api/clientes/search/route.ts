@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerOnlyClient, createServiceRoleClient } from "@/lib/supabase.server";
-import { resolveEquipoScope, equipoOrFilter } from "@/lib/auth/equipo-scope.server";
+import { resolveEquipoScope, equipoOrFilter, type EquipoScope } from "@/lib/auth/equipo-scope.server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,126 @@ export async function OPTIONS() {
 }
 
 /**
+ * Normaliza un username de WhatsApp: quita el "@" inicial, pasa a
+ * minúsculas y valida el formato. Devuelve null si no es un username
+ * válido (se ignora en vez de bloquear la búsqueda).
+ */
+function normalizarWhatsappUsername(raw: string | null): string | null {
+  if (!raw) return null;
+  const limpio = raw.trim().replace(/^@/, "").toLowerCase();
+  return /^[a-z0-9._]{3,30}$/.test(limpio) ? limpio : null;
+}
+
+/**
+ * Valida que un chat_id sea un identificador real de WhatsApp — un LID
+ * ("<dígitos>@lid") o los dígitos de un teléfono — y por lo tanto SEGURO
+ * para interpolar en un filtro `.or()` de PostgREST (sin comas, paréntesis
+ * ni otros caracteres que rompan la sintaxis del filtro o inyecten arms
+ * extra). Cualquier otro valor se ignora: la extensión ya evita mandar un
+ * username pelado como chat_id, pero el server nunca debe confiar en el
+ * query param del cliente.
+ */
+function chatIdValido(raw: string | null): string | null {
+  if (!raw) return null;
+  const limpio = raw.trim();
+  return /^\d+@lid$/.test(limpio) || /^\d+$/.test(limpio) ? limpio : null;
+}
+
+/**
+ * Elige, entre las filas devueltas por la búsqueda combinada, la de mayor
+ * prioridad: teléfono > chat_id > username. Dentro de la misma prioridad,
+ * las filas ya vienen ordenadas por created_at desc (ver buscarClientesPorFiltro),
+ * así que se queda con la más reciente.
+ */
+function seleccionarMejorMatch(
+  filas: Record<string, unknown>[],
+  cleanPhone: string,
+  chatId: string | null,
+  usernameNormalizado: string | null,
+): Record<string, unknown> | null {
+  if (filas.length === 0) return null;
+
+  const cleanPhoneWithPlus = cleanPhone ? `+${cleanPhone}` : "";
+  const matchTelefono = (f: Record<string, unknown>) =>
+    !!cleanPhone &&
+    (f.telefono === cleanPhone || f.telefono === cleanPhoneWithPlus ||
+      f.telefono_whatsapp === cleanPhone || f.telefono_whatsapp === cleanPhoneWithPlus);
+  const matchChatId = (f: Record<string, unknown>) => !!chatId && f.whatsapp_chat_id === chatId;
+  const matchUsername = (f: Record<string, unknown>) => !!usernameNormalizado && f.whatsapp_username === usernameNormalizado;
+
+  return filas.find(matchTelefono) ?? filas.find(matchChatId) ?? filas.find(matchUsername) ?? null;
+}
+
+/**
+ * Busca clientes que matcheen un filtro `.or()` ya armado (teléfono/chat_id
+ * /username combinados), intentando primero con el JOIN a usuario_perfil
+ * (más eficiente) y cayendo a una query sin JOIN solo si la FK todavía no
+ * existe. `.limit(5)` (no 1): con tres identificadores en el mismo `.or()`
+ * pueden matchear filas distintas — el caller elige la de mayor prioridad
+ * vía seleccionarMejorMatch().
+ */
+async function buscarClientesPorFiltro(
+  supabase: any,
+  scope: EquipoScope,
+  vendedorUsername: string | undefined,
+  camposCliente: string,
+  filtro: string,
+): Promise<{ filas: Record<string, unknown>[]; usedJoin: boolean; error?: { message: string } }> {
+  let queryWithJoin = supabase
+    .schema("crm")
+    .from("cliente")
+    .select(`${camposCliente}, vendedor:usuario_perfil!cliente_vendedor_asignado_fkey(nombre_completo)`)
+    .or(filtro);
+
+  if (scope.tier === "equipo") {
+    const filtroEquipo = equipoOrFilter(scope);
+    if (filtroEquipo) queryWithJoin = queryWithJoin.or(filtroEquipo);
+  } else if (scope.tier === "propio" && vendedorUsername) {
+    queryWithJoin = queryWithJoin.eq("vendedor_asignado", vendedorUsername);
+  }
+
+  const { data: filasJoin, error: errorJoin } = await queryWithJoin
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (!errorJoin) {
+    return { filas: filasJoin ?? [], usedJoin: true };
+  }
+
+  if (!(errorJoin.message?.includes("relationship") || errorJoin.code === "PGRST200")) {
+    return { filas: [], usedJoin: false, error: errorJoin };
+  }
+
+  // FK no existe todavía: fallback sin JOIN.
+  let queryBasic = supabase.schema("crm").from("cliente").select(camposCliente).or(filtro);
+
+  if (scope.tier === "equipo") {
+    const filtroEquipo = equipoOrFilter(scope);
+    if (filtroEquipo) queryBasic = queryBasic.or(filtroEquipo);
+  } else if (scope.tier === "propio" && vendedorUsername) {
+    queryBasic = queryBasic.eq("vendedor_asignado", vendedorUsername);
+  }
+
+  const { data: filasBasic, error: errorBasic } = await queryBasic
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (errorBasic) {
+    return { filas: [], usedJoin: false, error: errorBasic };
+  }
+
+  return { filas: filasBasic ?? [], usedJoin: false };
+}
+
+/**
  * GET /api/clientes/search?phone=+51999999999
+ * GET /api/clientes/search?chat_id=123456789012345@lid
+ * GET /api/clientes/search?username=juanperez
  *
- * Busca un cliente por número de teléfono
+ * Busca un cliente por teléfono, chat_id (WhatsApp LID) o username.
+ * Al menos uno de los tres parámetros es requerido — con WhatsApp
+ * usernames (Meta, jun 2026) un chat puede no exponer el teléfono real
+ * del contacto, así que el teléfono ya no es obligatorio.
  * Usado por AmersurChat Chrome Extension
  *
  * Restricción de visibilidad:
@@ -118,20 +235,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obtener parámetro de búsqueda
+    // Obtener parámetros de búsqueda. Con WhatsApp usernames (Meta, jun
+    // 2026) un chat puede no exponer el teléfono real del contacto, así
+    // que se acepta cualquiera de los tres identificadores.
     const searchParams = request.nextUrl.searchParams;
-    const phone = searchParams.get("phone");
+    const phoneParam = searchParams.get("phone");
+    const chatIdParam = searchParams.get("chat_id");
+    const usernameParam = searchParams.get("username");
 
-    if (!phone) {
+    // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
+    const cleanPhone = phoneParam ? phoneParam.replace(/[^\d]/g, "") : "";
+    // chatIdValido descarta cualquier valor que no sea un LID o dígitos de
+    // teléfono — imprescindible antes de interpolarlo en un .or() (ver
+    // chatIdValido). Un username pelado mandado como chat_id se ignora acá.
+    const chatId = chatIdValido(chatIdParam);
+    const usernameNormalizado = normalizarWhatsappUsername(usernameParam);
+
+    if (!cleanPhone && !chatId && !usernameNormalizado) {
       return NextResponse.json(
-        { error: "Parámetro 'phone' requerido" },
+        { error: "Se requiere al menos uno de: 'phone', 'chat_id', 'username'" },
         { status: 400, headers: corsHeaders }
       );
     }
-
-    // Limpiar número: solo dígitos (sin +, espacios, guiones, paréntesis, etc.)
-    const cleanPhone = phone.replace(/[^\d]/g, "");
-    const cleanPhoneWithPlus = `+${cleanPhone}`;
 
     // Campos base del cliente
     const camposCliente = `
@@ -145,86 +270,60 @@ export async function GET(request: NextRequest) {
       origen_lead,
       vendedor_asignado,
       created_at,
-      notas
+      notas,
+      whatsapp_username,
+      whatsapp_chat_id
     `;
 
-    // Intentar query con JOIN para obtener vendedor en una sola consulta (O(1))
-    // Si la FK no existe, hacemos fallback a query sin JOIN
-    const orFilter = `telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`;
-
-    let cliente: Record<string, unknown> | null = null;
-    let usedJoin = false;
-
-    // Primero intentar con JOIN (más eficiente si la FK existe)
-    let queryWithJoin = supabase
-      .schema("crm")
-      .from("cliente")
-      .select(`${camposCliente}, vendedor:usuario_perfil!cliente_vendedor_asignado_fkey(nombre_completo)`)
-      .or(orFilter);
-
-    if (scope.tier === "equipo") {
-      const filtroEquipo = equipoOrFilter(scope);
-      if (filtroEquipo) {
-        queryWithJoin = queryWithJoin.or(filtroEquipo);
-      }
-    } else if (scope.tier === "propio" && vendedorUsername) {
-      queryWithJoin = queryWithJoin.eq("vendedor_asignado", vendedorUsername);
+    // Filtro combinado con los tres identificadores en un solo .or(): evita
+    // encadenar hasta 3 round-trips secuenciales (uno por identificador) en
+    // cada polling de la extensión. Nunca se agrega el arm de teléfono con
+    // cleanPhone vacío — PostgREST interpretaría "telefono.eq." como filtro
+    // por string vacío, no como "sin filtro". chatId y username ya vienen
+    // validados (chatIdValido/normalizarWhatsappUsername), así que son
+    // seguros para interpolar sin riesgo de romper/inyectar arms extra en
+    // la sintaxis del filtro.
+    const orParts: string[] = [];
+    if (cleanPhone) {
+      const cleanPhoneWithPlus = `+${cleanPhone}`;
+      orParts.push(
+        `telefono.eq.${cleanPhone}`,
+        `telefono.eq.${cleanPhoneWithPlus}`,
+        `telefono_whatsapp.eq.${cleanPhone}`,
+        `telefono_whatsapp.eq.${cleanPhoneWithPlus}`,
+      );
     }
+    if (chatId) {
+      orParts.push(`whatsapp_chat_id.eq.${chatId}`);
+    }
+    if (usernameNormalizado) {
+      orParts.push(`whatsapp_username.eq.${usernameNormalizado}`);
+    }
+    const filtroCombinado = orParts.join(",");
 
-    const { data: clienteWithJoin, error: errorJoin } = await queryWithJoin
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const resultado = await buscarClientesPorFiltro(supabase, scope, vendedorUsername, camposCliente, filtroCombinado);
 
-    if (!errorJoin && clienteWithJoin) {
-      cliente = clienteWithJoin;
-      usedJoin = true;
-    } else if (errorJoin?.message?.includes("relationship") || errorJoin?.code === "PGRST200") {
-      // FK no existe, hacer query sin JOIN
-      let queryBasic = supabase
-        .schema("crm")
-        .from("cliente")
-        .select(camposCliente)
-        .or(orFilter);
-
-      if (scope.tier === "equipo") {
-        const filtroEquipo = equipoOrFilter(scope);
-        if (filtroEquipo) {
-          queryBasic = queryBasic.or(filtroEquipo);
-        }
-      } else if (scope.tier === "propio" && vendedorUsername) {
-        queryBasic = queryBasic.eq("vendedor_asignado", vendedorUsername);
-      }
-
-      const { data: clienteBasic, error: errorBasic } = await queryBasic
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (errorBasic) {
-        console.error("[ClienteSearch] Error en query:", errorBasic);
-        return NextResponse.json(
-          { error: "Error buscando cliente", details: errorBasic.message },
-          { status: 500, headers: corsHeaders }
-        );
-      }
-      cliente = clienteBasic;
-    } else if (errorJoin) {
-      console.error("[ClienteSearch] Error en query:", errorJoin);
+    if (resultado.error) {
+      console.error("[ClienteSearch] Error en query:", resultado.error);
       return NextResponse.json(
-        { error: "Error buscando cliente", details: errorJoin.message },
+        { error: "Error buscando cliente", details: resultado.error.message },
         { status: 500, headers: corsHeaders }
       );
     }
 
+    // Prioridad teléfono > chat_id > username entre las filas que matchearon.
+    const cliente = seleccionarMejorMatch(resultado.filas, cleanPhone, chatId, usernameNormalizado);
+    const usedJoin = resultado.usedJoin;
+
     if (!cliente) {
-      // Si es vendedor y no encontró cliente, verificar si existe pero está asignado a otro
+      // Si es vendedor y no encontró cliente, verificar si existe pero está
+      // asignado a otro — mismo filtro combinado, una sola query.
       if (scope.tier !== "global" && vendedorUsername) {
         const { data: clienteExiste } = await supabase
           .schema("crm")
           .from("cliente")
-          .select("id, vendedor_asignado")
-          .or(`telefono.eq.${cleanPhone},telefono.eq.${cleanPhoneWithPlus},telefono_whatsapp.eq.${cleanPhone},telefono_whatsapp.eq.${cleanPhoneWithPlus}`)
+          .select("id")
+          .or(filtroCombinado)
           .limit(1)
           .maybeSingle();
 
@@ -277,6 +376,8 @@ export async function GET(request: NextRequest) {
         vendedor_asignado: vendedorNombre,
         created_at: cliente.created_at,
         notas: cliente.notas,
+        whatsapp_username: cliente.whatsapp_username,
+        whatsapp_chat_id: cliente.whatsapp_chat_id,
       },
     }, { headers: corsHeaders });
   } catch (error) {
