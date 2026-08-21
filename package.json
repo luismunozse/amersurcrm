@@ -11,7 +11,7 @@
     "build:turbo": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:extension",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
@@ -24,7 +24,8 @@
     "ubigeo:force-update": "curl -X POST http://localhost:3000/api/ubicaciones/update | jq",
     "audit:coordinates": "tsx scripts/audit-lotes-coordinates.ts",
     "migrate:coordinates": "tsx scripts/migrate-coordinates.ts",
-    "migrate:coordinates:dry": "tsx scripts/migrate-coordinates.ts --dry-run"
+    "migrate:coordinates:dry": "tsx scripts/migrate-coordinates.ts --dry-run",
+    "test:extension": "vitest run --config chrome-extension/vitest.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

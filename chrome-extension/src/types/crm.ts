@@ -16,6 +16,22 @@ export interface AuthState {
   crmUrl: string;
 }
 
+/**
+ * Estados posibles de un cliente. Espejo de ESTADOS_CLIENTE_OPTIONS en
+ * `src/lib/types/clientes.ts` del CRM. `en_proceso` y `propietario` los setea
+ * el flujo de venta desde el CRM web — la extensión los muestra pero no los
+ * ofrece como opción (ver lib/estados.ts).
+ */
+export type EstadoCliente =
+  | 'por_contactar'
+  | 'contactado'
+  | 'intermedio'
+  | 'potencial'
+  | 'en_proceso'
+  | 'propietario'
+  | 'desestimado'
+  | 'transferido';
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -23,7 +39,7 @@ export interface Cliente {
   telefono_whatsapp: string | null;
   email?: string | null;
   tipo_cliente?: 'persona' | 'empresa';
-  estado_cliente: 'por_contactar' | 'contactado' | 'intermedio' | 'potencial' | 'desestimado' | 'transferido';
+  estado_cliente: EstadoCliente;
   origen_lead: string;
   vendedor_asignado?: string | null;
   created_at?: string;
@@ -41,7 +57,16 @@ export interface WhatsAppContact {
   phone: string | null;
   // Username de WhatsApp del contacto (sin @), si el chat expone uno.
   username: string | null;
-  name: string;
+  /**
+   * Nombre GUARDADO en la agenda, o null si el contacto no está agendado
+   * (el header muestra el número o el username — ver extractContactName).
+   *
+   * null real, NO un sentinel tipo 'Sin nombre': ese string se colaba en la
+   * UI como si fuera un nombre de verdad — precargaba el form de alta y los
+   * leads terminaban llamándose literalmente "Sin nombre", y las plantillas
+   * saludaban "Hola Sin nombre!". Cada consumidor decide su propio fallback.
+   */
+  name: string | null;
   chatId: string;
 }
 

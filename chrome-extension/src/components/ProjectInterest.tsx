@@ -96,12 +96,12 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
 
   async function handleAddProyecto() {
     if (!selectedProyecto) {
-      setError('Selecciona un proyecto');
+      setError('Seleccione un proyecto');
       return;
     }
 
     if (!selectedLote) {
-      setError('Selecciona un lote');
+      setError('Seleccione un lote');
       return;
     }
 
@@ -263,7 +263,7 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent text-sm"
                     disabled={saving}
                   >
-                    <option value="">1. Selecciona un proyecto</option>
+                    <option value="">1. Seleccione un proyecto</option>
                     {proyectos.map((proyecto) => (
                       <option key={proyecto.id} value={proyecto.id}>
                         {proyecto.nombre}
@@ -278,7 +278,7 @@ export function ProjectInterest({ clienteId, apiClient }: ProjectInterestProps) 
                     disabled={saving || !selectedProyecto || loadingLotes}
                   >
                     <option value="">
-                      {loadingLotes ? 'Cargando lotes...' : '2. Selecciona un lote'}
+                      {loadingLotes ? 'Cargando lotes...' : '2. Seleccione un lote'}
                     </option>
                     {lotes.map((lote) => (
                       <option key={lote.id} value={lote.id}>

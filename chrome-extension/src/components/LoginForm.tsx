@@ -80,7 +80,7 @@ export function LoginForm({ onLogin, sessionExpired = false }: LoginFormProps) {
 
         {sessionExpired && (
           <div className="mb-4">
-            <InlineAlert variant="warning" message="Tu sesión expiró. Iniciá sesión de nuevo para continuar." />
+            <InlineAlert variant="warning" message="Su sesión expiró. Inicie sesión nuevamente para continuar." />
           </div>
         )}
 
@@ -174,7 +174,7 @@ export function LoginForm({ onLogin, sessionExpired = false }: LoginFormProps) {
 
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Usa tus credenciales del CRM Amersur
+            Use sus credenciales del CRM Amersur
           </p>
         </div>
       </div>

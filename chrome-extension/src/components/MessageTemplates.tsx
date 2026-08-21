@@ -207,7 +207,7 @@ export function MessageTemplates({ onSelectTemplate, userName, clientName, proye
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {isRemote
                 ? '✓ Plantillas sincronizadas desde el CRM'
-                : '💡 Tip: Las plantillas se copiarán directamente. Puedes editarlas antes de enviar.'}
+                : '💡 Tip: Las plantillas se copiarán directamente. Puede editarlas antes de enviar.'}
             </p>
           </div>
         </div>

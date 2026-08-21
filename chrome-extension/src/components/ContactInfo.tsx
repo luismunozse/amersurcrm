@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
 import { createLogger } from '@/lib/logger';
+import { estadoMeta } from '@/lib/estados';
 import { Skeleton } from './Skeleton';
 
 const logger = createLogger('ContactInfo');
@@ -48,32 +49,10 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
   const [ultimaInteraccion, setUltimaInteraccion] = useState<any>(null);
   const [proyectosInteres, setProyectosInteres] = useState<any[]>([]);
 
-  const estadoColors: Record<string, string> = {
-    por_contactar: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    contactado: 'bg-blue-100 text-blue-800 border-blue-300',
-    intermedio: 'bg-purple-100 text-purple-800 border-purple-300',
-    potencial: 'bg-crm-accent/30 text-crm-primary border-crm-primary',
-    desestimado: 'bg-red-100 text-red-800 border-red-300',
-    transferido: 'bg-gray-100 text-gray-800 border-gray-300',
-  };
-
-  const estadoIcons: Record<string, string> = {
-    por_contactar: '📋',
-    contactado: '📞',
-    intermedio: '🔄',
-    potencial: '⭐',
-    desestimado: '❌',
-    transferido: '↗️',
-  };
-
-  const estadoLabels: Record<string, string> = {
-    por_contactar: 'Por Contactar',
-    contactado: 'Contactado',
-    intermedio: 'Intermedio',
-    potencial: 'Potencial',
-    desestimado: 'Desestimado',
-    transferido: 'Transferido',
-  };
+  // Catálogo único en lib/estados.ts: acá faltaban `en_proceso` y
+  // `propietario`, así que un cliente en esos estados renderizaba el badge
+  // vacío. estadoMeta() además nunca devuelve undefined.
+  const estado = estadoMeta(cliente?.estado_cliente);
 
   // Cargar información adicional cuando hay un cliente
   useEffect(() => {
@@ -111,7 +90,7 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
           </div>
           <div className="flex-1">
             <h2 className="font-semibold text-lg">
-              {cliente?.nombre || contact.name}
+              {cliente?.nombre || contact.name || 'Contacto sin nombre'}
             </h2>
             {contact.phone ? (
               <p className="text-sm opacity-90">{contact.phone}</p>
@@ -143,12 +122,12 @@ export function ContactInfo({ contact, cliente, loading, apiClient }: ContactInf
         {!loading && cliente && (
           <div className="space-y-3 animate-fade-in">
             {/* Estado destacado */}
-            <div className={`p-3 rounded-lg border-2 ${estadoColors[cliente.estado_cliente]}`}>
+            <div className={`p-3 rounded-lg border-2 ${estado.panel}`}>
               <div className="flex items-center gap-2">
-                <span className="text-2xl">{estadoIcons[cliente.estado_cliente]}</span>
+                <span className="text-2xl">{estado.icon}</span>
                 <div>
                   <p className="text-xs font-medium opacity-75">Estado del Lead</p>
-                  <p className="font-semibold">{estadoLabels[cliente.estado_cliente]}</p>
+                  <p className="font-semibold">{estado.label}</p>
                 </div>
               </div>
             </div>

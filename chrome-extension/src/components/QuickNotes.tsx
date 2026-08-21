@@ -8,6 +8,9 @@ interface QuickNotesProps {
   onNotaAdded?: () => void;
 }
 
+/** Largo máximo de una nota rápida (el contador y el botón ya lo asumían). */
+const NOTA_MAX = 200;
+
 export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProps) {
   const [nota, setNota] = useState('');
   const [saving, setSaving] = useState(false);
@@ -15,7 +18,9 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
   const [error, setError] = useState<string | null>(null);
 
   async function handleAddNota() {
-    if (!nota.trim() || saving) return;
+    // El límite se valida acá y no sólo en el `disabled` del botón: Ctrl+Enter
+    // llamaba directo a esta función y guardaba notas de más de NOTA_MAX.
+    if (!nota.trim() || saving || nota.length > NOTA_MAX) return;
 
     setSaving(true);
     setError(null);
@@ -41,7 +46,7 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
       }
     } catch (err) {
       console.error('[QuickNotes] Error agregando nota:', err);
-      setError('No se pudo agregar la nota. Intentá de nuevo.');
+      setError('No se pudo agregar la nota. Intente nuevamente.');
     } finally {
       setSaving(false);
     }
@@ -70,16 +75,17 @@ export function QuickNotes({ clienteId, apiClient, onNotaAdded }: QuickNotesProp
         placeholder="Cliente prefiere 2 habitaciones... (Ctrl+Enter para guardar)"
         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-crm-primary focus:border-transparent dark:bg-gray-700 dark:text-white text-sm resize-none"
         rows={3}
+        maxLength={NOTA_MAX}
         disabled={saving}
       />
 
       <div className="flex items-center justify-between mt-2">
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {nota.length}/200
+          {nota.length}/{NOTA_MAX}
         </span>
         <button
           onClick={handleAddNota}
-          disabled={!nota.trim() || saving || nota.length > 200}
+          disabled={!nota.trim() || saving || nota.length > NOTA_MAX}
           className="px-4 py-2 bg-crm-primary text-white text-sm rounded-lg hover:bg-crm-primary-hover disabled:bg-gray-400 disabled:cursor-not-allowed transition ease-out-strong active:scale-[0.98]"
         >
           {saving ? 'Guardando...' : 'Agregar'}

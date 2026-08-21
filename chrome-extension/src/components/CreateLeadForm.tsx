@@ -49,7 +49,12 @@ function chatIdParaPayload(contact: WhatsAppContact): string | undefined {
 }
 
 export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLeadFormProps) {
-  const [nombre, setNombre] = useState(contact.name);
+  // Un contacto no agendado llega con name null; ahí precargamos el nombre
+  // derivado del identificador disponible. Antes `name` traía el sentinel
+  // 'Sin nombre', que por ser truthy ganaba a defaultLeadName() en TODOS lados
+  // (acá y en el `nombre || defaultLeadName(contact)` del submit): los leads de
+  // contactos no agendados se creaban llamados literalmente "Sin nombre".
+  const [nombre, setNombre] = useState(contact.name ?? defaultLeadName(contact));
   const [mensaje, setMensaje] = useState('');
   // True cuando el mensaje se autocompletó desde el chat (para mostrar un check).
   const [mensajeAutoCapturado, setMensajeAutoCapturado] = useState(false);
@@ -94,6 +99,20 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
   // Ref para controlar que solo se capture el mensaje una vez por contacto
   const mensajeCapturedRef = useRef(false);
   const lastContactIdRef = useRef<string | null>(null);
+  // Timer del cartel de éxito, para cancelarlo si el form se desmonta antes.
+  const successTimeoutRef = useRef<number | null>(null);
+
+  // Si el vendedor cambia de chat en el segundo que dura el cartel de éxito, el
+  // form se desmonta (key={contact.chatId} en el Sidebar) pero el timer seguía
+  // vivo y llamaba a onLeadCreated con el cliente recién creado: el Sidebar lo
+  // mostraba bajo el chat NUEVO, como si ese contacto fuera el lead.
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current !== null) {
+        window.clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Cargar proyectos al montar
   useEffect(() => {
@@ -251,7 +270,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
             console.log('[CreateLeadForm] Consulta general registrada:', interesResult);
           } catch (err) {
             console.error('[CreateLeadForm] Error registrando consulta general:', err);
-            setWarning('Lead creado, pero hubo un error al guardar la consulta general. Puedes agregarla manualmente.');
+            setWarning('Lead creado, pero hubo un error al guardar la consulta general. Puede agregarla manualmente.');
           }
         } else if (selectedLote && result.clienteId) {
           try {
@@ -264,7 +283,7 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
           } catch (err) {
             console.error('[CreateLeadForm] Error agregando proyecto de interés:', err);
             // Mostrar warning al usuario pero no fallar la creación del lead
-            setWarning('Lead creado, pero hubo un error al guardar el proyecto de interés. Puedes agregarlo manualmente.');
+            setWarning('Lead creado, pero hubo un error al guardar el proyecto de interés. Puede agregarlo manualmente.');
           }
         } else if (selectedProyecto && !selectedLote) {
           // Usuario seleccionó proyecto pero no lote
@@ -297,7 +316,8 @@ export function CreateLeadForm({ contact, apiClient, onLeadCreated }: CreateLead
         setSuccess(true);
 
         // Después de 1 segundo, pasar los datos del cliente al Sidebar
-        setTimeout(() => {
+        successTimeoutRef.current = window.setTimeout(() => {
+          successTimeoutRef.current = null;
           console.log('[CreateLeadForm] Pasando cliente al Sidebar:', clienteCreado);
           onLeadCreated(clienteCreado);
         }, 1000);

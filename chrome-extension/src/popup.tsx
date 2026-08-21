@@ -122,8 +122,10 @@ function Popup() {
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-200">
+          {/* Desde el manifest, no hardcodeado: decía v1.0.0 con la extensión
+              publicada en 1.3.0. Mismo criterio que el footer del sidebar. */}
           <p className="text-xs text-gray-500">
-            Amersur CRM v1.0.0
+            AmersurChat v{chrome.runtime.getManifest().version}
           </p>
         </div>
       </div>

@@ -22,16 +22,35 @@ const logger = {
 // Ordenados por estabilidad: data-testid > aria > estructura DOM
 
 const SELECTORS = {
-  /** Header del chat activo */
+  /**
+   * Header del chat activo.
+   *
+   * OJO el orden: `'header'` pelado estaba PRIMERO, contra la convención del
+   * resto del registro. WhatsApp Web tiene más de un <header> y el del panel
+   * izquierdo (lista de chats) viene antes en el documento, así que
+   * `queryFirst` devolvía ESE — el MutationObserver de observeChatChanges
+   * quedaba escuchando un nodo que no cambia al cambiar de chat y la
+   * detección dependía sólo del interval de respaldo de 3s.
+   */
   chatHeader: [
-    'header',
     '[data-testid="conversation-header"]',
     '#main header',
+    'header',
   ],
-  /** Span del nombre/teléfono en el header */
+  /**
+   * Span del nombre/teléfono en el header.
+   *
+   * Las variantes con `#main header` van antes que las de `header` pelado por
+   * el mismo motivo: `queryAll` devuelve los resultados del PRIMER selector
+   * que matchee, y `header span[dir="auto"]` barre todos los headers del
+   * documento — incluido el del panel izquierdo. Las de `header` quedan como
+   * fallback para no perder el comportamiento actual si `#main` no existe.
+   */
   headerContactSpan: [
     '[data-testid="conversation-info-header"] span[dir="auto"]',
     '[data-testid="conversation-title"] span[dir="auto"]',
+    '#main header span[title][dir="auto"]',
+    '#main header span[dir="auto"]',
     'header span[title][dir="auto"]',
     'header span[dir="auto"]',
   ],
@@ -490,9 +509,17 @@ function normalizarTelefonoDetectado(raw: string): { phone: string; digits: stri
 }
 
 /**
+ * Separador de miles REAL: una coma entre dígitos ("85,000"). Antes se
+ * descartaba el match ante CUALQUIER coma en la ventana de contexto, y una
+ * coma de puntuación normal ("mi numero es 987123456, escríbame ahí") mataba
+ * la detección — el caso más común de todos.
+ */
+const SEPARADOR_MILES = /\d,\d/;
+
+/**
  * Busca el primer teléfono válido dentro de un texto de mensaje, descartando
- * falsos positivos comunes: montos con separador de miles (S/, $ o coma cerca
- * del match) y DNIs (8 dígitos SIN formato de teléfono con "dni" cerca).
+ * falsos positivos comunes: montos (símbolo de moneda o separador de miles
+ * cerca del match) y DNIs (8 dígitos SIN formato de teléfono con "dni" cerca).
  */
 function extraerTelefonoDeTexto(texto: string): string | null {
   const matches = texto.matchAll(PHONE_MATCH_PATTERN);
@@ -501,10 +528,11 @@ function extraerTelefonoDeTexto(texto: string): string | null {
     const raw = match[0];
     const idx = match.index ?? texto.indexOf(raw);
     // Ventana de contexto alrededor del match (no todo el mensaje): un
-    // "S/" o "," lejos del número no debería descartarlo.
+    // "S/" lejos del número no debería descartarlo.
     const entorno = texto.slice(Math.max(0, idx - 12), idx + raw.length + 12);
 
-    if (/S\/|\$|,/.test(entorno)) continue; // monto con separador de miles
+    if (/S\/|\$/.test(entorno)) continue;          // monto con símbolo de moneda
+    if (SEPARADOR_MILES.test(entorno)) continue;   // monto con separador de miles
 
     const normalizado = normalizarTelefonoDetectado(raw);
     if (!normalizado) continue;
@@ -578,7 +606,9 @@ export function extractContactInfo(): WhatsAppContact | null {
   return {
     // null real (no sentinel 'unknown'): un LID nunca es el teléfono.
     phone,
-    name: name || 'Sin nombre',
+    // null real (no sentinel 'Sin nombre'): un contacto no agendado no tiene
+    // nombre, y el string de relleno se colaba a la UI como nombre válido.
+    name,
     chatId: chatId || username || 'unknown',
     username,
   };
@@ -598,9 +628,14 @@ export function insertTextIntoWhatsApp(text: string): boolean {
 
     inputBox.focus();
 
+    // Se verifica contra un fragmento (no el texto entero) porque el editor
+    // normaliza espacios y saltos de línea al renderizar.
+    const fragmento = text.substring(0, 20);
+    const quedoEscrito = () => (inputBox.textContent || '').includes(fragmento);
+
     // Método principal: execCommand (aún funcional en contenteditable)
     const inserted = document.execCommand('insertText', false, text);
-    if (inserted && inputBox.textContent?.includes(text.substring(0, 20))) {
+    if (inserted && quedoEscrito()) {
       return true;
     }
 
@@ -615,7 +650,19 @@ export function insertTextIntoWhatsApp(text: string): boolean {
     inputBox.dispatchEvent(inputEvent);
     inputBox.dispatchEvent(new Event('change', { bubbles: true }));
 
-    return true;
+    // El fallback NO es confiable: el editor de WhatsApp es controlado y suele
+    // descartar una escritura directa de textContent. Antes se devolvía `true`
+    // fijo, así que el sidebar cantaba éxito con el input vacío y el vendedor
+    // creía haber pegado la plantilla. Ahora se verifica y el caller decide
+    // (ver el fallback a portapapeles en Sidebar.handleSelectTemplate).
+    const ok = quedoEscrito();
+    if (!ok) {
+      logger.warn(
+        'insertTextIntoWhatsApp: el input no quedó con el texto tras execCommand ni el fallback. ' +
+        '¿Cambió el editor de WhatsApp Web? Revisar SELECTORS.chatInput.',
+      );
+    }
+    return ok;
   } catch (error) {
     logger.error('Error insertando texto en WhatsApp', error instanceof Error ? error : undefined);
     return false;
@@ -646,15 +693,31 @@ export function observeChatChanges(callback: (contact: WhatsAppContact | null) =
   // Check inmediato
   checkChat();
 
-  // MutationObserver enfocado solo en el header (mucho más eficiente que body)
-  const header = queryFirst(SELECTORS.chatHeader);
-  if (header) {
+  // MutationObserver enfocado solo en el header (mucho más eficiente que body).
+  //
+  // Se re-engancha si el nodo resuelto cambió: al arrancar sin ningún chat
+  // abierto `#main` todavía no existe y el selector cae al <header> del panel
+  // izquierdo, que nunca cambia — el observer quedaba pegado a ese nodo para
+  // siempre y la detección de chat dependía del interval. WhatsApp además
+  // reemplaza el header de la conversación en algunos repintados, dejando al
+  // observer sobre un nodo huérfano.
+  let headerObservado: Element | null = null;
+  const engancharObserver = () => {
+    const headerActual = queryFirst(SELECTORS.chatHeader);
+    if (!headerActual || headerActual === headerObservado) return;
+
+    observer?.disconnect();
+    headerObservado = headerActual;
     observer = new MutationObserver(checkChat);
-    observer.observe(header, { childList: true, subtree: true, characterData: true });
-  }
+    observer.observe(headerActual, { childList: true, subtree: true, characterData: true });
+  };
+  engancharObserver();
 
   // Interval de respaldo cada 3s (en vez de 1s) por si el observer no captura el cambio
-  const interval = setInterval(checkChat, 3000);
+  const interval = setInterval(() => {
+    engancharObserver();
+    checkChat();
+  }, 3000);
 
   return () => {
     cleanedUp = true;

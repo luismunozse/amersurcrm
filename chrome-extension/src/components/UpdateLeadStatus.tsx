@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Cliente } from '@/types/crm';
 import { CRMApiClient } from '@/lib/api';
+import { ESTADOS_EDITABLES, esEstadoEditable, estadoMeta } from '@/lib/estados';
 
 interface UpdateLeadStatusProps {
   cliente: Cliente;
@@ -8,22 +9,18 @@ interface UpdateLeadStatusProps {
   onUpdate: () => void;
 }
 
-const ESTADOS = [
-  { value: 'por_contactar', label: 'Por Contactar', color: 'bg-yellow-100 text-yellow-800', icon: '📋' },
-  { value: 'contactado', label: 'Contactado', color: 'bg-blue-100 text-blue-800', icon: '📞' },
-  { value: 'intermedio', label: 'Intermedio', color: 'bg-purple-100 text-purple-800', icon: '🔄' },
-  { value: 'potencial', label: 'Potencial', color: 'bg-crm-accent/30 text-crm-primary', icon: '⭐' },
-  { value: 'desestimado', label: 'Desestimado', color: 'bg-red-100 text-red-800', icon: '❌' },
-  { value: 'transferido', label: 'Transferido', color: 'bg-gray-100 text-gray-800', icon: '↗️' },
-];
-
 export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadStatusProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nota, setNota] = useState('');
 
-  const currentEstado = ESTADOS.find((e) => e.value === cliente.estado_cliente);
+  // El badge del estado actual sale del catálogo COMPLETO (8): un cliente en
+  // `en_proceso`/`propietario` antes no matcheaba y el badge no se renderizaba.
+  // Los botones, en cambio, salen del subconjunto editable (6) — es el mismo
+  // allowlist que valida el endpoint de estado (ver lib/estados.ts).
+  const currentEstado = estadoMeta(cliente.estado_cliente);
+  const estadoGestionadoPorVenta = !esEstadoEditable(cliente.estado_cliente);
 
   async function handleUpdateStatus(nuevoEstado: string) {
     if (nuevoEstado === cliente.estado_cliente) {
@@ -69,11 +66,9 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
           </svg>
           <div className="flex-1 text-left">
             <span className="font-semibold text-gray-900 dark:text-white block">Cambiar estado</span>
-            {currentEstado && (
-              <span className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${currentEstado.color}`}>
-                {currentEstado.icon} {currentEstado.label}
-              </span>
-            )}
+            <span className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${currentEstado.chip}`}>
+              {currentEstado.icon} {currentEstado.label}
+            </span>
           </div>
         </div>
         <svg
@@ -94,8 +89,14 @@ export function UpdateLeadStatus({ cliente, apiClient, onUpdate }: UpdateLeadSta
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Nuevo estado
               </label>
+              {estadoGestionadoPorVenta && (
+                <p className="text-xs text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md p-2 mb-2">
+                  Este cliente está en "{currentEstado.label}", un estado que gestiona el flujo de
+                  venta desde el CRM web. Si lo cambia acá, saldrá de ese flujo.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-2">
-                {ESTADOS.map((estado) => (
+                {ESTADOS_EDITABLES.map((estado) => (
                   <button
                     key={estado.value}
                     onClick={() => handleUpdateStatus(estado.value)}

@@ -33,9 +33,19 @@ function parseApiErrorBody(error: unknown): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Ventana durante la cual un 401 posterior a una renovación exitosa se
+ * considera ya cubierto por esa renovación (ver renewToken).
+ */
+const RENEW_COOLDOWN_MS = 10_000;
+
 export class CRMApiClient {
   private baseUrl: string;
   private token: string | null;
+  /** Renovación en curso, para colapsar 401 concurrentes en un solo refresh. */
+  private renewInFlight: Promise<boolean> | null = null;
+  /** Timestamp de la última renovación exitosa. */
+  private ultimaRenovacion = 0;
 
   constructor(baseUrl: string, token: string | null = null) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -57,8 +67,18 @@ export class CRMApiClient {
     const requestId = `${method} ${endpoint}`;
     const throttleKey = getThrottleKey(method, endpoint);
 
-    // Deduplicar GET requests en vuelo al mismo endpoint
-    if (method === 'GET' && inflightRequests.has(throttleKey)) {
+    // Deduplicar GET requests en vuelo al mismo endpoint.
+    //
+    // OJO `!isRetry`: el reintento tras renovar el token (ver el manejo del
+    // 401 más abajo) se dispara DESDE ADENTRO de la promesa que este mismo
+    // Map tiene registrada bajo `throttleKey`. Sin esta exclusión el retry
+    // matchea su propia entrada y devuelve la promesa que lo contiene: la
+    // async function queda resuelta consigo misma y NUNCA settlea. Peor, el
+    // `.finally()` que limpia el Map tampoco corre, así que la clave queda
+    // envenenada y todo GET posterior a ese endpoint recibe la misma promesa
+    // colgada por el resto de la sesión del sidebar (solo se recupera
+    // recargando WhatsApp Web).
+    if (method === 'GET' && !isRetry && inflightRequests.has(throttleKey)) {
       logger.debug('Request deduplicado (en vuelo)', { requestId });
       return inflightRequests.get(throttleKey) as Promise<T>;
     }
@@ -155,7 +175,7 @@ export class CRMApiClient {
       
       // Manejar errores de red (timeout, sin conexión, etc.)
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        const networkError = new Error('Error de conexión: No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+        const networkError = new Error('Error de conexión: No se pudo conectar con el servidor. Verifique su conexión a internet.');
         logger.error('Error de red', networkError, {
           requestId,
           responseTime: `${responseTime}ms`,
@@ -173,21 +193,72 @@ export class CRMApiClient {
     }
     }; // fin executeRequest
 
-    // Registrar y limpiar inflight
+    // Registrar y limpiar inflight.
+    //
+    // Solo la llamada original registra: el reintento del 401 corre dentro de
+    // la promesa ya registrada, así que reemplazar la entrada dejaría dos
+    // limpiezas compitiendo por la misma clave. La promesa externa settlea
+    // cuando settlea el reintento, así que un único `.finally()` alcanza.
+    //
+    // El `.catch()` es sobre la promesa DERIVADA de `.finally()`, no sobre
+    // `promise`: sin él, un GET que rechaza deja esa derivada sin manejar y
+    // dispara un unhandledrejection en la consola del sidebar. El rechazo
+    // real sigue viajando al caller por `promise`, que se devuelve intacta.
     const promise = executeRequest();
-    if (method === 'GET') {
+    if (method === 'GET' && !isRetry) {
       inflightRequests.set(throttleKey, promise);
-      promise.finally(() => inflightRequests.delete(throttleKey));
+      promise
+        .finally(() => inflightRequests.delete(throttleKey))
+        .catch(() => {});
     }
     return promise;
   }
 
   /**
-   * Renovar token automáticamente usando refresh token
+   * Renovar token automáticamente usando refresh token.
+   *
+   * Single-flight + cooldown. El sidebar dispara varios GET en paralelo al
+   * abrir un chat (search, pendientes, interacciones, proyectos...), así que
+   * al expirar el access token TODOS reciben 401 casi a la vez. Sin esta
+   * coordinación cada uno lanzaba su propio POST /api/auth/refresh con el
+   * MISMO refresh token; Supabase los rota, así que las llamadas que llegan
+   * después de la primera usan un token ya rotado, fallan, y el `catch` de
+   * abajo hace clearCRMConfig() → el vendedor termina deslogueado en medio
+   * del trabajo.
+   *
+   * - `renewInFlight`: los 401 concurrentes esperan la MISMA renovación.
+   * - `ultimaRenovacion`: un 401 que llega justo DESPUÉS de que la renovación
+   *   terminó (request que ya viajaba con el token viejo) no dispara otra —
+   *   el token en memoria ya está fresco y el reintento lo va a usar.
+   *
    * NOTA: Por seguridad, NO guardamos contraseñas.
    * Si el refresh token falla, el usuario deberá volver a hacer login.
    */
-  private async renewToken(): Promise<boolean> {
+  private renewToken(): Promise<boolean> {
+    if (Date.now() - this.ultimaRenovacion < RENEW_COOLDOWN_MS) {
+      logger.debug('Renovación reciente, se reutiliza el token en memoria');
+      return Promise.resolve(true);
+    }
+
+    if (this.renewInFlight) {
+      logger.debug('Renovación ya en curso, esperando la misma');
+      return this.renewInFlight;
+    }
+
+    const renovacion = this.doRenewToken()
+      .then((ok) => {
+        if (ok) this.ultimaRenovacion = Date.now();
+        return ok;
+      })
+      .finally(() => {
+        this.renewInFlight = null;
+      });
+
+    this.renewInFlight = renovacion;
+    return renovacion;
+  }
+
+  private async doRenewToken(): Promise<boolean> {
     try {
       if (typeof chrome === 'undefined' || !chrome.storage) {
         return false;
@@ -618,7 +689,14 @@ export async function getCRMConfig(): Promise<{ url: string; token: string | nul
  */
 export async function clearCRMConfig(): Promise<void> {
   await new Promise<void>((resolve) => {
-    chrome.storage.local.remove(['authToken', 'refreshToken', 'lastLogin'], () => resolve());
+    // `templateCache`/`templateCacheTs` también: las plantillas vienen del CRM
+    // por usuario y sobrevivían al logout, así que el siguiente en loguearse en
+    // la misma máquina veía las del anterior hasta que venciera el TTL de 1h.
+    // `crmUrl` NO se borra: LoginForm lo relee para precargar la URL (modo dev).
+    chrome.storage.local.remove(
+      ['authToken', 'refreshToken', 'lastLogin', 'templateCache', 'templateCacheTs'],
+      () => resolve(),
+    );
   });
   // Limpiar tokens legacy de session storage si quedaron
   if (chrome.storage.session) {

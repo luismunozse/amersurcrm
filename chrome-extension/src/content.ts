@@ -4,29 +4,61 @@
  */
 
 import { detectSharedPhone, extractContactInfo, getLastReceivedMessage, insertTextIntoWhatsApp, observeChatChanges } from './lib/whatsapp';
+// Solo el tipo: `types/crm.ts` no emite runtime, así que esto no agrega un
+// módulo compartido al bundle del content script (ver la nota de bundling en
+// lib/chatId.ts).
+import type { WhatsAppContact } from '@/types/crm';
 
 const EXTENSION_ORIGIN = new URL(chrome.runtime.getURL('')).origin;
 let sidebarWindow: Window | null = null;
 
 /**
  * Notifica al sidebar de un cambio de contacto (push, no polling).
+ *
+ * Recibe el contacto YA EXTRAÍDO en vez de volver a leer el DOM: una segunda
+ * llamada a extractContactInfo() en el mismo tick anula la guarda de doble
+ * lectura de leerLidEstable() (lib/whatsapp.ts). Esa guarda solo devuelve el
+ * LID cuando dos lecturas consecutivas coinciden, y cachea la lectura actual
+ * como candidata al fallar — así que re-extraer acá matchea contra el cache
+ * que acaba de escribir observeChatChanges y confirma el LID sin que #main
+ * haya repintado. En un switch username→username eso manda al sidebar el LID
+ * del contacto ANTERIOR (cliente equivocado en el panel, chat_id equivocado
+ * en el lead nuevo) — exactamente lo que la guarda existe para evitar.
  */
-function pushContactToSidebar() {
+function pushContactToSidebar(contact: WhatsAppContact | null) {
   if (!sidebarWindow) return;
-  const contact = extractContactInfo();
   sidebarWindow.postMessage({ type: 'AMERSURCHAT_CONTACT_CHANGED', contact }, EXTENSION_ORIGIN);
 }
 
-// Esperar a que WhatsApp Web esté completamente cargado
+// Esperar a que WhatsApp Web esté completamente cargado.
+// Con tope: si #app nunca aparece (WhatsApp caído, pantalla de error, cambio de
+// markup), el interval quedaba corriendo cada 500ms para siempre. Al agotarse
+// se sigue igual — inyectar el botón es inofensivo y el sidebar sabe mostrar
+// "Seleccione un chat" — pero se deja constancia en la consola.
+const ESPERA_MAX_MS = 60_000;
+const ESPERA_INTERVALO_MS = 500;
+
 function waitForWhatsAppWeb(): Promise<void> {
   return new Promise((resolve) => {
+    let esperado = 0;
     const checkInterval = setInterval(() => {
       const whatsappApp = document.querySelector('#app');
       if (whatsappApp && whatsappApp.childNodes.length > 0) {
         clearInterval(checkInterval);
         resolve();
+        return;
       }
-    }, 500);
+
+      esperado += ESPERA_INTERVALO_MS;
+      if (esperado >= ESPERA_MAX_MS) {
+        clearInterval(checkInterval);
+        console.warn(
+          `[AmersurChat] #app no apareció tras ${ESPERA_MAX_MS / 1000}s. ` +
+          'Se inyecta el sidebar igual. ¿Cambió el markup de WhatsApp Web?',
+        );
+        resolve();
+      }
+    }, ESPERA_INTERVALO_MS);
   });
 }
 
@@ -75,6 +107,13 @@ function injectSidebar() {
     height: 100%;
     border: none;
   `;
+  // `clipboard-write` es una feature con allowlist por defecto "self": sin este
+  // atributo, el iframe (chrome-extension://, cross-origin respecto de
+  // web.whatsapp.com) NO puede usar navigator.clipboard.writeText y el fallback
+  // a portapapeles del sidebar rechazaba SIEMPRE con NotAllowedError — el error
+  // se logueaba y se descartaba, así que el vendedor se quedaba sin plantilla y
+  // sin aviso cuando la inserción directa fallaba.
+  iframe.allow = 'clipboard-write';
   iframe.src = chrome.runtime.getURL('sidebar.html');
   sidebarWindow = iframe.contentWindow;
   iframe.addEventListener('load', () => {
@@ -194,7 +233,7 @@ function updateBadge(count: number) {
 waitForWhatsAppWeb().then(() => {
   injectSidebar();
   // Observar cambios de chat y notificar al sidebar proactivamente
-  observeChatChanges(() => pushContactToSidebar());
+  observeChatChanges((contact) => pushContactToSidebar(contact));
 });
 
 // Escuchar mensajes del sidebar (comunicación con React)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { WhatsAppContact, Cliente } from '@/types/crm';
 import { CRMApiClient, getCRMConfig, clearCRMConfig } from '@/lib/api';
 import { LoginForm } from './LoginForm';
@@ -29,6 +29,10 @@ export function Sidebar() {
   const [clienteAsignadoAOtro, setClienteAsignadoAOtro] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [sesionExpirada, setSesionExpirada] = useState(false);
+  // Aviso cuando la plantilla no se pudo escribir en el input de WhatsApp.
+  const [templateAviso, setTemplateAviso] = useState<string | null>(null);
+  // Última plantilla enviada al content script, para el fallback a portapapeles.
+  const ultimaPlantillaRef = useRef<string | null>(null);
 
   // Ref para tracking del último chat procesado (evita re-renders innecesarios).
   // Se usa chatId (LID o teléfono) en vez de phone: phone puede ser null en
@@ -69,6 +73,18 @@ export function Sidebar() {
       if (contact.chatId !== lastProcessedChatIdRef.current) {
         logger.info('Nuevo contacto detectado', { chatId: contact.chatId, phone: contact.phone, username: contact.username });
         lastProcessedChatIdRef.current = contact.chatId;
+        // Limpiar ANTES de buscar: `searchingCliente` solo pone el skeleton en
+        // ContactInfo, pero el resto del panel (UpdateLeadStatus, QuickNotes,
+        // ProjectInterest, ClientHistory) seguía montado con el cliente del
+        // chat ANTERIOR y accionable — se podía cambiarle el estado o cargarle
+        // una nota al lead equivocado mientras corría la búsqueda del nuevo.
+        // Se limpia acá y no dentro de searchCliente() porque esa función
+        // también la usa handleClientUpdate() para refrescar el cliente ACTUAL
+        // (tras cambiar estado o agregar nota); ahí desmontar el panel entero
+        // sería un parpadeo gratis que además colapsa los acordeones abiertos.
+        setCliente(null);
+        setClienteAsignadoAOtro(null);
+        setSearchError(null);
         searchCliente(contact);
       }
     } else if (!contact) {
@@ -199,6 +215,10 @@ export function Sidebar() {
       if (event.data.type === 'AMERSURCHAT_CONTACT_CHANGED') {
         setContact(event.data.contact);
       }
+      // Resultado real de insertar la plantilla en el input de WhatsApp
+      if (event.data.type === 'AMERSURCHAT_TEMPLATE_INSERTED' && !event.data.success) {
+        handleInsercionFallida();
+      }
     }
 
     window.addEventListener('message', handleMessage);
@@ -272,20 +292,40 @@ export function Sidebar() {
   }
 
   function handleSelectTemplate(mensaje: string) {
-    logger.info('Insertando plantilla en WhatsApp', { 
-      mensajePreview: mensaje.substring(0, 50) 
+    logger.info('Insertando plantilla en WhatsApp', {
+      mensajePreview: mensaje.substring(0, 50)
     });
+
+    setTemplateAviso(null);
+    // Se guarda para el fallback: el content script responde si pudo insertar
+    // o no (AMERSURCHAT_TEMPLATE_INSERTED) y ahí recién se decide qué hacer.
+    ultimaPlantillaRef.current = mensaje;
 
     // Enviar mensaje al content script para insertar en WhatsApp
     window.parent.postMessage({
       type: 'AMERSURCHAT_INSERT_TEMPLATE',
       text: mensaje,
     }, WHATSAPP_WEB_ORIGIN);
+  }
 
-    // También copiar al portapapeles como fallback
-    navigator.clipboard.writeText(mensaje).catch((error) => {
-      logger.error('Error copiando plantilla', error instanceof Error ? error : undefined);
-    });
+  /**
+   * El content script no pudo escribir la plantilla en el input de WhatsApp:
+   * se cae al portapapeles y se avisa. Antes se copiaba SIEMPRE (pisando el
+   * portapapeles del vendedor en cada plantilla) y la respuesta del content
+   * script no se escuchaba, así que una inserción fallida quedaba muda.
+   */
+  function handleInsercionFallida() {
+    const mensaje = ultimaPlantillaRef.current;
+    if (!mensaje) return;
+
+    logger.warn('No se pudo insertar la plantilla en WhatsApp, cayendo a portapapeles');
+    navigator.clipboard.writeText(mensaje).then(
+      () => setTemplateAviso('No se pudo escribir en el chat. El mensaje se copió al portapapeles: péguelo con Ctrl+V.'),
+      (error) => {
+        logger.error('Error copiando plantilla', error instanceof Error ? error : undefined);
+        setTemplateAviso('No se pudo insertar el mensaje en WhatsApp. Copie el texto de la plantilla manualmente.');
+      },
+    );
   }
 
   if (loading) {
@@ -329,7 +369,7 @@ export function Sidebar() {
         {!contact && (
           <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              Selecciona un chat de WhatsApp para ver la información del contacto
+              Seleccione un chat de WhatsApp para ver la información del contacto
             </p>
           </div>
         )}
@@ -384,8 +424,15 @@ export function Sidebar() {
               />
             )}
 
+            {/* key por cliente.id: ClientHistory y ProjectInterest cargan sus
+                datos con useEffect([isExpanded]) y no miran clienteId, así que
+                sin key un cambio de cliente con el acordeón abierto dejaba en
+                pantalla las interacciones / lotes de interés del cliente
+                anterior. El key remonta todo el bloque cuando cambia el
+                cliente, y NO remonta cuando handleClientUpdate() refresca el
+                mismo cliente (mismo id) — los acordeones quedan como estaban. */}
             {cliente && (
-              <>
+              <Fragment key={cliente.id}>
                 {/* Sugerencia de teléfono cuando el cliente todavía no tiene uno
                     registrado: cubre tanto el número ya visible en contact.phone
                     (chat clásico, o revelado por Meta tras la excepción de ~30
@@ -426,7 +473,16 @@ export function Sidebar() {
                   clienteId={cliente.id}
                   apiClient={apiClient!}
                 />
-              </>
+              </Fragment>
+            )}
+
+            {/* La inserción de la plantilla falló: se avisa en vez de fallar mudo */}
+            {templateAviso && (
+              <InlineAlert
+                variant="warning"
+                message={templateAviso}
+                onDismiss={() => setTemplateAviso(null)}
+              />
             )}
 
             {/* Plantillas de mensajes (siempre disponibles) */}
