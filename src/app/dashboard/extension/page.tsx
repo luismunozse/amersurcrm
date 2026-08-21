@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.3.0
+                Descargar AmersurChat v1.3.1
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: 13 Agosto 2026
+                Última actualización: 21 Agosto 2026
               </p>
             </div>
           </li>
@@ -125,35 +125,47 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.3.0 */}
+      {/* Novedades v1.3.1 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.3.0
+          🎉 Novedades v1.3.1
         </h3>
+        <p className="text-sm text-crm-text-muted dark:text-gray-400 mb-3">
+          Versión de correcciones. Se recomienda actualizar: resuelve fallas que aparecían
+          al dejar WhatsApp Web abierto durante varias horas.
+        </p>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Soporte para contactos con nombre de usuario:</strong> WhatsApp ahora permite que algunos clientes escriban usando un nombre de usuario (@usuario) en vez de mostrar su número. AmersurChat reconoce estos chats y crea el lead igual, aunque el número no esté disponible.</span>
+            <span><strong>El panel ya no se queda cargando:</strong> tras varias horas con WhatsApp Web abierto, el panel podía quedarse en &quot;Buscando en CRM...&quot; para siempre y sólo se recuperaba recargando la página. Corregido.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Leads sin teléfono, completados después:</strong> si el número del contacto está oculto, el lead se crea igual y queda vinculado al chat. Cuando WhatsApp lo revela más adelante, la extensión se lo ofrece guardar con un click.</span>
+            <span><strong>No se vuelve a cerrar la sesión sola:</strong> al renovarse la sesión, varias consultas simultáneas podían dejarlo afuera en medio del trabajo.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Detección de número compartido en el chat:</strong> si el cliente escribe su número en un mensaje, aparece un aviso para guardarlo en el CRM. Usted confirma o descarta — nunca se guarda automáticamente.</span>
+            <span><strong>Datos del cliente correcto al cambiar de chat:</strong> mientras buscaba el cliente del chat nuevo, el panel seguía mostrando el anterior y permitía cambiarle el estado o cargarle una nota por error. En chats con nombre de usuario también podía mostrar un cliente equivocado.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Nueva plantilla para solicitar el número:</strong> un mensaje listo para pedirle el número al contacto cuando sigue oculto y no lo compartió en el chat.</span>
+            <span><strong>Estados &quot;En Proceso&quot; y &quot;Propietario&quot; visibles:</strong> los clientes en esos estados mostraban la etiqueta vacía en el panel.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Popup con detección de pestaña:</strong> el ícono de la extensión ahora indica si tiene WhatsApp Web abierto y lo lleva directo a esa pestaña.</span>
+            <span><strong>Leads con nombre real:</strong> los contactos que no están agendados ya no se crean con el nombre &quot;Sin nombre&quot;, y las plantillas dejaron de saludar con ese texto.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Plantillas con aviso:</strong> si el mensaje no se puede escribir en el chat, ahora se avisa y se copia al portapapeles para pegarlo con Ctrl+V.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Mejor detección del número compartido:</strong> antes se perdía si el cliente escribía una coma después del número.</span>
           </li>
         </ul>
         <p className="text-xs text-green-700 dark:text-green-300 mt-3 pt-3 border-t border-green-200 dark:border-green-700">
-          Si ya tienes la extensión instalada, descarga la nueva versión, reemplaza la carpeta anterior y recarga la extensión en <code className="dark:bg-green-800/30 dark:text-green-100">chrome://extensions/</code>.
+          Si ya tiene la extensión instalada, descargue la nueva versión, reemplace la carpeta anterior y recargue la extensión en <code className="dark:bg-green-800/30 dark:text-green-100">chrome://extensions/</code>.
         </p>
       </div>
 
