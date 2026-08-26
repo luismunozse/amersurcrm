@@ -17,6 +17,45 @@ function getThrottleKey(method: string, endpoint: string): string {
 }
 
 /**
+ * Techo de espera por request. `fetch` NO tiene timeout propio: ante un socket
+ * colgado (wifi que se corta, equipo que sale de suspensión, VPN que cae) la
+ * promesa no resuelve NI rechaza, posiblemente para siempre.
+ *
+ * Eso rompía el sidebar de una forma difícil de diagnosticar: la promesa
+ * colgada queda registrada en `inflightRequests` — el `.finally()` que limpia
+ * la clave sólo corre cuando la promesa se asienta — así que el poll de
+ * ConnectionStatus cada 30s caía en el dedupe y recibía LA MISMA promesa
+ * muerta. El indicador quedaba en "Verificando..." para siempre, incluso
+ * después de que la red se recuperaba, y sólo se salía recargando la página.
+ */
+const REQUEST_TIMEOUT_MS = 20_000;
+
+/**
+ * `fetch` con timeout duro vía AbortController. Traduce el AbortError a un
+ * mensaje con la palabra "conexión", que es lo que ConnectionStatus busca para
+ * mostrar "Sin conexión" en vez de un error genérico.
+ */
+async function fetchConTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if ((error as Error | undefined)?.name === 'AbortError') {
+      logger.warn('Request abortado por timeout', { url, timeoutMs: REQUEST_TIMEOUT_MS });
+      throw new Error(
+        `Error de conexión: el CRM no respondió en ${REQUEST_TIMEOUT_MS / 1000}s. ` +
+        'Verifique su conexión a internet.',
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * `CRMApiClient.request()` solo lanza un Error genérico con el status y el
  * body crudo ("API Error: 409 - {...}") — no preserva el body parseado. Acá
  * lo recuperamos para poder mostrar el mensaje específico del server (y
@@ -111,7 +150,7 @@ export class CRMApiClient {
     // Registrar request en vuelo para deduplicación de GETs
     const executeRequest = async (): Promise<T> => {
     try {
-      const response = await fetch(url, {
+      const response = await fetchConTimeout(url, {
         ...options,
         headers,
       });
@@ -273,7 +312,9 @@ export class CRMApiClient {
       }
 
       const url = localStored.crmUrl || this.baseUrl;
-      const response = await fetch(`${url}/api/auth/refresh`, {
+      // Con timeout igual que el resto: este fetch se espera DENTRO del manejo
+      // del 401, así que si cuelga se lleva puesto al request que lo disparó.
+      const response = await fetchConTimeout(`${url}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: stored.refreshToken }),

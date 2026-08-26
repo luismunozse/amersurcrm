@@ -113,6 +113,62 @@ describe('renovación de token en un 401', () => {
   });
 });
 
+describe('timeout de red', () => {
+  /** fetch que nunca responde y sólo termina si lo abortan, como un socket colgado. */
+  function fetchColgado(alAbortar?: () => void) {
+    const fn = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        alAbortar?.();
+        reject(new DOMException('The user aborted a request.', 'AbortError'));
+      });
+    }));
+    vi.stubGlobal('fetch', fn);
+    return fn;
+  }
+
+  it('corta un fetch colgado en vez de esperar para siempre', async () => {
+    const { CRMApiClient } = await cargarApi();
+    vi.useFakeTimers();
+    try {
+      fetchColgado();
+      const client = new CRMApiClient(BASE, 'tok');
+
+      const promesa = client.getCurrentUser();
+      const assertion = expect(promesa).rejects.toThrow(/conexión/i);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('no deja la clave inflight envenenada tras un fetch colgado', async () => {
+    const { CRMApiClient } = await cargarApi();
+    vi.useFakeTimers();
+    try {
+      fetchColgado();
+      const client = new CRMApiClient(BASE, 'tok');
+
+      // Primer intento: la red se traba y el request muere por timeout.
+      const primero = client.getCurrentUser();
+      const fallo = expect(primero).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await fallo;
+
+      // La red se recupera. El poll de ConnectionStaty debe hacer un fetch
+      // NUEVO, no recibir la promesa muerta del intento anterior.
+      const fn = vi.fn(async () => respuesta(200, { username: 'vendedor1' }));
+      vi.stubGlobal('fetch', fn);
+
+      await vi.advanceTimersByTimeAsync(1_000); // pasar el throttle
+      await expect(client.getCurrentUser()).resolves.toEqual({ username: 'vendedor1' });
+      expect(fn).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('deduplicación de requests', () => {
   it('un GET concurrente al mismo endpoint se reusa', async () => {
     const { CRMApiClient } = await cargarApi();
