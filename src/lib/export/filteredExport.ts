@@ -160,7 +160,7 @@ export async function exportFilteredProyectos(
       await exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
       break;
     case 'pdf':
-      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
+      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns, PDF_PROYECTOS);
       break;
   }
 }
@@ -199,7 +199,7 @@ export async function exportFilteredLotes(
       await exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
       break;
     case 'pdf':
-      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
+      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns, PDF_LOTES);
       break;
   }
 }
@@ -232,7 +232,7 @@ export async function exportFilteredClientes(
       await exportToCSVWithFilters(transformedData, filterMetadata, finalFileName, includeFiltersSheet);
       break;
     case 'pdf':
-      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns);
+      await exportToPDFWithFilters(transformedData, filterMetadata, finalFileName, columns, PDF_CLIENTES);
       break;
   }
 }
@@ -240,6 +240,38 @@ export async function exportFilteredClientes(
 // ============================================================================
 // FUNCIONES INTERNAS
 // ============================================================================
+
+// Portada, pie y recorte de columnas del PDF, por tipo de export.
+// `columnasPrioritarias: []` = el set completo entra en portrait, no se recorta.
+const PDF_PROYECTOS: PdfEntidad = {
+  titulo: 'Listado de Proyectos',
+  plural: 'proyectos',
+  columnasPrioritarias: [],
+};
+
+const PDF_LOTES: PdfEntidad = {
+  titulo: 'Listado de Lotes',
+  plural: 'lotes',
+  columnasPrioritarias: [],
+};
+
+const PDF_CLIENTES: PdfEntidad = {
+  titulo: 'Listado de Clientes',
+  plural: 'clientes',
+  // El cliente tiene 16 columnas: en portrait solo entran las de identificación
+  // y seguimiento. `whatsapp_username` está acá porque para un lead que llegó
+  // por alias es el ÚNICO dato de contacto: WhatsApp no expone su teléfono.
+  columnasPrioritarias: [
+    'nombre',
+    'codigo_cliente',
+    'estado_cliente',
+    'telefono',
+    'whatsapp_username',
+    'vendedor_asignado',
+    'fecha_alta',
+    'origen_lead',
+  ],
+};
 
 /**
  * Columnas por defecto para proyectos
@@ -525,13 +557,31 @@ async function getLogoBase64(): Promise<string | null> {
 }
 
 /**
+ * Identidad de la entidad exportada. El PDF lo comparten los tres tipos de
+ * export, así que los textos de portada/pie y el recorte de columnas no
+ * pueden estar hardcodeados a clientes.
+ */
+interface PdfEntidad {
+  /** Título del documento: "Listado de Clientes". */
+  titulo: string;
+  /** Sustantivo plural en minúscula para los conteos: "clientes". */
+  plural: string;
+  /**
+   * Keys de las columnas que entran en el PDF (portrait no da para todas).
+   * Se respeta el orden de `columns`, no el de esta lista. Vacía = todas.
+   */
+  columnasPrioritarias: string[];
+}
+
+/**
  * Exportar a PDF con estilo de reportes AMERSUR
  */
 async function exportToPDFWithFilters(
   data: any[],
   filterMetadata: any[],
   fileName: string,
-  columns: ExportColumn[]
+  columns: ExportColumn[],
+  entidad: PdfEntidad
 ): Promise<void> {
   const JsPDF = await getJsPDF();
   const { default: autoTable } = await import('jspdf-autotable');
@@ -570,7 +620,7 @@ async function exportToPDFWithFilters(
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...CRM_COLORS.textMuted);
-    doc.text(`AMERSUR CRM  |  Listado de Clientes`, MARGIN, PAGE_H - 9);
+    doc.text(`AMERSUR CRM  |  ${entidad.titulo}`, MARGIN, PAGE_H - 9);
     doc.text(`Página ${pageNum} de ${totalPages}`, PAGE_W - MARGIN, PAGE_H - 9, { align: 'right' });
   };
 
@@ -604,7 +654,7 @@ async function exportToPDFWithFilters(
   doc.setFontSize(26);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...CRM_COLORS.dark);
-  doc.text('Listado de Clientes', PAGE_W / 2, 85, { align: 'center' });
+  doc.text(entidad.titulo, PAGE_W / 2, 85, { align: 'center' });
 
   // Subtítulo con período si hay filtro de fecha
   const fechaDesde = filterMetadata.find(m => m.filtro === 'Fecha Desde')?.valor;
@@ -620,7 +670,7 @@ async function exportToPDFWithFilters(
   doc.setFontSize(13);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...CRM_COLORS.textSecondary);
-  doc.text(`${data.length} clientes exportados`, PAGE_W / 2, 94, { align: 'center' });
+  doc.text(`${data.length} ${entidad.plural} exportados`, PAGE_W / 2, 94, { align: 'center' });
 
   // Box de información
   const boxY = 110;
@@ -651,7 +701,7 @@ async function exportToPDFWithFilters(
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...CRM_COLORS.dark);
-    doc.text(`${data.length} clientes`, PAGE_W / 2, boxY + 18, { align: 'center' });
+    doc.text(`${data.length} ${entidad.plural}`, PAGE_W / 2, boxY + 18, { align: 'center' });
   }
 
   // Fecha de generación
@@ -734,13 +784,11 @@ async function exportToPDFWithFilters(
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...CRM_COLORS.dark);
-  doc.text('LISTADO DE CLIENTES', MARGIN + 6, yPos + 5.5);
+  doc.text(entidad.titulo.toUpperCase(), MARGIN + 6, yPos + 5.5);
   yPos += 14;
 
   // Columnas reducidas para formato portrait (las más importantes)
-  const pdfColumns = columns.filter(col =>
-    ['nombre', 'codigo_cliente', 'estado_cliente', 'telefono', 'vendedor_asignado', 'fecha_alta', 'origen_lead'].includes(col.key)
-  );
+  const pdfColumns = columns.filter(col => entidad.columnasPrioritarias.includes(col.key));
   // Si no hay columnas filtradas, usar todas
   const finalColumns = pdfColumns.length > 0 ? pdfColumns : columns;
 
