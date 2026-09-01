@@ -145,6 +145,37 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     }
   }
 
+  // Condiciones de búsqueda, compartidas por los dos caminos de permisos: un
+  // vendedor (vista accesible) y un admin/coordinador tienen que encontrar al
+  // mismo cliente con el mismo término. Antes la vista accesible solo miraba
+  // `nombre`, así que un vendedor buscando por email, código o alias no
+  // encontraba nada y parecía que el cliente no existía.
+  const searchConditions: string[] = [];
+
+  const term = sanitizarTerminoBusqueda(searchTerm);
+  if (term) {
+    searchConditions.push(`nombre.ilike.%${term}%`);
+    searchConditions.push(`email.ilike.%${term}%`);
+    searchConditions.push(`codigo_cliente.ilike.%${term}%`);
+    searchConditions.push(`whatsapp_username.ilike.%${term.replace(/^@/, "")}%`);
+
+    // Si parece un número de teléfono, buscar también en campos de teléfono
+    const digitsOnly = term.replace(/[^\d]/g, '');
+    if (digitsOnly.length >= 3) {
+      searchConditions.push(`telefono.ilike.%${digitsOnly}%`);
+      searchConditions.push(`telefono_whatsapp.ilike.%${digitsOnly}%`);
+    }
+  }
+
+  if (searchTelefono && searchTelefono.trim() !== '') {
+    // Limpiar número: solo dígitos para búsqueda más flexible
+    const cleanPhone = searchTelefono.replace(/[^\d]/g, '');
+    if (cleanPhone) {
+      searchConditions.push(`telefono.ilike.%${cleanPhone}%`);
+      searchConditions.push(`telefono_whatsapp.ilike.%${cleanPhone}%`);
+    }
+  }
+
   // buildBaseQuery ahora recibe las columnas a seleccionar y opciones
   // IMPORTANTE: .select() debe llamarse PRIMERO para que .or() esté disponible
   const buildBaseQuery = (selectColumns: string, options?: { count?: 'exact' | 'planned' | 'estimated', head?: boolean }) => {
@@ -172,15 +203,8 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
       if (origen) {
         query = query.eq('origen_lead', origen);
       }
-      // Para búsquedas en vista accesible, usar filtros individuales
-      if (searchTerm) {
-        query = query.ilike('nombre', `%${searchTerm}%`);
-      }
-      if (searchTelefono) {
-        // Limpiar número: solo dígitos para búsqueda más flexible
-        const cleanPhone = searchTelefono.replace(/[^\d]/g, '');
-        // Buscar en ambos campos de teléfono
-        query = query.or(`telefono.ilike.%${cleanPhone}%,telefono_whatsapp.ilike.%${cleanPhone}%`);
+      if (searchConditions.length > 0) {
+        query = query.or(searchConditions.join(','));
       }
       if (fechaDesde) {
         query = query.gte('fecha_alta', `${fechaDesde}T00:00:00`);
@@ -209,34 +233,6 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     }
 
     // 3. DESPUÉS aplicar filtros de búsqueda (AND con los permisos anteriores)
-    // Construir condiciones de búsqueda
-    const searchConditions: string[] = [];
-
-    const term = sanitizarTerminoBusqueda(searchTerm);
-    if (term) {
-      searchConditions.push(`nombre.ilike.%${term}%`);
-      searchConditions.push(`email.ilike.%${term}%`);
-      searchConditions.push(`codigo_cliente.ilike.%${term}%`);
-      searchConditions.push(`whatsapp_username.ilike.%${term.replace(/^@/, "")}%`);
-
-      // Si parece un número de teléfono, buscar también en campos de teléfono
-      const digitsOnly = term.replace(/[^\d]/g, '');
-      if (digitsOnly.length >= 3) {
-        searchConditions.push(`telefono.ilike.%${digitsOnly}%`);
-        searchConditions.push(`telefono_whatsapp.ilike.%${digitsOnly}%`);
-      }
-    }
-
-    if (searchTelefono && searchTelefono.trim() !== '') {
-      // Limpiar número: solo dígitos para búsqueda más flexible
-      const cleanPhone = searchTelefono.replace(/[^\d]/g, '');
-      if (cleanPhone) {
-        searchConditions.push(`telefono.ilike.%${cleanPhone}%`);
-        searchConditions.push(`telefono_whatsapp.ilike.%${cleanPhone}%`);
-      }
-    }
-
-    // Aplicar condiciones de búsqueda (OR entre ellas, AND con permisos)
     if (searchConditions.length > 0) {
       query = query.or(searchConditions.join(','));
     }
