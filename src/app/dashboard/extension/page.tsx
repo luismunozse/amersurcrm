@@ -37,7 +37,7 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.3.3
+                Descargar AmersurChat v1.3.4
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
                 Última actualización: 1 Septiembre 2026
@@ -125,18 +125,18 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.3.3 */}
+      {/* Novedades v1.3.4 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.3.3
+          🎉 Novedades v1.3.4
         </h3>
         <p className="text-sm text-crm-text-muted dark:text-gray-400 mb-3">
-          Actualice para poder abrir desde el CRM los chats de clientes que solo tienen alias.
+          Actualice para mejorar la apertura asistida de chats por alias en WhatsApp Web.
         </p>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400 mb-4">
           <li className="flex items-start gap-2">
             <span className="text-green-600 dark:text-green-400">✓</span>
-            <span><strong>Abrir el chat de un cliente sin teléfono:</strong> cuando un cliente escribe con su alias de WhatsApp, WhatsApp no comparte su número, así que desde el CRM no había forma de escribirle. Ahora el botón de WhatsApp del CRM abre WhatsApp Web y la extensión busca el alias y abre la conversación. Si el buscador de WhatsApp cambia, el alias queda escrito y solo resta un click.</span>
+            <span><strong>Compatibilidad con el buscador de WhatsApp Web:</strong> la apertura por alias ahora reconoce más variantes del campo y de los resultados de búsqueda. WhatsApp no ofrece enlaces oficiales por username, por lo que esta función requiere la extensión y funciona solamente en WhatsApp Web.</span>
           </li>
         </ul>
 

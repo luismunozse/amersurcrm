@@ -116,13 +116,19 @@ const SELECTORS = {
     '#side [contenteditable="true"][data-tab="3"]',
     '#side [contenteditable="true"][role="textbox"]',
     '#side [contenteditable="true"]',
+    '#side input[role="searchbox"]',
+    '#side input[type="text"]',
+    '#side input:not([type])',
     '[data-testid="chat-list-search"]',
+    'input[role="searchbox"]',
   ],
   /** Filas de resultado de la búsqueda, en orden de aparición. */
   searchResultItem: [
     '#pane-side [role="listitem"]',
+    '#pane-side [role="row"]',
     '#pane-side [data-testid="cell-frame-container"]',
     '#side [role="listitem"]',
+    '#side [role="row"]',
   ],
 } as const;
 
@@ -748,7 +754,7 @@ export function observeChatChanges(callback: (contact: WhatsAppContact | null) =
 // ─── Apertura de chat por alias ──────────────────────────────────────────
 
 /** Cuánto se espera a que la búsqueda de WhatsApp pinte resultados. */
-const BUSQUEDA_TIMEOUT_MS = 3000;
+const BUSQUEDA_TIMEOUT_MS = 1500;
 const BUSQUEDA_INTERVALO_MS = 100;
 const BUSCADOR_TIMEOUT_MS = 3000;
 
@@ -762,6 +768,19 @@ const BUSCADOR_TIMEOUT_MS = 3000;
 function escribirEn(campo: HTMLElement, texto: string): boolean {
   campo.focus();
 
+  if (campo instanceof HTMLInputElement || campo instanceof HTMLTextAreaElement) {
+    const setter = Object.getOwnPropertyDescriptor(
+      campo instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype,
+      'value',
+    )?.set;
+    setter?.call(campo, texto);
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: texto }));
+    campo.dispatchEvent(new Event('change', { bubbles: true }));
+    return campo.value === texto;
+  }
+
+  document.execCommand('selectAll');
+  document.execCommand('delete');
   if (document.execCommand('insertText', false, texto) && (campo.textContent || '').includes(texto)) {
     return true;
   }
@@ -798,20 +817,24 @@ export async function abrirChatPorAlias(alias: string): Promise<boolean> {
     return false;
   }
 
-  // WhatsApp identifica los usernames con el prefijo @ en su buscador.
-  if (!escribirEn(buscador, `@${limpio}`)) {
-    logger.warn('No se pudo escribir el alias en la caja de búsqueda');
-    return false;
+  // WhatsApp usa @ para identificar usernames, pero algunas versiones del
+  // buscador indexan el alias sin el prefijo. Probar ambos formatos evita que
+  // el enlace dependa de una variante concreta de WhatsApp Web.
+  for (const termino of [`@${limpio}`, limpio]) {
+    if (!escribirEn(buscador, termino)) {
+      logger.warn('No se pudo escribir el alias en la caja de búsqueda');
+      continue;
+    }
+
+    const primerResultado = await esperarPrimerResultado();
+    if (primerResultado) {
+      primerResultado.click();
+      return true;
+    }
   }
 
-  const primerResultado = await esperarPrimerResultado();
-  if (!primerResultado) {
-    logger.warn(`La búsqueda de "${limpio}" no devolvió resultados`);
-    return false;
-  }
-
-  primerResultado.click();
-  return true;
+  logger.warn(`La búsqueda de "${limpio}" no devolvió resultados`);
+  return false;
 }
 
 /** Espera a que WhatsApp monte un elemento que todavía no existe en el DOM. */
