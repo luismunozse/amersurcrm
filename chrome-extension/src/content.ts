@@ -3,7 +3,7 @@
  * Inyecta el sidebar de AmersurChat
  */
 
-import { detectSharedPhone, extractContactInfo, getLastReceivedMessage, insertTextIntoWhatsApp, observeChatChanges } from './lib/whatsapp';
+import { abrirChatPorAlias, detectSharedPhone, extractContactInfo, getLastReceivedMessage, insertTextIntoWhatsApp, observeChatChanges } from './lib/whatsapp';
 // Solo el tipo: `types/crm.ts` no emite runtime, así que esto no agrega un
 // módulo compartido al bundle del content script (ver la nota de bundling en
 // lib/chatId.ts).
@@ -229,11 +229,47 @@ function updateBadge(count: number) {
   }
 }
 
+/**
+ * Apertura de chat pedida por el CRM.
+ *
+ * El CRM no puede linkear al chat de un contacto que escribió por alias:
+ * WhatsApp no expone su teléfono y `wa.me` solo acepta números. Entonces abre
+ * `https://web.whatsapp.com/#amersur-chat=<alias>` y la extensión, que ya vive
+ * acá adentro, termina el trabajo manejando el buscador.
+ */
+const PARAM_CHAT = 'amersur-chat';
+
+function leerAliasDelHash(): string | null {
+  const alias = new URLSearchParams(window.location.hash.replace(/^#/, '')).get(PARAM_CHAT);
+  return alias?.trim() || null;
+}
+
+async function abrirChatPedidoPorElCrm() {
+  const alias = leerAliasDelHash();
+  if (!alias) return;
+
+  // Limpiar el hash ANTES de abrir: si queda puesto, un F5 vuelve a disparar
+  // la búsqueda y le pisa al vendedor el chat que esté mirando.
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+
+  const abierto = await abrirChatPorAlias(alias);
+  if (!abierto) {
+    console.warn(`[AmersurChat] No se pudo abrir el chat de "${alias}". Queda escrito en el buscador.`);
+  }
+}
+
 // Inicializar cuando WhatsApp Web esté listo
 waitForWhatsAppWeb().then(() => {
   injectSidebar();
   // Observar cambios de chat y notificar al sidebar proactivamente
   observeChatChanges((contact) => pushContactToSidebar(contact));
+  void abrirChatPedidoPorElCrm();
+});
+
+// El CRM reusa la MISMA pestaña (target con nombre), así que en el segundo
+// click no hay recarga: solo cambia el hash y hay que reaccionar a eso.
+window.addEventListener('hashchange', () => {
+  void abrirChatPedidoPorElCrm();
 });
 
 // Escuchar mensajes del sidebar (comunicación con React)

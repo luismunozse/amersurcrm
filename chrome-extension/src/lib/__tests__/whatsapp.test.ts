@@ -259,3 +259,74 @@ describe('detectSharedPhone', () => {
     expect(detectSharedPhone()).toBeNull();
   });
 });
+
+describe('abrirChatPorAlias', () => {
+  /**
+   * Panel izquierdo de WhatsApp Web: caja de búsqueda (contenteditable, igual
+   * que el compositor) y la lista de resultados.
+   */
+  function montarBuscador(resultados: string[] = []) {
+    document.body.innerHTML = `
+      <div id="app">
+        <div id="side">
+          <div contenteditable="true" role="textbox" data-tab="3"></div>
+          <div id="pane-side">
+            ${resultados.map((r) => `<div role="listitem"><span dir="auto">${r}</span></div>`).join('')}
+          </div>
+        </div>
+        <div id="main"></div>
+      </div>`;
+  }
+
+  it('escribe el alias en el buscador y abre el primer resultado', async () => {
+    const { abrirChatPorAlias } = await cargarWhatsapp();
+    montarBuscador(['Juan Pérez']);
+    const fila = document.querySelector('[role="listitem"]') as HTMLElement;
+    const clicks = vi.fn();
+    fila.addEventListener('click', clicks);
+
+    const abierto = await abrirChatPorAlias('juanp');
+
+    const buscador = document.querySelector('#side [contenteditable="true"]')!;
+    expect(buscador.textContent).toContain('juanp');
+    expect(clicks).toHaveBeenCalled();
+    expect(abierto).toBe(true);
+  });
+
+  it('acepta el alias con "@" adelante', async () => {
+    const { abrirChatPorAlias } = await cargarWhatsapp();
+    montarBuscador(['Juan Pérez']);
+
+    await abrirChatPorAlias('@juanp');
+
+    const buscador = document.querySelector('#side [contenteditable="true"]')!;
+    expect(buscador.textContent).toBe('juanp');
+  });
+
+  it('devuelve false y DEJA el alias escrito si no aparece ningún resultado', async () => {
+    const { abrirChatPorAlias } = await cargarWhatsapp();
+    montarBuscador([]);
+
+    const abierto = await abrirChatPorAlias('juanp');
+
+    // El fallback es que el vendedor termine la búsqueda a mano: borrar lo
+    // escrito lo dejaría sin nada.
+    const buscador = document.querySelector('#side [contenteditable="true"]')!;
+    expect(buscador.textContent).toContain('juanp');
+    expect(abierto).toBe(false);
+  });
+
+  it('devuelve false si no encuentra la caja de búsqueda', async () => {
+    const { abrirChatPorAlias } = await cargarWhatsapp();
+    document.body.innerHTML = '<div id="app"></div>';
+
+    expect(await abrirChatPorAlias('juanp')).toBe(false);
+  });
+
+  it('ignora un alias vacío', async () => {
+    const { abrirChatPorAlias } = await cargarWhatsapp();
+    montarBuscador(['Juan Pérez']);
+
+    expect(await abrirChatPorAlias('  ')).toBe(false);
+  });
+});

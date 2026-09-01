@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
+import { construirUrlChatPorAlias, WHATSAPP_WEB_TARGET } from "@/lib/whatsapp/aliasChat";
 
 /**
  * Alias (username) de WhatsApp del contacto, capturado por la extensión.
@@ -41,7 +42,16 @@ export default function WhatsappAliasBadge({
       className={`inline-flex max-w-full items-center gap-1 rounded-full border border-crm-border bg-crm-card-hover px-2 py-0.5 text-[11px] text-crm-text-secondary ${className}`}
       title={`Alias de WhatsApp: @${limpio}`}
     >
-      <WhatsAppIcon className="h-3 w-3 shrink-0 text-green-600" />
+      <a
+        href={construirUrlChatPorAlias(limpio)}
+        target={WHATSAPP_WEB_TARGET}
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        title="Abrir el chat en WhatsApp Web"
+        className="shrink-0 rounded text-green-600 transition-colors hover:text-green-700"
+      >
+        <WhatsAppIcon className="h-3 w-3" />
+      </a>
       <span className="truncate font-mono">@{limpio}</span>
       <button
         type="button"

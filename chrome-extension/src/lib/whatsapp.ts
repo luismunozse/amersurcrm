@@ -105,6 +105,25 @@ const SELECTORS = {
   messageDataId: [
     '#main [data-id]',
   ],
+  /**
+   * Caja de búsqueda del panel izquierdo. Es un contenteditable, igual que el
+   * compositor, así que se escribe con la misma técnica (ver escribirEn).
+   * Los selectores acotados a `#side` van primero: `[data-tab="3"]` a secas
+   * también matchea nodos del panel derecho en algunas versiones.
+   */
+  searchInput: [
+    '#side [data-testid="chat-list-search"]',
+    '#side [contenteditable="true"][data-tab="3"]',
+    '#side [contenteditable="true"][role="textbox"]',
+    '#side [contenteditable="true"]',
+    '[data-testid="chat-list-search"]',
+  ],
+  /** Filas de resultado de la búsqueda, en orden de aparición. */
+  searchResultItem: [
+    '#pane-side [role="listitem"]',
+    '#pane-side [data-testid="cell-frame-container"]',
+    '#side [role="listitem"]',
+  ],
 } as const;
 
 // ─── Helpers de selectores ───────────────────────────────────────────────
@@ -724,4 +743,90 @@ export function observeChatChanges(callback: (contact: WhatsAppContact | null) =
     clearInterval(interval);
     observer?.disconnect();
   };
+}
+
+// ─── Apertura de chat por alias ──────────────────────────────────────────
+
+/** Cuánto se espera a que la búsqueda de WhatsApp pinte resultados. */
+const BUSQUEDA_TIMEOUT_MS = 3000;
+const BUSQUEDA_INTERVALO_MS = 100;
+
+/**
+ * Escribe texto en un contenteditable de WhatsApp.
+ *
+ * Mismo problema que insertTextIntoWhatsApp: el editor es controlado y
+ * descarta una asignación directa de textContent, así que primero se intenta
+ * execCommand y recién después el fallback por InputEvent.
+ */
+function escribirEn(campo: HTMLElement, texto: string): boolean {
+  campo.focus();
+
+  if (document.execCommand('insertText', false, texto) && (campo.textContent || '').includes(texto)) {
+    return true;
+  }
+
+  campo.textContent = texto;
+  campo.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: texto }));
+  return (campo.textContent || '').includes(texto);
+}
+
+/**
+ * Busca un alias (username de WhatsApp) en el panel izquierdo y abre su chat.
+ *
+ * Por qué existe: WhatsApp no expone el teléfono real de un contacto que
+ * escribió por username, y `wa.me` solo acepta números — no hay deep link
+ * posible para ese chat. Como la extensión ya vive adentro de WhatsApp Web,
+ * la abre manejando el buscador como lo haría el vendedor.
+ *
+ * El chat siempre existe: si hay alias guardado es porque ese contacto
+ * escribió, que es lo que generó el lead.
+ *
+ * Devuelve false si no pudo abrirlo. En ese caso el alias queda ESCRITO en el
+ * buscador a propósito: el fallback es que el vendedor haga el último click,
+ * no que se quede con la caja vacía y sin saber qué pasó.
+ */
+export async function abrirChatPorAlias(alias: string): Promise<boolean> {
+  const limpio = (alias || '').replace(/^@/, '').trim();
+  if (!limpio) return false;
+
+  const buscador = queryFirst(SELECTORS.searchInput) as HTMLElement | null;
+  if (!buscador) {
+    logger.warn('No se encontró la caja de búsqueda de WhatsApp con ningún selector');
+    return false;
+  }
+
+  if (!escribirEn(buscador, limpio)) {
+    logger.warn('No se pudo escribir el alias en la caja de búsqueda');
+    return false;
+  }
+
+  const primerResultado = await esperarPrimerResultado();
+  if (!primerResultado) {
+    logger.warn(`La búsqueda de "${limpio}" no devolvió resultados`);
+    return false;
+  }
+
+  primerResultado.click();
+  return true;
+}
+
+/** Espera a que la lista de resultados pinte al menos una fila. */
+function esperarPrimerResultado(): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    let esperado = 0;
+    const timer = setInterval(() => {
+      const fila = queryAll(SELECTORS.searchResultItem)[0] as HTMLElement | undefined;
+      if (fila) {
+        clearInterval(timer);
+        resolve(fila);
+        return;
+      }
+
+      esperado += BUSQUEDA_INTERVALO_MS;
+      if (esperado >= BUSQUEDA_TIMEOUT_MS) {
+        clearInterval(timer);
+        resolve(null);
+      }
+    }, BUSQUEDA_INTERVALO_MS);
+  });
 }

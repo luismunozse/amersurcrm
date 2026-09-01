@@ -23,6 +23,7 @@ import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
 import WhatsappAliasBadge from "@/components/WhatsappAliasBadge";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
+import { construirUrlChatPorAlias, WHATSAPP_WEB_TARGET } from "@/lib/whatsapp/aliasChat";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
 import { Download, MoreVertical, Eye, Trash2, FileText, ChevronDown, Search, X, CheckCircle2, User, Users, Mail, Phone, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -1519,6 +1520,19 @@ const ClienteRow = memo(function ClienteRow({
               rel="noopener noreferrer"
               className="text-green-600 hover:text-green-700 transition-colors"
               title="Enviar WhatsApp"
+            >
+              <WhatsAppIcon className="w-4 h-4" />
+            </a>
+          )}
+          {/* Sin teléfono, el chat se abre por alias a través de la extensión:
+              wa.me no resuelve usernames (ver lib/whatsapp/aliasChat). */}
+          {!waDigits && cliente.whatsapp_username && (
+            <a
+              href={construirUrlChatPorAlias(cliente.whatsapp_username)}
+              target={WHATSAPP_WEB_TARGET}
+              rel="noopener noreferrer"
+              className="text-green-600 hover:text-green-700 transition-colors"
+              title={`Abrir el chat de @${cliente.whatsapp_username.replace(/^@/, '')} en WhatsApp Web`}
             >
               <WhatsAppIcon className="w-4 h-4" />
             </a>
