@@ -29,7 +29,7 @@ export default function WhatsappAliasBadge({
     e.preventDefault();
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(limpio);
+      await navigator.clipboard.writeText(`@${limpio}`);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1500);
     } catch {

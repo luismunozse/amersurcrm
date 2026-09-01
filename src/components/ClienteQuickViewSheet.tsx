@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import WhatsappAliasBadge from "@/components/WhatsappAliasBadge";
+import { construirUrlChatPorAlias, WHATSAPP_WEB_TARGET } from "@/lib/whatsapp/aliasChat";
 import {
   Sheet,
   SheetContent,
@@ -155,7 +156,7 @@ function QuickViewBody({
       </SheetHeader>
 
       {/* Quick actions — toolbar compacto */}
-      {(data.telefono || waDigits || data.email) && (
+      {(data.telefono || waDigits || data.whatsapp_username || data.email) && (
         <div className="flex items-stretch border-b border-crm-border bg-crm-card-hover/30">
           <QuickAction
             icon={<Phone className="h-4 w-4" />}
@@ -165,7 +166,14 @@ function QuickViewBody({
           <QuickAction
             icon={<WhatsAppIcon className="h-4 w-4" />}
             label="WhatsApp"
-            href={waDigits ? `https://wa.me/${waDigits}` : undefined}
+            href={
+              waDigits
+                ? `https://wa.me/${waDigits}`
+                : data.whatsapp_username
+                  ? construirUrlChatPorAlias(data.whatsapp_username)
+                  : undefined
+            }
+            target={data.whatsapp_username && !waDigits ? WHATSAPP_WEB_TARGET : undefined}
             external
           />
           <QuickAction
@@ -272,11 +280,13 @@ function QuickAction({
   label,
   href,
   external,
+  target,
 }: {
   icon: React.ReactNode;
   label: string;
   href?: string;
   external?: boolean;
+  target?: string;
 }) {
   const disabled = !href;
   const classes =
@@ -297,7 +307,7 @@ function QuickAction({
   }
 
   return external ? (
-    <a href={href} target="_blank" rel="noreferrer" className={classes}>
+    <a href={href} target={target ?? "_blank"} rel="noreferrer" className={classes}>
       {content}
     </a>
   ) : (

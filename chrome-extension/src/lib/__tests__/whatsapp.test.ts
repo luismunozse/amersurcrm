@@ -288,7 +288,7 @@ describe('abrirChatPorAlias', () => {
     const abierto = await abrirChatPorAlias('juanp');
 
     const buscador = document.querySelector('#side [contenteditable="true"]')!;
-    expect(buscador.textContent).toContain('juanp');
+    expect(buscador.textContent).toContain('@juanp');
     expect(clicks).toHaveBeenCalled();
     expect(abierto).toBe(true);
   });
@@ -300,7 +300,7 @@ describe('abrirChatPorAlias', () => {
     await abrirChatPorAlias('@juanp');
 
     const buscador = document.querySelector('#side [contenteditable="true"]')!;
-    expect(buscador.textContent).toBe('juanp');
+    expect(buscador.textContent).toBe('@juanp');
   });
 
   it('devuelve false y DEJA el alias escrito si no aparece ningún resultado', async () => {
@@ -312,7 +312,7 @@ describe('abrirChatPorAlias', () => {
     // El fallback es que el vendedor termine la búsqueda a mano: borrar lo
     // escrito lo dejaría sin nada.
     const buscador = document.querySelector('#side [contenteditable="true"]')!;
-    expect(buscador.textContent).toContain('juanp');
+    expect(buscador.textContent).toContain('@juanp');
     expect(abierto).toBe(false);
   });
 

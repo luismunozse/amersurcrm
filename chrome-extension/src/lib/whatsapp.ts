@@ -750,6 +750,7 @@ export function observeChatChanges(callback: (contact: WhatsAppContact | null) =
 /** Cuánto se espera a que la búsqueda de WhatsApp pinte resultados. */
 const BUSQUEDA_TIMEOUT_MS = 3000;
 const BUSQUEDA_INTERVALO_MS = 100;
+const BUSCADOR_TIMEOUT_MS = 3000;
 
 /**
  * Escribe texto en un contenteditable de WhatsApp.
@@ -789,13 +790,16 @@ export async function abrirChatPorAlias(alias: string): Promise<boolean> {
   const limpio = (alias || '').replace(/^@/, '').trim();
   if (!limpio) return false;
 
-  const buscador = queryFirst(SELECTORS.searchInput) as HTMLElement | null;
+  // #app aparece antes que el panel lateral en algunas cargas de WhatsApp.
+  // Esperar evita que el enlace del CRM falle sólo por una carrera de render.
+  const buscador = await esperarElemento(SELECTORS.searchInput, BUSCADOR_TIMEOUT_MS);
   if (!buscador) {
     logger.warn('No se encontró la caja de búsqueda de WhatsApp con ningún selector');
     return false;
   }
 
-  if (!escribirEn(buscador, limpio)) {
+  // WhatsApp identifica los usernames con el prefijo @ en su buscador.
+  if (!escribirEn(buscador, `@${limpio}`)) {
     logger.warn('No se pudo escribir el alias en la caja de búsqueda');
     return false;
   }
@@ -808,6 +812,33 @@ export async function abrirChatPorAlias(alias: string): Promise<boolean> {
 
   primerResultado.click();
   return true;
+}
+
+/** Espera a que WhatsApp monte un elemento que todavía no existe en el DOM. */
+function esperarElemento(
+  selectors: readonly string[],
+  timeoutMs: number,
+): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    let esperado = 0;
+    const revisar = () => {
+      const elemento = queryFirst(selectors) as HTMLElement | null;
+      if (elemento) {
+        resolve(elemento);
+        return;
+      }
+
+      esperado += BUSQUEDA_INTERVALO_MS;
+      if (esperado >= timeoutMs) {
+        resolve(null);
+        return;
+      }
+
+      setTimeout(revisar, BUSQUEDA_INTERVALO_MS);
+    };
+
+    revisar();
+  });
 }
 
 /** Espera a que la lista de resultados pinte al menos una fila. */
