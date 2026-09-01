@@ -56,6 +56,16 @@ function setupAnonimo() {
   chains.usuario_perfil = createChainMock({ data: null, error: null });
 }
 
+function setupVendedor(username = "vend1") {
+  chains.usuario_perfil = createChainMock({
+    data: { username, rol: { nombre: "ROL_VENDEDOR" } },
+    error: null,
+  });
+}
+
+const PROPIO_FILTRO =
+  "created_by.eq.user-1,vendedor_username.eq.vend1,vendedor_asignado.eq.vend1";
+
 const TEAM_FILTRO =
   'created_by.in.(vend-1,user-1),vendedor_username.in.("vend1","coord1"),vendedor_asignado.in.("vend1","coord1")';
 
@@ -109,6 +119,54 @@ describe("getCachedClientes — equipo scope", () => {
 
     expect(resultado).toEqual({ data: [], total: 0 });
     expect(fromSpy).not.toHaveBeenCalledWith("cliente");
+  });
+
+  it("queries cliente (never the cliente_accesible view) for an individual vendedor", async () => {
+    setupVendedor();
+    chains.cliente = createChainMock({ data: [], count: 0, error: null });
+
+    await getCachedClientes({});
+
+    // La vista es un UNION ALL: duplicaba filas e inflaba el count, y su
+    // `SELECT c.*` congelado se quedaba sin las columnas nuevas de cliente.
+    expect(fromSpy).not.toHaveBeenCalledWith("cliente_accesible");
+    expect(fromSpy).toHaveBeenCalledWith("cliente");
+  });
+
+  it("scopes an individual vendedor with the three-arm propio filter", async () => {
+    setupVendedor();
+    chains.cliente = createChainMock({ data: [], count: 0, error: null });
+
+    await getCachedClientes({});
+
+    const propioCalls = chains.cliente.or.mock.calls.filter(([f]: [string]) => f === PROPIO_FILTRO);
+    expect(propioCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("reports the row count as the total, without deduplicating", async () => {
+    setupVendedor();
+    const filas = [{ id: "c-1" }, { id: "c-2" }];
+    chains.cliente = createChainMock({ data: filas, count: 2, error: null });
+
+    const resultado = await getCachedClientes({});
+
+    expect(resultado.data).toHaveLength(2);
+    expect(resultado.total).toBe(2);
+  });
+
+  it("searches every field for an individual vendedor, same as a coordinador", async () => {
+    setupVendedor();
+    chains.cliente = createChainMock({ data: [], count: 0, error: null });
+
+    await getCachedClientes({ searchTerm: "ana@mail.com" });
+
+    const searchCall = chains.cliente.or.mock.calls
+      .map(([f]: [string]) => f)
+      .find((f: string) => f.includes("email.ilike."));
+    expect(searchCall).toContain("nombre.ilike.%ana@mail.com%");
+    expect(searchCall).toContain("email.ilike.%ana@mail.com%");
+    expect(searchCall).toContain("codigo_cliente.ilike.%ana@mail.com%");
+    expect(searchCall).toContain("whatsapp_username.ilike.%ana@mail.com%");
   });
 });
 

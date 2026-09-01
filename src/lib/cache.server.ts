@@ -110,13 +110,17 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     return { data: [], total: 0 };
   }
 
-  const username = scope.tier === 'global' ? null : scope.username;
-
-  // La vista optimizada `cliente_accesible` solo etiqueta filas por un ÚNICO
-  // usuario (ver crm.cliente_accesible) — no sirve para el alcance de equipo
-  // de un coordinador, así que solo se usa para vendedores individuales.
-  const usarVistaAccesible = scope.tier === 'propio' && !vendedor && !!username;
-  const tablaClientes = usarVistaAccesible ? 'cliente_accesible' : 'cliente';
+  // Se consulta SIEMPRE crm.cliente, para todos los tiers. La vista
+  // `cliente_accesible` se usaba solo para el vendedor individual y traía tres
+  // problemas propios: (1) es un UNION ALL, así que un cliente creado por su
+  // mismo asesor aparecía dos veces e inflaba el total de la paginación;
+  // (2) su `SELECT c.*` quedó congelado al crearla, así que cada columna nueva
+  // de crm.cliente obligaba a recrearla o la query moría con 42703; (3) solo
+  // vinculaba por `vendedor_username`, no por `vendedor_asignado`, así que un
+  // cliente asignado por ese campo no le aparecía al vendedor pero sí a su
+  // coordinador. El filtro de permisos de equipoOrFilter cubre el tier
+  // `propio` con los tres brazos, y sobre la tabla también aplica RLS.
+  const tablaClientes = 'cliente';
 
   // Pre-filtro: obtener IDs de clientes por proyecto de interés (si aplica)
   let clienteIdsProyecto: string[] | null = null;
@@ -185,34 +189,6 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     // Filtro por proyecto de interés (pre-computado)
     if (clienteIdsProyecto) {
       query = query.in('id', clienteIdsProyecto);
-    }
-
-    // Filtros de permisos usando vista accesible (solo para vendedores, no admins)
-    if (usarVistaAccesible) {
-      query = query.eq('usuario_id', userId);
-      // Si usamos vista accesible, aplicar filtros adicionales directamente
-      if (searchDni) {
-        query = query.ilike('documento_identidad', `%${searchDni}%`);
-      }
-      if (estado) {
-        query = query.eq('estado_cliente', estado);
-      }
-      if (tipo) {
-        query = query.eq('tipo_cliente', tipo);
-      }
-      if (origen) {
-        query = query.eq('origen_lead', origen);
-      }
-      if (searchConditions.length > 0) {
-        query = query.or(searchConditions.join(','));
-      }
-      if (fechaDesde) {
-        query = query.gte('fecha_alta', `${fechaDesde}T00:00:00`);
-      }
-      if (fechaHasta) {
-        query = query.lte('fecha_alta', `${fechaHasta}T23:59:59`);
-      }
-      return query;
     }
 
     // 1. PRIMERO aplicar filtros de permisos/equipo (AND) - restringen el acceso
@@ -289,17 +265,16 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     throw dataResult.error;
   }
 
-  // Deduplicar resultados por ID (puede haber duplicados si hay múltiples condiciones OR)
-  const dataArray = dataResult.data as any[];
-  const uniqueData = dataArray ? Array.from(
-    new Map(dataArray.map(item => [item.id, item])).values()
-  ) : [];
-
-  const total = countResult.count ?? uniqueData.length;
+  // Sin deduplicar: un `.or()` es una sola cláusula WHERE, no una unión, así
+  // que no puede repetir filas. Los duplicados que motivaron ese descarte
+  // venían del UNION ALL de cliente_accesible, que ya no se consulta — y el
+  // `count: 'exact'` de la query paralela nunca se deduplicaba, con lo cual el
+  // total quedaba inflado respecto de las filas mostradas.
+  const data = (dataResult.data ?? []) as unknown as ClienteCached[];
 
   return {
-    data: uniqueData as ClienteCached[],
-    total,
+    data,
+    total: countResult.count ?? data.length,
   };
 });
 
