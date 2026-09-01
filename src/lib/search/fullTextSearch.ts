@@ -29,6 +29,7 @@
  */
 
 import { createServerActionClient } from '@/lib/supabase.server-actions';
+import { sanitizarTerminoBusqueda } from '@/lib/utils/postgrest';
 
 type SupabaseSearchClient = Awaited<ReturnType<typeof createServerActionClient>>;
 
@@ -292,6 +293,9 @@ async function searchWithILike(
 ): Promise<any[]> {
   const { proyectoId, limit = 50 } = options;
   const supabase = await createServerActionClient();
+  // El término se interpola dentro de un .or(), donde la coma y los paréntesis
+  // son sintaxis del filtro y no texto a buscar.
+  const termino = sanitizarTerminoBusqueda(query);
 
   if (proyectoId) {
     // Buscar lotes con ILIKE (schema crm)
@@ -300,7 +304,7 @@ async function searchWithILike(
       .from('lote')
       .select('id, codigo, numero_lote, estado, precio, sup_m2')
       .eq('proyecto_id', proyectoId)
-      .or(`codigo.ilike.%${query}%,numero_lote.ilike.%${query}%`)
+      .or(`codigo.ilike.%${termino}%,numero_lote.ilike.%${termino}%`)
       .limit(limit);
 
     return (data || []).map((item) => ({ ...item, rank: 0.5 }));
@@ -310,7 +314,7 @@ async function searchWithILike(
       .schema('crm')
       .from('proyecto')
       .select('id, nombre, ubicacion, estado, tipo')
-      .or(`nombre.ilike.%${query}%,ubicacion.ilike.%${query}%`)
+      .or(`nombre.ilike.%${termino}%,ubicacion.ilike.%${termino}%`)
       .limit(limit);
 
     return (data || []).map((item) => ({ ...item, rank: 0.5 }));
@@ -361,7 +365,7 @@ export async function getSearchSuggestions(
 
   try {
     const supabase = await createServerActionClient();
-    const trimmedQuery = query.trim();
+    const trimmedQuery = sanitizarTerminoBusqueda(query);
 
     if (type === 'proyecto') {
       const { data } = await supabase

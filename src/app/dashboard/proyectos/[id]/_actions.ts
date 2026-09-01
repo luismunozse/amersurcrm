@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createServerActionClient } from "@/lib/supabase.server-actions";
+import { sanitizarTerminoBusqueda } from "@/lib/utils/postgrest";
 import { PERMISOS } from "@/lib/permissions";
 import { requierePermiso, esAdmin, esAdminOCoordinador, obtenerPermisosUsuario, tieneRol } from "@/lib/permissions/server";
 import type { LoteCoordenadas } from "@/types/proyectos";
@@ -880,8 +881,8 @@ export async function obtenerClientesParaSelect(busqueda?: string): Promise<{
       .limit(500); // Aumentado a 500 clientes
 
     // Si hay búsqueda, filtrar por nombre, email o teléfono
-    if (busqueda && busqueda.trim()) {
-      const termino = busqueda.trim();
+    const termino = sanitizarTerminoBusqueda(busqueda);
+    if (termino) {
       query = query.or(`nombre.ilike.%${termino}%,email.ilike.%${termino}%,telefono.ilike.%${termino}%`);
     }
 

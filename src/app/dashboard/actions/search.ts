@@ -2,6 +2,7 @@
 
 import { createServerOnlyClient } from "@/lib/supabase.server";
 import { SearchResult, SearchResponse, PropiedadSearchResult, ProyectoSearchResult, EventoSearchResult } from "@/types/search";
+import { sanitizarTerminoBusqueda } from "@/lib/utils/postgrest";
 
 type RelationValue<T> = T | T[] | null | undefined;
 
@@ -51,6 +52,9 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
 
   const supabase = await createServerOnlyClient();
   const results: SearchResult[] = [];
+  // Cada búsqueda de acá abajo interpola el término dentro de un .or(), donde
+  // la coma separa condiciones: va saneado, no crudo.
+  const termino = sanitizarTerminoBusqueda(query);
 
   try {
     // Búsqueda en propiedades
@@ -68,7 +72,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
         moneda,
         proyecto:proyecto_id(nombre)
       `)
-      .or(`codigo.ilike.%${query}%, identificacion_interna.ilike.%${query}%`)
+      .or(`codigo.ilike.%${termino}%,identificacion_interna.ilike.%${termino}%`)
       .limit(limit);
 
     if (propError) {
@@ -116,7 +120,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
         ubicacion,
         descripcion
       `)
-      .or(`nombre.ilike.%${query}%, ubicacion.ilike.%${query}%`)
+      .or(`nombre.ilike.%${termino}%,ubicacion.ilike.%${termino}%`)
       .limit(limit);
 
     if (projError) {
@@ -159,7 +163,7 @@ export async function globalSearch(query: string, limit: number = 10): Promise<S
         cliente:cliente_id(nombre),
         propiedad:propiedad_id(codigo, identificacion_interna)
       `)
-      .or(`titulo.ilike.%${query}%, descripcion.ilike.%${query}%`)
+      .or(`titulo.ilike.%${termino}%,descripcion.ilike.%${termino}%`)
       .limit(limit);
 
     if (eventError) {

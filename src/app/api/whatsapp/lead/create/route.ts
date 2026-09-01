@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Falta campo requerido: telefono" }, { status: 400 });
     }
 
+    const telefonoDigitos = String(body.telefono).replace(/\D/g, '');
+
     const supabase = createServiceRoleClient();
 
     // Verificar si ya existe un cliente con este teléfono
@@ -51,7 +53,9 @@ export async function POST(request: NextRequest) {
       .schema("crm")
       .from("cliente")
       .select("id, nombre, estado_cliente, vendedor_asignado")
-      .or(`telefono.eq.${body.telefono},telefono_whatsapp.eq.${body.telefono}`)
+      // Solo dígitos: el teléfono llega del bot sin validar de formato y acá se
+      // interpola dentro de un .or(), donde la coma separa condiciones.
+      .or(`telefono.eq.${telefonoDigitos},telefono_whatsapp.eq.${telefonoDigitos}`)
       .limit(1)
       .maybeSingle();
 

@@ -9,6 +9,7 @@ import type {
 } from "@/types/crm";
 import { EXCLUIR_IMPORTACION_NUNCA_CONTACTADO } from "@/lib/dashboard/aging";
 import { getEquipoScope, equipoOrFilter } from "@/lib/auth/equipo-scope.server";
+import { sanitizarTerminoBusqueda } from "@/lib/utils/postgrest";
 
 // DEPRECATED: Usar getCachedUserId() directamente en su lugar
 // Mantener por compatibilidad temporal
@@ -211,8 +212,8 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
     // Construir condiciones de búsqueda
     const searchConditions: string[] = [];
 
-    if (searchTerm && searchTerm.trim() !== '') {
-      const term = searchTerm.trim();
+    const term = sanitizarTerminoBusqueda(searchTerm);
+    if (term) {
       searchConditions.push(`nombre.ilike.%${term}%`);
       searchConditions.push(`email.ilike.%${term}%`);
       searchConditions.push(`codigo_cliente.ilike.%${term}%`);
@@ -616,9 +617,8 @@ export const getCachedProyectosPaginados = cache(async (
   const buildBaseQuery = (selectExpr: string, options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
     let query = supabase.schema('crm').from('proyecto').select(selectExpr, options);
 
-    if (q) {
-      // Escape % y , para evitar romper sintaxis de .or()
-      const safe = q.replace(/[%,]/g, ' ');
+    const safe = sanitizarTerminoBusqueda(q);
+    if (safe) {
       query = query.or(`nombre.ilike.%${safe}%,ubicacion.ilike.%${safe}%`);
     }
 

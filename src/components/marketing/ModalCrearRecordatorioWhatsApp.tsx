@@ -11,6 +11,7 @@ import { extractVariables, renderTemplate } from "@/lib/marketing/whatsapp";
 import type { MarketingTemplate } from "@/types/whatsapp-marketing";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 import { createClient } from "@/lib/supabase.client";
+import { sanitizarTerminoBusqueda } from "@/lib/utils/postgrest";
 
 interface Props {
   open: boolean;
@@ -81,7 +82,9 @@ export default function ModalCrearRecordatorioWhatsApp({
   // Búsqueda de clientes con debounce
   useEffect(() => {
     if (!open || clienteSeleccionado) return;
-    const q = busquedaCliente.trim();
+    // Saneado porque se interpola dentro de un .or(), donde la coma y los
+    // paréntesis son sintaxis del filtro.
+    const q = sanitizarTerminoBusqueda(busquedaCliente);
     if (q.length < 2) {
       setResultadosClientes([]);
       return;

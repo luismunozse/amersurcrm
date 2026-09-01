@@ -3,6 +3,7 @@ import PropiedadesList from "./_PropiedadesList";
 import NewPropiedadForm from "./_NewPropiedadForm";
 import FiltrosPropiedades from "./_FiltrosPropiedades";
 import EstadisticasPropiedades from "./_EstadisticasPropiedades";
+import { sanitizarTerminoBusqueda } from "@/lib/utils/postgrest";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -47,8 +48,9 @@ export default async function PropiedadesPage({
     `, { count: 'exact' });
 
   // Aplicar filtros a propiedades
-  if (busqueda) {
-    propiedadesQuery = propiedadesQuery.or(`codigo.ilike.%${busqueda}%,identificacion_interna.ilike.%${busqueda}%`);
+  const busquedaSegura = sanitizarTerminoBusqueda(busqueda);
+  if (busquedaSegura) {
+    propiedadesQuery = propiedadesQuery.or(`codigo.ilike.%${busquedaSegura}%,identificacion_interna.ilike.%${busquedaSegura}%`);
   }
   if (tipoFiltro) {
     propiedadesQuery = propiedadesQuery.eq('tipo', tipoFiltro);
