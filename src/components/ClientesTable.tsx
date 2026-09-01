@@ -21,6 +21,7 @@ import { Pagination } from "@/components/Pagination";
 import ClienteForm from "@/components/ClienteForm";
 import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 import RegistrarContactoModal from "@/components/RegistrarContactoModal";
+import WhatsappAliasBadge from "@/components/WhatsappAliasBadge";
 import { exportFilteredClientes, addCountToFilters, type ClienteExportFilters } from "@/lib/export/filteredExport";
 import { Download, MoreVertical, Eye, Trash2, FileText, ChevronDown, Search, X, CheckCircle2, User, Users, Mail, Phone, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -41,6 +42,7 @@ type Cliente = {
   email: string | null;
   telefono: string | null;
   telefono_whatsapp: string | null;
+  whatsapp_username?: string | null;
   documento_identidad: string | null;
   estado_cliente: string;
   origen_lead: string | null;
@@ -1076,7 +1078,12 @@ export default function ClientesTable({
                 <div className="mt-3 space-y-2 text-xs text-crm-text-secondary">
                   <p>
                     <strong className="text-crm-text-primary">Contacto:</strong>{' '}
-                    {cliente.telefono || cliente.email || 'Sin datos'}
+                    {cliente.telefono || cliente.email || (!cliente.whatsapp_username && 'Sin datos')}
+                    {cliente.whatsapp_username && (
+                      <span onClick={(e) => e.stopPropagation()} className="ml-1 inline-flex align-middle">
+                        <WhatsappAliasBadge alias={cliente.whatsapp_username} />
+                      </span>
+                    )}
                   </p>
                   <p>
                     <strong className="text-crm-text-primary">Último contacto:</strong>{' '}
@@ -1445,7 +1452,12 @@ const ClienteRow = memo(function ClienteRow({
               {cliente.telefono}
             </div>
           )}
-          {!cliente.email && !cliente.telefono && (
+          {cliente.whatsapp_username && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <WhatsappAliasBadge alias={cliente.whatsapp_username} />
+            </div>
+          )}
+          {!cliente.email && !cliente.telefono && !cliente.whatsapp_username && (
             <div className="text-sm text-crm-text-muted">Sin contacto</div>
           )}
         </div>

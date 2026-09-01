@@ -44,6 +44,7 @@ const CLIENTE_LIST_COLUMNS = `
       email,
       telefono,
       telefono_whatsapp,
+      whatsapp_username,
       estado_cliente,
       origen_lead,
       vendedor_asignado,
@@ -215,6 +216,7 @@ export const getCachedClientes = cache(async (params?: GetClientesParams): Promi
       searchConditions.push(`nombre.ilike.%${term}%`);
       searchConditions.push(`email.ilike.%${term}%`);
       searchConditions.push(`codigo_cliente.ilike.%${term}%`);
+      searchConditions.push(`whatsapp_username.ilike.%${term.replace(/^@/, "")}%`);
 
       // Si parece un número de teléfono, buscar también en campos de teléfono
       const digitsOnly = term.replace(/[^\d]/g, '');
@@ -383,6 +385,7 @@ export type PipelineCliente = {
   propiedades_reservadas: number;
   telefono: string | null;
   telefono_whatsapp: string | null;
+  whatsapp_username: string | null;
 };
 
 interface GetPipelineParams {
@@ -460,6 +463,7 @@ export const getCachedPipelineClientes = cache(
             propiedades_reservadas,
             telefono,
             telefono_whatsapp,
+            whatsapp_username,
             fecha_alta
           `)
           .eq('estado_cliente', estado)

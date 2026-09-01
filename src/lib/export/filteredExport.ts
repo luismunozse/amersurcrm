@@ -306,6 +306,15 @@ function getDefaultClienteColumns(): ExportColumn[] {
     { key: 'email', label: 'Email', width: 28, format: (value) => value || '-' },
     { key: 'telefono', label: 'Teléfono', width: 18, format: (value) => value || '-' },
     { key: 'telefono_whatsapp', label: 'WhatsApp', width: 18, format: (value) => value || '-' },
+    {
+      // Alias (username) de WhatsApp capturado por la extensión. Se exporta sin
+      // "@" (a diferencia de la UI): una celda que empieza con "@" la puede
+      // interpretar Excel como referencia a una función al abrir el CSV.
+      key: 'whatsapp_username',
+      label: 'Alias WhatsApp',
+      width: 20,
+      format: (value) => (value ? String(value).replace(/^@/, '') : '-'),
+    },
     { key: 'documento_identidad', label: 'Documento', width: 18, format: (value) => value || '-' },
     { key: 'vendedor_asignado', label: 'Vendedor', width: 20, format: (value) => value || '-' },
     { key: 'origen_lead', label: 'Origen', width: 18, format: (value) => value || '-' },

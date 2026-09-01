@@ -8,6 +8,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
+import WhatsappAliasBadge from "@/components/WhatsappAliasBadge";
 import {
   Sheet,
   SheetContent,
@@ -182,6 +183,12 @@ function QuickViewBody({
             {data.telefono && <InfoRow label="Teléfono" value={data.telefono} mono />}
             {data.telefono_whatsapp && (
               <InfoRow label="WhatsApp" value={data.telefono_whatsapp} mono />
+            )}
+            {data.whatsapp_username && (
+              <InfoRow
+                label="Alias WhatsApp"
+                value={<WhatsappAliasBadge alias={data.whatsapp_username} />}
+              />
             )}
             {data.email && (
               <InfoRow

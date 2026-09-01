@@ -7,6 +7,7 @@ import { formatCapacidadCompra } from "@/lib/types/clientes";
 import type { PipelineCliente } from "@/lib/cache.server";
 import { useClienteQuickView } from "@/components/ClienteQuickViewSheet";
 import BotonEnviarWhatsApp from "@/components/marketing/BotonEnviarWhatsApp";
+import WhatsappAliasBadge from "@/components/WhatsappAliasBadge";
 
 const PROXIMA_ACCION_LABEL: Record<string, string> = {
   llamar: "Llamar",
@@ -99,6 +100,12 @@ export default function PipelineCard({ cliente, urgencia, asLink = true }: Props
         <User className="w-3 h-3" />
         <span className="truncate">{cliente.vendedor_username ?? "Sin asignar"}</span>
       </div>
+
+      {cliente.whatsapp_username && (
+        <div className="mt-1.5" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+          <WhatsappAliasBadge alias={cliente.whatsapp_username} />
+        </div>
+      )}
 
       {accionLabel && accionLabel !== "Sin acción" ? (
         <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-crm-primary/10 text-crm-primary">

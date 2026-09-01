@@ -81,6 +81,8 @@ export interface ClienteCompleto {
   email?: string;
   telefono?: string;
   telefono_whatsapp?: string;
+  whatsapp_username?: string | null;
+  whatsapp_chat_id?: string | null;
   direccion: DireccionCliente;
   estado_civil?: EstadoCivil;
   

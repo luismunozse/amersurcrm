@@ -731,6 +731,7 @@ export type ClienteQuickView = {
   tipo_cliente: string | null;
   telefono: string | null;
   telefono_whatsapp: string | null;
+  whatsapp_username: string | null;
   email: string | null;
   direccion: Record<string, unknown> | null;
   origen_lead: string | null;
@@ -752,7 +753,7 @@ export async function obtenerClienteParaQuickView(id: string): Promise<ClienteQu
   const [clienteRes, interaccionRes] = await Promise.all([
     supabase
       .from('cliente')
-      .select('id, codigo_cliente, nombre, estado_cliente, tipo_cliente, telefono, telefono_whatsapp, email, direccion, origen_lead, interes_principal, capacidad_compra_estimada, vendedor_username, ultimo_contacto, notas')
+      .select('id, codigo_cliente, nombre, estado_cliente, tipo_cliente, telefono, telefono_whatsapp, whatsapp_username, email, direccion, origen_lead, interes_principal, capacidad_compra_estimada, vendedor_username, ultimo_contacto, notas')
       .eq('id', id)
       .maybeSingle(),
     supabase
@@ -787,6 +788,7 @@ export async function obtenerClienteParaQuickView(id: string): Promise<ClienteQu
     tipo_cliente: cliente.tipo_cliente,
     telefono: cliente.telefono,
     telefono_whatsapp: cliente.telefono_whatsapp,
+    whatsapp_username: cliente.whatsapp_username,
     email: cliente.email,
     direccion: cliente.direccion as Record<string, unknown> | null,
     origen_lead: cliente.origen_lead,

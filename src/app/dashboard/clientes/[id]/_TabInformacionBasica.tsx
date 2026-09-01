@@ -15,6 +15,7 @@ import EditarClienteModal from "@/components/EditarClienteModal";
 import DesestimarDialog from "@/app/dashboard/pipeline/_DesestimarDialog";
 import BotonEnviarWhatsApp from "@/components/marketing/BotonEnviarWhatsApp";
 import WhatsAppOptOutToggle from "@/components/marketing/WhatsAppOptOutToggle";
+import WhatsappAliasBadge from "@/components/WhatsappAliasBadge";
 
 import type { ClienteCompleto } from "@/lib/types/clientes";
 
@@ -295,7 +296,7 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
             </div>
           )}
 
-          {(cliente.telefono_whatsapp || cliente.telefono) && (
+          {(cliente.telefono_whatsapp || cliente.telefono || cliente.whatsapp_username) && (
             <div className="p-4 bg-crm-background rounded-lg space-y-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-crm-text-muted">WhatsApp</p>
               {cliente.telefono_whatsapp && (
@@ -309,6 +310,20 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
                 </a>
               )}
 
+              {cliente.whatsapp_username && (
+                <div className="space-y-1">
+                  <p className="text-[11px] text-crm-text-muted">Alias</p>
+                  <WhatsappAliasBadge alias={cliente.whatsapp_username} />
+                  {!cliente.telefono_whatsapp && !cliente.telefono && (
+                    // Chat iniciado por alias: WhatsApp no expone el teléfono
+                    // real del contacto, así que no hay link wa.me posible.
+                    <p className="text-[11px] text-crm-text-muted">
+                      El contacto escribió por alias: WhatsApp no comparte su número. Búsquelo por el alias en WhatsApp Web.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <WhatsAppOptOutToggle
                 clienteId={cliente.id}
                 optOut={cliente.whatsapp_opt_out ?? false}
@@ -317,7 +332,9 @@ export default function TabInformacionBasica({ cliente, vendedores }: Props) {
                 puedeEditar={puedeEditar}
               />
 
-              {!cliente.whatsapp_opt_out && (
+              {/* Sin teléfono (lead que llegó solo por alias) no hay destino
+                  al que enviar la plantilla. */}
+              {!cliente.whatsapp_opt_out && (cliente.telefono_whatsapp || cliente.telefono) && (
                 <BotonEnviarWhatsApp
                   telefono={cliente.telefono_whatsapp ?? cliente.telefono ?? ""}
                   clienteId={cliente.id}
