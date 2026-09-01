@@ -93,6 +93,30 @@ describe("excel adapter — objectsToCsv", () => {
   it("devuelve string vacío sin datos", () => {
     expect(objectsToCsv([])).toBe("");
   });
+
+  it("neutraliza valores que Excel interpretaría como fórmula", () => {
+    const csv = objectsToCsv([
+      { nombre: "=1+1", notas: "@SUM(A1)", extra: "+49111", raro: "-cmd|'/C calc'!A0" },
+    ]);
+    expect(csv).toBe(
+      "nombre,notas,extra,raro\n'=1+1,'@SUM(A1),'+49111,'-cmd|'/C calc'!A0"
+    );
+  });
+
+  it("no toca montos negativos, para que sigan sumando en la planilla", () => {
+    const csv = objectsToCsv([{ saldo: "-1500", cuota: "-0,75" }]);
+    expect(csv).toBe('saldo,cuota\n-1500,"-0,75"');
+  });
+
+  it("preserva el + de un teléfono internacional como texto", () => {
+    const csv = objectsToCsv([{ telefono: "+51987654321" }]);
+    expect(csv).toBe("telefono\n'+51987654321");
+  });
+
+  it("neutraliza antes de escapar, no después", () => {
+    const csv = objectsToCsv([{ texto: '=HYPERLINK("a,b")' }]);
+    expect(csv).toBe('texto\n"\'=HYPERLINK(""a,b"")"');
+  });
 });
 
 describe("excel adapter — multi-hoja", () => {

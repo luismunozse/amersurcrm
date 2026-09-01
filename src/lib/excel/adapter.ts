@@ -225,6 +225,25 @@ export function downloadCsv(content: string, fileName: string): void {
   triggerDownload(new Blob([content], { type: "text/csv;charset=utf-8;" }), fileName);
 }
 
+// Caracteres con los que Excel, LibreOffice y Sheets arrancan una fórmula al
+// abrir un CSV: una celda `=cmd|'/C calc'!A0` se EJECUTA, no se muestra. El
+// contenido exportado es texto libre de terceros (nombre y notas de un lead
+// entran desde WhatsApp), así que se neutraliza en el borde.
+const PREFIJO_FORMULA = /^[=+\-@\t\r]/;
+// Un monto negativo es un dato legítimo, no un ataque: anteponerle la comilla
+// lo convierte en texto y deja de sumar en la planilla. El "+" NO entra en la
+// excepción: Excel se lo come igual al interpretarlo, y acá arrastra teléfonos
+// ("+51987...") que deben sobrevivir tal cual.
+const VALOR_NUMERICO = /^-\d+(?:[.,]\d+)?$/;
+
+/**
+ * Antepone una comilla simple a los valores que el lector de CSV tomaría por
+ * fórmula. Excel la consume al mostrar la celda: el usuario ve el texto original.
+ */
+function neutralizarFormula(str: string): string {
+  return PREFIJO_FORMULA.test(str) && !VALOR_NUMERICO.test(str) ? `'${str}` : str;
+}
+
 /**
  * Convierte un arreglo de objetos a CSV (reemplaza
  * `XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(data))`). Implementación
@@ -234,7 +253,9 @@ export function objectsToCsv(objects: Record<string, unknown>[]): string {
   if (objects.length === 0) return "";
   const headers = Object.keys(objects[0]);
   const escape = (value: unknown): string => {
-    const str = value === null || value === undefined ? "" : String(value);
+    const str = neutralizarFormula(
+      value === null || value === undefined ? "" : String(value)
+    );
     return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
   };
   const lines = [headers.map(escape).join(",")];
