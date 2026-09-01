@@ -37,10 +37,10 @@ export default function ExtensionPage() {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-crm-primary text-white rounded-lg hover:bg-crm-primary-dark transition font-medium"
               >
                 <Download className="w-5 h-5" />
-                Descargar AmersurChat v1.3.2
+                Descargar AmersurChat v1.3.3
               </a>
               <p className="text-xs text-crm-text-muted dark:text-gray-500 mt-2">
-                Última actualización: 25 Agosto 2026
+                Última actualización: 1 Septiembre 2026
               </p>
             </div>
           </li>
@@ -125,13 +125,23 @@ export default function ExtensionPage() {
         </ol>
       </div>
 
-      {/* Novedades v1.3.2 */}
+      {/* Novedades v1.3.3 */}
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-6 mb-8">
         <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 dark:text-gray-100">
-          🎉 Novedades v1.3.2
+          🎉 Novedades v1.3.3
         </h3>
         <p className="text-sm text-crm-text-muted dark:text-gray-400 mb-3">
-          Versión de correcciones. Se recomienda actualizar.
+          Actualice para poder abrir desde el CRM los chats de clientes que solo tienen alias.
+        </p>
+        <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400 mb-4">
+          <li className="flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400">✓</span>
+            <span><strong>Abrir el chat de un cliente sin teléfono:</strong> cuando un cliente escribe con su alias de WhatsApp, WhatsApp no comparte su número, así que desde el CRM no había forma de escribirle. Ahora el botón de WhatsApp del CRM abre WhatsApp Web y la extensión busca el alias y abre la conversación. Si el buscador de WhatsApp cambia, el alias queda escrito y solo resta un click.</span>
+          </li>
+        </ul>
+
+        <p className="text-sm font-medium text-crm-text-muted dark:text-gray-300 mb-2 pt-3 border-t border-green-200 dark:border-green-700">
+          También incluye lo corregido en la v1.3.2:
         </p>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400 mb-4">
           <li className="flex items-start gap-2">
@@ -141,7 +151,7 @@ export default function ExtensionPage() {
         </ul>
 
         <p className="text-sm font-medium text-crm-text-muted dark:text-gray-300 mb-2 pt-3 border-t border-green-200 dark:border-green-700">
-          También incluye lo corregido en la v1.3.1:
+          Y lo corregido en la v1.3.1:
         </p>
         <ul className="space-y-2 text-sm text-crm-text-muted dark:text-gray-400">
           <li className="flex items-start gap-2">
