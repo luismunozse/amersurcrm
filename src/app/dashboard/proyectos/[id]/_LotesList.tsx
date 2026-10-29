@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ArrowUp, ArrowDown, ArrowUpDown, Rows3, Rows2, AlignJustify, Presentation } from "lucide-react";
@@ -37,6 +37,7 @@ import LoteDetailModal from "./LoteDetailModal";
 import EstadoBadgeAuditoria from "./_EstadoBadgeAuditoria";
 import ModalReservaLote from "./ModalReservaLote";
 import { useLoteLocks } from "@/hooks/useLoteLocks";
+import { useLotesRealtime, aplicarCambioLote, type CambioLote } from "@/hooks/useLotesRealtime";
 import DeleteAllLotesModal from "./_DeleteAllLotesModal";
 import BulkImportLotesModal from "./_BulkImportLotesModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -103,6 +104,9 @@ interface LotesListProps {
 export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, masterplan, presentacionDto }: LotesListProps) {
   const [editingLote, setEditingLote] = useState<string | null>(null);
   const [lotesState, setLotesState] = useState<Lote[]>(lotes);
+  // Copia local de TODOS los lotes del plano, para que Realtime pueda
+  // repintar lotes que no están en la página actual de la lista.
+  const [lotesPlanoState, setLotesPlanoState] = useState<Lote[] | undefined>(lotesPlano);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
   const [reservandoLoteId, setReservandoLoteId] = useState<string | null>(null);
@@ -443,10 +447,49 @@ export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, m
   };
 
 
-  // Sincronizar estado cuando cambien los props
   useEffect(() => {
-    setLotesState(lotes);
-  }, [lotes]);
+    setLotesPlanoState(lotesPlano);
+  }, [lotesPlano]);
+
+  // ── Tiempo real: otro usuario reserva/vende/libera/edita un lote ──
+  const ESTADO_TEXTO: Record<Lote["estado"], string> = {
+    disponible: "disponible",
+    reservado: "reservado",
+    vendido: "vendido",
+  };
+  // Último estado conocido de cada lote, para avisar solo cuando cambia de
+  // verdad (los cambios propios ya se aplicaron de forma optimista y no
+  // generan aviso).
+  const estadoPorIdRef = useRef<Record<string, Lote["estado"]>>({});
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshDiferido = () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => router.refresh(), 600);
+  };
+  useEffect(() => () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+  }, []);
+
+  const conexionRealtime = useLotesRealtime(
+    proyectoId,
+    (cambio: CambioLote) => {
+      // Altas: la lista está paginada/ordenada en el server, se pide de nuevo.
+      if (cambio.tipo === "INSERT") {
+        refreshDiferido();
+        return;
+      }
+      if (cambio.tipo === "UPDATE" && cambio.lote.estado) {
+        const previo = estadoPorIdRef.current[cambio.lote.id];
+        if (previo && previo !== cambio.lote.estado) {
+          const codigo = cambio.lote.codigo ?? "";
+          toast.info(`Lote ${codigo} ahora está ${ESTADO_TEXTO[cambio.lote.estado]}`);
+        }
+      }
+      setLotesState((prev) => aplicarCambioLote(prev, cambio));
+      setLotesPlanoState((prev) => (prev ? aplicarCambioLote(prev, cambio) : prev));
+    },
+    { onResync: () => router.refresh() },
+  );
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -475,7 +518,7 @@ export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, m
   // pines del viewer y el texto del dropdown del editor, en vez de quedar
   // desactualizadas hasta el próximo refresh del server component.
   const lotesParaPlano = (() => {
-    const base = lotesPlano && lotesPlano.length > 0 ? lotesPlano : lotesAMostrar;
+    const base = lotesPlanoState && lotesPlanoState.length > 0 ? lotesPlanoState : lotesAMostrar;
     if (base === lotesAMostrar) return base;
     // `Map` está tomado por el ícono de lucide-react importado arriba: se usa
     // un record plano en su lugar (los ids de lote son strings).
@@ -488,6 +531,28 @@ export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, m
   // Admin price columns elsewhere in this list read from `lotesAMostrar`
   // directly and are untouched by this mapping.
   const lotesMarcados: PlanoLoteDTO[] = lotesParaPlano.map(toPlanoLoteDTO);
+
+  // Snapshot de estados para el aviso de Realtime (se lee dentro del callback).
+  useEffect(() => {
+    const estadosActuales: Record<string, Lote["estado"]> = {};
+    for (const l of lotesParaPlano) estadosActuales[l.id] = l.estado;
+    for (const l of lotesAMostrar) estadosActuales[l.id] = l.estado;
+    estadoPorIdRef.current = estadosActuales;
+  });
+
+  // El modo presentación también se repinta en vivo: se mantiene el DTO del
+  // server (imagen, dimensiones) y se toman estado/polígono del estado local.
+  const marcadosPorId: Record<string, PlanoLoteDTO> = {};
+  for (const l of lotesMarcados) marcadosPorId[l.id] = l;
+  const presentacionDtoEnVivo: PlanoPresentacionDTO | null = presentacionDto
+    ? {
+        ...presentacionDto,
+        lotes: presentacionDto.lotes.map((l) => {
+          const vivo = marcadosPorId[l.id];
+          return vivo ? { ...l, estado: vivo.estado, poly: vivo.poly } : l;
+        }),
+      }
+    : null;
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -765,6 +830,21 @@ export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, m
                   <Map className="w-4 h-4 text-crm-primary" />
                 </div>
                 Masterplan
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs font-normal text-crm-text-muted"
+                  title={
+                    conexionRealtime === "en_vivo"
+                      ? "Los cambios de otros usuarios se ven al instante"
+                      : "Conectando para recibir cambios en vivo…"
+                  }
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      conexionRealtime === "en_vivo" ? "bg-green-500" : "bg-amber-400 animate-pulse"
+                    }`}
+                  />
+                  {conexionRealtime === "en_vivo" ? "En vivo" : conexionRealtime === "reconectando" ? "Reconectando" : "Conectando"}
+                </span>
               </CardTitle>
               {showMasterplan ? (
                 <ChevronUp className="w-5 h-5 text-crm-text-muted flex-shrink-0" />
@@ -1443,7 +1523,7 @@ export default function LotesList({ proyectoId, lotes, lotesPlano, totalLotes, m
       </Card>
     </div>
     {modoPresentacion && (
-      <PlanoPresentacion dto={presentacionDto ?? null} onClose={() => setModoPresentacion(false)} />
+      <PlanoPresentacion dto={presentacionDtoEnVivo} onClose={() => setModoPresentacion(false)} />
     )}
     {/* Modal de edición de lote */}
     <LoteEditModal
